@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-VERSION="${VERSION:-1.2.18}"
+VERSION="${VERSION:-1.2.19}"
 DERIVED_DATA="$ROOT_DIR/build/DerivedDataRelease"
 SOURCE_PACKAGES="$ROOT_DIR/build/SourcePackages"
 DIST_DIR="$ROOT_DIR/dist/release-v$VERSION"
@@ -81,6 +81,18 @@ PKG_ROOT="$DIST_DIR/pkg-root"
 PKG_SCRIPTS="$DIST_DIR/pkg-scripts"
 mkdir -p "$PKG_ROOT/Applications" "$PKG_SCRIPTS"
 ditto "$APP_PATH" "$PKG_ROOT/Applications/Surge Relay.app"
+cat > "$PKG_SCRIPTS/preinstall" <<'SCRIPT'
+#!/bin/sh
+/usr/bin/osascript -e 'tell application id "com.allenmiao.SurgeRelay" to quit' >/dev/null 2>&1 || true
+for _ in 1 2 3 4 5; do
+  if ! /usr/bin/pgrep -x "Surge Relay" >/dev/null 2>&1; then
+    exit 0
+  fi
+  /bin/sleep 1
+done
+/usr/bin/pkill -x "Surge Relay" >/dev/null 2>&1 || true
+exit 0
+SCRIPT
 cat > "$PKG_SCRIPTS/postinstall" <<'SCRIPT'
 #!/bin/sh
 target_volume="${3:-/}"
@@ -92,7 +104,7 @@ fi
 /usr/bin/xattr -cr "$app_path" 2>/dev/null || true
 exit 0
 SCRIPT
-chmod 755 "$PKG_SCRIPTS/postinstall"
+chmod 755 "$PKG_SCRIPTS/preinstall" "$PKG_SCRIPTS/postinstall"
 
 PKG_PATH="$ARTIFACT_DIR/Surge-Relay-$VERSION.pkg"
 pkgbuild \

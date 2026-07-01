@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.19
+
+- pkg 更新包新增 `preinstall`，安装前会请求正在运行的 Surge Relay 退出，短暂等待后仍未退出时再兜底结束进程，降低运行中替换 App bundle 导致更新不完整的风险。
+- Release 验证会检查 pkg `preinstall` 是否存在、是否可执行，并确认包含退出旧 App 的逻辑。
+- `postinstall` 仍负责清理 `/Applications/Surge Relay.app` 的隔离属性，更新已有安装继续无需手动执行 `xattr -cr`。
+
 ## 1.2.18
 
 - 新增 `script/verify_github_release_assets.sh`，可直接校验 GitHub Release 线上资产列表、下载后的 sha256 sidecar、GitHub API digest 和包内结构。

@@ -311,6 +311,7 @@ verify_postinstall_clears_staged_quarantine() {
 verify_pkg() {
   local tmp_dir="$1/pkg"
   local payload_app
+  local preinstall
   local postinstall
   local signature_output
 
@@ -318,6 +319,14 @@ verify_pkg() {
   payload_app="$(find "$tmp_dir" -path "*/Applications/$APP_NAME.app" -type d -print -quit)"
   [[ -n "$payload_app" ]] || fail "pkg payload missing $APP_NAME.app"
   verify_app_bundle "$payload_app"
+
+  preinstall="$(find "$tmp_dir" -path "*/Scripts/preinstall" -type f -print -quit)"
+  [[ -n "$preinstall" ]] || fail "pkg missing preinstall script"
+  [[ -x "$preinstall" ]] || fail "pkg preinstall is not executable"
+  grep -Fq 'tell application id "com.allenmiao.SurgeRelay" to quit' "$preinstall" \
+    || fail "pkg preinstall does not request app quit"
+  grep -Fq '/usr/bin/pkill -x "Surge Relay"' "$preinstall" \
+    || fail "pkg preinstall does not stop running app before replacement"
 
   postinstall="$(find "$tmp_dir" -path "*/Scripts/postinstall" -type f -print -quit)"
   [[ -n "$postinstall" ]] || fail "pkg missing postinstall script"
@@ -330,7 +339,7 @@ verify_pkg() {
   if [[ "$PKG_SIGNATURE_MODE" == "unsigned" ]]; then
     assert_contains "pkg signature" "Status: no signature" "$signature_output"
   fi
-  ok "verified pkg payload and postinstall"
+  ok "verified pkg payload and install scripts"
 }
 
 verify_appcast() {
