@@ -118,8 +118,12 @@ let nameLookupTimer = null;
 let nameLookupSequence = 0;
 let autoFilledName = '';
 let manualNameEdited = false;
+let webAccessToken = '';
+let stateEvents = null;
+const webAccessTokenStorageKey = 'surgeRelay.webAccessToken';
 const mobileLayout = window.matchMedia('(max-width: 700px)');
 
+initializeAccessToken();
 initializeHistoryState();
 
 ui.advancedOptions.innerHTML = `<p class="advanced-intro">这些选项由 App 内置的 Script‑Hub 引擎执行，并随当前模块保存。留空即采用上游默认行为。</p>${advancedGroups.map(advancedGroupMarkup).join('')}`;
@@ -174,7 +178,11 @@ async function api(path, options = {}) {
   const headers = new Headers(options.headers || {});
   let body = options.body;
   if (options.json !== undefined) { headers.set('Content-Type', 'application/json'); body = JSON.stringify(options.json); }
+  if (webAccessToken) headers.set('Authorization', `Bearer ${webAccessToken}`);
   const response = await fetch(path, { method: options.method || 'GET', headers, body });
+  if (response.status === 401 && await promptForAccessToken()) {
+    return api(path, options);
+  }
   if (!response.ok) {
     let message = `请求失败（${response.status}）`;
     try { message = (await response.json()).message || message; } catch (_) {}
@@ -220,14 +228,56 @@ function startStateEvents() {
     setInterval(() => { if (!document.hidden) loadState(false, false); }, 5000);
     return;
   }
-  const events = new EventSource('/api/events');
-  events.addEventListener('state', event => {
+  if (stateEvents) stateEvents.close();
+  stateEvents = new EventSource(authenticatedPath('/api/events'));
+  stateEvents.addEventListener('state', event => {
     try { applyState(JSON.parse(event.data), false, false); }
     catch (_) { /* The next event contains a complete state snapshot. */ }
   });
-  events.onerror = () => {
-    if (!document.hidden) loadState(false, false);
+  stateEvents.onerror = () => {
+    stateEvents?.close();
+    stateEvents = null;
+    if (!document.hidden) {
+      loadState(false, false).finally(() => setTimeout(startStateEvents, 3000));
+    }
   };
+}
+
+function initializeAccessToken() {
+  const url = new URL(location.href);
+  const token = url.searchParams.get('token') || '';
+  webAccessToken = token || readStoredAccessToken();
+  if (token) {
+    storeAccessToken(token);
+    url.searchParams.delete('token');
+    history.replaceState(history.state, '', url);
+  }
+}
+
+function readStoredAccessToken() {
+  try { return sessionStorage.getItem(webAccessTokenStorageKey) || ''; }
+  catch (_) { return ''; }
+}
+
+function storeAccessToken(token) {
+  webAccessToken = token.trim();
+  try {
+    if (webAccessToken) sessionStorage.setItem(webAccessTokenStorageKey, webAccessToken);
+    else sessionStorage.removeItem(webAccessTokenStorageKey);
+  } catch (_) {}
+}
+
+async function promptForAccessToken() {
+  const token = window.prompt('请输入 Web 管理访问令牌');
+  if (!token) return false;
+  storeAccessToken(token);
+  return true;
+}
+
+function authenticatedPath(path) {
+  const url = new URL(path, location.href);
+  if (webAccessToken) url.searchParams.set('token', webAccessToken);
+  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 function patchLiveState(previous, next) {

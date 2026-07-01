@@ -3,6 +3,22 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.2.3</title>
+            <pubDate>Thu, 02 Jul 2026 02:21:00 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.2.3</link>
+            <sparkle:version>5</sparkle:version>
+            <sparkle:shortVersionString>1.2.3</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.2.3
+
+- Web 管理新增访问令牌，所有 `/api/*` 接口与实时事件流都需要通过令牌验证。
+- Web 管理默认仅允许本机访问；局域网访问需要在设置中显式开启。
+- 设置页提供带令牌的访问链接、二维码、拷贝按钮与重置令牌操作。
+- 访问令牌保存在 macOS 系统钥匙串；诊断报告不会导出令牌。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.2.3/Surge-Relay-1.2.3.pkg" length="7180948" type="application/octet-stream" sparkle:edSignature="1Dwi6uDxTjEpVMlqeOXGjQt1+6cmpzZ3CRCGbMoIw6jkhuV62vMU/wCEonKACRnRUKYVLTRKw/XDX8qdUQBjDg=="/>
+        </item>
+        <item>
             <title>1.2.2</title>
             <pubDate>Thu, 02 Jul 2026 01:58:00 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.2.2</link>

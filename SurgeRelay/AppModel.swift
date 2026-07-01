@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import Observation
+import Security
 
 @MainActor
 @Observable
@@ -15,6 +16,7 @@ final class AppModel {
     var statusMessage = "准备就绪"
     var presentedError: String?
     var githubToken: String
+    var webAccessToken: String
     var navigationRequest: SidebarDestination?
     /// Set to true to ask the main window to present the in-app settings sheet
     /// (used by the menu bar, the ⌘, command, and the toolbar gear button).
@@ -49,6 +51,11 @@ final class AppModel {
         var statusMessage: String?
     }
 
+    private struct WebAccessTokenLoadResult {
+        var token: String
+        var statusMessage: String?
+    }
+
     init() {
         var loadedSettings = PersistenceStore.loadSettings()
         if loadedSettings.github.owner.isEmpty { loadedSettings.github.owner = "EEliberto" }
@@ -60,15 +67,18 @@ final class AppModel {
             combinedFileName: loadedSettings.combinedModuleFileName
         )
         let tokenLoad = Self.loadGitHubToken(migratingLegacyToken: loadedSettings.githubToken)
+        let webTokenLoad = Self.loadWebAccessToken()
         loadedSettings.githubToken = tokenLoad.shouldClearLegacyToken ? "" : loadedSettings.githubToken
         modules = loadedModules
         settings = loadedSettings
         upstreamState = PersistenceStore.loadUpstreamState()
         updateHistory = PersistenceStore.loadUpdateHistory()
         githubToken = tokenLoad.token
+        webAccessToken = webTokenLoad.token
         selectedModuleID = Self.combinedModuleSelectionID
-        if let message = tokenLoad.statusMessage {
-            statusMessage = message
+        let startupMessages = [tokenLoad.statusMessage, webTokenLoad.statusMessage].compactMap { $0 }
+        if !startupMessages.isEmpty {
+            statusMessage = startupMessages.joined(separator: "；")
         }
         PersistenceStore.saveSettings(loadedSettings)
         try? PersistenceStore.saveModules(loadedModules)
@@ -104,6 +114,49 @@ final class AppModel {
                 statusMessage: "无法访问系统钥匙串，暂时沿用旧同步配置中的 GitHub Token"
             )
         }
+    }
+
+    private static func loadWebAccessToken() -> WebAccessTokenLoadResult {
+        do {
+            let storedToken = try KeychainStore.loadWebAccessToken()
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !storedToken.isEmpty {
+                return WebAccessTokenLoadResult(token: storedToken)
+            }
+            let token = generateWebAccessToken()
+            try KeychainStore.saveWebAccessToken(token)
+            return WebAccessTokenLoadResult(token: token)
+        } catch {
+            return WebAccessTokenLoadResult(
+                token: generateWebAccessToken(),
+                statusMessage: "无法访问系统钥匙串，Web 管理访问令牌仅在本次运行中有效"
+            )
+        }
+    }
+
+    private static func generateWebAccessToken() -> String {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        let status = bytes.withUnsafeMutableBytes { buffer in
+            SecRandomCopyBytes(kSecRandomDefault, buffer.count, buffer.baseAddress!)
+        }
+        if status == errSecSuccess {
+            return bytes.map { String(format: "%02x", $0) }.joined()
+        }
+        return UUID().uuidString.replacingOccurrences(of: "-", with: "")
+            + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+    }
+
+    func resetWebAccessToken() {
+        let token = Self.generateWebAccessToken()
+        webAccessToken = token
+        do {
+            try KeychainStore.saveWebAccessToken(token)
+            statusMessage = "Web 管理访问令牌已重置"
+        } catch {
+            presentedError = "无法保存 Web 管理访问令牌：\(error.localizedDescription)"
+            statusMessage = "Web 管理访问令牌仅在本次运行中有效"
+        }
+        applyWebServerSettings()
     }
 
     func start() {
@@ -180,7 +233,16 @@ final class AppModel {
             return
         }
 
-        let configuration = WebServerConfiguration(port: port)
+        if webAccessToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            webAccessToken = Self.generateWebAccessToken()
+            try? KeychainStore.saveWebAccessToken(webAccessToken)
+        }
+
+        let configuration = WebServerConfiguration(
+            port: port,
+            allowRemoteAccess: settings.webServerAllowRemoteAccess,
+            accessToken: webAccessToken
+        )
         do {
             try webServer.start(
                 configuration: configuration,
@@ -1051,9 +1113,22 @@ final class AppModel {
 
     var webManagementURL: URL? {
         guard settings.webServerEnabled else { return nil }
+        var components = URLComponents()
+        components.scheme = "http"
+        components.host = webManagementHost
+        components.port = settings.webServerPort
+        components.path = "/"
+        if !webAccessToken.isEmpty {
+            components.queryItems = [URLQueryItem(name: "token", value: webAccessToken)]
+        }
+        return components.url
+    }
+
+    private var webManagementHost: String {
+        guard settings.webServerAllowRemoteAccess else { return "127.0.0.1" }
         var host = ProcessInfo.processInfo.hostName.trimmingCharacters(in: CharacterSet(charactersIn: "."))
         if !host.contains(".") { host += ".local" }
-        return URL(string: "http://\(host):\(settings.webServerPort)/")
+        return host
     }
 
     func rawURL(for module: RelayModule) -> URL? {
@@ -1185,6 +1260,7 @@ final class AppModel {
             githubRepository: "\(settings.github.owner)/\(settings.github.repository)",
             webServerEnabled: settings.webServerEnabled,
             webServerPort: settings.webServerPort,
+            webServerAllowRemoteAccess: settings.webServerAllowRemoteAccess,
             modules: modules.map {
                 DiagnosticModuleSnapshot(
                     id: $0.id,

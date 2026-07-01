@@ -4,6 +4,7 @@ import Security
 enum KeychainStore {
     static let defaultService = "com.allenmiao.SurgeRelay"
     static let githubTokenAccount = "github-token"
+    static let webAccessTokenAccount = "web-management-token"
 
     static func loadGitHubToken() throws -> String {
         try readPassword(account: githubTokenAccount) ?? ""
@@ -15,6 +16,19 @@ enum KeychainStore {
             try deletePassword(account: githubTokenAccount)
         } else {
             try savePassword(value, account: githubTokenAccount)
+        }
+    }
+
+    static func loadWebAccessToken() throws -> String {
+        try readPassword(account: webAccessTokenAccount) ?? ""
+    }
+
+    static func saveWebAccessToken(_ token: String) throws {
+        let value = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.isEmpty {
+            try deletePassword(account: webAccessTokenAccount)
+        } else {
+            try savePassword(value, account: webAccessTokenAccount)
         }
     }
 
@@ -56,6 +70,7 @@ enum KeychainStore {
 
         var addQuery = query
         addQuery[kSecValueData as String] = data
+        addQuery[kSecAttrLabel as String] = label(for: account)
         let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
         guard addStatus == errSecSuccess else {
             throw KeychainStoreError(operation: "保存", status: addStatus)
@@ -76,9 +91,16 @@ enum KeychainStore {
         [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecAttrLabel as String: "Surge Relay GitHub Token"
+            kSecAttrAccount as String: account
         ]
+    }
+
+    private static func label(for account: String) -> String {
+        switch account {
+        case githubTokenAccount: "Surge Relay GitHub Token"
+        case webAccessTokenAccount: "Surge Relay Web Access Token"
+        default: "Surge Relay Password"
+        }
     }
 }
 

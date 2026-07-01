@@ -3,6 +3,8 @@ import Network
 
 struct WebServerConfiguration: Sendable {
     let port: UInt16
+    let allowRemoteAccess: Bool
+    let accessToken: String
 }
 
 enum WebServerRuntimeState: Equatable, Sendable {
@@ -86,6 +88,52 @@ struct WebHTTPResponse: Sendable {
         default: "Internal Server Error"
         }
         return .json(Payload(error: message, message: message), status: status, reason: reason)
+    }
+}
+
+enum WebRequestSecurity {
+    static func rejection(for request: WebHTTPRequest, configuration: WebServerConfiguration) -> WebHTTPResponse? {
+        if !configuration.allowRemoteAccess && !request.isLoopback {
+            return .error(status: 403, message: "Web 管理仅允许从本机访问。")
+        }
+        guard request.path.hasPrefix("/api/") else { return nil }
+        guard isAuthorized(request, configuration: configuration) else {
+            return .error(status: 401, message: "Web 管理访问令牌无效或缺失。")
+        }
+        return nil
+    }
+
+    static func isAuthorized(_ request: WebHTTPRequest, configuration: WebServerConfiguration) -> Bool {
+        let expected = configuration.accessToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !expected.isEmpty, let provided = accessToken(in: request) else { return false }
+        return timingSafeEqual(provided, expected)
+    }
+
+    private static func accessToken(in request: WebHTTPRequest) -> String? {
+        if let value = request.query["token"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !value.isEmpty {
+            return value
+        }
+        if let value = request.headers["x-surge-relay-token"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !value.isEmpty {
+            return value
+        }
+        guard let authorization = request.headers["authorization"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !authorization.isEmpty else { return nil }
+        if authorization.lowercased().hasPrefix("bearer ") {
+            return String(authorization.dropFirst("Bearer ".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return authorization
+    }
+
+    private static func timingSafeEqual(_ lhs: String, _ rhs: String) -> Bool {
+        let left = Array(lhs.utf8)
+        let right = Array(rhs.utf8)
+        var difference = left.count ^ right.count
+        for index in 0..<max(left.count, right.count) {
+            difference |= Int((index < left.count ? left[index] : 0) ^ (index < right.count ? right[index] : 0))
+        }
+        return difference == 0
     }
 }
 
@@ -200,13 +248,21 @@ final class WebManagementServer: @unchecked Sendable {
     }
 
     private func dispatch(_ request: WebHTTPRequest, over connection: NWConnection) {
+        guard let configuration = lock.withLock({ self.configuration }) else {
+            send(.error(status: 500, message: "Web 服务尚未就绪。"), over: connection)
+            return
+        }
+        if let rejection = WebRequestSecurity.rejection(for: request, configuration: configuration) {
+            send(rejection, over: connection)
+            return
+        }
+
         if request.method == "GET", request.path == "/api/events",
            let eventHandler = lock.withLock({ self.eventHandler }) {
             openEventStream(over: connection, eventHandler: eventHandler)
             return
         }
-        guard lock.withLock({ self.configuration }) != nil,
-              let requestHandler = lock.withLock({ self.requestHandler }) else {
+        guard let requestHandler = lock.withLock({ self.requestHandler }) else {
             send(.error(status: 500, message: "Web 服务尚未就绪。"), over: connection)
             return
         }

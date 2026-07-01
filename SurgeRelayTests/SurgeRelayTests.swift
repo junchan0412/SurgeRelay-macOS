@@ -518,10 +518,76 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertTrue(parsed.isLoopback)
     }
 
+    func testWebRequestSecurityAllowsLoopbackWithValidToken() {
+        let configuration = WebServerConfiguration(port: 8787, allowRemoteAccess: false, accessToken: "secret")
+        let request = WebHTTPRequest(
+            method: "GET",
+            path: "/api/state",
+            query: ["token": "secret"],
+            headers: [:],
+            body: Data(),
+            isLoopback: true
+        )
+
+        XCTAssertNil(WebRequestSecurity.rejection(for: request, configuration: configuration))
+    }
+
+    func testWebRequestSecurityRejectsMissingOrWrongToken() {
+        let configuration = WebServerConfiguration(port: 8787, allowRemoteAccess: true, accessToken: "secret")
+        let missing = WebHTTPRequest(
+            method: "GET",
+            path: "/api/state",
+            query: [:],
+            headers: [:],
+            body: Data(),
+            isLoopback: true
+        )
+        let wrong = WebHTTPRequest(
+            method: "GET",
+            path: "/api/state",
+            query: ["token": "wrong"],
+            headers: [:],
+            body: Data(),
+            isLoopback: true
+        )
+
+        XCTAssertEqual(WebRequestSecurity.rejection(for: missing, configuration: configuration)?.status, 401)
+        XCTAssertEqual(WebRequestSecurity.rejection(for: wrong, configuration: configuration)?.status, 401)
+    }
+
+    func testWebRequestSecurityRejectsRemoteWhenDisabled() {
+        let configuration = WebServerConfiguration(port: 8787, allowRemoteAccess: false, accessToken: "secret")
+        let request = WebHTTPRequest(
+            method: "GET",
+            path: "/api/state",
+            query: ["token": "secret"],
+            headers: [:],
+            body: Data(),
+            isLoopback: false
+        )
+
+        XCTAssertEqual(WebRequestSecurity.rejection(for: request, configuration: configuration)?.status, 403)
+    }
+
+    func testWebRequestSecurityAllowsRemoteWhenEnabledAndTokenMatchesHeader() {
+        let configuration = WebServerConfiguration(port: 8787, allowRemoteAccess: true, accessToken: "secret")
+        let request = WebHTTPRequest(
+            method: "POST",
+            path: "/api/update-all",
+            query: [:],
+            headers: ["authorization": "Bearer secret"],
+            body: Data(),
+            isLoopback: false
+        )
+
+        XCTAssertNil(WebRequestSecurity.rejection(for: request, configuration: configuration))
+    }
+
     func testAppSettingsDecodesWebManagementDefaults() throws {
         let settings = try JSONDecoder().decode(AppSettings.self, from: Data("{}".utf8))
         XCTAssertFalse(settings.webServerEnabled)
         XCTAssertEqual(settings.webServerPort, 8787)
+        XCTAssertFalse(settings.webServerAllowRemoteAccess)
     }
 
     func testMergerAddsSourceTogglesAndRemovesDeviceRestrictions() throws {

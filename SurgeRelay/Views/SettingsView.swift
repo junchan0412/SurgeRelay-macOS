@@ -85,15 +85,35 @@ struct SettingsView: View {
                         model.applyWebServerSettings()
                     }
                 }
+                Toggle("允许局域网访问", isOn: Binding(
+                    get: { model.settings.webServerAllowRemoteAccess },
+                    set: {
+                        model.settings.webServerAllowRemoteAccess = $0
+                        model.applyWebServerSettings()
+                    }
+                ))
+                .disabled(!model.settings.webServerEnabled)
                 if let url = model.webManagementURL {
-                    LabeledContent("Bonjour 地址") {
+                    LabeledContent(model.settings.webServerAllowRemoteAccess ? "局域网地址" : "本机地址") {
                         Text(url.absoluteString)
                             .foregroundStyle(.secondary)
                             .textSelection(.enabled)
                     }
                     HStack {
                         Button("打开", systemImage: "safari") { NSWorkspace.shared.open(url) }
+                        Button("拷贝", systemImage: "doc.on.doc") {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(url.absoluteString, forType: .string)
+                        }
                         Button("二维码", systemImage: "qrcode") { showsWebQRCode = true }
+                        Button("重置令牌", systemImage: "arrow.triangle.2.circlepath") {
+                            model.resetWebAccessToken()
+                        }
+                    }
+                    if model.settings.webServerAllowRemoteAccess {
+                        Label("局域网访问会暴露模块管理入口，请只在可信网络中启用。", systemImage: "lock.open.fill")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
                     }
                 }
             }
