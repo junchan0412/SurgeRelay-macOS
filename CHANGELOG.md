@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.4
+
+- 新增 `script/verify_release_assets.sh`，自动校验 Release 产物的 sha256、App 版本号、构建号、通用架构、ad-hoc 签名、pkg payload、postinstall 隔离属性清理脚本与 Sparkle EdDSA 签名。
+- `script/build_release_assets.sh` 在生成 `.app.zip`、`.pkg`、校验和与 Sparkle 签名后会自动执行发布产物校验。
+- Release 构建脚本支持通过 `SPARKLE_ED_KEY` 环境变量注入 Sparkle 私钥，便于 GitHub Actions 等 CI 环境生成签名元数据。
+- Release 构建脚本会在调用 Sparkle 签名前预检私钥来源，避免 Keychain 私钥缺失时长时间卡住；无私钥的预览构建需显式设置 `SKIP_SPARKLE_SIGNING=1 REQUIRE_SPARKLE_SIGNATURES=0`。
+- GitHub Actions 发布打包流程改为复用本地 Release 脚本，生成 `.app.zip`、`.pkg` 与 sha256 校验文件。
+- 发布 appcast 前可使用同一脚本加 `--appcast appcast.xml` 校验最新 Sparkle 条目的版本号、构建号、下载地址、包大小和 EdDSA 签名是否与实际 `.pkg` 一致。
+
 ## 1.2.3
 
 - Web 管理新增访问令牌，所有 `/api/*` 接口与实时事件流都需要通过令牌验证。
