@@ -46,14 +46,21 @@ actor ScriptHubClient {
     func convert(module: RelayModule, github: GitHubSettings? = nil) async throws -> ConversionResult {
         guard let sourceURL = URL(string: module.sourceURL) else { throw RelayError.invalidSourceURL }
         if module.sourceFormat.isNativeSurgeModule(for: sourceURL) {
-            var request = URLRequest(url: sourceURL, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: 60)
-            request.setValue("SurgeRelay/0.1", forHTTPHeaderField: "User-Agent")
-            let (data, response) = try await session.data(for: request)
-            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-            let content = String(data: data, encoding: .utf8) ?? ""
-            guard (200..<300).contains(status) else {
-                throw RelayError.httpFailure(status: status, message: String(content.prefix(240)))
+            let data: Data
+            if sourceURL.isFileURL {
+                data = try Data(contentsOf: sourceURL)
+            } else {
+                var request = URLRequest(url: sourceURL, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: 60)
+                request.setValue("SurgeRelay/0.1", forHTTPHeaderField: "User-Agent")
+                let (responseData, response) = try await session.data(for: request)
+                let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                guard (200..<300).contains(status) else {
+                    let body = String(data: responseData, encoding: .utf8) ?? ""
+                    throw RelayError.httpFailure(status: status, message: String(body.prefix(240)))
+                }
+                data = responseData
             }
+            let content = String(data: data, encoding: .utf8) ?? ""
             let namedContent = ModuleMetadataParser.applyingModuleMetadata(
                 name: module.name,
                 category: module.category,
@@ -152,8 +159,23 @@ actor SourceRevisionService {
     }
 
     func check(_ module: RelayModule) async throws -> SourceRevisionResult {
-        guard let url = URL(string: module.sourceURL),
-              ["http", "https"].contains(url.scheme?.lowercased()) else {
+        guard let url = URL(string: module.sourceURL) else {
+            throw RelayError.invalidSourceURL
+        }
+        if url.isFileURL {
+            let data = try Data(contentsOf: url)
+            guard !data.isEmpty, data.count <= 20 * 1024 * 1024 else {
+                throw RelayError.invalidOutput("来源文件为空或超过 20 MB。")
+            }
+            let snapshot = SourceRevisionSnapshot(
+                etag: nil,
+                lastModified: nil,
+                contentHash: data.sha256String,
+                checkedAt: .now
+            )
+            return snapshot.contentHash == module.sourceContentHash ? .unchanged(snapshot) : .changed(snapshot)
+        }
+        guard ["http", "https"].contains(url.scheme?.lowercased()) else {
             throw RelayError.invalidSourceURL
         }
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: 45)

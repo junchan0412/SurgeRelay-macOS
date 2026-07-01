@@ -208,6 +208,13 @@ struct ModulesView: View {
                             Label("更新全部", systemImage: "arrow.clockwise")
                         }
                         .disabled(model.modules.isEmpty || model.isWorking)
+                        Button {
+                            Task { await model.importExistingLocalModules() }
+                        } label: {
+                            Label("扫描本地模块", systemImage: "folder.badge.plus")
+                        }
+                        .disabled(model.isWorking)
+                        .help("扫描本地模块根目录下已有的 .sgmodule，并纳入 Surge Relay 管理")
                     }
                 }
             }

@@ -3,6 +3,24 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.2.1</title>
+            <pubDate>Thu, 02 Jul 2026 01:30:00 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.2.1</link>
+            <sparkle:version>3</sparkle:version>
+            <sparkle:shortVersionString>1.2.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.2.1
+
+- 新增“扫描本地模块”，可将根目录下已有 `.sgmodule` 按原文件夹纳入管理。
+- 支持本地 `file://` Surge 模块来源，统一参与启用、排序、编辑、汇总和发布。
+- Release 新增 `.pkg` 更新包，安装后自动清除 App 隔离属性，更新时不再需要手动执行 `xattr -cr`。
+- 切换到新的 Sparkle EdDSA 公钥，为后续版本的 App 内更新签名做准备。
+
+从 1.2.0 更新到 1.2.1 请优先使用 GitHub Release 中的 `.pkg` 安装包；旧版本的 Sparkle 私钥不可用，无法从 1.2.0 直接走可信 Sparkle 更新链路。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.2.1/Surge-Relay-1.2.1.pkg" length="7145431" type="application/octet-stream" sparkle:edSignature="mwLgt7IlELD5kFzZGdun1yE32Vro9EKbkiF9YalOun9Ke9+s9db82pzRhqL9GldUWlaeCcrboWWIpRh3wUAZBQ=="/>
+        </item>
+        <item>
             <title>1.1.0</title>
             <pubDate>Wed, 01 Jul 2026 16:35:44 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS</link>

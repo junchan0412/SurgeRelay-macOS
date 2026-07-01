@@ -3,6 +3,7 @@ Build/
 .build/
 .build-*/
 DerivedData/
+dist/
 *.profraw
 *.dmg
 *.pdf

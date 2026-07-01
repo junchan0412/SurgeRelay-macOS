@@ -36,6 +36,19 @@ final class SurgeRelayTests: XCTestCase {
         ))
     }
 
+    func testLocalFileSourceIsAcceptedForSurgeModules() {
+        var draft = ModuleDraft()
+        draft.name = "Local"
+        draft.sourceURL = URL(filePath: "/tmp/Local Demo.sgmodule").absoluteString
+        draft.sourceFormat = .automatic
+
+        XCTAssertNil(draft.validationMessage)
+        XCTAssertTrue(ModuleSourceIdentity.matches(
+            draft.sourceURL,
+            URL(filePath: "/tmp/./Local Demo.sgmodule").standardizedFileURL.absoluteString
+        ))
+    }
+
     func testModuleOutputFolderBuildsRelativePaths() {
         XCTAssertEqual(ModuleOutputFolder.normalized(" /Ads/Video/ "), "Ads/Video")
         XCTAssertEqual(ModuleOutputFolder.normalized("../Ads"), "Ads")
@@ -310,6 +323,68 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertTrue(result.contains("#!category=Ads"))
         XCTAssertFalse(result.contains("#!category=Old"))
         XCTAssertEqual(ModuleMetadataParser.applyingCategory("", to: content), content)
+    }
+
+    func testModuleMetadataParserReadsCategory() {
+        XCTAssertEqual(ModuleMetadataParser.category(in: "#!category = 'Ads'\n[General]"), "Ads")
+        XCTAssertNil(ModuleMetadataParser.category(in: "#!name=Demo\n[General]"))
+    }
+
+    func testLocalModuleScannerDiscoversExistingModules() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(
+            at: root.appending(path: "Ads", directoryHint: .isDirectory),
+            withIntermediateDirectories: true
+        )
+        try Data("""
+        #!name=YouTube
+        #!category=Video
+        [General]
+        """.utf8).write(to: root.appending(path: "Ads/YouTube.sgmodule"))
+        try Data("#!name=Combined\n[General]\n".utf8).write(to: root.appending(path: "Surge-Relay.sgmodule"))
+
+        let candidates = try LocalModuleScanner.candidates(
+            in: root.path,
+            combinedFileName: "Surge Relay",
+            existingModules: [],
+            publishedFilePaths: []
+        )
+
+        XCTAssertEqual(candidates.count, 1)
+        XCTAssertEqual(candidates[0].relativePath, "Ads/YouTube.sgmodule")
+        XCTAssertEqual(candidates[0].name, "YouTube")
+        XCTAssertEqual(candidates[0].category, "Video")
+        XCTAssertEqual(candidates[0].outputFolder, "Ads")
+        XCTAssertEqual(candidates[0].outputFileName, "YouTube.sgmodule")
+    }
+
+    func testScriptHubClientConvertsLocalSurgeModule() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let file = root.appending(path: "Local.sgmodule")
+        try Data("""
+        #!name=Original
+        [General]
+        loglevel = notify
+        """.utf8).write(to: file)
+        let module = RelayModule(
+            name: "Managed",
+            sourceURL: file.absoluteString,
+            sourceFormat: .surge,
+            outputFileName: "Local",
+            category: "Imported"
+        )
+
+        let result = try await ScriptHubClient().convert(module: module)
+
+        XCTAssertEqual(result.requestURL, file)
+        XCTAssertTrue(result.content.contains("#!name=Managed"))
+        XCTAssertTrue(result.content.contains("#!category=Imported"))
+        XCTAssertTrue(result.content.contains("loglevel = notify"))
     }
 
     func testGitBlobHashMatchesGitHubContentSHA() {

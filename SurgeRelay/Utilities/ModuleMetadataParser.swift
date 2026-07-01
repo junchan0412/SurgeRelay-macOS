@@ -32,6 +32,17 @@ enum ModuleMetadataParser {
         return value.isEmpty ? nil : value
     }
 
+    static func category(in content: String) -> String? {
+        let pattern = #"(?im)^\s*#!\s*category\s*=\s*(.+?)\s*$"#
+        guard let expression = try? NSRegularExpression(pattern: pattern),
+              let match = expression.firstMatch(in: content, range: NSRange(content.startIndex..., in: content)),
+              let range = Range(match.range(at: 1), in: content) else { return nil }
+        let value = String(content[range])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+        return value.isEmpty ? nil : value
+    }
+
     static func applyingDisplayName(_ name: String, to content: String) -> String {
         let normalized = content.replacingOccurrences(of: "\r\n", with: "\n")
         let line = "#!name=\(name.trimmingCharacters(in: .whitespacesAndNewlines))"

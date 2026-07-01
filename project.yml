@@ -9,8 +9,8 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     MACOSX_DEPLOYMENT_TARGET: "26.0"
-    CURRENT_PROJECT_VERSION: 2
-    MARKETING_VERSION: 1.2.0
+    CURRENT_PROJECT_VERSION: 3
+    MARKETING_VERSION: 1.2.1
     CODE_SIGN_STYLE: Automatic
     ENABLE_USER_SCRIPT_SANDBOXING: YES
 packages:
@@ -32,7 +32,7 @@ targets:
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
         SUFeedURL: https://raw.githubusercontent.com/junchan0412/SurgeRelay-macOS/main/appcast.xml
-        SUPublicEDKey: FEcOaL+hwqoGMoia0HFa+ejmGKDUH/NNyyUDf9kEOBQ=
+        SUPublicEDKey: 3JG2u2H9qhvB178FpLAnhTE8MEs5ng4CrEaDosYUWvM=
         SUEnableAutomaticChecks: true
     sources:
       - path: SurgeRelay

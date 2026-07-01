@@ -3,6 +3,9 @@ import Foundation
 enum ModuleSourceIdentity {
     static func canonicalValue(for source: String) -> String {
         let trimmed = source.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let url = URL(string: trimmed), url.isFileURL {
+            return url.standardizedFileURL.absoluteString
+        }
         guard var components = URLComponents(string: trimmed) else { return trimmed }
 
         components.scheme = components.scheme?.lowercased()
@@ -292,8 +295,17 @@ struct ModuleDraft: Sendable {
 
     var validationMessage: String? {
         if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "请输入模块名称。" }
-        guard let url = URL(string: sourceURL), ["http", "https"].contains(url.scheme?.lowercased()) else {
-            return "请输入有效的 HTTP 或 HTTPS 来源地址。"
+        guard let url = URL(string: sourceURL) else {
+            return "请输入有效的 HTTP、HTTPS 或本地文件来源地址。"
+        }
+        if url.isFileURL {
+            guard sourceFormat.isNativeSurgeModule(for: url) else {
+                return "本地文件来源仅支持 Surge .sgmodule。"
+            }
+            return nil
+        }
+        guard ["http", "https"].contains(url.scheme?.lowercased()) else {
+            return "请输入有效的 HTTP、HTTPS 或本地文件来源地址。"
         }
         return nil
     }

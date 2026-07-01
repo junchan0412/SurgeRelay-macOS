@@ -192,6 +192,83 @@ final class AppModel {
         if settings.storageMode == .local { Task { await rebuildCombinedFromCache() } }
     }
 
+    func importExistingLocalModules() async {
+        guard !isWorking else { return }
+        isWorking = true
+        statusMessage = "正在扫描本地模块根目录…"
+        defer { isWorking = false }
+
+        do {
+            let candidates = try LocalModuleScanner.candidates(
+                in: settings.localModuleDirectory,
+                combinedFileName: settings.combinedModuleFileName,
+                existingModules: modules,
+                publishedFilePaths: settings.localPublishedFilePaths
+            )
+            guard !candidates.isEmpty else {
+                statusMessage = "未发现可导入的新本地模块"
+                return
+            }
+
+            registerLocalChange()
+            var imported: [RelayModule] = []
+            var failures: [String] = []
+            for candidate in candidates {
+                var module = RelayModule(
+                    name: candidate.name,
+                    sourceURL: candidate.sourceURL,
+                    sourceFormat: .surge,
+                    outputFileName: candidate.outputFileName,
+                    category: candidate.category,
+                    outputFolder: candidate.outputFolder,
+                    isEnabled: true,
+                    detectedSourceFormat: .surge,
+                    sourceContentHash: candidate.sourceContentHash,
+                    sourceCheckedAt: .now
+                )
+                do {
+                    let result = try await scriptHubClient.convert(
+                        module: module,
+                        github: settings.github.isConfigured ? settings.github : nil
+                    )
+                    try await fileStore.writeComponent(result.content, id: module.id)
+                    let fingerprint = await processingWorker.contentFingerprint(
+                        of: result.content,
+                        assets: result.assets
+                    )
+                    module.contentHash = fingerprint
+                    module.lastUpdatedAt = .now
+                    module.state = .current
+                    module.lastError = nil
+                    imported.append(module)
+                } catch {
+                    failures.append("\(candidate.relativePath)：\(error.localizedDescription)")
+                }
+            }
+
+            guard !imported.isEmpty else {
+                statusMessage = "本地模块扫描完成，但没有可导入项目"
+                if !failures.isEmpty {
+                    presentedError = "以下本地模块无法导入：\n\(failures.joined(separator: "\n"))"
+                }
+                return
+            }
+
+            modules.append(contentsOf: imported)
+            selectedModuleID = imported.first?.id
+            try persistModules()
+            await rebuildCombinedFromCache()
+            let failureSuffix = failures.isEmpty ? "" : "；\(failures.count) 个文件无法导入"
+            statusMessage = "已导入 \(imported.count) 个本地模块\(failureSuffix)"
+            if !failures.isEmpty {
+                presentedError = "部分本地模块无法导入：\n\(failures.joined(separator: "\n"))"
+            }
+        } catch {
+            presentedError = "扫描本地模块失败：\(error.localizedDescription)"
+            statusMessage = "本地模块扫描失败"
+        }
+    }
+
     func moduleOutputFolderOptions(preserving selected: String? = nil) -> [String] {
         let configuredFolders = settings.storageMode == .local
             ? localModuleOutputFolders()
@@ -1162,34 +1239,156 @@ final class AppModel {
             ? FilenameSanitizer.suggestedName(from: source)
             : draft.name
         let normalized = FilenameSanitizer.sgmoduleName(from: preferred)
+        let folder = ModuleOutputFolder.normalized(draft.outputFolder)
+        let combined = ModuleOutputFolder.relativePath(
+            fileName: settings.combinedModuleFileName,
+            folder: ModuleOutputFolder.root
+        ).lowercased()
         let unavailable = Set(modules.compactMap { module -> String? in
-            module.id == excludedID ? nil : module.outputFileName.lowercased()
-        } + [FilenameSanitizer.sgmoduleName(from: settings.combinedModuleFileName).lowercased()])
-        guard unavailable.contains(normalized.lowercased()) else { return normalized }
+            module.id == excludedID ? nil : module.publishedRelativePath.lowercased()
+        } + [combined])
+        var relativePath = ModuleOutputFolder.relativePath(fileName: normalized, folder: folder)
+        guard unavailable.contains(relativePath.lowercased()) else { return normalized }
 
         let base = FilenameSanitizer.baseName(from: normalized)
         var suffix = 2
-        while unavailable.contains("\(base)-\(suffix).sgmodule".lowercased()) { suffix += 1 }
+        repeat {
+            relativePath = ModuleOutputFolder.relativePath(fileName: "\(base)-\(suffix).sgmodule", folder: folder)
+            if unavailable.contains(relativePath.lowercased()) { suffix += 1 } else { break }
+        } while true
         return "\(base)-\(suffix).sgmodule"
     }
 
     private static func normalizedModuleNaming(_ modules: [RelayModule], combinedFileName: String) -> [RelayModule] {
         var used = Set<String>()
-        let combined = FilenameSanitizer.sgmoduleName(from: combinedFileName)
+        let combined = ModuleOutputFolder.relativePath(
+            fileName: combinedFileName,
+            folder: ModuleOutputFolder.root
+        ).lowercased()
         return modules.map { value in
             var module = value
-            let preferred = FilenameSanitizer.sgmoduleName(from: module.name)
+            module.outputFolder = ModuleOutputFolder.normalized(module.outputFolder)
+            let preferred = FilenameSanitizer.sgmoduleName(
+                from: module.outputFileName.isEmpty ? module.name : module.outputFileName
+            )
             let base = FilenameSanitizer.baseName(from: preferred)
             var candidate = preferred
             var suffix = 2
-            while used.contains(candidate.lowercased()) || candidate.caseInsensitiveCompare(combined) == .orderedSame {
+            var relative = ModuleOutputFolder.relativePath(fileName: candidate, folder: module.outputFolder)
+            while used.contains(relative.lowercased()) || relative.lowercased() == combined {
                 candidate = "\(base)-\(suffix).sgmodule"
+                relative = ModuleOutputFolder.relativePath(fileName: candidate, folder: module.outputFolder)
                 suffix += 1
             }
-            used.insert(candidate.lowercased())
+            used.insert(relative.lowercased())
             module.outputFileName = candidate
             return module
         }
     }
 
+}
+
+struct LocalModuleScanCandidate: Hashable, Sendable {
+    var relativePath: String
+    var sourceURL: String
+    var name: String
+    var outputFileName: String
+    var category: String
+    var outputFolder: String
+    var sourceContentHash: String
+}
+
+enum LocalModuleScanner {
+    static func candidates(
+        in rootDirectoryPath: String,
+        combinedFileName: String,
+        existingModules: [RelayModule],
+        publishedFilePaths: [String]
+    ) throws -> [LocalModuleScanCandidate] {
+        let trimmedPath = rootDirectoryPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedPath.isEmpty else {
+            throw RelayError.invalidOutput("请先设置本地模块根目录。")
+        }
+
+        let root = URL(filePath: trimmedPath, directoryHint: .isDirectory).standardizedFileURL
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: root.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+            throw RelayError.invalidOutput("本地模块根目录不存在。")
+        }
+
+        let combined = ModuleOutputFolder.relativePath(
+            fileName: combinedFileName,
+            folder: ModuleOutputFolder.root
+        ).lowercased()
+        var existingSources = Set(existingModules.map { ModuleSourceIdentity.canonicalValue(for: $0.sourceURL) })
+        var existingPaths = Set(existingModules.map { $0.publishedRelativePath.lowercased() })
+        existingPaths.formUnion(publishedFilePaths.map { ModuleOutputFolder.normalized($0).lowercased() })
+        existingPaths.insert(combined)
+
+        guard let enumerator = FileManager.default.enumerator(
+            at: root,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else { return [] }
+
+        var values: [LocalModuleScanCandidate] = []
+        var seenPaths = Set<String>()
+        for case let fileURL as URL in enumerator {
+            let standardizedURL = fileURL.standardizedFileURL
+            guard standardizedURL.pathExtension.lowercased() == "sgmodule",
+                  (try? standardizedURL.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else {
+                continue
+            }
+            guard let relativePath = relativePath(for: standardizedURL, root: root) else { continue }
+            let normalizedRelativePath = normalizeRelativePath(relativePath)
+            let relativeKey = normalizedRelativePath.lowercased()
+            guard relativeKey != combined,
+                  !existingPaths.contains(relativeKey),
+                  seenPaths.insert(relativeKey).inserted else {
+                continue
+            }
+
+            let sourceURL = standardizedURL.absoluteString
+            let sourceKey = ModuleSourceIdentity.canonicalValue(for: sourceURL)
+            guard existingSources.insert(sourceKey).inserted else { continue }
+
+            let data = try Data(contentsOf: standardizedURL)
+            guard !data.isEmpty, data.count <= 20 * 1024 * 1024,
+                  let content = String(data: data, encoding: .utf8) else {
+                continue
+            }
+            let components = normalizedRelativePath.split(separator: "/").map(String.init)
+            let outputFileName = components.last ?? standardizedURL.lastPathComponent
+            let outputFolder = components.dropLast().joined(separator: "/")
+            let fallbackName = FilenameSanitizer.baseName(from: outputFileName)
+                .replacingOccurrences(of: "-", with: " ")
+            values.append(LocalModuleScanCandidate(
+                relativePath: normalizedRelativePath,
+                sourceURL: sourceURL,
+                name: ModuleMetadataParser.displayName(in: content) ?? fallbackName,
+                outputFileName: FilenameSanitizer.sgmoduleName(from: outputFileName),
+                category: ModuleMetadataParser.category(in: content) ?? "",
+                outputFolder: ModuleOutputFolder.normalized(outputFolder),
+                sourceContentHash: data.sha256String
+            ))
+        }
+
+        return values.sorted { lhs, rhs in
+            lhs.relativePath.localizedStandardCompare(rhs.relativePath) == .orderedAscending
+        }
+    }
+
+    private static func relativePath(for fileURL: URL, root: URL) -> String? {
+        let rootPath = root.path.hasSuffix("/") ? root.path : root.path + "/"
+        guard fileURL.path.hasPrefix(rootPath) else { return nil }
+        return String(fileURL.path.dropFirst(rootPath.count))
+    }
+
+    private static func normalizeRelativePath(_ path: String) -> String {
+        path.replacingOccurrences(of: "\\", with: "/")
+            .split(separator: "/")
+            .map(String.init)
+            .filter { !$0.isEmpty && $0 != "." && $0 != ".." }
+            .joined(separator: "/")
+    }
 }
