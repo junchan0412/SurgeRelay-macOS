@@ -180,6 +180,7 @@ struct SettingsView: View {
                 SecureField("GitHub Token", text: $model.githubToken)
                 HStack(spacing: 8) {
                     Button("保存") { model.saveGitHubToken() }
+                        .help("GitHub Token 会保存在系统钥匙串")
                     Button("测试连接") {
                         Task {
                             isTesting = true

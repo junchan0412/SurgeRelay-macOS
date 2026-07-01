@@ -3,6 +3,22 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.2.2</title>
+            <pubDate>Thu, 02 Jul 2026 01:58:00 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.2.2</link>
+            <sparkle:version>4</sparkle:version>
+            <sparkle:shortVersionString>1.2.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.2.2
+
+- GitHub Token 改为保存到 macOS 系统钥匙串，不再写入 iCloud 同步配置文件。
+- 旧版 `settings.json` 中已有的 GitHub Token 会在启动时自动迁移；迁移成功后同步配置中的旧字段会被清空。
+- 如果钥匙串暂时不可用，App 会暂时沿用旧配置中的 Token，避免升级后丢失凭据。
+- 设置页更新 GitHub Token 保存提示，并补充钥匙串读写回归测试。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.2.2/Surge-Relay-1.2.2.pkg" length="7157543" type="application/octet-stream" sparkle:edSignature="sWFjGvH0h6bLMBoNVswUG605OmRTMEpcyX7wmhod00g6nV/gKmCxKfjq5fANRjTt5TJ/inMjYdD9su1gmN7WDg=="/>
+        </item>
+        <item>
             <title>1.2.1</title>
             <pubDate>Thu, 02 Jul 2026 01:30:00 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.2.1</link>

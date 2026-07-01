@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-VERSION="${VERSION:-1.2.1}"
+VERSION="${VERSION:-1.2.2}"
 DERIVED_DATA="$ROOT_DIR/build/DerivedDataRelease"
 SOURCE_PACKAGES="$ROOT_DIR/build/SourcePackages"
 DIST_DIR="$ROOT_DIR/dist/release-v$VERSION"

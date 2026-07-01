@@ -43,6 +43,12 @@ final class AppModel {
     @ObservationIgnored private var githubModuleOutputFoldersLastRefreshedAt: Date?
     @ObservationIgnored private var githubModuleOutputFoldersConfiguration: GitHubSettings?
 
+    private struct GitHubTokenLoadResult {
+        var token: String
+        var shouldClearLegacyToken: Bool
+        var statusMessage: String?
+    }
+
     init() {
         var loadedSettings = PersistenceStore.loadSettings()
         if loadedSettings.github.owner.isEmpty { loadedSettings.github.owner = "EEliberto" }
@@ -53,14 +59,51 @@ final class AppModel {
             PersistenceStore.loadModules(),
             combinedFileName: loadedSettings.combinedModuleFileName
         )
+        let tokenLoad = Self.loadGitHubToken(migratingLegacyToken: loadedSettings.githubToken)
+        loadedSettings.githubToken = tokenLoad.shouldClearLegacyToken ? "" : loadedSettings.githubToken
         modules = loadedModules
         settings = loadedSettings
         upstreamState = PersistenceStore.loadUpstreamState()
         updateHistory = PersistenceStore.loadUpdateHistory()
-        githubToken = loadedSettings.githubToken
+        githubToken = tokenLoad.token
         selectedModuleID = Self.combinedModuleSelectionID
+        if let message = tokenLoad.statusMessage {
+            statusMessage = message
+        }
         PersistenceStore.saveSettings(loadedSettings)
         try? PersistenceStore.saveModules(loadedModules)
+    }
+
+    private static func loadGitHubToken(migratingLegacyToken legacyToken: String) -> GitHubTokenLoadResult {
+        let legacyToken = legacyToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        do {
+            let storedToken = try KeychainStore.loadGitHubToken()
+            if !storedToken.isEmpty {
+                return GitHubTokenLoadResult(
+                    token: storedToken,
+                    shouldClearLegacyToken: true,
+                    statusMessage: legacyToken.isEmpty ? nil : "GitHub Token 已改由系统钥匙串管理"
+                )
+            }
+            guard !legacyToken.isEmpty else {
+                return GitHubTokenLoadResult(token: "", shouldClearLegacyToken: true)
+            }
+            try KeychainStore.saveGitHubToken(legacyToken)
+            return GitHubTokenLoadResult(
+                token: legacyToken,
+                shouldClearLegacyToken: true,
+                statusMessage: "GitHub Token 已从同步配置迁移到系统钥匙串"
+            )
+        } catch {
+            guard !legacyToken.isEmpty else {
+                return GitHubTokenLoadResult(token: "", shouldClearLegacyToken: false)
+            }
+            return GitHubTokenLoadResult(
+                token: legacyToken,
+                shouldClearLegacyToken: false,
+                statusMessage: "无法访问系统钥匙串，暂时沿用旧同步配置中的 GitHub Token"
+            )
+        }
     }
 
     func start() {
@@ -105,7 +148,6 @@ final class AppModel {
     }
 
     func saveSettings() {
-        settings.githubToken = githubToken.trimmingCharacters(in: .whitespacesAndNewlines)
         if !settings.automaticallyPublish {
             automaticPublishTask?.cancel()
         }
@@ -114,9 +156,15 @@ final class AppModel {
 
     func saveGitHubToken() {
         githubToken = githubToken.trimmingCharacters(in: .whitespacesAndNewlines)
-        settings.githubToken = githubToken
-        PersistenceStore.saveSettings(settings)
-        statusMessage = githubToken.isEmpty ? "GitHub Token 已从同步配置移除" : "GitHub Token 已保存到 iCloud 配置"
+        do {
+            try KeychainStore.saveGitHubToken(githubToken)
+            settings.githubToken = ""
+            PersistenceStore.saveSettings(settings)
+            statusMessage = githubToken.isEmpty ? "GitHub Token 已从系统钥匙串移除" : "GitHub Token 已保存到系统钥匙串"
+        } catch {
+            presentedError = "无法保存 GitHub Token：\(error.localizedDescription)"
+            statusMessage = "GitHub Token 未保存"
+        }
     }
 
     func applyWebServerSettings(persist: Bool = true) {

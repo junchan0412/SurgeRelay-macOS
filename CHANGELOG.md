@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.2
+
+- GitHub Token 改为保存到 macOS 系统钥匙串，避免继续写入 iCloud 同步配置文件。
+- 启动时会自动迁移旧版 `settings.json` 中的 GitHub Token；迁移成功后同步配置中的旧字段会被清空。
+- 如果钥匙串暂时不可用，App 会暂时沿用旧配置中的 Token，避免升级后丢失凭据。
+- 设置页更新 GitHub Token 保存提示，并补充钥匙串读写回归测试。
+
 ## 1.2.1
 
 - 新增“扫描本地模块”：递归扫描本地模块根目录下已有 `.sgmodule`，读取 `#!name` 与 `#!category`，并按原文件夹纳入 Surge Relay 管理。

@@ -1,3 +1,4 @@
+import Security
 import XCTest
 @testable import SurgeRelay
 
@@ -164,6 +165,32 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertTrue(settings.localPublishedFilePaths.isEmpty)
         XCTAssertNil(settings.githubPublishedRepositoryKey)
         XCTAssertTrue(settings.githubPublishedFilePaths.isEmpty)
+    }
+
+    func testSettingsStillDecodesLegacyGitHubTokenForMigration() throws {
+        let data = Data(#"{"githubToken":"ghp_legacy","github":{"owner":"someone","repository":"relay","branch":"main","directory":"modules"}}"#.utf8)
+        let settings = try JSONDecoder().decode(AppSettings.self, from: data)
+
+        XCTAssertEqual(settings.githubToken, "ghp_legacy")
+    }
+
+    func testKeychainStoreRoundTripsPasswordWithCustomService() throws {
+        let service = "com.allenmiao.SurgeRelayTests.\(UUID().uuidString)"
+        let account = "github-token"
+        defer { try? KeychainStore.deletePassword(account: account, service: service) }
+
+        do {
+            XCTAssertNil(try KeychainStore.readPassword(account: account, service: service))
+            try KeychainStore.savePassword("ghp_first", account: account, service: service)
+            XCTAssertEqual(try KeychainStore.readPassword(account: account, service: service), "ghp_first")
+            try KeychainStore.savePassword("ghp_second", account: account, service: service)
+            XCTAssertEqual(try KeychainStore.readPassword(account: account, service: service), "ghp_second")
+            try KeychainStore.deletePassword(account: account, service: service)
+            XCTAssertNil(try KeychainStore.readPassword(account: account, service: service))
+        } catch let error as KeychainStoreError
+            where [errSecNotAvailable, errSecInteractionNotAllowed, errSecAuthFailed].contains(error.status) {
+            throw XCTSkip("Keychain is unavailable in this test environment: \(error.localizedDescription)")
+        }
     }
 
     func testStorageModeSelectsOnlyItsOwnCombinedOutput() throws {
