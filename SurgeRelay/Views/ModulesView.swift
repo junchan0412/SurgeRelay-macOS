@@ -466,19 +466,28 @@ private struct ModuleEditorRoute: Identifiable {
 private struct LocalModuleImportPreviewView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    let candidates: [LocalModuleScanCandidate]
     @Binding var selectedCandidateIDs: Set<String>
+    @State private var candidates: [LocalModuleScanCandidate]
     @State private var isImporting = false
+
+    init(candidates: [LocalModuleScanCandidate], selectedCandidateIDs: Binding<Set<String>>) {
+        _candidates = State(initialValue: candidates)
+        _selectedCandidateIDs = selectedCandidateIDs
+    }
 
     private var selectedCandidates: [LocalModuleScanCandidate] {
         candidates.filter { selectedCandidateIDs.contains($0.id) }
+    }
+
+    private var hasInvalidSelection: Bool {
+        selectedCandidates.contains { $0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("导入本地模块").font(.title2.bold())
-                Text("确认要纳入 Surge Relay 管理的 `.sgmodule` 文件。")
+                Text("确认要纳入 Surge Relay 管理的 `.sgmodule` 文件，可先调整名称、标签和存放文件夹。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -487,31 +496,10 @@ private struct LocalModuleImportPreviewView: View {
 
             Divider()
 
-            List(candidates) { candidate in
-                Toggle(isOn: selectionBinding(for: candidate)) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(candidate.name)
-                            .fontWeight(.medium)
-                            .lineLimit(1)
-                        Text(candidate.relativePath)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                        HStack(spacing: 12) {
-                            Label(
-                                ModuleOutputFolder.displayTitle(for: candidate.outputFolder),
-                                systemImage: "folder"
-                            )
-                            if !candidate.category.isEmpty {
-                                Label(candidate.category, systemImage: "tag")
-                            }
-                        }
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                    }
+            List {
+                ForEach(candidates.indices, id: \.self) { index in
+                    importCandidateRow(index: index)
                 }
-                .toggleStyle(.checkbox)
-                .padding(.vertical, 5)
             }
             .frame(minHeight: 300)
 
@@ -525,37 +513,103 @@ private struct LocalModuleImportPreviewView: View {
                     selectedCandidateIDs.removeAll()
                 }
                 Spacer()
-                Text("已选择 \(selectedCandidates.count) / \(candidates.count)")
+                Text(hasInvalidSelection ? "已选择项需要填写名称" : "已选择 \(selectedCandidates.count) / \(candidates.count)")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(hasInvalidSelection ? .red : .secondary)
                 Button("取消", role: .cancel) { dismiss() }
                 Button("导入") {
                     Task { await importSelectedCandidates() }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(selectedCandidates.isEmpty || isImporting || model.isWorking)
+                .disabled(selectedCandidates.isEmpty || hasInvalidSelection || isImporting || model.isWorking)
             }
             .padding(20)
         }
-        .frame(width: 720, height: 520)
+        .frame(width: 780, height: 560)
     }
 
-    private func selectionBinding(for candidate: LocalModuleScanCandidate) -> Binding<Bool> {
+    private func importCandidateRow(index: Int) -> some View {
+        let candidate = candidates[index]
+        return HStack(alignment: .top, spacing: 12) {
+            Toggle("", isOn: selectionBinding(forID: candidate.id))
+                .labelsHidden()
+                .toggleStyle(.checkbox)
+                .padding(.top, 5)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text(candidate.relativePath)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+
+                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
+                    GridRow {
+                        Text("名称")
+                            .foregroundStyle(.secondary)
+                        TextField("模块名称", text: textBinding(index: index, keyPath: \.name))
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    GridRow {
+                        Text("标签")
+                            .foregroundStyle(.secondary)
+                        TextField("Surge category", text: textBinding(index: index, keyPath: \.category))
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    GridRow {
+                        Text("文件夹")
+                            .foregroundStyle(.secondary)
+                        Picker("", selection: outputFolderBinding(index: index)) {
+                            ForEach(outputFolderOptions(preserving: candidate.outputFolder), id: \.self) { folder in
+                                Text(ModuleOutputFolder.displayTitle(for: folder)).tag(folder)
+                            }
+                        }
+                        .labelsHidden()
+                    }
+                }
+                .font(.callout)
+            }
+        }
+        .padding(.vertical, 7)
+        .opacity(selectedCandidateIDs.contains(candidate.id) ? 1 : 0.55)
+    }
+
+    private func selectionBinding(forID id: String) -> Binding<Bool> {
         Binding(
-            get: { selectedCandidateIDs.contains(candidate.id) },
+            get: { selectedCandidateIDs.contains(id) },
             set: { isSelected in
                 if isSelected {
-                    selectedCandidateIDs.insert(candidate.id)
+                    selectedCandidateIDs.insert(id)
                 } else {
-                    selectedCandidateIDs.remove(candidate.id)
+                    selectedCandidateIDs.remove(id)
                 }
             }
         )
     }
 
+    private func textBinding(index: Int, keyPath: WritableKeyPath<LocalModuleScanCandidate, String>) -> Binding<String> {
+        Binding(
+            get: { candidates[index][keyPath: keyPath] },
+            set: { candidates[index][keyPath: keyPath] = $0 }
+        )
+    }
+
+    private func outputFolderBinding(index: Int) -> Binding<String> {
+        Binding(
+            get: { ModuleOutputFolder.normalized(candidates[index].outputFolder) },
+            set: { candidates[index].outputFolder = $0 }
+        )
+    }
+
+    private func outputFolderOptions(preserving selected: String) -> [String] {
+        ModuleOutputFolder.options(
+            from: model.moduleOutputFolderOptions(preserving: selected) + candidates.map(\.outputFolder),
+            preserving: selected
+        )
+    }
+
     private func importSelectedCandidates() async {
         let selected = selectedCandidates
-        guard !selected.isEmpty else { return }
+        guard !selected.isEmpty, !hasInvalidSelection else { return }
         isImporting = true
         await model.importLocalModules(selected)
         isImporting = false

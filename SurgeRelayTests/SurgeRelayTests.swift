@@ -443,6 +443,25 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertEqual(candidates[0].outputFileName, "YouTube.sgmodule")
     }
 
+    func testLocalModuleFolderScannerFindsNestedFolders() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(
+            at: root.appending(path: "Ads/Video", directoryHint: .isDirectory),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: root.appending(path: "Tools", directoryHint: .isDirectory),
+            withIntermediateDirectories: true
+        )
+
+        XCTAssertEqual(
+            try LocalModuleFolderScanner.folders(in: root.path),
+            ["Ads", "Ads/Video", "Tools"]
+        )
+    }
+
     func testScriptHubClientConvertsLocalSurgeModule() async throws {
         let root = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)

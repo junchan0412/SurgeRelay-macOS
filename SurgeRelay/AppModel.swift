@@ -348,14 +348,35 @@ final class AppModel {
         registerLocalChange()
         var imported: [RelayModule] = []
         var failures: [String] = []
+        var unavailablePaths = Set(modules.map { $0.publishedRelativePath.lowercased() })
+        let combinedPath = ModuleOutputFolder.relativePath(
+            fileName: settings.combinedModuleFileName,
+            folder: ModuleOutputFolder.root
+        ).lowercased()
+        unavailablePaths.insert(combinedPath)
+
         for candidate in candidates {
+            let name = candidate.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty else {
+                failures.append("\(candidate.relativePath)：模块名称不能为空")
+                continue
+            }
+            let outputFolder = ModuleOutputFolder.normalized(candidate.outputFolder)
+            let outputFileName = uniqueOutputFileName(
+                preferredFileName: candidate.outputFileName,
+                folder: outputFolder,
+                unavailable: unavailablePaths
+            )
+            unavailablePaths.insert(
+                ModuleOutputFolder.relativePath(fileName: outputFileName, folder: outputFolder).lowercased()
+            )
             var module = RelayModule(
-                name: candidate.name,
+                name: name,
                 sourceURL: candidate.sourceURL,
                 sourceFormat: .surge,
-                outputFileName: candidate.outputFileName,
+                outputFileName: outputFileName,
                 category: candidate.category,
-                outputFolder: candidate.outputFolder,
+                outputFolder: outputFolder,
                 isEnabled: true,
                 detectedSourceFormat: .surge,
                 sourceContentHash: candidate.sourceContentHash,
@@ -1380,18 +1401,7 @@ final class AppModel {
     }
 
     private func localModuleOutputFolders() -> [String] {
-        let root = URL(filePath: settings.localModuleDirectory, directoryHint: .isDirectory)
-        guard let contents = try? FileManager.default.contentsOfDirectory(
-            at: root,
-            includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles]
-        ) else { return [] }
-        return contents.compactMap { url in
-            guard (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else {
-                return nil
-            }
-            return url.lastPathComponent
-        }
+        (try? LocalModuleFolderScanner.folders(in: settings.localModuleDirectory)) ?? []
     }
 
     private func githubPublishRepositoryKey(_ settings: GitHubSettings) -> String {
@@ -1434,6 +1444,18 @@ final class AppModel {
         var relativePath = ModuleOutputFolder.relativePath(fileName: normalized, folder: folder)
         guard unavailable.contains(relativePath.lowercased()) else { return normalized }
 
+        return uniqueOutputFileName(preferredFileName: normalized, folder: folder, unavailable: unavailable)
+    }
+
+    private func uniqueOutputFileName(
+        preferredFileName: String,
+        folder: String,
+        unavailable: Set<String>
+    ) -> String {
+        let normalized = FilenameSanitizer.sgmoduleName(from: preferredFileName)
+        var relativePath = ModuleOutputFolder.relativePath(fileName: normalized, folder: folder)
+        guard unavailable.contains(relativePath.lowercased()) else { return normalized }
+
         let base = FilenameSanitizer.baseName(from: normalized)
         var suffix = 2
         repeat {
@@ -1470,6 +1492,41 @@ final class AppModel {
         }
     }
 
+}
+
+enum LocalModuleFolderScanner {
+    static func folders(in rootDirectoryPath: String) throws -> [String] {
+        let trimmedPath = rootDirectoryPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedPath.isEmpty else { return [] }
+
+        let root = URL(filePath: trimmedPath, directoryHint: .isDirectory).standardizedFileURL
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: root.path, isDirectory: &isDirectory),
+              isDirectory.boolValue,
+              let enumerator = FileManager.default.enumerator(
+                at: root,
+                includingPropertiesForKeys: [.isDirectoryKey, .isPackageKey],
+                options: [.skipsHiddenFiles, .skipsPackageDescendants]
+              ) else {
+            return []
+        }
+
+        var values = Set<String>()
+        for case let url as URL in enumerator {
+            let resourceValues = try url.resourceValues(forKeys: [.isDirectoryKey, .isPackageKey])
+            guard resourceValues.isDirectory == true, resourceValues.isPackage != true else { continue }
+            guard let relativePath = relativePath(for: url.standardizedFileURL, root: root) else { continue }
+            let folder = ModuleOutputFolder.normalized(relativePath)
+            if !folder.isEmpty { values.insert(folder) }
+        }
+        return values.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
+
+    private static func relativePath(for fileURL: URL, root: URL) -> String? {
+        let rootPath = root.path.hasSuffix("/") ? root.path : root.path + "/"
+        guard fileURL.path.hasPrefix(rootPath) else { return nil }
+        return String(fileURL.path.dropFirst(rootPath.count))
+    }
 }
 
 struct LocalModuleScanCandidate: Identifiable, Hashable, Sendable {
