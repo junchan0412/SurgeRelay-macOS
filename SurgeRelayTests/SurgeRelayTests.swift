@@ -36,6 +36,13 @@ final class SurgeRelayTests: XCTestCase {
         ))
     }
 
+    func testModuleOutputFolderBuildsRelativePaths() {
+        XCTAssertEqual(ModuleOutputFolder.normalized(" /Ads/Video/ "), "Ads/Video")
+        XCTAssertEqual(ModuleOutputFolder.normalized("../Ads"), "Ads")
+        XCTAssertEqual(ModuleOutputFolder.relativePath(fileName: "YouTube Ads", folder: "Ads"), "Ads/YouTube-Ads.sgmodule")
+        XCTAssertEqual(ModuleOutputFolder.displayTitle(for: ""), "根目录")
+    }
+
     func testWebErrorPayloadIncludesUserFacingMessage() throws {
         let response = WebHTTPResponse.error(status: 409, message: "该模块已经添加，不能重复添加。")
         let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: response.body) as? [String: String])
@@ -107,6 +114,10 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertEqual(
             try XCTUnwrap(settings.rawURL(for: "YouTube.sgmodule")).absoluteString,
             "https://raw.githubusercontent.com/someone/relay/main/modules/YouTube.sgmodule"
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(settings.rawURL(for: "Ads/YouTube.sgmodule")).absoluteString,
+            "https://raw.githubusercontent.com/someone/relay/main/modules/Ads/YouTube.sgmodule"
         )
     }
 
@@ -206,6 +217,8 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertEqual(decoded.scriptHubOptions, ScriptHubOptions())
         XCTAssertTrue(decoded.argumentOverrides.isEmpty)
         XCTAssertNil(decoded.iconURL)
+        XCTAssertEqual(decoded.category, "")
+        XCTAssertEqual(decoded.outputFolder, "")
         XCTAssertNil(decoded.sourceETag)
         XCTAssertNil(decoded.sourceContentHash)
         XCTAssertFalse(decoded.hasOverrideConflict)
@@ -257,6 +270,18 @@ final class SurgeRelayTests: XCTestCase {
         )
         XCTAssertNil(ModuleMetadataParser.iconURL(in: "#!name=No Icon\n[General]"))
         XCTAssertTrue(ModuleMetadataParser.applyingDisplayName("GUI Name", to: content).hasPrefix("#!name=GUI Name\n"))
+    }
+
+    func testModuleMetadataParserAppliesCategory() {
+        let content = """
+        #!name=Demo
+        #!category=Old
+        [General]
+        """
+        let result = ModuleMetadataParser.applyingCategory("Ads", to: content)
+        XCTAssertTrue(result.contains("#!category=Ads"))
+        XCTAssertFalse(result.contains("#!category=Old"))
+        XCTAssertEqual(ModuleMetadataParser.applyingCategory("", to: content), content)
     }
 
     func testGitBlobHashMatchesGitHubContentSHA() {

@@ -105,6 +105,19 @@ actor ModuleFileStore {
         try Data(content.utf8).write(to: directory.appending(path: fileName), options: .atomic)
     }
 
+    func exportPublishedFiles(_ files: [PublishFile], toRootDirectory rootDirectoryPath: String) throws {
+        let root = URL(filePath: rootDirectoryPath, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        for file in files {
+            let destination = try exportURL(root: root, relativePath: file.name)
+            try FileManager.default.createDirectory(
+                at: destination.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try file.data.write(to: destination, options: .atomic)
+        }
+    }
+
     func writeCombinedOverride(_ content: String) throws {
         try FileManager.default.createDirectory(at: combinedOverrideURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data(content.utf8).write(to: combinedOverrideURL, options: .atomic)
@@ -191,6 +204,23 @@ actor ModuleFileStore {
 
     private func componentOverrideURL(for id: UUID) -> URL {
         overrideDirectory.appending(path: "\(id.uuidString).module")
+    }
+
+    private func exportURL(root: URL, relativePath: String) throws -> URL {
+        let components = relativePath
+            .replacingOccurrences(of: "\\", with: "/")
+            .split(separator: "/")
+            .map(String.init)
+        guard !components.isEmpty,
+              components.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else {
+            throw RelayError.invalidOutput("发布路径无效。")
+        }
+
+        var url = root
+        for component in components.dropLast() {
+            url = url.appending(path: component, directoryHint: .isDirectory)
+        }
+        return url.appending(path: components[components.count - 1])
     }
 
     private func decodeText(at url: URL) throws -> String {

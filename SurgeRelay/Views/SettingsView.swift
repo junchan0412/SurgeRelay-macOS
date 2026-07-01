@@ -145,13 +145,13 @@ struct SettingsView: View {
                 if model.settings.storageMode == .local {
                     HStack(alignment: .firstTextBaseline) {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("总模块保存目录")
+                            Text("本地模块根目录")
                             Text(model.settings.localModuleDirectory)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .textSelection(.enabled)
                                 .lineLimit(2)
-                            Text("将保存为 \(FilenameSanitizer.sgmoduleName(from: model.settings.combinedModuleFileName))")
+                            Text("总模块保存在根目录；独立模块可选择根目录下的文件夹")
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
                         }
@@ -166,7 +166,7 @@ struct SettingsView: View {
                 TextField("所有者", text: githubBinding(\.owner))
                 TextField("仓库", text: githubBinding(\.repository))
                 TextField("分支", text: githubBinding(\.branch))
-                TextField("目录", text: githubBinding(\.directory))
+                TextField("模块根目录", text: githubBinding(\.directory))
                 LabeledContent("仓库类型") {
                     switch model.settings.github.repositoryIsPrivate {
                     case .some(true): Label("私有", systemImage: "lock.fill")

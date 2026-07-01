@@ -25,6 +25,49 @@ enum ModuleSourceIdentity {
     }
 }
 
+enum ModuleOutputFolder {
+    static let root = ""
+
+    static func normalized(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/\\"))
+        guard !trimmed.isEmpty else { return root }
+
+        let components = trimmed
+            .replacingOccurrences(of: "\\", with: "/")
+            .split(separator: "/")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && $0 != "." && $0 != ".." }
+        return components.joined(separator: "/")
+    }
+
+    static func displayTitle(for folder: String) -> String {
+        let normalized = normalized(folder)
+        return normalized.isEmpty ? "根目录" : normalized
+    }
+
+    static func relativePath(fileName: String, folder: String) -> String {
+        let normalizedFolder = normalized(folder)
+        let normalizedFileName = FilenameSanitizer.sgmoduleName(from: fileName)
+        return [normalizedFolder, normalizedFileName].filter { !$0.isEmpty }.joined(separator: "/")
+    }
+
+    static func options(from folders: [String], preserving selected: String? = nil) -> [String] {
+        var values = Set([root])
+        for folder in folders {
+            values.insert(normalized(folder))
+        }
+        if let selected {
+            values.insert(normalized(selected))
+        }
+        return values.sorted { lhs, rhs in
+            if lhs.isEmpty { return true }
+            if rhs.isEmpty { return false }
+            return lhs.localizedStandardCompare(rhs) == .orderedAscending
+        }
+    }
+}
+
 enum ModuleSourceFormat: String, Codable, CaseIterable, Identifiable, Sendable {
     case automatic
     case quantumultX
@@ -102,6 +145,8 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     var sourceURL: String
     var sourceFormat: ModuleSourceFormat
     var outputFileName: String
+    var category: String
+    var outputFolder: String
     var isEnabled: Bool
     var scriptHubOptions: ScriptHubOptions
     var argumentOverrides: [String: String]
@@ -126,6 +171,8 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         sourceURL: String,
         sourceFormat: ModuleSourceFormat = .automatic,
         outputFileName: String,
+        category: String = "",
+        outputFolder: String = ModuleOutputFolder.root,
         isEnabled: Bool = true,
         scriptHubOptions: ScriptHubOptions = ScriptHubOptions(),
         argumentOverrides: [String: String] = [:],
@@ -149,6 +196,8 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         self.sourceURL = sourceURL
         self.sourceFormat = sourceFormat
         self.outputFileName = FilenameSanitizer.sgmoduleName(from: outputFileName)
+        self.category = category.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.outputFolder = ModuleOutputFolder.normalized(outputFolder)
         self.isEnabled = isEnabled
         self.scriptHubOptions = scriptHubOptions
         self.argumentOverrides = argumentOverrides
@@ -169,7 +218,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, sourceURL, sourceFormat, outputFileName, isEnabled, scriptHubOptions, argumentOverrides, iconURL, detectedSourceFormat
+        case id, name, sourceURL, sourceFormat, outputFileName, category, outputFolder, isEnabled, scriptHubOptions, argumentOverrides, iconURL, detectedSourceFormat
         case createdAt, lastUpdatedAt, contentHash, sourceETag, sourceLastModified, sourceContentHash, sourceCheckedAt
         case conversionEngineRevision, overrideBaseHash, hasOverrideConflict, state, lastError
     }
@@ -182,6 +231,11 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         sourceFormat = try container.decodeIfPresent(ModuleSourceFormat.self, forKey: .sourceFormat) ?? .automatic
         outputFileName = try container.decodeIfPresent(String.self, forKey: .outputFileName)
             ?? FilenameSanitizer.suggestedName(from: sourceURL)
+        category = try container.decodeIfPresent(String.self, forKey: .category)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        outputFolder = ModuleOutputFolder.normalized(
+            try container.decodeIfPresent(String.self, forKey: .outputFolder) ?? ModuleOutputFolder.root
+        )
         isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
         scriptHubOptions = try container.decodeIfPresent(ScriptHubOptions.self, forKey: .scriptHubOptions) ?? ScriptHubOptions()
         argumentOverrides = try container.decodeIfPresent([String: String].self, forKey: .argumentOverrides) ?? [:]
@@ -207,6 +261,10 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         guard let resolved else { return sourceFormat.title }
         return "自动识别（\(resolved.shortTitle)）"
     }
+
+    var publishedRelativePath: String {
+        ModuleOutputFolder.relativePath(fileName: outputFileName, folder: outputFolder)
+    }
 }
 
 struct ModuleDraft: Sendable {
@@ -214,6 +272,8 @@ struct ModuleDraft: Sendable {
     var sourceURL = ""
     var sourceFormat: ModuleSourceFormat = .automatic
     var outputFileName = ""
+    var category = ""
+    var outputFolder = ModuleOutputFolder.root
     var isEnabled = true
     var scriptHubOptions = ScriptHubOptions()
 
@@ -224,6 +284,8 @@ struct ModuleDraft: Sendable {
         sourceURL = module.sourceURL
         sourceFormat = module.sourceFormat
         outputFileName = module.outputFileName
+        category = module.category
+        outputFolder = module.outputFolder
         isEnabled = module.isEnabled
         scriptHubOptions = module.scriptHubOptions
     }

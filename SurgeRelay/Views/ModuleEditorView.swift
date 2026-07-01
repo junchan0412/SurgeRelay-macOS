@@ -39,6 +39,15 @@ struct ModuleEditorView: View {
             Form {
                 Section("基本信息") {
                     TextField("显示名称", text: $draft.name, prompt: Text("例如：YouTube 去广告"))
+                    TextField("模块标签（category）", text: $draft.category, prompt: Text("例如：广告过滤"))
+                    Picker("存放文件夹", selection: Binding(
+                        get: { ModuleOutputFolder.normalized(draft.outputFolder) },
+                        set: { draft.outputFolder = $0 }
+                    )) {
+                        ForEach(model.moduleOutputFolderOptions(preserving: draft.outputFolder), id: \.self) { folder in
+                            Text(ModuleOutputFolder.displayTitle(for: folder)).tag(folder)
+                        }
+                    }
                     Toggle("包含在总模块中", isOn: $draft.isEnabled)
                 }
                 Section("来源") {
@@ -83,6 +92,9 @@ struct ModuleEditorView: View {
                 }
             }
             .formStyle(.grouped)
+            .task {
+                await model.refreshModuleOutputFolders()
+            }
             .onChange(of: draft.sourceURL) { _, newValue in
                 autofillName(from: newValue)
             }
@@ -97,7 +109,7 @@ struct ModuleEditorView: View {
             }
             .padding(20)
         }
-        .frame(width: 620, height: 640)
+        .frame(width: 620, height: 700)
         .alert("无法保存", isPresented: Binding(
             get: { localError != nil },
             set: { if !$0 { localError = nil } }

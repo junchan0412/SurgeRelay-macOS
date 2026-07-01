@@ -68,7 +68,7 @@ struct AppSettings: Codable, Equatable, Sendable {
     var github = GitHubSettings()
     var githubToken = ""
     var storageMode: StorageMode = .gitHub
-    var localModuleDirectory: String = AppSettings.defaultConfigurationDirectory
+    var localModuleDirectory: String = AppSettings.defaultLocalModuleRootDirectory
     var webServerEnabled = false
     var webServerPort = 8787
 
@@ -89,7 +89,7 @@ struct AppSettings: Codable, Equatable, Sendable {
         github = try container.decodeIfPresent(GitHubSettings.self, forKey: .github) ?? GitHubSettings()
         githubToken = try container.decodeIfPresent(String.self, forKey: .githubToken) ?? ""
         storageMode = try container.decodeIfPresent(StorageMode.self, forKey: .storageMode) ?? .gitHub
-        localModuleDirectory = try container.decodeIfPresent(String.self, forKey: .localModuleDirectory) ?? Self.defaultConfigurationDirectory
+        localModuleDirectory = try container.decodeIfPresent(String.self, forKey: .localModuleDirectory) ?? Self.defaultLocalModuleRootDirectory
         webServerEnabled = try container.decodeIfPresent(Bool.self, forKey: .webServerEnabled) ?? false
         webServerPort = try container.decodeIfPresent(Int.self, forKey: .webServerPort) ?? 8787
     }
@@ -101,6 +101,12 @@ struct AppSettings: Codable, Equatable, Sendable {
     static var defaultConfigurationDirectory: String {
         FileManager.default.homeDirectoryForCurrentUser
             .appending(path: "Library/Mobile Documents/iCloud~com~nssurge~inc/Documents/Surge Relay", directoryHint: .isDirectory)
+            .path
+    }
+
+    static var defaultLocalModuleRootDirectory: String {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appending(path: "Library/Mobile Documents/iCloud~com~nssurge~inc", directoryHint: .isDirectory)
             .path
     }
 

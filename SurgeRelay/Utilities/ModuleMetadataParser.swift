@@ -48,6 +48,38 @@ enum ModuleMetadataParser {
         }
         return line + "\n" + normalized
     }
+
+    static func applyingCategory(_ category: String, to content: String) -> String {
+        let value = category.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else {
+            return content.replacingOccurrences(of: "\r\n", with: "\n")
+        }
+        let normalized = content.replacingOccurrences(of: "\r\n", with: "\n")
+        let line = "#!category=\(value)"
+        guard let expression = try? NSRegularExpression(pattern: #"(?im)^\s*#!category\s*=.*$"#) else {
+            return line + "\n" + normalized
+        }
+        let range = NSRange(normalized.startIndex..., in: normalized)
+        if expression.firstMatch(in: normalized, range: range) != nil {
+            return expression.stringByReplacingMatches(
+                in: normalized,
+                range: range,
+                withTemplate: NSRegularExpression.escapedTemplate(for: line)
+            )
+        }
+        if let nameExpression = try? NSRegularExpression(pattern: #"(?im)^\s*#!name\s*=.*$"#),
+           let match = nameExpression.firstMatch(in: normalized, range: range),
+           let nameRange = Range(match.range, in: normalized) {
+            var updated = normalized
+            updated.insert(contentsOf: "\n\(line)", at: nameRange.upperBound)
+            return updated
+        }
+        return line + "\n" + normalized
+    }
+
+    static func applyingModuleMetadata(name: String, category: String, to content: String) -> String {
+        applyingCategory(category, to: applyingDisplayName(name, to: content))
+    }
 }
 
 struct ModuleArgumentDefinition: Identifiable, Hashable, Sendable {

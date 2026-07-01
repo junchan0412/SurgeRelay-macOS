@@ -54,7 +54,11 @@ actor ScriptHubClient {
             guard (200..<300).contains(status) else {
                 throw RelayError.httpFailure(status: status, message: String(content.prefix(240)))
             }
-            let namedContent = ModuleMetadataParser.applyingDisplayName(module.name, to: content)
+            let namedContent = ModuleMetadataParser.applyingModuleMetadata(
+                name: module.name,
+                category: module.category,
+                to: content
+            )
             let sanitized = SurgeModuleSanitizer.sanitize(namedContent)
             try validate(sanitized)
             return ConversionResult(content: sanitized, requestURL: sourceURL)
@@ -73,7 +77,11 @@ actor ScriptHubClient {
             converterScript: converter,
             github: github
         )
-        let namedContent = ModuleMetadataParser.applyingDisplayName(module.name, to: materialized.content)
+        let namedContent = ModuleMetadataParser.applyingModuleMetadata(
+            name: module.name,
+            category: module.category,
+            to: materialized.content
+        )
         let sanitized = SurgeModuleSanitizer.sanitize(namedContent)
         try validate(sanitized)
         return ConversionResult(content: sanitized, requestURL: url, assets: materialized.assets)

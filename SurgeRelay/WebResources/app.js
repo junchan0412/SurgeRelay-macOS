@@ -275,7 +275,7 @@ function patchSidebarLive() {
 function renderSidebar() {
   if (!state) return;
   const query = ui.search.value.trim().toLocaleLowerCase();
-  const modules = state.modules.filter(module => [module.name, module.sourceURL, module.sourceFormatTitle, module.outputFileName].join('\n').toLocaleLowerCase().includes(query));
+  const modules = state.modules.filter(module => [module.name, module.sourceURL, module.sourceFormatTitle, module.outputFileName, module.category, module.outputFolder].join('\n').toLocaleLowerCase().includes(query));
   ui.summarySubtitle.textContent = `${state.combined.enabledCount} 个来源 · 总模块订阅`;
   ui.summaryRow.classList.toggle('selected', selectedID === 'combined');
   ui.list.innerHTML = modules.length ? modules.map(moduleRow).join('') : `<div class="empty-state"><div><span class="symbol" data-symbol="magnifyingglass"></span><div>${query ? '没有搜索结果' : '还没有模块'}</div></div></div>`;
@@ -368,6 +368,8 @@ function renderModuleDetail(module, animate = true) {
     <section class="form-section-view"><h3 class="section-heading">模块信息</h3><div class="group-box">
       ${detailRow('link', '原始地址', `<a href="${escapeAttribute(module.sourceURL)}" target="_blank" rel="noreferrer">${escapeHTML(module.sourceURL)}</a>`, true)}
       ${detailRow('doc.text', '来源格式', module.sourceFormatTitle)}
+      ${detailRow('shippingbox', '模块标签', module.category || '未设置')}
+      ${detailRow('externaldrive', '存放文件夹', folderTitle(module.outputFolder))}
       ${detailRow('square.stack.3d.up.fill', '汇总订阅', state.combined.subscriptionURL || '等待发布配置')}
       ${detailRow('clock', '上次更新', formatDate(module.lastUpdatedAt, '从未更新'))}
     </div></section>
@@ -540,6 +542,22 @@ function populateScriptHubOptions(values = scriptHubDefaults) {
 
 function hasAdvancedValues(values) { return Object.keys(scriptHubDefaults).some(key => (values?.[key] ?? scriptHubDefaults[key]) !== scriptHubDefaults[key]); }
 
+function folderTitle(folder) {
+  return folder ? folder : '根目录';
+}
+
+function populateOutputFolders(selected = '') {
+  const select = ui.moduleForm.elements.outputFolder;
+  if (!select) return;
+  const folders = new Set(['', ...(state?.moduleOutputFolders || []), selected || '']);
+  select.innerHTML = [...folders].sort((a, b) => {
+    if (!a) return -1;
+    if (!b) return 1;
+    return a.localeCompare(b, 'zh-Hans-CN', { numeric: true });
+  }).map(folder => `<option value="${escapeAttribute(folder)}">${escapeHTML(folderTitle(folder))}</option>`).join('');
+  select.value = selected || '';
+}
+
 function handleListClick(event) {
   if (event.target.closest('.module-toggle')) return;
   const row = event.target.closest('.module-row');
@@ -652,6 +670,8 @@ function openEditor(module = null) {
   ui.saveModule.textContent = module ? '保存' : '添加';
   const form = ui.moduleForm.elements;
   form.name.value = module?.name || '';
+  form.category.value = module?.category || '';
+  populateOutputFolders(module?.outputFolder || '');
   autoFilledName = module?.name || '';
   manualNameEdited = Boolean(module);
   form.sourceURL.value = module?.sourceURL || '';
@@ -669,7 +689,15 @@ function openEditor(module = null) {
 async function saveModule(event) {
   event.preventDefault();
   const form = ui.moduleForm.elements;
-  const payload = { name: form.name.value.trim(), sourceURL: form.sourceURL.value.trim(), sourceFormat: form.sourceFormat.value, isEnabled: form.isEnabled.checked, scriptHubOptions: collectScriptHubOptions() };
+  const payload = {
+    name: form.name.value.trim(),
+    sourceURL: form.sourceURL.value.trim(),
+    sourceFormat: form.sourceFormat.value,
+    category: form.category.value.trim(),
+    outputFolder: form.outputFolder.value,
+    isEnabled: form.isEnabled.checked,
+    scriptHubOptions: collectScriptHubOptions()
+  };
   ui.saveModule.disabled = true;
   try {
     const path = editingID ? `/api/modules/${editingID}` : '/api/modules';

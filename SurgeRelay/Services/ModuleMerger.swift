@@ -200,6 +200,10 @@ actor ModuleProcessingWorker {
         ModuleMetadataParser.applyingDisplayName(name, to: content)
     }
 
+    func applyingModuleMetadata(name: String, category: String, to content: String) -> String {
+        ModuleMetadataParser.applyingModuleMetadata(name: name, category: category, to: content)
+    }
+
     func iconURL(in content: String, relativeTo source: String?) -> URL? {
         ModuleMetadataParser.iconURL(in: content, relativeTo: source)
     }

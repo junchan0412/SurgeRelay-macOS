@@ -18,6 +18,7 @@ enum WebManagementAPI {
         do {
             switch (request.method, request.path) {
             case ("GET", "/api/state"):
+                await model.refreshModuleOutputFolders()
                 return .json(statePayload(model: model))
             case ("POST", "/api/update-all"):
                 Task { await model.updateAll() }
@@ -154,6 +155,7 @@ enum WebManagementAPI {
                 lastUpdatedAt: newestUpdate,
                 subscriptionURL: model.combinedRawURL?.absoluteString ?? model.combinedLocalFileURL?.absoluteString
             ),
+            moduleOutputFolders: model.moduleOutputFolderOptions(),
             modules: model.modules.map { module in
                 WebModulePayload(
                     id: module.id.uuidString.lowercased(),
@@ -162,6 +164,8 @@ enum WebManagementAPI {
                     sourceFormat: module.sourceFormat.rawValue,
                     sourceFormatTitle: module.sourceFormatDisplayTitle,
                     outputFileName: module.outputFileName,
+                    category: module.category,
+                    outputFolder: module.outputFolder,
                     isEnabled: module.isEnabled,
                     state: module.state.rawValue,
                     stateTitle: module.state.title,
@@ -253,6 +257,7 @@ enum WebManagementAPI {
 
 private struct WebStatePayload: Encodable {
     let combined: WebCombinedPayload
+    let moduleOutputFolders: [String]
     let modules: [WebModulePayload]
     let activity: WebActivityPayload
 }
@@ -273,6 +278,8 @@ private struct WebModulePayload: Encodable {
     let sourceFormat: String
     let sourceFormatTitle: String
     let outputFileName: String
+    let category: String
+    let outputFolder: String
     let isEnabled: Bool
     let state: String
     let stateTitle: String
@@ -337,6 +344,8 @@ private struct WebModuleMutation: Decodable {
     let name: String
     let sourceURL: String
     let sourceFormat: String?
+    let category: String?
+    let outputFolder: String?
     let isEnabled: Bool?
     let policy: String?
     let includeKeywords: String?
@@ -357,6 +366,8 @@ private struct WebModuleMutation: Decodable {
             }
             draft.sourceFormat = format
         }
+        if let category { draft.category = category }
+        if let outputFolder { draft.outputFolder = outputFolder }
         if let isEnabled { draft.isEnabled = isEnabled }
         if let scriptHubOptions { draft.scriptHubOptions = scriptHubOptions }
         if let policy { draft.scriptHubOptions.policy = policy }

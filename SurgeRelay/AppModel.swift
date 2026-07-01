@@ -24,6 +24,7 @@ final class AppModel {
     var synchronizingModuleID: UUID?
     var webServerState: WebServerRuntimeState = .stopped
     var updateHistory: [UpdateHistoryEntry]
+    var githubModuleOutputFolders: [String] = [ModuleOutputFolder.root]
 
     @ObservationIgnored private let scriptHubClient = ScriptHubClient()
     @ObservationIgnored private let sourceRevisionService = SourceRevisionService()
@@ -185,6 +186,28 @@ final class AppModel {
         if settings.storageMode == .local { Task { await rebuildCombinedFromCache() } }
     }
 
+    func moduleOutputFolderOptions(preserving selected: String? = nil) -> [String] {
+        let configuredFolders = settings.storageMode == .local
+            ? localModuleOutputFolders()
+            : githubModuleOutputFolders
+        return ModuleOutputFolder.options(
+            from: configuredFolders + modules.map(\.outputFolder),
+            preserving: selected
+        )
+    }
+
+    func refreshModuleOutputFolders() async {
+        guard settings.storageMode == .gitHub, settings.github.isConfigured else { return }
+        do {
+            let folders = try await githubClient.listDirectories(settings: settings.github, token: githubToken)
+            githubModuleOutputFolders = ModuleOutputFolder.options(
+                from: folders + modules.map(\.outputFolder)
+            )
+        } catch {
+            githubModuleOutputFolders = ModuleOutputFolder.options(from: modules.map(\.outputFolder))
+        }
+    }
+
     func openConfigurationDirectory() {
         NSWorkspace.shared.open(PersistenceStore.configurationDirectoryURL)
     }
@@ -224,6 +247,8 @@ final class AppModel {
             sourceURL: source,
             sourceFormat: draft.sourceFormat,
             outputFileName: uniqueOutputFileName(for: draft, source: source),
+            category: draft.category,
+            outputFolder: draft.outputFolder,
             isEnabled: draft.isEnabled,
             scriptHubOptions: draft.scriptHubOptions,
             detectedSourceFormat: detectedFormat(for: draft.sourceFormat, source: source)
@@ -241,6 +266,8 @@ final class AppModel {
         guard let index = modules.firstIndex(where: { $0.id == id }) else { return }
         let name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
         let source = draft.sourceURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let category = draft.category.trimmingCharacters(in: .whitespacesAndNewlines)
+        let outputFolder = ModuleOutputFolder.normalized(draft.outputFolder)
         guard !modules.contains(where: {
             $0.id != id && ModuleSourceIdentity.matches($0.sourceURL, source)
         }) else {
@@ -253,13 +280,14 @@ final class AppModel {
                 current.sourceURL != source ||
                 current.sourceFormat != draft.sourceFormat ||
                 current.outputFileName != outputFileName ||
+                current.category != category ||
+                current.outputFolder != outputFolder ||
                 current.isEnabled != draft.isEnabled ||
                 current.scriptHubOptions != draft.scriptHubOptions else {
             statusMessage = "没有需要保存的更改"
             return
         }
         registerLocalChange()
-        let nameChanged = current.name != name
         let sourceChanged = modules[index].sourceURL != source ||
             modules[index].sourceFormat != draft.sourceFormat ||
             modules[index].scriptHubOptions != draft.scriptHubOptions
@@ -268,10 +296,12 @@ final class AppModel {
         modules[index].sourceURL = source
         modules[index].sourceFormat = draft.sourceFormat
         modules[index].outputFileName = outputFileName
+        modules[index].category = category
+        modules[index].outputFolder = outputFolder
         modules[index].isEnabled = draft.isEnabled
         modules[index].scriptHubOptions = draft.scriptHubOptions
         modules[index].detectedSourceFormat = detectedSourceFormat
-        if sourceChanged || nameChanged {
+        if sourceChanged {
             modules[index].state = .never
             modules[index].lastError = nil
             modules[index].sourceETag = nil
@@ -286,8 +316,10 @@ final class AppModel {
         }
         _ = previousOutputFileName
         try persistModules()
-        statusMessage = "已保存 \(modules[index].name)，即将自动更新"
-        if modules[index].isEnabled {
+        statusMessage = sourceChanged
+            ? "已保存 \(modules[index].name)，即将自动更新"
+            : "已保存 \(modules[index].name)，正在重新合并"
+        if sourceChanged, modules[index].isEnabled {
             scheduleAutomaticUpdate()
         } else {
             Task { await rebuildCombinedFromCache() }
@@ -716,19 +748,10 @@ final class AppModel {
             settings.github.repositoryIsPrivate = isPrivate
             saveSettings()
         }
-        let fileName = FilenameSanitizer.sgmoduleName(from: settings.combinedModuleFileName)
         let data = try await fileStore.readCombined()
-        var files = [PublishFile(name: fileName, data: data)]
-        for module in modules {
-            try Task.checkCancellation()
-            guard let content = try? await fileStore.readComponent(id: module.id) else { continue }
-            let materialized = await processingWorker.materialize(content, overrides: module.argumentOverrides)
-            let namedContent = await processingWorker.applyingDisplayName(module.name, to: materialized)
-            files.append(PublishFile(name: module.outputFileName, data: Data(namedContent.utf8)))
-        }
-        let assets = try await fileStore.generatedAssetFiles()
+        let files = try await currentPublishedFiles(combinedData: data, includeAssets: true)
         return try await githubClient.publish(
-            files: files + assets,
+            files: files,
             settings: settings.github,
             token: githubToken
         )
@@ -794,6 +817,30 @@ final class AppModel {
         if changed { try? persistModules() }
     }
 
+    private func currentPublishedFiles(combinedData: Data, includeAssets: Bool) async throws -> [PublishFile] {
+        var files = [
+            PublishFile(
+                name: FilenameSanitizer.sgmoduleName(from: settings.combinedModuleFileName),
+                data: combinedData
+            )
+        ]
+        for module in modules {
+            try Task.checkCancellation()
+            guard let content = try? await fileStore.readComponent(id: module.id) else { continue }
+            let materialized = await processingWorker.materialize(content, overrides: module.argumentOverrides)
+            let namedContent = await processingWorker.applyingModuleMetadata(
+                name: module.name,
+                category: module.category,
+                to: materialized
+            )
+            files.append(PublishFile(name: module.publishedRelativePath, data: Data(namedContent.utf8)))
+        }
+        if includeAssets {
+            files.append(contentsOf: try await fileStore.generatedAssetFiles())
+        }
+        return files
+    }
+
     private func writeCombinedModule(_ components: [(RelayModule, String)]) async throws {
         let merged = try await processingWorker.merge(
             components,
@@ -801,11 +848,8 @@ final class AppModel {
         )
         try await fileStore.writeCombined(merged)
         if settings.storageMode == .local {
-            try await fileStore.exportCombined(
-                merged,
-                toDirectory: settings.localModuleDirectory,
-                fileName: FilenameSanitizer.sgmoduleName(from: settings.combinedModuleFileName)
-            )
+            let files = try await currentPublishedFiles(combinedData: Data(merged.utf8), includeAssets: false)
+            try await fileStore.exportPublishedFiles(files, toRootDirectory: settings.localModuleDirectory)
         }
     }
 
@@ -832,12 +876,17 @@ final class AppModel {
     }
 
     func rawURL(for module: RelayModule) -> URL? {
-        settings.publishedURL(for: module.outputFileName)
+        settings.publishedURL(for: module.publishedRelativePath)
     }
 
     func previewContent(for module: RelayModule) async throws -> String {
         let content = try await fileStore.readComponent(id: module.id)
-        return await processingWorker.materialize(content, overrides: module.argumentOverrides)
+        let materialized = await processingWorker.materialize(content, overrides: module.argumentOverrides)
+        return await processingWorker.applyingModuleMetadata(
+            name: module.name,
+            category: module.category,
+            to: materialized
+        )
     }
 
     func moduleArgumentInfo(for module: RelayModule) async -> ModuleArgumentInfo {
@@ -884,7 +933,11 @@ final class AppModel {
 
     func savePreviewContent(_ content: String, for module: RelayModule) async throws {
         guard !isWorking else { throw RelayError.invalidOutput("当前正在更新，请稍后再写入。") }
-        let namedContent = await processingWorker.applyingDisplayName(module.name, to: content)
+        let namedContent = await processingWorker.applyingModuleMetadata(
+            name: module.name,
+            category: module.category,
+            to: content
+        )
         if let current = try? await fileStore.readComponent(id: module.id), current == namedContent {
             statusMessage = "内容没有变化"
             return
@@ -918,7 +971,12 @@ final class AppModel {
         statusMessage = settings.automaticallyPublish
             ? "已恢复 \(module.name) 的转换结果，等待合并发布"
             : "已恢复 \(module.name) 的转换结果"
-        return await processingWorker.materialize(content, overrides: module.argumentOverrides)
+        let materialized = await processingWorker.materialize(content, overrides: module.argumentOverrides)
+        return await processingWorker.applyingModuleMetadata(
+            name: module.name,
+            category: module.category,
+            to: materialized
+        )
     }
 
     func acceptOverrideConflict(moduleID: UUID) async {
@@ -1002,6 +1060,21 @@ final class AppModel {
         guard !entries.isEmpty else { return }
         updateHistory = Array((entries.reversed() + updateHistory).prefix(200))
         PersistenceStore.saveUpdateHistory(updateHistory)
+    }
+
+    private func localModuleOutputFolders() -> [String] {
+        let root = URL(filePath: settings.localModuleDirectory, directoryHint: .isDirectory)
+        guard let contents = try? FileManager.default.contentsOfDirectory(
+            at: root,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+        return contents.compactMap { url in
+            guard (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else {
+                return nil
+            }
+            return url.lastPathComponent
+        }
     }
 
     private func redactedSourceURL(_ value: String) -> String {

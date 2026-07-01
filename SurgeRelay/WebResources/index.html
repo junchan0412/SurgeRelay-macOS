@@ -13,7 +13,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Surge Relay">
   <link rel="stylesheet" href="/app.css?v=17">
-  <script src="/app.js?v=14" defer></script>
+  <script src="/app.js?v=15" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -70,6 +70,8 @@
           <h3>基本信息</h3>
           <div class="editor-group">
             <label class="form-row"><span>显示名称</span><input name="name" type="text" required placeholder="例如：YouTube 去广告"></label>
+            <label class="form-row"><span>模块标签</span><input name="category" type="text" placeholder="Surge category"></label>
+            <label class="form-row"><span>存放文件夹</span><select name="outputFolder"><option value="">根目录</option></select></label>
             <label class="form-row switch-row"><span>包含在总模块中</span><input name="isEnabled" type="checkbox" role="switch" checked><span class="toggle-track" aria-hidden="true"></span></label>
           </div>
         </section>

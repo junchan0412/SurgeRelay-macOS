@@ -7,6 +7,10 @@ actor GitHubClient {
         let isPrivate: Bool
         private enum CodingKeys: String, CodingKey { case isPrivate = "private" }
     }
+    private struct RepositoryContentItem: Decodable {
+        let name: String
+        let type: String
+    }
     private struct GitObject: Codable { let sha: String }
     private struct ReferenceResponse: Decodable { let object: GitObject }
     private struct CommitResponse: Decodable {
@@ -57,6 +61,28 @@ actor GitHubClient {
             throw RelayError.httpFailure(status: status, message: "无法访问该仓库。")
         }
         return try JSONDecoder().decode(RepositoryMetadata.self, from: data).isPrivate
+    }
+
+    func listDirectories(settings: GitHubSettings, token: String) async throws -> [String] {
+        guard settings.isConfigured else { throw RelayError.githubNotConfigured }
+        var components = URLComponents(url: try contentsURL(settings: settings), resolvingAgainstBaseURL: false)
+        components?.queryItems = [URLQueryItem(name: "ref", value: settings.branch)]
+        guard let url = components?.url else { throw RelayError.githubNotConfigured }
+
+        var request = URLRequest(url: url, timeoutInterval: 30)
+        applyHeaders(to: &request, token: token)
+        let (data, response) = try await session.data(for: request)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        if status == 404 { return [] }
+        guard (200..<300).contains(status) else {
+            let message = (try? JSONDecoder().decode(GitHubMessage.self, from: data).message)
+                ?? "GitHub 目录查询失败。"
+            throw RelayError.httpFailure(status: status, message: message)
+        }
+        return try JSONDecoder().decode([RepositoryContentItem].self, from: data)
+            .filter { $0.type == "dir" }
+            .map(\.name)
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
     func publish(files: [PublishFile], settings: GitHubSettings, token: String) async throws -> PublishReport {
@@ -196,10 +222,16 @@ actor GitHubClient {
     private func apiURL(settings: GitHubSettings, fileName: String?) throws -> URL {
         var path = "https://api.github.com/repos/\(settings.owner)/\(settings.repository)"
         if let fileName {
-            let directory = settings.directory.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            let fullPath = [directory, fileName].filter { !$0.isEmpty }.joined(separator: "/")
-            path += "/contents/\(fullPath)"
+            path += "/contents/\(encodedRepositoryPath(for: fileName, settings: settings))"
         }
+        guard let url = URL(string: path) else { throw RelayError.githubNotConfigured }
+        return url
+    }
+
+    private func contentsURL(settings: GitHubSettings) throws -> URL {
+        var path = "https://api.github.com/repos/\(settings.owner)/\(settings.repository)/contents"
+        let directory = encodedRepositoryDirectory(settings: settings)
+        if !directory.isEmpty { path += "/\(directory)" }
         guard let url = URL(string: path) else { throw RelayError.githubNotConfigured }
         return url
     }
@@ -216,6 +248,21 @@ actor GitHubClient {
         return [directory, fileName].filter { !$0.isEmpty }.joined(separator: "/")
     }
 
+    private func encodedRepositoryPath(for fileName: String, settings: GitHubSettings) -> String {
+        repositoryPath(for: fileName, settings: settings)
+            .split(separator: "/")
+            .map { encodedPathComponent(String($0)) }
+            .joined(separator: "/")
+    }
+
+    private func encodedRepositoryDirectory(settings: GitHubSettings) -> String {
+        settings.directory
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            .split(separator: "/")
+            .map { encodedPathComponent(String($0)) }
+            .joined(separator: "/")
+    }
+
     private func encodedPathComponent(_ value: String) -> String {
         var allowed = CharacterSet.urlPathAllowed
         allowed.remove(charactersIn: "/")
@@ -223,7 +270,9 @@ actor GitHubClient {
     }
 
     private func applyHeaders(to request: inout URLRequest, token: String) {
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        if !token.isEmpty {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
         request.setValue("SurgeRelay/1.0", forHTTPHeaderField: "User-Agent")
