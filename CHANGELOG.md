@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.17
+
+- App 内 GitHub Release 更新检查会下载 `.pkg.sha256` 与 `.app.zip.sha256` 小文件，并与 GitHub API 返回的资产 digest 比对。
+- 更新面板的资产完整性状态细化为 sha256 匹配、不匹配、缺少 digest、缺少 sha256 或无法读取，下载前即可发现校验文件损坏或不一致。
+- 补充 sha256 匹配和不匹配两类 Release API 回归测试，覆盖更新面板的完整性判断。
+
 ## 1.2.16
 
 - App 内 GitHub Release 更新面板新增资产完整性区域，会显示 `.pkg` 与 `.app.zip` 的文件大小、GitHub digest 和对应 `.sha256` 文件状态。

@@ -252,9 +252,9 @@ final class SurgeRelayTests: XCTestCase {
         GitHubMockURLProtocol.reset()
         defer { GitHubMockURLProtocol.reset() }
         GitHubMockURLProtocol.handler = { request in
-            XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "application/vnd.github+json")
             switch (request.httpMethod ?? "GET", request.url?.path ?? "") {
             case ("GET", "/repos/junchan0412/SurgeRelay-macOS/releases/latest"):
+                XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "application/vnd.github+json")
                 return (200, Data("""
                 {
                   "tag_name": "v1.2.12",
@@ -288,6 +288,12 @@ final class SurgeRelayTests: XCTestCase {
                   ]
                 }
                 """.utf8))
+            case ("GET", "/Surge-Relay-1.2.12.app.zip.sha256"):
+                XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "text/plain")
+                return (200, Data("appzipdigest  Surge-Relay-1.2.12.app.zip\n".utf8))
+            case ("GET", "/Surge-Relay-1.2.12.pkg.sha256"):
+                XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "text/plain")
+                return (200, Data("pkgdigest  Surge-Relay-1.2.12.pkg\n".utf8))
             default:
                 return (404, Data(#"{"message":"not found"}"#.utf8))
             }
@@ -302,12 +308,14 @@ final class SurgeRelayTests: XCTestCase {
             release.packageAsset.flatMap { release.checksumAsset(for: $0)?.name },
             "Surge-Relay-1.2.12.pkg.sha256"
         )
+        XCTAssertEqual(release.packageAsset.map { release.checksumValidation(for: $0).status }, .matched)
         XCTAssertEqual(release.appZipAsset?.name, "Surge-Relay-1.2.12.app.zip")
         XCTAssertEqual(release.appZipAsset?.digestDisplay, "sha256:appzipdigest")
         XCTAssertEqual(
             release.appZipAsset.flatMap { release.checksumAsset(for: $0)?.name },
             "Surge-Relay-1.2.12.app.zip.sha256"
         )
+        XCTAssertEqual(release.appZipAsset.map { release.checksumValidation(for: $0).status }, .matched)
         XCTAssertEqual(release.installableAssets.map(\.name), [
             "Surge-Relay-1.2.12.pkg",
             "Surge-Relay-1.2.12.app.zip"
@@ -316,6 +324,55 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertTrue(GitHubMockURLProtocol.requestedPaths.contains(
             "GET /repos/junchan0412/SurgeRelay-macOS/releases/latest"
         ))
+        XCTAssertTrue(GitHubMockURLProtocol.requestedPaths.contains("GET /Surge-Relay-1.2.12.app.zip.sha256"))
+        XCTAssertTrue(GitHubMockURLProtocol.requestedPaths.contains("GET /Surge-Relay-1.2.12.pkg.sha256"))
+    }
+
+    func testGitHubReleaseClientFlagsChecksumMismatch() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GitHubMockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        GitHubMockURLProtocol.reset()
+        defer { GitHubMockURLProtocol.reset() }
+        GitHubMockURLProtocol.handler = { request in
+            switch (request.httpMethod ?? "GET", request.url?.path ?? "") {
+            case ("GET", "/repos/junchan0412/SurgeRelay-macOS/releases/latest"):
+                return (200, Data("""
+                {
+                  "tag_name": "v1.2.13",
+                  "name": "Surge Relay 1.2.13",
+                  "html_url": "https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.2.13",
+                  "published_at": "2026-07-02T10:00:00Z",
+                  "body": "",
+                  "assets": [
+                    {
+                      "name": "Surge-Relay-1.2.13.app.zip",
+                      "browser_download_url": "https://example.com/Surge-Relay-1.2.13.app.zip",
+                      "size": 7000000,
+                      "digest": "sha256:expectedhash"
+                    },
+                    {
+                      "name": "Surge-Relay-1.2.13.app.zip.sha256",
+                      "browser_download_url": "https://example.com/Surge-Relay-1.2.13.app.zip.sha256",
+                      "size": 93
+                    }
+                  ]
+                }
+                """.utf8))
+            case ("GET", "/Surge-Relay-1.2.13.app.zip.sha256"):
+                return (200, Data("differenthash  Surge-Relay-1.2.13.app.zip\n".utf8))
+            default:
+                return (404, Data(#"{"message":"not found"}"#.utf8))
+            }
+        }
+
+        let release = try await GitHubReleaseClient(session: session).latestRelease()
+        let appZip = try XCTUnwrap(release.appZipAsset)
+        let validation = release.checksumValidation(for: appZip)
+
+        XCTAssertEqual(validation.status, .mismatched)
+        XCTAssertEqual(validation.digestHash, "expectedhash")
+        XCTAssertEqual(validation.checksumHash, "differenthash")
     }
 
     func testPrivateRepositoryRequiresCloudflareAndUsesItWhenConfigured() throws {

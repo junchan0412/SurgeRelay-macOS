@@ -137,7 +137,7 @@ struct CheckForUpdatesSheet: View {
                     Text("资产完整性")
                         .font(.headline)
                     ForEach(release.installableAssets) { asset in
-                        assetIntegrityRow(asset, checksum: release.checksumAsset(for: asset))
+                        assetIntegrityRow(asset, validation: release.checksumValidation(for: asset))
                     }
                 }
             }
@@ -160,7 +160,7 @@ struct CheckForUpdatesSheet: View {
         .frame(minHeight: 180, alignment: .topLeading)
     }
 
-    private func assetIntegrityRow(_ asset: GitHubReleaseAsset, checksum: GitHubReleaseAsset?) -> some View {
+    private func assetIntegrityRow(_ asset: GitHubReleaseAsset, validation: ReleaseAssetChecksumValidation) -> some View {
         HStack(alignment: .top, spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(asset.name)
@@ -173,11 +173,18 @@ struct CheckForUpdatesSheet: View {
             }
             Spacer()
             Label(
-                checksum == nil ? "缺少 sha256" : "已提供 sha256",
-                systemImage: checksum == nil ? "exclamationmark.triangle.fill" : "checkmark.seal.fill"
+                validation.title,
+                systemImage: validation.systemImage
             )
             .font(.caption)
-            .foregroundStyle(checksum == nil ? .orange : .green)
+            .foregroundStyle(checksumValidationColor(validation.status))
+        }
+    }
+
+    private func checksumValidationColor(_ status: ReleaseAssetChecksumStatus) -> Color {
+        switch status {
+        case .matched: .green
+        case .missingChecksum, .missingDigest, .mismatched, .unreadable: .orange
         }
     }
 
@@ -205,6 +212,7 @@ struct GitHubRelease: Decodable, Equatable, Sendable {
     var publishedAt: Date
     var body: String
     var assets: [GitHubReleaseAsset]
+    var checksumValidations: [String: ReleaseAssetChecksumValidation] = [:]
 
     var version: String {
         tagName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -228,6 +236,19 @@ struct GitHubRelease: Decodable, Equatable, Sendable {
         return assets.first { $0.name.lowercased() == expectedName }
     }
 
+    func checksumValidation(for asset: GitHubReleaseAsset) -> ReleaseAssetChecksumValidation {
+        if let validation = checksumValidations[asset.name] {
+            return validation
+        }
+        guard checksumAsset(for: asset) != nil else {
+            return ReleaseAssetChecksumValidation(status: .missingChecksum)
+        }
+        guard asset.sha256Digest != nil else {
+            return ReleaseAssetChecksumValidation(status: .missingDigest)
+        }
+        return ReleaseAssetChecksumValidation(status: .unreadable)
+    }
+
     var notesPreview: String {
         let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count > 900 else { return trimmed }
@@ -242,6 +263,37 @@ struct GitHubRelease: Decodable, Equatable, Sendable {
         case body
         case assets
     }
+}
+
+struct ReleaseAssetChecksumValidation: Equatable, Sendable {
+    var status: ReleaseAssetChecksumStatus
+    var checksumHash: String? = nil
+    var digestHash: String? = nil
+
+    var title: String {
+        switch status {
+        case .matched: "sha256 匹配"
+        case .missingChecksum: "缺少 sha256"
+        case .missingDigest: "缺少 digest"
+        case .mismatched: "sha256 不匹配"
+        case .unreadable: "无法读取 sha256"
+        }
+    }
+
+    var systemImage: String {
+        switch status {
+        case .matched: "checkmark.seal.fill"
+        case .missingChecksum, .missingDigest, .mismatched, .unreadable: "exclamationmark.triangle.fill"
+        }
+    }
+}
+
+enum ReleaseAssetChecksumStatus: Equatable, Sendable {
+    case matched
+    case missingChecksum
+    case missingDigest
+    case mismatched
+    case unreadable
 }
 
 struct GitHubReleaseAsset: Decodable, Equatable, Identifiable, Sendable {
@@ -261,6 +313,14 @@ struct GitHubReleaseAsset: Decodable, Equatable, Identifiable, Sendable {
               !digest.isEmpty else { return "GitHub digest 不可用" }
         guard digest.count > 28 else { return digest }
         return "\(digest.prefix(28))..."
+    }
+
+    var sha256Digest: String? {
+        guard let digest = digest?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !digest.isEmpty else { return nil }
+        return digest.replacingOccurrences(of: "sha256:", with: "", options: [.caseInsensitive])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -365,7 +425,54 @@ actor GitHubReleaseClient {
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode(GitHubRelease.self, from: data)
+        let release = try decoder.decode(GitHubRelease.self, from: data)
+        return await releaseWithChecksumValidations(release)
+    }
+
+    private func releaseWithChecksumValidations(_ release: GitHubRelease) async -> GitHubRelease {
+        var validated = release
+        for asset in release.installableAssets {
+            validated.checksumValidations[asset.name] = await checksumValidation(for: asset, in: release)
+        }
+        return validated
+    }
+
+    private func checksumValidation(
+        for asset: GitHubReleaseAsset,
+        in release: GitHubRelease
+    ) async -> ReleaseAssetChecksumValidation {
+        guard let checksum = release.checksumAsset(for: asset) else {
+            return ReleaseAssetChecksumValidation(status: .missingChecksum)
+        }
+        guard let digestHash = asset.sha256Digest else {
+            return ReleaseAssetChecksumValidation(status: .missingDigest)
+        }
+
+        do {
+            var request = URLRequest(url: checksum.downloadURL, timeoutInterval: 15)
+            request.setValue("text/plain", forHTTPHeaderField: "Accept")
+            request.setValue("SurgeRelay/1.0", forHTTPHeaderField: "User-Agent")
+            let (data, response) = try await session.data(for: request)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            guard (200..<300).contains(status),
+                  let checksumHash = Self.sha256Hash(inChecksumText: String(decoding: data, as: UTF8.self)) else {
+                return ReleaseAssetChecksumValidation(status: .unreadable, digestHash: digestHash)
+            }
+            return ReleaseAssetChecksumValidation(
+                status: checksumHash == digestHash ? .matched : .mismatched,
+                checksumHash: checksumHash,
+                digestHash: digestHash
+            )
+        } catch {
+            return ReleaseAssetChecksumValidation(status: .unreadable, digestHash: digestHash)
+        }
+    }
+
+    private static func sha256Hash(inChecksumText text: String) -> String? {
+        text.split(whereSeparator: { $0.isWhitespace })
+            .first
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .flatMap { $0.isEmpty ? nil : $0 }
     }
 }
 
