@@ -12,6 +12,54 @@ enum WebServerRuntimeState: Equatable, Sendable {
     case starting
     case running
     case failed(String)
+
+    var title: String {
+        switch self {
+        case .stopped: "已停止"
+        case .starting: "正在启动"
+        case .running: "运行中"
+        case .failed: "启动失败"
+        }
+    }
+
+    var diagnosticValue: String {
+        switch self {
+        case .stopped: "stopped"
+        case .starting: "starting"
+        case .running: "running"
+        case let .failed(message): "failed: \(message)"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .stopped: "pause.circle"
+        case .starting: "clock"
+        case .running: "checkmark.circle.fill"
+        case .failed: "exclamationmark.triangle.fill"
+        }
+    }
+
+    var failureMessage: String? {
+        if case let .failed(message) = self { return message }
+        return nil
+    }
+}
+
+enum WebManagementURLFactory {
+    static func url(host: String, port: Int, accessToken: String, includingToken: Bool) -> URL? {
+        guard (1...65_535).contains(port) else { return nil }
+        var components = URLComponents()
+        components.scheme = "http"
+        components.host = host
+        components.port = port
+        components.path = "/"
+        let token = accessToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        if includingToken, !token.isEmpty {
+            components.queryItems = [URLQueryItem(name: "token", value: token)]
+        }
+        return components.url
+    }
 }
 
 struct WebHTTPRequest: Sendable {

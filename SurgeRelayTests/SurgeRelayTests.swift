@@ -70,6 +70,36 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertEqual(payload["message"], "该模块已经添加，不能重复添加。")
     }
 
+    func testWebServerRuntimeStateHasUserFacingAndDiagnosticValues() {
+        XCTAssertEqual(WebServerRuntimeState.running.title, "运行中")
+        XCTAssertEqual(WebServerRuntimeState.running.diagnosticValue, "running")
+        XCTAssertEqual(WebServerRuntimeState.running.systemImage, "checkmark.circle.fill")
+
+        let failed = WebServerRuntimeState.failed("端口已被占用")
+        XCTAssertEqual(failed.title, "启动失败")
+        XCTAssertEqual(failed.diagnosticValue, "failed: 端口已被占用")
+        XCTAssertEqual(failed.failureMessage, "端口已被占用")
+    }
+
+    func testWebManagementDisplayURLOmitsAccessToken() throws {
+        let accessURL = try XCTUnwrap(WebManagementURLFactory.url(
+            host: "relay.local",
+            port: 8787,
+            accessToken: "secret-token",
+            includingToken: true
+        ))
+        let displayURL = try XCTUnwrap(WebManagementURLFactory.url(
+            host: "relay.local",
+            port: 8787,
+            accessToken: "secret-token",
+            includingToken: false
+        ))
+
+        XCTAssertEqual(accessURL.absoluteString, "http://relay.local:8787/?token=secret-token")
+        XCTAssertEqual(displayURL.absoluteString, "http://relay.local:8787/")
+        XCTAssertFalse(displayURL.absoluteString.contains("secret-token"))
+    }
+
     func testRefreshPolicyDoesNotRefreshAgainBeforeInterval() {
         let now = Date(timeIntervalSince1970: 10_000)
         XCTAssertFalse(RefreshPolicy.isDue(

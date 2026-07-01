@@ -1353,15 +1353,26 @@ final class AppModel {
 
     var webManagementURL: URL? {
         guard settings.webServerEnabled else { return nil }
-        var components = URLComponents()
-        components.scheme = "http"
-        components.host = webManagementHost
-        components.port = settings.webServerPort
-        components.path = "/"
-        if !webAccessToken.isEmpty {
-            components.queryItems = [URLQueryItem(name: "token", value: webAccessToken)]
-        }
-        return components.url
+        return WebManagementURLFactory.url(
+            host: webManagementHost,
+            port: settings.webServerPort,
+            accessToken: webAccessToken,
+            includingToken: true
+        )
+    }
+
+    var webManagementDisplayURL: URL? {
+        guard settings.webServerEnabled else { return nil }
+        return WebManagementURLFactory.url(
+            host: webManagementHost,
+            port: settings.webServerPort,
+            accessToken: webAccessToken,
+            includingToken: false
+        )
+    }
+
+    var webManagementAccessModeTitle: String {
+        settings.webServerAllowRemoteAccess ? "局域网" : "仅本机"
     }
 
     private var webManagementHost: String {
@@ -1512,8 +1523,12 @@ final class AppModel {
             storageMode: settings.storageMode == .gitHub ? "GitHub" : "Local",
             githubRepository: "\(settings.github.owner)/\(settings.github.repository)",
             webServerEnabled: settings.webServerEnabled,
+            webServerState: webServerState.diagnosticValue,
             webServerPort: settings.webServerPort,
             webServerAllowRemoteAccess: settings.webServerAllowRemoteAccess,
+            webServerAccessMode: webManagementAccessModeTitle,
+            webManagementURL: webManagementDisplayURL?.absoluteString,
+            webAccessTokenStorageStatus: webAccessTokenStorageStatus.title,
             modules: modules.map {
                 DiagnosticModuleSnapshot(
                     id: $0.id,

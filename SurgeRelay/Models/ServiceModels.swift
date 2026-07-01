@@ -115,8 +115,12 @@ struct DiagnosticReport: Codable, Sendable {
     var storageMode: String
     var githubRepository: String
     var webServerEnabled: Bool
+    var webServerState: String
     var webServerPort: Int
     var webServerAllowRemoteAccess: Bool
+    var webServerAccessMode: String
+    var webManagementURL: String?
+    var webAccessTokenStorageStatus: String
     var modules: [DiagnosticModuleSnapshot]
     var history: [UpdateHistoryEntry]
 }

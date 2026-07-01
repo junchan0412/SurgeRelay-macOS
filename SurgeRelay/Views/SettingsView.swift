@@ -140,6 +140,11 @@ struct SettingsView: View {
             }
 
             Section("Web 管理") {
+                LabeledContent("服务状态") {
+                    Label(model.webServerState.title, systemImage: model.webServerState.systemImage)
+                        .foregroundStyle(webServerStateColor)
+                        .textSelection(.enabled)
+                }
                 Toggle("启用 Web 管理", isOn: Binding(
                     get: { model.settings.webServerEnabled },
                     set: {
@@ -164,15 +169,35 @@ struct SettingsView: View {
                     }
                 ))
                 .disabled(!model.settings.webServerEnabled)
-                if let url = model.webManagementURL {
+                if model.settings.webServerEnabled {
+                    LabeledContent("访问范围") {
+                        Label(
+                            model.webManagementAccessModeTitle,
+                            systemImage: model.settings.webServerAllowRemoteAccess ? "network" : "desktopcomputer"
+                        )
+                        .foregroundStyle(model.settings.webServerAllowRemoteAccess ? .orange : .secondary)
+                    }
+                    LabeledContent("令牌存储") {
+                        Label(model.webAccessTokenStorageStatus.title, systemImage: webAccessTokenStorageImage)
+                            .foregroundStyle(webAccessTokenStorageColor)
+                            .textSelection(.enabled)
+                    }
+                }
+                if let failure = model.webServerState.failureMessage {
+                    Label(failure, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .textSelection(.enabled)
+                }
+                if let displayURL = model.webManagementDisplayURL, let url = model.webManagementURL {
                     LabeledContent(model.settings.webServerAllowRemoteAccess ? "局域网地址" : "本机地址") {
-                        Text(url.absoluteString)
+                        Text(displayURL.absoluteString)
                             .foregroundStyle(.secondary)
                             .textSelection(.enabled)
                     }
                     HStack {
                         Button("打开", systemImage: "safari") { NSWorkspace.shared.open(url) }
-                        Button("拷贝", systemImage: "doc.on.doc") {
+                        Button("拷贝访问链接", systemImage: "doc.on.doc") {
                             NSPasteboard.general.clearContents()
                             NSPasteboard.general.setString(url.absoluteString, forType: .string)
                         }
@@ -345,7 +370,7 @@ struct SettingsView: View {
         .navigationTitle("设置")
         .task { refreshInstallationDiagnostics() }
         .sheet(isPresented: $showsWebQRCode) {
-            if let url = model.webManagementURL {
+            if let url = model.webManagementURL, let displayURL = model.webManagementDisplayURL {
                 VStack(spacing: 18) {
                     Text("Web 管理").font(.title2.bold())
                     if let image = qrCodeImage(for: url.absoluteString) {
@@ -354,7 +379,7 @@ struct SettingsView: View {
                             .resizable()
                             .frame(width: 240, height: 240)
                     }
-                    Text(url.absoluteString)
+                    Text(displayURL.absoluteString)
                         .font(.system(.callout, design: .monospaced))
                         .textSelection(.enabled)
                     Button("完成") { showsWebQRCode = false }
@@ -371,6 +396,24 @@ struct SettingsView: View {
             get: { model.settings.storageMode },
             set: { model.setStorageMode($0) }
         )
+    }
+
+    private var webServerStateColor: Color {
+        switch model.webServerState {
+        case .running: .green
+        case .failed: .red
+        case .starting, .stopped: .secondary
+        }
+    }
+
+    private var webAccessTokenStorageImage: String {
+        model.webAccessTokenStorageStatus == .keychain
+            ? "key.fill"
+            : "exclamationmark.triangle.fill"
+    }
+
+    private var webAccessTokenStorageColor: Color {
+        model.webAccessTokenStorageStatus == .keychain ? .green : .orange
     }
 
     private func chooseLocalModuleDirectory() {
