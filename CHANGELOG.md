@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.16
+
+- App 内 GitHub Release 更新面板新增资产完整性区域，会显示 `.pkg` 与 `.app.zip` 的文件大小、GitHub digest 和对应 `.sha256` 文件状态。
+- 更新面板会提示安装资产是否缺少 sha256 校验文件，便于在下载安装前发现 Release 资产不完整的问题。
+- GitHub Release API 解码测试补充 `digest` 与 `.sha256` 配对覆盖，避免后续调整破坏更新面板的完整性信息。
+
 ## 1.2.15
 
 - Release 验证新增主程序动态库依赖解析检查，会读取 `LC_RPATH` 与 `otool -L`，确认 `@rpath` 依赖能够解析到 App bundle 内或系统库路径。

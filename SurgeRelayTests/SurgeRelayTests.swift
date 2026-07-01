@@ -266,12 +266,24 @@ final class SurgeRelayTests: XCTestCase {
                     {
                       "name": "Surge-Relay-1.2.12.app.zip",
                       "browser_download_url": "https://example.com/Surge-Relay-1.2.12.app.zip",
-                      "size": 7000000
+                      "size": 7000000,
+                      "digest": "sha256:appzipdigest"
+                    },
+                    {
+                      "name": "Surge-Relay-1.2.12.app.zip.sha256",
+                      "browser_download_url": "https://example.com/Surge-Relay-1.2.12.app.zip.sha256",
+                      "size": 93
                     },
                     {
                       "name": "Surge-Relay-1.2.12.pkg",
                       "browser_download_url": "https://example.com/Surge-Relay-1.2.12.pkg",
-                      "size": 7100000
+                      "size": 7100000,
+                      "digest": "sha256:pkgdigest"
+                    },
+                    {
+                      "name": "Surge-Relay-1.2.12.pkg.sha256",
+                      "browser_download_url": "https://example.com/Surge-Relay-1.2.12.pkg.sha256",
+                      "size": 89
                     }
                   ]
                 }
@@ -285,7 +297,21 @@ final class SurgeRelayTests: XCTestCase {
 
         XCTAssertEqual(release.version, "1.2.12")
         XCTAssertEqual(release.packageAsset?.name, "Surge-Relay-1.2.12.pkg")
+        XCTAssertEqual(release.packageAsset?.digest, "sha256:pkgdigest")
+        XCTAssertEqual(
+            release.packageAsset.flatMap { release.checksumAsset(for: $0)?.name },
+            "Surge-Relay-1.2.12.pkg.sha256"
+        )
         XCTAssertEqual(release.appZipAsset?.name, "Surge-Relay-1.2.12.app.zip")
+        XCTAssertEqual(release.appZipAsset?.digestDisplay, "sha256:appzipdigest")
+        XCTAssertEqual(
+            release.appZipAsset.flatMap { release.checksumAsset(for: $0)?.name },
+            "Surge-Relay-1.2.12.app.zip.sha256"
+        )
+        XCTAssertEqual(release.installableAssets.map(\.name), [
+            "Surge-Relay-1.2.12.pkg",
+            "Surge-Relay-1.2.12.app.zip"
+        ])
         XCTAssertEqual(release.notesPreview, "Release notes")
         XCTAssertTrue(GitHubMockURLProtocol.requestedPaths.contains(
             "GET /repos/junchan0412/SurgeRelay-macOS/releases/latest"

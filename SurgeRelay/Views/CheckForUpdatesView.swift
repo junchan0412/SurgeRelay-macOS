@@ -131,6 +131,17 @@ struct CheckForUpdatesSheet: View {
                 }
             }
 
+            if !release.installableAssets.isEmpty {
+                Divider()
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("资产完整性")
+                        .font(.headline)
+                    ForEach(release.installableAssets) { asset in
+                        assetIntegrityRow(asset, checksum: release.checksumAsset(for: asset))
+                    }
+                }
+            }
+
             if !release.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Divider()
                 VStack(alignment: .leading, spacing: 6) {
@@ -147,6 +158,27 @@ struct CheckForUpdatesSheet: View {
             }
         }
         .frame(minHeight: 180, alignment: .topLeading)
+    }
+
+    private func assetIntegrityRow(_ asset: GitHubReleaseAsset, checksum: GitHubReleaseAsset?) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(asset.name)
+                    .font(.caption.weight(.semibold))
+                    .textSelection(.enabled)
+                Text("\(asset.formattedSize) · \(asset.digestDisplay)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+            Spacer()
+            Label(
+                checksum == nil ? "缺少 sha256" : "已提供 sha256",
+                systemImage: checksum == nil ? "exclamationmark.triangle.fill" : "checkmark.seal.fill"
+            )
+            .font(.caption)
+            .foregroundStyle(checksum == nil ? .orange : .green)
+        }
     }
 
     @MainActor
@@ -187,6 +219,15 @@ struct GitHubRelease: Decodable, Equatable, Sendable {
         assets.first { $0.name.lowercased().hasSuffix(".app.zip") }
     }
 
+    var installableAssets: [GitHubReleaseAsset] {
+        [packageAsset, appZipAsset].compactMap(\.self)
+    }
+
+    func checksumAsset(for asset: GitHubReleaseAsset) -> GitHubReleaseAsset? {
+        let expectedName = "\(asset.name).sha256".lowercased()
+        return assets.first { $0.name.lowercased() == expectedName }
+    }
+
     var notesPreview: String {
         let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count > 900 else { return trimmed }
@@ -207,6 +248,7 @@ struct GitHubReleaseAsset: Decodable, Equatable, Identifiable, Sendable {
     var name: String
     var downloadURL: URL
     var size: Int
+    var digest: String?
 
     var id: String { name }
 
@@ -214,10 +256,18 @@ struct GitHubReleaseAsset: Decodable, Equatable, Identifiable, Sendable {
         ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file)
     }
 
+    var digestDisplay: String {
+        guard let digest = digest?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !digest.isEmpty else { return "GitHub digest 不可用" }
+        guard digest.count > 28 else { return digest }
+        return "\(digest.prefix(28))..."
+    }
+
     private enum CodingKeys: String, CodingKey {
         case name
         case downloadURL = "browser_download_url"
         case size
+        case digest
     }
 }
 
