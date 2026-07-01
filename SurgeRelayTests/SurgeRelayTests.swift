@@ -140,6 +140,48 @@ final class SurgeRelayTests: XCTestCase {
         )
     }
 
+    func testGitHubClientListsNestedModuleDirectoriesFromTree() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GitHubMockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        GitHubMockURLProtocol.reset()
+        defer { GitHubMockURLProtocol.reset() }
+        GitHubMockURLProtocol.handler = { request in
+            switch (request.httpMethod ?? "GET", request.url?.path ?? "") {
+            case ("GET", "/repos/someone/relay/git/ref/heads/main"):
+                return (200, Data(#"{"object":{"sha":"commit1"}}"#.utf8))
+            case ("GET", "/repos/someone/relay/git/commits/commit1"):
+                return (200, Data(#"{"sha":"commit1","tree":{"sha":"tree1"}}"#.utf8))
+            case ("GET", "/repos/someone/relay/git/trees/tree1"):
+                return (200, Data("""
+                {
+                  "tree": [
+                    {"path": "modules/Ads", "type": "tree", "sha": "tree-ads"},
+                    {"path": "modules/Ads/Video", "type": "tree", "sha": "tree-video"},
+                    {"path": "modules/Ads/Video/YouTube.sgmodule", "type": "blob", "sha": "blob-video"},
+                    {"path": "modules/Root.sgmodule", "type": "blob", "sha": "blob-root"},
+                    {"path": "modules/assets/Generated/script.js", "type": "blob", "sha": "blob-asset"},
+                    {"path": "other/Ignored", "type": "tree", "sha": "tree-ignored"}
+                  ],
+                  "truncated": false
+                }
+                """.utf8))
+            default:
+                return (404, Data(#"{"message":"not found"}"#.utf8))
+            }
+        }
+        var settings = GitHubSettings()
+        settings.owner = "someone"
+        settings.repository = "relay"
+        settings.branch = "main"
+        settings.directory = "modules"
+
+        let folders = try await GitHubClient(session: session).listDirectories(settings: settings, token: "token")
+
+        XCTAssertEqual(folders, ["Ads", "Ads/Video"])
+        XCTAssertTrue(GitHubMockURLProtocol.requestedPaths.contains("GET /repos/someone/relay/git/trees/tree1?recursive=1"))
+    }
+
     func testPublicRepositoryUsesGitHubRawWithoutCloudflare() throws {
         var settings = GitHubSettings()
         settings.repositoryIsPrivate = false
@@ -432,6 +474,70 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertEqual(Data("hello\n".utf8).gitBlobSHA1, "ce013625030ba8dba906f756967f9e9ca394464a")
     }
 
+    func testGitHubPublishDiffsAgainstRecursiveTree() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GitHubMockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        GitHubMockURLProtocol.reset()
+        defer { GitHubMockURLProtocol.reset() }
+        let sameSHA = Data("same".utf8).gitBlobSHA1
+        let oldSHA = Data("old".utf8).gitBlobSHA1
+        GitHubMockURLProtocol.handler = { request in
+            let path = request.url?.path ?? ""
+            switch (request.httpMethod ?? "GET", path) {
+            case ("GET", "/repos/someone/relay/git/ref/heads/main"):
+                return (200, Data(#"{"object":{"sha":"commit1"}}"#.utf8))
+            case ("GET", "/repos/someone/relay/git/commits/commit1"):
+                return (200, Data(#"{"sha":"commit1","tree":{"sha":"tree1"}}"#.utf8))
+            case ("GET", "/repos/someone/relay/git/trees/tree1"):
+                return (200, Data("""
+                {
+                  "tree": [
+                    {"path": "modules/Same.sgmodule", "type": "blob", "sha": "\(sameSHA)"},
+                    {"path": "modules/Changed.sgmodule", "type": "blob", "sha": "\(oldSHA)"},
+                    {"path": "modules/Stale.sgmodule", "type": "blob", "sha": "\(oldSHA)"}
+                  ],
+                  "truncated": false
+                }
+                """.utf8))
+            case ("POST", "/repos/someone/relay/git/blobs"):
+                return (200, Data(#"{"sha":"new-blob"}"#.utf8))
+            case ("POST", "/repos/someone/relay/git/trees"):
+                return (200, Data(#"{"sha":"tree2"}"#.utf8))
+            case ("POST", "/repos/someone/relay/git/commits"):
+                return (200, Data(#"{"sha":"commit2","tree":{"sha":"tree2"}}"#.utf8))
+            case ("PATCH", "/repos/someone/relay/git/refs/heads/main"):
+                return (200, Data(#"{"object":{"sha":"commit2"}}"#.utf8))
+            default:
+                return (404, Data(#"{"message":"not found"}"#.utf8))
+            }
+        }
+        var settings = GitHubSettings()
+        settings.owner = "someone"
+        settings.repository = "relay"
+        settings.branch = "main"
+        settings.directory = "modules"
+
+        let report = try await GitHubClient(session: session).publish(
+            files: [
+                PublishFile(name: "Same.sgmodule", data: Data("same".utf8)),
+                PublishFile(name: "Changed.sgmodule", data: Data("new".utf8))
+            ],
+            deleting: ["Stale.sgmodule"],
+            settings: settings,
+            token: "token"
+        )
+
+        XCTAssertEqual(report.publishedFiles, ["Changed.sgmodule"])
+        XCTAssertEqual(report.deletedFiles, ["Stale.sgmodule"])
+        XCTAssertEqual(report.commitSHA, "commit2")
+        XCTAssertFalse(GitHubMockURLProtocol.requestedPaths.contains { $0.contains("/contents/") })
+        XCTAssertEqual(
+            GitHubMockURLProtocol.requestedPaths.filter { $0 == "POST /repos/someone/relay/git/blobs" }.count,
+            1
+        )
+    }
+
     func testModuleArgumentsAreMaterializedAndMetadataIsRemoved() {
         let content = """
         #!name=Demo
@@ -684,6 +790,38 @@ private final class SourceRevisionURLProtocol: URLProtocol, @unchecked Sendable 
         )!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: responseValue.data)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
+private final class GitHubMockURLProtocol: URLProtocol, @unchecked Sendable {
+    nonisolated(unsafe) static var handler: ((URLRequest) -> (status: Int, data: Data))?
+    nonisolated(unsafe) static var requestedPaths: [String] = []
+
+    static func reset() {
+        handler = nil
+        requestedPaths = []
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        let method = request.httpMethod ?? "GET"
+        let url = request.url!
+        let query = url.query.map { "?\($0)" } ?? ""
+        Self.requestedPaths.append("\(method) \(url.path)\(query)")
+        let responseValue = Self.handler?(request) ?? (500, Data(#"{"message":"unhandled request"}"#.utf8))
+        let response = HTTPURLResponse(
+            url: url,
+            statusCode: responseValue.0,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Content-Type": "application/json"]
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: responseValue.1)
         client?.urlProtocolDidFinishLoading(self)
     }
 

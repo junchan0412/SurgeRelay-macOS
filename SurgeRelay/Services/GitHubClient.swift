@@ -7,15 +7,20 @@ actor GitHubClient {
         let isPrivate: Bool
         private enum CodingKeys: String, CodingKey { case isPrivate = "private" }
     }
-    private struct RepositoryContentItem: Decodable {
-        let name: String
-        let type: String
-    }
     private struct GitObject: Codable { let sha: String }
     private struct ReferenceResponse: Decodable { let object: GitObject }
     private struct CommitResponse: Decodable {
         let sha: String
         let tree: GitObject
+    }
+    private struct GitTreeItem: Decodable {
+        let path: String
+        let type: String
+        let sha: String?
+    }
+    private struct RecursiveTreeResponse: Decodable {
+        let tree: [GitTreeItem]
+        let truncated: Bool?
     }
     private struct BlobRequest: Encodable {
         let content: String
@@ -71,6 +76,13 @@ actor GitHubClient {
         let sha: String
         let force = false
     }
+    private struct RemoteTreeSnapshot {
+        let headCommitSHA: String
+        let baseTreeSHA: String
+        let blobsByRepositoryPath: [String: String]
+        let moduleDirectories: [String]
+        let isTruncated: Bool
+    }
 
     private let session: URLSession
 
@@ -93,24 +105,8 @@ actor GitHubClient {
 
     func listDirectories(settings: GitHubSettings, token: String) async throws -> [String] {
         guard settings.isConfigured else { throw RelayError.githubNotConfigured }
-        var components = URLComponents(url: try contentsURL(settings: settings), resolvingAgainstBaseURL: false)
-        components?.queryItems = [URLQueryItem(name: "ref", value: settings.branch)]
-        guard let url = components?.url else { throw RelayError.githubNotConfigured }
-
-        var request = URLRequest(url: url, timeoutInterval: 30)
-        applyHeaders(to: &request, token: token)
-        let (data, response) = try await session.data(for: request)
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        if status == 404 { return [] }
-        guard (200..<300).contains(status) else {
-            let message = (try? JSONDecoder().decode(GitHubMessage.self, from: data).message)
-                ?? "GitHub 目录查询失败。"
-            throw RelayError.httpFailure(status: status, message: message)
-        }
-        return try JSONDecoder().decode([RepositoryContentItem].self, from: data)
-            .filter { $0.type == "dir" }
-            .map(\.name)
-            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        let snapshot = try await remoteTreeSnapshot(settings: settings, token: token)
+        return snapshot.moduleDirectories
     }
 
     func publish(
@@ -123,38 +119,42 @@ actor GitHubClient {
         guard !token.isEmpty else { throw RelayError.githubTokenMissing }
         guard !files.isEmpty || !obsoleteFileNames.isEmpty else { throw RelayError.noFilesToPublish }
 
-        var changedFiles: [PublishFile] = []
-        for file in files {
-            try Task.checkCancellation()
-            let sha = try await existingSHA(fileName: file.name, settings: settings, token: token)
-            if sha != file.data.gitBlobSHA1 { changedFiles.append(file) }
-        }
-
+        let snapshot = try await remoteTreeSnapshot(settings: settings, token: token)
         let currentFileNames = Set(files.map(\.name))
+        var changedFiles: [PublishFile] = []
         var deletedFiles: [String] = []
-        for fileName in Set(obsoleteFileNames).sorted() where !currentFileNames.contains(fileName) {
-            try Task.checkCancellation()
-            if try await existingSHA(fileName: fileName, settings: settings, token: token) != nil {
-                deletedFiles.append(fileName)
+        if snapshot.isTruncated {
+            for file in files {
+                try Task.checkCancellation()
+                let sha = try await existingSHA(fileName: file.name, settings: settings, token: token)
+                if sha != file.data.gitBlobSHA1 { changedFiles.append(file) }
+            }
+            for fileName in Set(obsoleteFileNames).sorted() where !currentFileNames.contains(fileName) {
+                try Task.checkCancellation()
+                if try await existingSHA(fileName: fileName, settings: settings, token: token) != nil {
+                    deletedFiles.append(fileName)
+                }
+            }
+        } else {
+            for file in files {
+                try Task.checkCancellation()
+                let path = repositoryPath(for: file.name, settings: settings)
+                if snapshot.blobsByRepositoryPath[path] != file.data.gitBlobSHA1 {
+                    changedFiles.append(file)
+                }
+            }
+            for fileName in Set(obsoleteFileNames).sorted() where !currentFileNames.contains(fileName) {
+                try Task.checkCancellation()
+                let path = repositoryPath(for: fileName, settings: settings)
+                if snapshot.blobsByRepositoryPath[path] != nil {
+                    deletedFiles.append(fileName)
+                }
             }
         }
         guard !changedFiles.isEmpty || !deletedFiles.isEmpty else {
             return PublishReport(publishedFiles: [])
         }
 
-        let branch = encodedPathComponent(settings.branch)
-        let reference: ReferenceResponse = try await requestJSON(
-            path: "git/ref/heads/\(branch)",
-            method: "GET",
-            settings: settings,
-            token: token
-        )
-        let headCommit: CommitResponse = try await requestJSON(
-            path: "git/commits/\(reference.object.sha)",
-            method: "GET",
-            settings: settings,
-            token: token
-        )
         var entries: [TreeEntry] = []
         for file in changedFiles {
             try Task.checkCancellation()
@@ -173,7 +173,7 @@ actor GitHubClient {
         let tree: TreeResponse = try await requestJSON(
             path: "git/trees",
             method: "POST",
-            body: TreeRequest(baseTree: headCommit.tree.sha, tree: entries),
+            body: TreeRequest(baseTree: snapshot.baseTreeSHA, tree: entries),
             settings: settings,
             token: token
         )
@@ -183,11 +183,12 @@ actor GitHubClient {
             body: CommitRequest(
                 message: commitMessage(changedCount: changedFiles.count, deletedCount: deletedFiles.count),
                 tree: tree.sha,
-                parents: [headCommit.sha]
+                parents: [snapshot.headCommitSHA]
             ),
             settings: settings,
             token: token
         )
+        let branch = encodedPathComponent(settings.branch)
         let _: ReferenceResponse = try await requestJSON(
             path: "git/refs/heads/\(branch)",
             method: "PATCH",
@@ -200,6 +201,35 @@ actor GitHubClient {
             publishedFiles: changedFiles.map(\.name),
             deletedFiles: deletedFiles,
             commitSHA: commit.sha
+        )
+    }
+
+    private func remoteTreeSnapshot(settings: GitHubSettings, token: String) async throws -> RemoteTreeSnapshot {
+        let branch = encodedPathComponent(settings.branch)
+        let reference: ReferenceResponse = try await requestJSON(
+            path: "git/ref/heads/\(branch)",
+            method: "GET",
+            settings: settings,
+            token: token
+        )
+        let headCommit: CommitResponse = try await requestJSON(
+            path: "git/commits/\(reference.object.sha)",
+            method: "GET",
+            settings: settings,
+            token: token
+        )
+        let tree: RecursiveTreeResponse = try await requestJSON(
+            path: "git/trees/\(headCommit.tree.sha)?recursive=1",
+            method: "GET",
+            settings: settings,
+            token: token
+        )
+        return RemoteTreeSnapshot(
+            headCommitSHA: headCommit.sha,
+            baseTreeSHA: headCommit.tree.sha,
+            blobsByRepositoryPath: blobsByRepositoryPath(from: tree.tree),
+            moduleDirectories: moduleDirectories(from: tree.tree, settings: settings),
+            isTruncated: tree.truncated == true
         )
     }
 
@@ -279,14 +309,6 @@ actor GitHubClient {
         return url
     }
 
-    private func contentsURL(settings: GitHubSettings) throws -> URL {
-        var path = "https://api.github.com/repos/\(settings.owner)/\(settings.repository)/contents"
-        let directory = encodedRepositoryDirectory(settings: settings)
-        if !directory.isEmpty { path += "/\(directory)" }
-        guard let url = URL(string: path) else { throw RelayError.githubNotConfigured }
-        return url
-    }
-
     private func apiURL(settings: GitHubSettings, suffix: String) throws -> URL {
         guard let url = URL(string: "https://api.github.com/repos/\(settings.owner)/\(settings.repository)/\(suffix)") else {
             throw RelayError.githubNotConfigured
@@ -295,8 +317,51 @@ actor GitHubClient {
     }
 
     private func repositoryPath(for fileName: String, settings: GitHubSettings) -> String {
-        let directory = settings.directory.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let directory = repositoryDirectory(settings: settings)
         return [directory, fileName].filter { !$0.isEmpty }.joined(separator: "/")
+    }
+
+    private func repositoryDirectory(settings: GitHubSettings) -> String {
+        settings.directory
+            .replacingOccurrences(of: "\\", with: "/")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            .split(separator: "/")
+            .map(String.init)
+            .filter { !$0.isEmpty && $0 != "." && $0 != ".." }
+            .joined(separator: "/")
+    }
+
+    private func blobsByRepositoryPath(from tree: [GitTreeItem]) -> [String: String] {
+        Dictionary(
+            uniqueKeysWithValues: tree.compactMap { item in
+                guard item.type == "blob", let sha = item.sha else { return nil }
+                return (item.path, sha)
+            }
+        )
+    }
+
+    private func moduleDirectories(from tree: [GitTreeItem], settings: GitHubSettings) -> [String] {
+        var folders = Set<String>()
+        for item in tree {
+            guard let relativePath = relativeModulePath(for: item.path, settings: settings) else { continue }
+            let components = relativePath.split(separator: "/").map(String.init)
+            guard components.first?.lowercased() != "assets" else { continue }
+            let directoryComponents = item.type == "tree" ? components : Array(components.dropLast())
+            guard !directoryComponents.isEmpty else { continue }
+            for index in 1...directoryComponents.count {
+                let folder = ModuleOutputFolder.normalized(directoryComponents.prefix(index).joined(separator: "/"))
+                if !folder.isEmpty { folders.insert(folder) }
+            }
+        }
+        return folders.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
+
+    private func relativeModulePath(for repositoryPath: String, settings: GitHubSettings) -> String? {
+        let directory = repositoryDirectory(settings: settings)
+        guard !directory.isEmpty else { return repositoryPath }
+        guard repositoryPath.hasPrefix(directory + "/") else { return nil }
+        let relative = String(repositoryPath.dropFirst(directory.count + 1))
+        return relative.isEmpty ? nil : relative
     }
 
     private func commitMessage(changedCount: Int, deletedCount: Int) -> String {
@@ -312,14 +377,6 @@ actor GitHubClient {
 
     private func encodedRepositoryPath(for fileName: String, settings: GitHubSettings) -> String {
         repositoryPath(for: fileName, settings: settings)
-            .split(separator: "/")
-            .map { encodedPathComponent(String($0)) }
-            .joined(separator: "/")
-    }
-
-    private func encodedRepositoryDirectory(settings: GitHubSettings) -> String {
-        settings.directory
-            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
             .split(separator: "/")
             .map { encodedPathComponent(String($0)) }
             .joined(separator: "/")
