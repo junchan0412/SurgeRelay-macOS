@@ -28,7 +28,7 @@
 		<true/>
 	</dict>
 	<key>SUEnableAutomaticChecks</key>
-	<true/>
+	<false/>
 	<key>SUFeedURL</key>
 	<string>https://raw.githubusercontent.com/junchan0412/SurgeRelay-macOS/main/appcast.xml</string>
 	<key>SUPublicEDKey</key>

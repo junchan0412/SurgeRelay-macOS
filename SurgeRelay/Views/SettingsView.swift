@@ -9,6 +9,7 @@ struct SettingsView: View {
     @State private var isTesting = false
     @State private var connectionResult: ConnectionResult?
     @State private var showsWebQRCode = false
+    @State private var installationDiagnostics: InstallationDiagnosticSnapshot?
 
     private enum ConnectionResult {
         case success(String)
@@ -66,6 +67,76 @@ struct SettingsView: View {
                     get: { model.settings.automaticallyPublish },
                     set: { model.settings.automaticallyPublish = $0; model.saveSettings() }
                 ))
+            }
+
+            Section("安装与权限") {
+                if let diagnostics = installationDiagnostics {
+                    LabeledContent("版本") {
+                        Text("\(diagnostics.appVersion) (\(diagnostics.buildNumber))")
+                            .foregroundStyle(.secondary)
+                    }
+                    LabeledContent("App 位置") {
+                        Text(diagnostics.appPath)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .lineLimit(2)
+                    }
+                    diagnosticLabel("签名", value: diagnostics.signatureStatus, systemImage: "signature")
+                    diagnosticLabel("Gatekeeper", value: diagnostics.gatekeeperStatus, systemImage: "lock.shield")
+                    diagnosticLabel("隔离属性", value: diagnostics.quarantineStatus, systemImage: "shield.lefthalf.filled")
+                    LabeledContent("自动检查更新") {
+                        Label(
+                            diagnostics.sparkleAutomaticChecksEnabled ? "开启" : "关闭",
+                            systemImage: diagnostics.sparkleAutomaticChecksEnabled ? "checkmark.circle.fill" : "pause.circle"
+                        )
+                        .foregroundStyle(diagnostics.sparkleAutomaticChecksEnabled ? .green : .secondary)
+                    }
+                    if let feedURL = diagnostics.sparkleFeedURL {
+                        LabeledContent("更新源") {
+                            Text(feedURL)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                                .lineLimit(2)
+                        }
+                    }
+                    Label(diagnostics.updateRecommendation, systemImage: "shippingbox")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button("重新检查", systemImage: "arrow.clockwise") {
+                        refreshInstallationDiagnostics()
+                    }
+                } else {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("正在读取安装状态…")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            Section("钥匙串") {
+                let credentials = model.credentialDiagnostics()
+                LabeledContent("服务") {
+                    Text(credentials.keychainService)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+                credentialLabel(
+                    "GitHub Token",
+                    account: credentials.githubTokenAccount,
+                    status: credentials.githubTokenStatus
+                )
+                credentialLabel(
+                    "Web 管理令牌",
+                    account: credentials.webAccessTokenAccount,
+                    status: credentials.webAccessTokenStatus
+                )
+                Label(credentials.note, systemImage: "key.fill")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Web 管理") {
@@ -272,6 +343,7 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .navigationTitle("设置")
+        .task { refreshInstallationDiagnostics() }
         .sheet(isPresented: $showsWebQRCode) {
             if let url = model.webManagementURL {
                 VStack(spacing: 18) {
@@ -310,6 +382,36 @@ struct SettingsView: View {
         panel.directoryURL = URL(filePath: model.settings.localModuleDirectory, directoryHint: .isDirectory)
         guard panel.runModal() == .OK, let url = panel.url else { return }
         model.setLocalModuleDirectory(url.path)
+    }
+
+    private func refreshInstallationDiagnostics() {
+        Task { @MainActor in
+            let snapshot = await Task.detached(priority: .utility) {
+                InstallationDiagnosticSnapshot.current()
+            }.value
+            installationDiagnostics = snapshot
+        }
+    }
+
+    private func diagnosticLabel(_ title: String, value: String, systemImage: String) -> some View {
+        LabeledContent(title) {
+            Label(value, systemImage: systemImage)
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+        }
+    }
+
+    private func credentialLabel(_ title: String, account: String, status: String) -> some View {
+        LabeledContent(title) {
+            VStack(alignment: .trailing, spacing: 2) {
+                Label(status, systemImage: status.contains("钥匙串") ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                    .foregroundStyle(status.contains("钥匙串") ? .green : .secondary)
+                Text(account)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .textSelection(.enabled)
+            }
+        }
     }
 
     private func githubBinding(_ keyPath: WritableKeyPath<GitHubSettings, String>) -> Binding<String> {

@@ -17,6 +17,8 @@ final class AppModel {
     var presentedError: String?
     var githubToken: String
     var webAccessToken: String
+    var githubTokenStorageStatus: CredentialStorageStatus
+    var webAccessTokenStorageStatus: CredentialStorageStatus
     var navigationRequest: SidebarDestination?
     /// Set to true to ask the main window to present the in-app settings sheet
     /// (used by the menu bar, the ⌘, command, and the toolbar gear button).
@@ -47,12 +49,14 @@ final class AppModel {
 
     private struct GitHubTokenLoadResult {
         var token: String
+        var storageStatus: CredentialStorageStatus
         var shouldClearLegacyToken: Bool
         var statusMessage: String?
     }
 
     private struct WebAccessTokenLoadResult {
         var token: String
+        var storageStatus: CredentialStorageStatus
         var statusMessage: String?
     }
 
@@ -78,6 +82,8 @@ final class AppModel {
         updateHistory = PersistenceStore.loadUpdateHistory()
         githubToken = tokenLoad.token
         webAccessToken = webTokenLoad.token
+        githubTokenStorageStatus = tokenLoad.storageStatus
+        webAccessTokenStorageStatus = webTokenLoad.storageStatus
         selectedModuleID = Self.combinedModuleSelectionID
         let startupMessages = [tokenLoad.statusMessage, webTokenLoad.statusMessage].compactMap { $0 }
         if !startupMessages.isEmpty {
@@ -94,25 +100,36 @@ final class AppModel {
             if !storedToken.isEmpty {
                 return GitHubTokenLoadResult(
                     token: storedToken,
+                    storageStatus: .keychain,
                     shouldClearLegacyToken: true,
                     statusMessage: legacyToken.isEmpty ? nil : "GitHub Token 已改由系统钥匙串管理"
                 )
             }
             guard !legacyToken.isEmpty else {
-                return GitHubTokenLoadResult(token: "", shouldClearLegacyToken: true)
+                return GitHubTokenLoadResult(
+                    token: "",
+                    storageStatus: .notConfigured,
+                    shouldClearLegacyToken: true
+                )
             }
             try KeychainStore.saveGitHubToken(legacyToken)
             return GitHubTokenLoadResult(
                 token: legacyToken,
+                storageStatus: .keychain,
                 shouldClearLegacyToken: true,
                 statusMessage: "GitHub Token 已从同步配置迁移到系统钥匙串"
             )
         } catch {
             guard !legacyToken.isEmpty else {
-                return GitHubTokenLoadResult(token: "", shouldClearLegacyToken: false)
+                return GitHubTokenLoadResult(
+                    token: "",
+                    storageStatus: .unavailable,
+                    shouldClearLegacyToken: false
+                )
             }
             return GitHubTokenLoadResult(
                 token: legacyToken,
+                storageStatus: .legacyConfigurationFallback,
                 shouldClearLegacyToken: false,
                 statusMessage: "无法访问系统钥匙串，暂时沿用旧同步配置中的 GitHub Token"
             )
@@ -124,14 +141,15 @@ final class AppModel {
             let storedToken = try KeychainStore.loadWebAccessToken()
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             if !storedToken.isEmpty {
-                return WebAccessTokenLoadResult(token: storedToken)
+                return WebAccessTokenLoadResult(token: storedToken, storageStatus: .keychain)
             }
             let token = generateWebAccessToken()
             try KeychainStore.saveWebAccessToken(token)
-            return WebAccessTokenLoadResult(token: token)
+            return WebAccessTokenLoadResult(token: token, storageStatus: .keychain)
         } catch {
             return WebAccessTokenLoadResult(
                 token: generateWebAccessToken(),
+                storageStatus: .memoryOnly,
                 statusMessage: "无法访问系统钥匙串，Web 管理访问令牌仅在本次运行中有效"
             )
         }
@@ -154,8 +172,10 @@ final class AppModel {
         webAccessToken = token
         do {
             try KeychainStore.saveWebAccessToken(token)
+            webAccessTokenStorageStatus = .keychain
             statusMessage = "Web 管理访问令牌已重置"
         } catch {
+            webAccessTokenStorageStatus = .memoryOnly
             presentedError = "无法保存 Web 管理访问令牌：\(error.localizedDescription)"
             statusMessage = "Web 管理访问令牌仅在本次运行中有效"
         }
@@ -215,9 +235,11 @@ final class AppModel {
         do {
             try KeychainStore.saveGitHubToken(githubToken)
             settings.githubToken = ""
+            githubTokenStorageStatus = githubToken.isEmpty ? .notConfigured : .keychain
             PersistenceStore.saveSettings(settings)
             statusMessage = githubToken.isEmpty ? "GitHub Token 已从系统钥匙串移除" : "GitHub Token 已保存到系统钥匙串"
         } catch {
+            githubTokenStorageStatus = githubToken.isEmpty ? .unavailable : .memoryOnly
             presentedError = "无法保存 GitHub Token：\(error.localizedDescription)"
             statusMessage = "GitHub Token 未保存"
         }
@@ -238,7 +260,12 @@ final class AppModel {
 
         if webAccessToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             webAccessToken = Self.generateWebAccessToken()
-            try? KeychainStore.saveWebAccessToken(webAccessToken)
+            do {
+                try KeychainStore.saveWebAccessToken(webAccessToken)
+                webAccessTokenStorageStatus = .keychain
+            } catch {
+                webAccessTokenStorageStatus = .memoryOnly
+            }
         }
 
         let configuration = WebServerConfiguration(
@@ -1330,12 +1357,25 @@ final class AppModel {
         return await processingWorker.materialize(content, overrides: module.argumentOverrides)
     }
 
+    func installationDiagnostics() -> InstallationDiagnosticSnapshot {
+        InstallationDiagnosticSnapshot.current()
+    }
+
+    func credentialDiagnostics() -> CredentialDiagnosticSnapshot {
+        CredentialDiagnosticSnapshot.current(
+            githubTokenStatus: githubTokenStorageStatus,
+            webAccessTokenStatus: webAccessTokenStorageStatus
+        )
+    }
+
     func diagnosticsData() throws -> Data {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
         let report = DiagnosticReport(
             generatedAt: .now,
             appVersion: version,
             operatingSystem: ProcessInfo.processInfo.operatingSystemVersionString,
+            installation: installationDiagnostics(),
+            credentials: credentialDiagnostics(),
             engineRevision: upstreamState.revision,
             storageMode: settings.storageMode == .gitHub ? "GitHub" : "Local",
             githubRepository: "\(settings.github.owner)/\(settings.github.repository)",

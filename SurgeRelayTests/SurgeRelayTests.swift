@@ -248,6 +248,38 @@ final class SurgeRelayTests: XCTestCase {
         }
     }
 
+    func testInstallationDiagnosticsClassifiesAdHocGatekeeperAndQuarantine() {
+        let signature = InstallationDiagnosticSnapshot.signatureSummary(from: .init(
+            status: 0,
+            output: "Signature=adhoc\nTeamIdentifier=not set\n"
+        ))
+        XCTAssertEqual(signature, "ad-hoc 签名，未使用 Developer ID")
+
+        let gatekeeper = InstallationDiagnosticSnapshot.gatekeeperSummary(from: .init(
+            status: 1,
+            output: "Surge Relay.app: rejected\n"
+        ))
+        XCTAssertEqual(gatekeeper, "会被 Gatekeeper 拦截，首次安装可能需要手动信任")
+
+        let quarantine = InstallationDiagnosticSnapshot.quarantineSummary(from: .init(
+            status: 0,
+            output: "0081;687...;Safari;\n"
+        ))
+        XCTAssertEqual(quarantine, "存在隔离属性，首次打开可能被拦截")
+    }
+
+    func testCredentialDiagnosticsDescribeKeychainAccountsWithoutSecrets() {
+        let diagnostics = CredentialDiagnosticSnapshot.current(
+            githubTokenStatus: .keychain,
+            webAccessTokenStatus: .memoryOnly
+        )
+        XCTAssertEqual(diagnostics.keychainService, KeychainStore.defaultService)
+        XCTAssertEqual(diagnostics.githubTokenAccount, KeychainStore.githubTokenAccount)
+        XCTAssertEqual(diagnostics.webAccessTokenAccount, KeychainStore.webAccessTokenAccount)
+        XCTAssertFalse(diagnostics.note.contains("ghp_"))
+        XCTAssertFalse(diagnostics.note.contains("Bearer"))
+    }
+
     func testStorageModeSelectsOnlyItsOwnCombinedOutput() throws {
         var settings = AppSettings()
         settings.combinedModuleFileName = "My Relay"
