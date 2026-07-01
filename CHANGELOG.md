@@ -6,8 +6,9 @@
 - 优化 GitHub 文件夹菜单刷新，避免 Web 管理状态轮询频繁访问 GitHub API。
 - 将 fork 构建的 Sparkle 更新源切换到 `junchan0412/SurgeRelay-macOS`。
 - 完善模块文件夹与 `category` 的测试覆盖和文档说明。
+- 新增 GitHub Actions 打包流程，可为 Release 上传 ad-hoc 签名的 `.app.zip` 安装包。
 
-说明：本次 GitHub Release 提供源码归档。签名 DMG 与 Sparkle appcast 需要在具备完整 Xcode、签名和 Sparkle 私钥的环境中单独生成。
+说明：Release 安装包为 ad-hoc 签名 zip，未做 Developer ID 公证。签名 DMG 与 Sparkle appcast 需要在具备完整 Xcode、签名和 Sparkle 私钥的环境中单独生成。
 
 ## 1.1.0
 

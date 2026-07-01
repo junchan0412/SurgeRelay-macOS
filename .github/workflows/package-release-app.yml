@@ -1,0 +1,85 @@
+name: Package Release App
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to package, for example v1.2.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: Build macOS app zip
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Show Xcode version
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks
+
+      - name: Resolve packages
+        run: |
+          xcodebuild \
+            -resolvePackageDependencies \
+            -project "Surge Relay.xcodeproj" \
+            -scheme "Surge Relay"
+
+      - name: Build app
+        run: |
+          set -euo pipefail
+          DERIVED_DATA="$RUNNER_TEMP/DerivedData"
+          xcodebuild \
+            -project "Surge Relay.xcodeproj" \
+            -scheme "Surge Relay" \
+            -configuration Release \
+            -destination "generic/platform=macOS" \
+            -derivedDataPath "$DERIVED_DATA" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+          APP_PATH="$(find "$DERIVED_DATA/Build/Products/Release" -maxdepth 1 -name "Surge Relay.app" -type d -print -quit)"
+          if [[ -z "$APP_PATH" ]]; then
+            echo "Unable to locate built Surge Relay.app" >&2
+            exit 1
+          fi
+
+          echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
+
+      - name: Ad-hoc sign app
+        run: |
+          set -euo pipefail
+          codesign --force --deep --sign - --timestamp=none "$APP_PATH"
+          codesign --verify --deep --strict "$APP_PATH"
+
+      - name: Package app zip
+        run: |
+          set -euo pipefail
+          VERSION="${{ inputs.tag }}"
+          VERSION="${VERSION#v}"
+          ARTIFACT_DIR="$RUNNER_TEMP/artifacts"
+          mkdir -p "$ARTIFACT_DIR"
+          ZIP_PATH="$ARTIFACT_DIR/Surge-Relay-${VERSION}.app.zip"
+          ditto -c -k --keepParent "$APP_PATH" "$ZIP_PATH"
+          shasum -a 256 "$ZIP_PATH" > "$ZIP_PATH.sha256"
+          echo "ZIP_PATH=$ZIP_PATH" >> "$GITHUB_ENV"
+          echo "SHA_PATH=$ZIP_PATH.sha256" >> "$GITHUB_ENV"
+
+      - name: Upload to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ inputs.tag }}" \
+            "$ZIP_PATH#Surge Relay app zip" \
+            "$SHA_PATH#SHA256 checksum" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
