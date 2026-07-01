@@ -10,6 +10,7 @@ struct SettingsView: View {
     @State private var connectionResult: ConnectionResult?
     @State private var showsWebQRCode = false
     @State private var installationDiagnostics: InstallationDiagnosticSnapshot?
+    @State private var localRootDiagnostics: LocalModuleRootDiagnosticSnapshot?
 
     private enum ConnectionResult {
         case success(String)
@@ -274,6 +275,15 @@ struct SettingsView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         Button("选择…") { chooseLocalModuleDirectory() }
                     }
+                    if let diagnostics = localRootDiagnostics {
+                        localRootDiagnosticContent(diagnostics)
+                    } else {
+                        HStack(spacing: 8) {
+                            ProgressView().controlSize(.small)
+                            Text("正在检查本地模块根目录…")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
 
@@ -368,7 +378,13 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .navigationTitle("设置")
-        .task { refreshInstallationDiagnostics() }
+        .task {
+            refreshInstallationDiagnostics()
+            refreshLocalRootDiagnostics()
+        }
+        .onChange(of: model.settings.localModuleDirectory) { _, _ in
+            refreshLocalRootDiagnostics()
+        }
         .sheet(isPresented: $showsWebQRCode) {
             if let url = model.webManagementURL, let displayURL = model.webManagementDisplayURL {
                 VStack(spacing: 18) {
@@ -436,12 +452,69 @@ struct SettingsView: View {
         }
     }
 
+    private func refreshLocalRootDiagnostics() {
+        Task { @MainActor in
+            let path = model.settings.localModuleDirectory
+            let snapshot = await Task.detached(priority: .utility) {
+                LocalModuleRootDiagnosticSnapshot.current(path: path)
+            }.value
+            localRootDiagnostics = snapshot
+        }
+    }
+
     private func diagnosticLabel(_ title: String, value: String, systemImage: String) -> some View {
         LabeledContent(title) {
             Label(value, systemImage: systemImage)
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
         }
+    }
+
+    private func localRootDiagnosticContent(_ diagnostics: LocalModuleRootDiagnosticSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            LabeledContent("根目录状态") {
+                Label(diagnostics.status, systemImage: localRootDiagnosticImage(diagnostics))
+                    .foregroundStyle(localRootDiagnosticColor(diagnostics))
+                    .textSelection(.enabled)
+            }
+            LabeledContent("写入权限") {
+                Label(diagnostics.isWritable ? "可写" : "不可写", systemImage: diagnostics.isWritable ? "pencil" : "lock.fill")
+                    .foregroundStyle(diagnostics.isWritable ? .green : .orange)
+            }
+            LabeledContent("目录内容") {
+                Text("\(diagnostics.folderCount) 个文件夹 · \(diagnostics.moduleFileCount) 个 .sgmodule")
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+            if let error = diagnostics.error {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .textSelection(.enabled)
+            }
+            HStack(spacing: 8) {
+                Button("重新检查", systemImage: "arrow.clockwise") {
+                    refreshLocalRootDiagnostics()
+                }
+                Button("在 Finder 中显示", systemImage: "folder") {
+                    NSWorkspace.shared.open(URL(filePath: diagnostics.path, directoryHint: .isDirectory))
+                }
+                .disabled(!diagnostics.exists || !diagnostics.isDirectory)
+            }
+        }
+    }
+
+    private func localRootDiagnosticImage(_ diagnostics: LocalModuleRootDiagnosticSnapshot) -> String {
+        if diagnostics.exists, diagnostics.isDirectory, diagnostics.isWritable, diagnostics.error == nil {
+            return "checkmark.circle.fill"
+        }
+        return "exclamationmark.triangle.fill"
+    }
+
+    private func localRootDiagnosticColor(_ diagnostics: LocalModuleRootDiagnosticSnapshot) -> Color {
+        diagnostics.exists && diagnostics.isDirectory && diagnostics.isWritable && diagnostics.error == nil
+            ? .green
+            : .orange
     }
 
     private func credentialLabel(_ title: String, account: String, status: String) -> some View {

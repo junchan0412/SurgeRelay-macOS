@@ -621,6 +621,28 @@ final class SurgeRelayTests: XCTestCase {
         )
     }
 
+    func testLocalModuleRootDiagnosticsReportsWritableDirectoryContents() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(
+            at: root.appending(path: "Ads/Video", directoryHint: .isDirectory),
+            withIntermediateDirectories: true
+        )
+        try Data("#!name=Demo\n[General]\n".utf8).write(to: root.appending(path: "Ads/Video/Demo.sgmodule"))
+        try Data("ignore".utf8).write(to: root.appending(path: "notes.txt"))
+
+        let diagnostics = LocalModuleRootDiagnosticSnapshot.current(path: root.path)
+
+        XCTAssertTrue(diagnostics.exists)
+        XCTAssertTrue(diagnostics.isDirectory)
+        XCTAssertTrue(diagnostics.isWritable)
+        XCTAssertEqual(diagnostics.folderCount, 2)
+        XCTAssertEqual(diagnostics.moduleFileCount, 1)
+        XCTAssertEqual(diagnostics.status, "目录可用")
+        XCTAssertNil(diagnostics.error)
+    }
+
     func testScriptHubClientConvertsLocalSurgeModule() async throws {
         let root = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
@@ -765,6 +787,67 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertEqual(report.publishedFiles, ["Changed.sgmodule"])
         XCTAssertEqual(report.deletedFiles, ["Stale.sgmodule"])
         XCTAssertFalse(GitHubMockURLProtocol.requestedPaths.contains { $0.hasPrefix("POST ") || $0.hasPrefix("PATCH ") })
+    }
+
+    func testGitHubPublishRetriesOnceWhenReferenceMoves() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GitHubMockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        GitHubMockURLProtocol.reset()
+        defer { GitHubMockURLProtocol.reset() }
+        var referenceReads = 0
+        var patchAttempts = 0
+        GitHubMockURLProtocol.handler = { request in
+            let path = request.url?.path ?? ""
+            switch (request.httpMethod ?? "GET", path) {
+            case ("GET", "/repos/someone/relay/git/ref/heads/main"):
+                referenceReads += 1
+                let commit = referenceReads == 1 ? "commit1" : "commit2"
+                return (200, Data(#"{"object":{"sha":"\#(commit)"}}"#.utf8))
+            case ("GET", "/repos/someone/relay/git/commits/commit1"):
+                return (200, Data(#"{"sha":"commit1","tree":{"sha":"tree1"}}"#.utf8))
+            case ("GET", "/repos/someone/relay/git/commits/commit2"):
+                return (200, Data(#"{"sha":"commit2","tree":{"sha":"tree2"}}"#.utf8))
+            case ("GET", "/repos/someone/relay/git/trees/tree1"),
+                 ("GET", "/repos/someone/relay/git/trees/tree2"):
+                return (200, Data(#"{"tree":[],"truncated":false}"#.utf8))
+            case ("POST", "/repos/someone/relay/git/blobs"):
+                return (200, Data(#"{"sha":"new-blob"}"#.utf8))
+            case ("POST", "/repos/someone/relay/git/trees"):
+                return (200, Data(#"{"sha":"new-tree"}"#.utf8))
+            case ("POST", "/repos/someone/relay/git/commits"):
+                let commit = patchAttempts == 0 ? "new-commit1" : "new-commit2"
+                return (200, Data(#"{"sha":"\#(commit)","tree":{"sha":"new-tree"}}"#.utf8))
+            case ("PATCH", "/repos/someone/relay/git/refs/heads/main"):
+                patchAttempts += 1
+                if patchAttempts == 1 {
+                    return (422, Data(#"{"message":"Reference update failed"}"#.utf8))
+                }
+                return (200, Data(#"{"object":{"sha":"new-commit2"}}"#.utf8))
+            default:
+                return (404, Data(#"{"message":"not found"}"#.utf8))
+            }
+        }
+        var settings = GitHubSettings()
+        settings.owner = "someone"
+        settings.repository = "relay"
+        settings.branch = "main"
+        settings.directory = "modules"
+
+        let report = try await GitHubClient(session: session).publish(
+            files: [PublishFile(name: "Changed.sgmodule", data: Data("new".utf8))],
+            settings: settings,
+            token: "token"
+        )
+
+        XCTAssertTrue(report.retriedAfterConflict)
+        XCTAssertEqual(report.publishedFiles, ["Changed.sgmodule"])
+        XCTAssertEqual(report.commitSHA, "new-commit2")
+        XCTAssertEqual(patchAttempts, 2)
+        XCTAssertEqual(
+            GitHubMockURLProtocol.requestedPaths.filter { $0 == "GET /repos/someone/relay/git/ref/heads/main" }.count,
+            2
+        )
     }
 
     func testModuleArgumentsAreMaterializedAndMetadataIsRemoved() {

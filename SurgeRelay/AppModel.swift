@@ -998,13 +998,13 @@ final class AppModel {
                 guard !Task.isCancelled else { return }
                 self.statusMessage = report.changedFileCount == 0
                     ? "GitHub 内容没有变化，无需上传"
-                    : "已合并发布到 GitHub（\(report.changedFileCount) 个文件变更）"
+                    : "\(self.githubPublishRetryPrefix(report))已合并发布到 GitHub（\(report.changedFileCount) 个文件变更）"
                 if let commit = report.commitSHA {
                     self.recordHistory([UpdateHistoryEntry(
                         moduleName: "GitHub",
                         outcome: .published,
                         duration: 0,
-                        message: "原子提交 \(commit.prefix(8))"
+                        message: self.githubPublishHistoryMessage(commit: commit, report: report)
                     )])
                 }
             } catch {
@@ -1077,7 +1077,7 @@ final class AppModel {
             let report = try await publishAllInternal()
             statusMessage = report.changedFileCount == 0
                 ? "没有文件需要发布"
-                : "总模块与独立模块已发布到 GitHub（\(report.changedFileCount) 个文件变更）"
+                : "\(githubPublishRetryPrefix(report))总模块与独立模块已发布到 GitHub（\(report.changedFileCount) 个文件变更）"
         } catch {
             presentedError = error.localizedDescription
         }
@@ -1114,13 +1114,13 @@ final class AppModel {
                 pendingPublishPreview = nil
                 statusMessage = report.changedFileCount == 0
                     ? "没有文件需要发布"
-                    : "总模块与独立模块已发布到 GitHub（\(report.changedFileCount) 个文件变更）"
+                    : "\(githubPublishRetryPrefix(report))总模块与独立模块已发布到 GitHub（\(report.changedFileCount) 个文件变更）"
                 if let commit = report.commitSHA {
                     recordHistory([UpdateHistoryEntry(
                         moduleName: "GitHub",
                         outcome: .published,
                         duration: 0,
-                        message: "原子提交 \(commit.prefix(8))"
+                        message: githubPublishHistoryMessage(commit: commit, report: report)
                     )])
                 }
             case .local:
@@ -1512,6 +1512,10 @@ final class AppModel {
         )
     }
 
+    func localModuleRootDiagnostics() -> LocalModuleRootDiagnosticSnapshot {
+        LocalModuleRootDiagnosticSnapshot.current(path: settings.localModuleDirectory)
+    }
+
     func diagnosticsData() throws -> Data {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
         let report = DiagnosticReport(
@@ -1522,6 +1526,7 @@ final class AppModel {
             credentials: credentialDiagnostics(),
             engineRevision: upstreamState.revision,
             storageMode: settings.storageMode == .gitHub ? "GitHub" : "Local",
+            localModuleRoot: localModuleRootDiagnostics(),
             githubRepository: "\(settings.github.owner)/\(settings.github.repository)",
             webServerEnabled: settings.webServerEnabled,
             webServerState: webServerState.diagnosticValue,
@@ -1601,6 +1606,15 @@ final class AppModel {
             settings.directory.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         ]
         .joined(separator: "/")
+    }
+
+    private func githubPublishRetryPrefix(_ report: PublishReport) -> String {
+        report.retriedAfterConflict ? "远端分支已更新并重新同步；" : ""
+    }
+
+    private func githubPublishHistoryMessage(commit: String, report: PublishReport) -> String {
+        let suffix = report.retriedAfterConflict ? "（已处理远端更新）" : ""
+        return "原子提交 \(commit.prefix(8))\(suffix)"
     }
 
     private func redactedSourceURL(_ value: String) -> String {

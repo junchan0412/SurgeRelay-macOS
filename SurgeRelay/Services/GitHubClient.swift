@@ -146,6 +146,33 @@ actor GitHubClient {
         guard !token.isEmpty else { throw RelayError.githubTokenMissing }
         guard !files.isEmpty || !obsoleteFileNames.isEmpty else { throw RelayError.noFilesToPublish }
 
+        var retriedAfterConflict = false
+        for attempt in 0..<2 {
+            do {
+                var report = try await publishOnce(
+                    files: files,
+                    deleting: obsoleteFileNames,
+                    settings: settings,
+                    token: token
+                )
+                report.retriedAfterConflict = retriedAfterConflict
+                return report
+            } catch let error as RelayError where attempt == 0 && Self.isReferenceUpdateConflict(error) {
+                retriedAfterConflict = true
+                try Task.checkCancellation()
+                continue
+            }
+        }
+
+        throw RelayError.invalidOutput("GitHub 发布重试失败。")
+    }
+
+    private func publishOnce(
+        files: [PublishFile],
+        deleting obsoleteFileNames: [String],
+        settings: GitHubSettings,
+        token: String
+    ) async throws -> PublishReport {
         let diff = try await publishDiff(
             files: files,
             deleting: obsoleteFileNames,
@@ -206,6 +233,17 @@ actor GitHubClient {
             deletedFiles: deletedFiles,
             commitSHA: commit.sha
         )
+    }
+
+    private static func isReferenceUpdateConflict(_ error: RelayError) -> Bool {
+        guard case let .httpFailure(status, message) = error,
+              status == 409 || status == 422 else { return false }
+        let lowercased = message.lowercased()
+        return lowercased.contains("reference update failed")
+            || lowercased.contains("not a fast forward")
+            || lowercased.contains("non-fast-forward")
+            || lowercased.contains("cannot lock ref")
+            || lowercased.contains("sha does not match")
     }
 
     private func publishDiff(
