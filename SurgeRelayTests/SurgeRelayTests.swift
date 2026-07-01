@@ -147,6 +147,10 @@ final class SurgeRelayTests: XCTestCase {
         let settings = try JSONDecoder().decode(AppSettings.self, from: data)
         XCTAssertEqual(settings.githubToken, "")
         XCTAssertNil(settings.github.repositoryIsPrivate)
+        XCTAssertNil(settings.localPublishedRootDirectory)
+        XCTAssertTrue(settings.localPublishedFilePaths.isEmpty)
+        XCTAssertNil(settings.githubPublishedRepositoryKey)
+        XCTAssertTrue(settings.githubPublishedFilePaths.isEmpty)
     }
 
     func testStorageModeSelectsOnlyItsOwnCombinedOutput() throws {
@@ -196,6 +200,30 @@ final class SurgeRelayTests: XCTestCase {
             "edited module"
         )
         XCTAssertEqual(try String(contentsOf: existingOverride, encoding: .utf8), "keep me")
+    }
+
+    func testLocalPublishedExportRemovesManifestStaleFilesOnly() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = ModuleFileStore()
+        try await store.exportPublishedFiles([
+            PublishFile(name: "Old.sgmodule", data: Data("old".utf8)),
+            PublishFile(name: "Folder/Current.sgmodule", data: Data("current".utf8))
+        ], toRootDirectory: root.path)
+        try Data("manual".utf8).write(to: root.appending(path: "Manual.sgmodule"))
+
+        let removed = try await store.exportPublishedFiles(
+            [PublishFile(name: "New.sgmodule", data: Data("new".utf8))],
+            toRootDirectory: root.path,
+            removingObsoleteRelativePaths: ["Old.sgmodule", "Folder/Current.sgmodule"]
+        )
+
+        XCTAssertEqual(Set(removed), ["Old.sgmodule", "Folder/Current.sgmodule"])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appending(path: "Old.sgmodule").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appending(path: "Folder").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appending(path: "New.sgmodule").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appending(path: "Manual.sgmodule").path))
     }
 
     func testRelayModuleDecodesRegistryWithoutAdvancedOptions() throws {

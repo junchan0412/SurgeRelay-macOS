@@ -18,7 +18,12 @@ struct PublishFile: Sendable {
 
 struct PublishReport: Sendable {
     var publishedFiles: [String]
+    var deletedFiles: [String] = []
     var commitSHA: String? = nil
+
+    var changedFileCount: Int {
+        publishedFiles.count + deletedFiles.count
+    }
 }
 
 enum UpdateHistoryOutcome: String, Codable, Sendable {

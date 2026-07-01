@@ -40,6 +40,8 @@ final class AppModel {
     @ObservationIgnored private var automaticPublishTask: Task<Void, Never>?
     @ObservationIgnored private var localChangeGeneration = 0
     @ObservationIgnored private var hasStarted = false
+    @ObservationIgnored private var githubModuleOutputFoldersLastRefreshedAt: Date?
+    @ObservationIgnored private var githubModuleOutputFoldersConfiguration: GitHubSettings?
 
     init() {
         var loadedSettings = PersistenceStore.loadSettings()
@@ -177,7 +179,11 @@ final class AppModel {
         guard settings.storageMode != mode else { return }
         settings.storageMode = mode
         saveSettings()
-        if mode == .local { Task { await rebuildCombinedFromCache() } }
+        if mode == .local {
+            Task { await rebuildCombinedFromCache() }
+        } else {
+            Task { await refreshModuleOutputFolders(force: true) }
+        }
     }
 
     func setLocalModuleDirectory(_ path: String) {
@@ -196,15 +202,31 @@ final class AppModel {
         )
     }
 
-    func refreshModuleOutputFolders() async {
-        guard settings.storageMode == .gitHub, settings.github.isConfigured else { return }
+    func refreshModuleOutputFolders(force: Bool = false) async {
+        guard settings.storageMode == .gitHub, settings.github.isConfigured else {
+            githubModuleOutputFolders = [ModuleOutputFolder.root]
+            githubModuleOutputFoldersLastRefreshedAt = nil
+            githubModuleOutputFoldersConfiguration = nil
+            return
+        }
+        let now = Date.now
+        if !force,
+           githubModuleOutputFoldersConfiguration == settings.github,
+           let lastRefresh = githubModuleOutputFoldersLastRefreshedAt,
+           now.timeIntervalSince(lastRefresh) < 300 {
+            return
+        }
         do {
             let folders = try await githubClient.listDirectories(settings: settings.github, token: githubToken)
             githubModuleOutputFolders = ModuleOutputFolder.options(
                 from: folders + modules.map(\.outputFolder)
             )
+            githubModuleOutputFoldersLastRefreshedAt = now
+            githubModuleOutputFoldersConfiguration = settings.github
         } catch {
             githubModuleOutputFolders = ModuleOutputFolder.options(from: modules.map(\.outputFolder))
+            githubModuleOutputFoldersLastRefreshedAt = now
+            githubModuleOutputFoldersConfiguration = settings.github
         }
     }
 
@@ -661,9 +683,9 @@ final class AppModel {
             do {
                 let report = try await self.publishAllInternal()
                 guard !Task.isCancelled else { return }
-                self.statusMessage = report.publishedFiles.isEmpty
+                self.statusMessage = report.changedFileCount == 0
                     ? "GitHub 内容没有变化，无需上传"
-                    : "已合并发布到 GitHub（\(report.publishedFiles.count) 个文件）"
+                    : "已合并发布到 GitHub（\(report.changedFileCount) 个文件变更）"
                 if let commit = report.commitSHA {
                     self.recordHistory([UpdateHistoryEntry(
                         moduleName: "GitHub",
@@ -720,6 +742,7 @@ final class AppModel {
             let isPrivate = try await githubClient.test(settings: settings.github, token: githubToken)
             settings.github.repositoryIsPrivate = isPrivate
             saveSettings()
+            await refreshModuleOutputFolders(force: true)
             statusMessage = isPrivate ? "GitHub 私有仓库连接成功，需要配置 Cloudflare Worker" : "GitHub 公开仓库连接成功，将直接使用 Raw 地址"
         } catch {
             presentedError = error.localizedDescription
@@ -733,8 +756,9 @@ final class AppModel {
         defer { isWorking = false }
         do {
             let report = try await publishAllInternal()
-            statusMessage = "总模块与独立模块已发布到 GitHub"
-            if report.publishedFiles.isEmpty { statusMessage = "没有文件需要发布" }
+            statusMessage = report.changedFileCount == 0
+                ? "没有文件需要发布"
+                : "总模块与独立模块已发布到 GitHub（\(report.changedFileCount) 个文件变更）"
         } catch {
             presentedError = error.localizedDescription
         }
@@ -750,11 +774,21 @@ final class AppModel {
         }
         let data = try await fileStore.readCombined()
         let files = try await currentPublishedFiles(combinedData: data, includeAssets: true)
-        return try await githubClient.publish(
+        let currentPaths = files.map(\.name)
+        let repositoryKey = githubPublishRepositoryKey(settings.github)
+        let stalePaths = settings.githubPublishedRepositoryKey == repositoryKey
+            ? settings.githubPublishedFilePaths.filter { !currentPaths.contains($0) }
+            : []
+        let report = try await githubClient.publish(
             files: files,
+            deleting: stalePaths,
             settings: settings.github,
             token: githubToken
         )
+        settings.githubPublishedRepositoryKey = repositoryKey
+        settings.githubPublishedFilePaths = currentPaths
+        saveSettings()
+        return report
     }
 
     private func rebuildCombinedFromCache() async {
@@ -762,6 +796,17 @@ final class AppModel {
         let enabled = modules.filter(\.isEnabled)
         guard !enabled.isEmpty else {
             try? await fileStore.removeCombined()
+            if settings.storageMode == .local,
+               settings.localPublishedRootDirectory == settings.localModuleDirectory {
+                _ = try? await fileStore.exportPublishedFiles(
+                    [],
+                    toRootDirectory: settings.localModuleDirectory,
+                    removingObsoleteRelativePaths: settings.localPublishedFilePaths
+                )
+                settings.localPublishedRootDirectory = settings.localModuleDirectory
+                settings.localPublishedFilePaths = []
+                saveSettings()
+            }
             return
         }
         var components: [(RelayModule, String)] = []
@@ -849,7 +894,18 @@ final class AppModel {
         try await fileStore.writeCombined(merged)
         if settings.storageMode == .local {
             let files = try await currentPublishedFiles(combinedData: Data(merged.utf8), includeAssets: false)
-            try await fileStore.exportPublishedFiles(files, toRootDirectory: settings.localModuleDirectory)
+            let currentPaths = files.map(\.name)
+            let stalePaths = settings.localPublishedRootDirectory == settings.localModuleDirectory
+                ? settings.localPublishedFilePaths.filter { !currentPaths.contains($0) }
+                : []
+            _ = try await fileStore.exportPublishedFiles(
+                files,
+                toRootDirectory: settings.localModuleDirectory,
+                removingObsoleteRelativePaths: stalePaths
+            )
+            settings.localPublishedRootDirectory = settings.localModuleDirectory
+            settings.localPublishedFilePaths = currentPaths
+            saveSettings()
         }
     }
 
@@ -1075,6 +1131,16 @@ final class AppModel {
             }
             return url.lastPathComponent
         }
+    }
+
+    private func githubPublishRepositoryKey(_ settings: GitHubSettings) -> String {
+        [
+            settings.owner,
+            settings.repository,
+            settings.branch,
+            settings.directory.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        ]
+        .joined(separator: "/")
     }
 
     private func redactedSourceURL(_ value: String) -> String {

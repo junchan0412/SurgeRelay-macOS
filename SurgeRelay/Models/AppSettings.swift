@@ -69,6 +69,10 @@ struct AppSettings: Codable, Equatable, Sendable {
     var githubToken = ""
     var storageMode: StorageMode = .gitHub
     var localModuleDirectory: String = AppSettings.defaultLocalModuleRootDirectory
+    var localPublishedRootDirectory: String?
+    var localPublishedFilePaths: [String] = []
+    var githubPublishedRepositoryKey: String?
+    var githubPublishedFilePaths: [String] = []
     var webServerEnabled = false
     var webServerPort = 8787
 
@@ -90,6 +94,10 @@ struct AppSettings: Codable, Equatable, Sendable {
         githubToken = try container.decodeIfPresent(String.self, forKey: .githubToken) ?? ""
         storageMode = try container.decodeIfPresent(StorageMode.self, forKey: .storageMode) ?? .gitHub
         localModuleDirectory = try container.decodeIfPresent(String.self, forKey: .localModuleDirectory) ?? Self.defaultLocalModuleRootDirectory
+        localPublishedRootDirectory = try container.decodeIfPresent(String.self, forKey: .localPublishedRootDirectory)
+        localPublishedFilePaths = try container.decodeIfPresent([String].self, forKey: .localPublishedFilePaths) ?? []
+        githubPublishedRepositoryKey = try container.decodeIfPresent(String.self, forKey: .githubPublishedRepositoryKey)
+        githubPublishedFilePaths = try container.decodeIfPresent([String].self, forKey: .githubPublishedFilePaths) ?? []
         webServerEnabled = try container.decodeIfPresent(Bool.self, forKey: .webServerEnabled) ?? false
         webServerPort = try container.decodeIfPresent(Int.self, forKey: .webServerPort) ?? 8787
     }

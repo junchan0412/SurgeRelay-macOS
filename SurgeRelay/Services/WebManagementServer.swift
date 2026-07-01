@@ -254,9 +254,9 @@ final class WebManagementServer: @unchecked Sendable {
                 // Closing a browser tab or changing networks naturally ends the stream.
             }
             connection.cancel()
-            _ = lock.withLock { eventTasks.removeValue(forKey: identifier) }
+            _ = self.lock.withLock { self.eventTasks.removeValue(forKey: identifier) }
         }
-        lock.withLock { eventTasks[identifier] = task }
+        lock.withLock { self.eventTasks[identifier] = task }
     }
 
     private func sendStreamData(_ data: Data, over connection: NWConnection) async throws {

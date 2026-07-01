@@ -105,9 +105,25 @@ actor ModuleFileStore {
         try Data(content.utf8).write(to: directory.appending(path: fileName), options: .atomic)
     }
 
-    func exportPublishedFiles(_ files: [PublishFile], toRootDirectory rootDirectoryPath: String) throws {
+    func exportPublishedFiles(
+        _ files: [PublishFile],
+        toRootDirectory rootDirectoryPath: String,
+        removingObsoleteRelativePaths obsoleteRelativePaths: [String] = []
+    ) throws -> [String] {
         let root = URL(filePath: rootDirectoryPath, directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let currentPaths = Set(files.map(\.name))
+        var removedPaths: [String] = []
+
+        for relativePath in obsoleteRelativePaths where !currentPaths.contains(relativePath) {
+            let destination = try exportURL(root: root, relativePath: relativePath)
+            if FileManager.default.fileExists(atPath: destination.path) {
+                try FileManager.default.removeItem(at: destination)
+                removedPaths.append(relativePath)
+                try removeEmptyParentDirectories(startingAt: destination.deletingLastPathComponent(), root: root)
+            }
+        }
+
         for file in files {
             let destination = try exportURL(root: root, relativePath: file.name)
             try FileManager.default.createDirectory(
@@ -116,6 +132,7 @@ actor ModuleFileStore {
             )
             try file.data.write(to: destination, options: .atomic)
         }
+        return removedPaths
     }
 
     func writeCombinedOverride(_ content: String) throws {
@@ -221,6 +238,16 @@ actor ModuleFileStore {
             url = url.appending(path: component, directoryHint: .isDirectory)
         }
         return url.appending(path: components[components.count - 1])
+    }
+
+    private func removeEmptyParentDirectories(startingAt directory: URL, root: URL) throws {
+        var current = directory
+        while current.path != root.path, current.path.hasPrefix(root.path + "/") {
+            let contents = try FileManager.default.contentsOfDirectory(atPath: current.path)
+            guard contents.isEmpty else { return }
+            try FileManager.default.removeItem(at: current)
+            current.deleteLastPathComponent()
+        }
     }
 
     private func decodeText(at url: URL) throws -> String {

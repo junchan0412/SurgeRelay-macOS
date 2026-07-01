@@ -24,9 +24,37 @@ actor GitHubClient {
     private struct BlobResponse: Decodable { let sha: String }
     private struct TreeEntry: Encodable {
         let path: String
-        let mode = "100644"
-        let type = "blob"
-        let sha: String
+        let mode: String?
+        let type: String?
+        let sha: String?
+
+        init(path: String, sha: String) {
+            self.path = path
+            mode = "100644"
+            type = "blob"
+            self.sha = sha
+        }
+
+        init(deletingPath path: String) {
+            self.path = path
+            mode = nil
+            type = nil
+            sha = nil
+        }
+
+        private enum CodingKeys: String, CodingKey { case path, mode, type, sha }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(path, forKey: .path)
+            try container.encodeIfPresent(mode, forKey: .mode)
+            try container.encodeIfPresent(type, forKey: .type)
+            if let sha {
+                try container.encode(sha, forKey: .sha)
+            } else {
+                try container.encodeNil(forKey: .sha)
+            }
+        }
     }
     private struct TreeRequest: Encodable {
         let baseTree: String
@@ -85,10 +113,15 @@ actor GitHubClient {
             .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
-    func publish(files: [PublishFile], settings: GitHubSettings, token: String) async throws -> PublishReport {
+    func publish(
+        files: [PublishFile],
+        deleting obsoleteFileNames: [String] = [],
+        settings: GitHubSettings,
+        token: String
+    ) async throws -> PublishReport {
         guard settings.isConfigured else { throw RelayError.githubNotConfigured }
         guard !token.isEmpty else { throw RelayError.githubTokenMissing }
-        guard !files.isEmpty else { throw RelayError.noFilesToPublish }
+        guard !files.isEmpty || !obsoleteFileNames.isEmpty else { throw RelayError.noFilesToPublish }
 
         var changedFiles: [PublishFile] = []
         for file in files {
@@ -96,7 +129,18 @@ actor GitHubClient {
             let sha = try await existingSHA(fileName: file.name, settings: settings, token: token)
             if sha != file.data.gitBlobSHA1 { changedFiles.append(file) }
         }
-        guard !changedFiles.isEmpty else { return PublishReport(publishedFiles: []) }
+
+        let currentFileNames = Set(files.map(\.name))
+        var deletedFiles: [String] = []
+        for fileName in Set(obsoleteFileNames).sorted() where !currentFileNames.contains(fileName) {
+            try Task.checkCancellation()
+            if try await existingSHA(fileName: fileName, settings: settings, token: token) != nil {
+                deletedFiles.append(fileName)
+            }
+        }
+        guard !changedFiles.isEmpty || !deletedFiles.isEmpty else {
+            return PublishReport(publishedFiles: [])
+        }
 
         let branch = encodedPathComponent(settings.branch)
         let reference: ReferenceResponse = try await requestJSON(
@@ -123,6 +167,9 @@ actor GitHubClient {
             )
             entries.append(TreeEntry(path: repositoryPath(for: file.name, settings: settings), sha: blob.sha))
         }
+        for fileName in deletedFiles {
+            entries.append(TreeEntry(deletingPath: repositoryPath(for: fileName, settings: settings)))
+        }
         let tree: TreeResponse = try await requestJSON(
             path: "git/trees",
             method: "POST",
@@ -134,7 +181,7 @@ actor GitHubClient {
             path: "git/commits",
             method: "POST",
             body: CommitRequest(
-                message: "Update \(changedFiles.count) files via Surge Relay",
+                message: commitMessage(changedCount: changedFiles.count, deletedCount: deletedFiles.count),
                 tree: tree.sha,
                 parents: [headCommit.sha]
             ),
@@ -149,7 +196,11 @@ actor GitHubClient {
             token: token
         )
         try Task.checkCancellation()
-        return PublishReport(publishedFiles: changedFiles.map(\.name), commitSHA: commit.sha)
+        return PublishReport(
+            publishedFiles: changedFiles.map(\.name),
+            deletedFiles: deletedFiles,
+            commitSHA: commit.sha
+        )
     }
 
     private func requestJSON<Response: Decodable>(
@@ -246,6 +297,17 @@ actor GitHubClient {
     private func repositoryPath(for fileName: String, settings: GitHubSettings) -> String {
         let directory = settings.directory.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         return [directory, fileName].filter { !$0.isEmpty }.joined(separator: "/")
+    }
+
+    private func commitMessage(changedCount: Int, deletedCount: Int) -> String {
+        switch (changedCount, deletedCount) {
+        case (_, 0):
+            "Update \(changedCount) files via Surge Relay"
+        case (0, _):
+            "Remove \(deletedCount) stale files via Surge Relay"
+        default:
+            "Update \(changedCount) files and remove \(deletedCount) stale files via Surge Relay"
+        }
     }
 
     private func encodedRepositoryPath(for fileName: String, settings: GitHubSettings) -> String {
