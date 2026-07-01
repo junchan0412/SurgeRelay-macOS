@@ -9,6 +9,10 @@ struct ModulesView: View {
     @State private var detailTab: DetailTab = .info
     @State private var contentIndex: [UUID: String] = [:]
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var isScanningLocalModules = false
+    @State private var showsLocalImportPreview = false
+    @State private var localImportCandidates: [LocalModuleScanCandidate] = []
+    @State private var selectedLocalImportCandidateIDs = Set<String>()
 
     private enum DetailTab: Hashable { case info, preview }
 
@@ -209,11 +213,11 @@ struct ModulesView: View {
                         }
                         .disabled(model.modules.isEmpty || model.isWorking)
                         Button {
-                            Task { await model.importExistingLocalModules() }
+                            scanLocalModulesForPreview()
                         } label: {
                             Label("扫描本地模块", systemImage: "folder.badge.plus")
                         }
-                        .disabled(model.isWorking)
+                        .disabled(model.isWorking || isScanningLocalModules)
                         .help("扫描本地模块根目录下已有的 .sgmodule，并纳入 Surge Relay 管理")
                     }
                 }
@@ -280,6 +284,13 @@ struct ModulesView: View {
             ModuleEditorView(module: route.module)
                 .environment(model)
         }
+        .sheet(isPresented: $showsLocalImportPreview) {
+            LocalModuleImportPreviewView(
+                candidates: localImportCandidates,
+                selectedCandidateIDs: $selectedLocalImportCandidateIDs
+            )
+            .environment(model)
+        }
         .sheet(isPresented: $model.presentsSettings) {
             NavigationStack {
                 SettingsView()
@@ -312,6 +323,25 @@ struct ModulesView: View {
 
     private func presentEditor(_ module: RelayModule) {
         editorRoute = ModuleEditorRoute(module: module)
+    }
+
+    @MainActor
+    private func scanLocalModulesForPreview() {
+        guard !model.isWorking, !isScanningLocalModules else { return }
+        isScanningLocalModules = true
+        Task { @MainActor in
+            defer { isScanningLocalModules = false }
+            do {
+                let candidates = try await model.scanExistingLocalModules()
+                guard !candidates.isEmpty else { return }
+                localImportCandidates = candidates
+                selectedLocalImportCandidateIDs = Set(candidates.map(\.id))
+                showsLocalImportPreview = true
+            } catch {
+                model.presentedError = "扫描本地模块失败：\(error.localizedDescription)"
+                model.statusMessage = "本地模块扫描失败"
+            }
+        }
     }
 
     @ViewBuilder
@@ -430,6 +460,106 @@ private struct ModuleEditorRoute: Identifiable {
     init(module: RelayModule?) {
         self.module = module
         id = module?.id ?? UUID()
+    }
+}
+
+private struct LocalModuleImportPreviewView: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    let candidates: [LocalModuleScanCandidate]
+    @Binding var selectedCandidateIDs: Set<String>
+    @State private var isImporting = false
+
+    private var selectedCandidates: [LocalModuleScanCandidate] {
+        candidates.filter { selectedCandidateIDs.contains($0.id) }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("导入本地模块").font(.title2.bold())
+                Text("确认要纳入 Surge Relay 管理的 `.sgmodule` 文件。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(24)
+
+            Divider()
+
+            List(candidates) { candidate in
+                Toggle(isOn: selectionBinding(for: candidate)) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(candidate.name)
+                            .fontWeight(.medium)
+                            .lineLimit(1)
+                        Text(candidate.relativePath)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                        HStack(spacing: 12) {
+                            Label(
+                                ModuleOutputFolder.displayTitle(for: candidate.outputFolder),
+                                systemImage: "folder"
+                            )
+                            if !candidate.category.isEmpty {
+                                Label(candidate.category, systemImage: "tag")
+                            }
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    }
+                }
+                .toggleStyle(.checkbox)
+                .padding(.vertical, 5)
+            }
+            .frame(minHeight: 300)
+
+            Divider()
+
+            HStack {
+                Button("全选") {
+                    selectedCandidateIDs = Set(candidates.map(\.id))
+                }
+                Button("全不选") {
+                    selectedCandidateIDs.removeAll()
+                }
+                Spacer()
+                Text("已选择 \(selectedCandidates.count) / \(candidates.count)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button("取消", role: .cancel) { dismiss() }
+                Button("导入") {
+                    Task { await importSelectedCandidates() }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(selectedCandidates.isEmpty || isImporting || model.isWorking)
+            }
+            .padding(20)
+        }
+        .frame(width: 720, height: 520)
+    }
+
+    private func selectionBinding(for candidate: LocalModuleScanCandidate) -> Binding<Bool> {
+        Binding(
+            get: { selectedCandidateIDs.contains(candidate.id) },
+            set: { isSelected in
+                if isSelected {
+                    selectedCandidateIDs.insert(candidate.id)
+                } else {
+                    selectedCandidateIDs.remove(candidate.id)
+                }
+            }
+        )
+    }
+
+    private func importSelectedCandidates() async {
+        let selected = selectedCandidates
+        guard !selected.isEmpty else { return }
+        isImporting = true
+        await model.importLocalModules(selected)
+        isImporting = false
+        dismiss()
     }
 }
 

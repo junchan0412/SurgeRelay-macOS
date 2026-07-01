@@ -62,6 +62,9 @@ final class AppModel {
         if loadedSettings.github.repository.isEmpty { loadedSettings.github.repository = "Surge-Relay" }
         if loadedSettings.github.branch.isEmpty { loadedSettings.github.branch = "main" }
         if loadedSettings.github.directory.isEmpty { loadedSettings.github.directory = "modules" }
+        loadedSettings.customModuleOutputFolders = ModuleOutputFolder.options(
+            from: loadedSettings.customModuleOutputFolders
+        ).filter { !$0.isEmpty }
         let loadedModules = Self.normalizedModuleNaming(
             PersistenceStore.loadModules(),
             combinedFileName: loadedSettings.combinedModuleFileName
@@ -302,80 +305,102 @@ final class AppModel {
         if settings.storageMode == .local { Task { await rebuildCombinedFromCache() } }
     }
 
+    func scanExistingLocalModules() async throws -> [LocalModuleScanCandidate] {
+        statusMessage = "正在扫描本地模块根目录…"
+        let rootDirectoryPath = settings.localModuleDirectory
+        let combinedFileName = settings.combinedModuleFileName
+        let existingModules = modules
+        let publishedFilePaths = settings.localPublishedFilePaths
+        let candidates = try await Task.detached(priority: .userInitiated) {
+            try LocalModuleScanner.candidates(
+                in: rootDirectoryPath,
+                combinedFileName: combinedFileName,
+                existingModules: existingModules,
+                publishedFilePaths: publishedFilePaths
+            )
+        }.value
+        statusMessage = candidates.isEmpty
+            ? "未发现可导入的新本地模块"
+            : "发现 \(candidates.count) 个可导入本地模块"
+        return candidates
+    }
+
     func importExistingLocalModules() async {
         guard !isWorking else { return }
-        isWorking = true
-        statusMessage = "正在扫描本地模块根目录…"
-        defer { isWorking = false }
-
         do {
-            let candidates = try LocalModuleScanner.candidates(
-                in: settings.localModuleDirectory,
-                combinedFileName: settings.combinedModuleFileName,
-                existingModules: modules,
-                publishedFilePaths: settings.localPublishedFilePaths
-            )
-            guard !candidates.isEmpty else {
-                statusMessage = "未发现可导入的新本地模块"
-                return
-            }
-
-            registerLocalChange()
-            var imported: [RelayModule] = []
-            var failures: [String] = []
-            for candidate in candidates {
-                var module = RelayModule(
-                    name: candidate.name,
-                    sourceURL: candidate.sourceURL,
-                    sourceFormat: .surge,
-                    outputFileName: candidate.outputFileName,
-                    category: candidate.category,
-                    outputFolder: candidate.outputFolder,
-                    isEnabled: true,
-                    detectedSourceFormat: .surge,
-                    sourceContentHash: candidate.sourceContentHash,
-                    sourceCheckedAt: .now
-                )
-                do {
-                    let result = try await scriptHubClient.convert(
-                        module: module,
-                        github: settings.github.isConfigured ? settings.github : nil
-                    )
-                    try await fileStore.writeComponent(result.content, id: module.id)
-                    let fingerprint = await processingWorker.contentFingerprint(
-                        of: result.content,
-                        assets: result.assets
-                    )
-                    module.contentHash = fingerprint
-                    module.lastUpdatedAt = .now
-                    module.state = .current
-                    module.lastError = nil
-                    imported.append(module)
-                } catch {
-                    failures.append("\(candidate.relativePath)：\(error.localizedDescription)")
-                }
-            }
-
-            guard !imported.isEmpty else {
-                statusMessage = "本地模块扫描完成，但没有可导入项目"
-                if !failures.isEmpty {
-                    presentedError = "以下本地模块无法导入：\n\(failures.joined(separator: "\n"))"
-                }
-                return
-            }
-
-            modules.append(contentsOf: imported)
-            selectedModuleID = imported.first?.id
-            try persistModules()
-            await rebuildCombinedFromCache()
-            let failureSuffix = failures.isEmpty ? "" : "；\(failures.count) 个文件无法导入"
-            statusMessage = "已导入 \(imported.count) 个本地模块\(failureSuffix)"
-            if !failures.isEmpty {
-                presentedError = "部分本地模块无法导入：\n\(failures.joined(separator: "\n"))"
-            }
+            let candidates = try await scanExistingLocalModules()
+            await importLocalModules(candidates)
         } catch {
             presentedError = "扫描本地模块失败：\(error.localizedDescription)"
             statusMessage = "本地模块扫描失败"
+        }
+    }
+
+    func importLocalModules(_ candidates: [LocalModuleScanCandidate]) async {
+        guard !isWorking else { return }
+        guard !candidates.isEmpty else {
+            statusMessage = "没有选择需要导入的本地模块"
+            return
+        }
+        isWorking = true
+        defer { isWorking = false }
+
+        registerLocalChange()
+        var imported: [RelayModule] = []
+        var failures: [String] = []
+        for candidate in candidates {
+            var module = RelayModule(
+                name: candidate.name,
+                sourceURL: candidate.sourceURL,
+                sourceFormat: .surge,
+                outputFileName: candidate.outputFileName,
+                category: candidate.category,
+                outputFolder: candidate.outputFolder,
+                isEnabled: true,
+                detectedSourceFormat: .surge,
+                sourceContentHash: candidate.sourceContentHash,
+                sourceCheckedAt: .now
+            )
+            do {
+                let result = try await scriptHubClient.convert(
+                    module: module,
+                    github: settings.github.isConfigured ? settings.github : nil
+                )
+                try await fileStore.writeComponent(result.content, id: module.id)
+                let fingerprint = await processingWorker.contentFingerprint(
+                    of: result.content,
+                    assets: result.assets
+                )
+                module.contentHash = fingerprint
+                module.lastUpdatedAt = .now
+                module.state = .current
+                module.lastError = nil
+                imported.append(module)
+            } catch {
+                failures.append("\(candidate.relativePath)：\(error.localizedDescription)")
+            }
+        }
+
+        guard !imported.isEmpty else {
+            statusMessage = "本地模块扫描完成，但没有可导入项目"
+            if !failures.isEmpty {
+                presentedError = "以下本地模块无法导入：\n\(failures.joined(separator: "\n"))"
+            }
+            return
+        }
+
+        modules.append(contentsOf: imported)
+        selectedModuleID = imported.first?.id
+        do {
+            try persistModules()
+        } catch {
+            presentedError = "保存导入模块失败：\(error.localizedDescription)"
+        }
+        await rebuildCombinedFromCache()
+        let failureSuffix = failures.isEmpty ? "" : "；\(failures.count) 个文件无法导入"
+        statusMessage = "已导入 \(imported.count) 个本地模块\(failureSuffix)"
+        if !failures.isEmpty {
+            presentedError = "部分本地模块无法导入：\n\(failures.joined(separator: "\n"))"
         }
     }
 
@@ -384,9 +409,44 @@ final class AppModel {
             ? localModuleOutputFolders()
             : githubModuleOutputFolders
         return ModuleOutputFolder.options(
-            from: configuredFolders + modules.map(\.outputFolder),
+            from: configuredFolders + settings.customModuleOutputFolders + modules.map(\.outputFolder),
             preserving: selected
         )
+    }
+
+    @discardableResult
+    func createModuleOutputFolder(named rawValue: String) throws -> String {
+        let folder = ModuleOutputFolder.normalized(rawValue)
+        guard !folder.isEmpty else {
+            throw RelayError.invalidOutput("请输入文件夹名称。")
+        }
+
+        if settings.storageMode == .local {
+            let rootPath = settings.localModuleDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !rootPath.isEmpty else {
+                throw RelayError.invalidOutput("请先设置本地模块根目录。")
+            }
+            let root = URL(filePath: rootPath, directoryHint: .isDirectory)
+                .standardizedFileURL
+            var destination = root
+            for component in ModuleOutputFolder.components(folder) {
+                destination = destination.appending(path: component, directoryHint: .isDirectory)
+            }
+            try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+        }
+
+        var folders = Set(settings.customModuleOutputFolders.map(ModuleOutputFolder.normalized))
+        folders.insert(folder)
+        settings.customModuleOutputFolders = ModuleOutputFolder.options(from: Array(folders))
+            .filter { !$0.isEmpty }
+        if !githubModuleOutputFolders.contains(folder) {
+            githubModuleOutputFolders = ModuleOutputFolder.options(from: githubModuleOutputFolders + [folder])
+        }
+        saveSettings()
+        statusMessage = settings.storageMode == .local
+            ? "已创建文件夹 \(folder)"
+            : "已添加 GitHub 文件夹 \(folder)，发布模块时会自动创建路径"
+        return folder
     }
 
     func refreshModuleOutputFolders(force: Bool = false) async {
@@ -1412,7 +1472,7 @@ final class AppModel {
 
 }
 
-struct LocalModuleScanCandidate: Hashable, Sendable {
+struct LocalModuleScanCandidate: Identifiable, Hashable, Sendable {
     var relativePath: String
     var sourceURL: String
     var name: String
@@ -1420,6 +1480,8 @@ struct LocalModuleScanCandidate: Hashable, Sendable {
     var category: String
     var outputFolder: String
     var sourceContentHash: String
+
+    var id: String { relativePath }
 }
 
 enum LocalModuleScanner {

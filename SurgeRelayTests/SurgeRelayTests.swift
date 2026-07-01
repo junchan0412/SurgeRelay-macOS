@@ -53,8 +53,13 @@ final class SurgeRelayTests: XCTestCase {
     func testModuleOutputFolderBuildsRelativePaths() {
         XCTAssertEqual(ModuleOutputFolder.normalized(" /Ads/Video/ "), "Ads/Video")
         XCTAssertEqual(ModuleOutputFolder.normalized("../Ads"), "Ads")
+        XCTAssertEqual(ModuleOutputFolder.components(" /Ads/Video/ "), ["Ads", "Video"])
         XCTAssertEqual(ModuleOutputFolder.relativePath(fileName: "YouTube Ads", folder: "Ads"), "Ads/YouTube-Ads.sgmodule")
         XCTAssertEqual(ModuleOutputFolder.displayTitle(for: ""), "根目录")
+        XCTAssertEqual(
+            ModuleOutputFolder.options(from: ["Video", "Ads/Video"], preserving: "Tools"),
+            ["", "Ads/Video", "Tools", "Video"]
+        )
     }
 
     func testWebErrorPayloadIncludesUserFacingMessage() throws {
@@ -165,6 +170,14 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertTrue(settings.localPublishedFilePaths.isEmpty)
         XCTAssertNil(settings.githubPublishedRepositoryKey)
         XCTAssertTrue(settings.githubPublishedFilePaths.isEmpty)
+        XCTAssertTrue(settings.customModuleOutputFolders.isEmpty)
+    }
+
+    func testSettingsDecodesCustomModuleOutputFolders() throws {
+        let data = Data(#"{"customModuleOutputFolders":["Ads","Tools/Nested"]}"#.utf8)
+        let settings = try JSONDecoder().decode(AppSettings.self, from: data)
+
+        XCTAssertEqual(settings.customModuleOutputFolders, ["Ads", "Tools/Nested"])
     }
 
     func testSettingsStillDecodesLegacyGitHubTokenForMigration() throws {
@@ -381,6 +394,7 @@ final class SurgeRelayTests: XCTestCase {
 
         XCTAssertEqual(candidates.count, 1)
         XCTAssertEqual(candidates[0].relativePath, "Ads/YouTube.sgmodule")
+        XCTAssertEqual(candidates[0].id, "Ads/YouTube.sgmodule")
         XCTAssertEqual(candidates[0].name, "YouTube")
         XCTAssertEqual(candidates[0].category, "Video")
         XCTAssertEqual(candidates[0].outputFolder, "Ads")

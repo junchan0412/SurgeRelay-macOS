@@ -8,6 +8,8 @@ struct ModuleEditorView: View {
     @State private var localError: String?
     @State private var isAdvancedExpanded: Bool
     @State private var nameLookup: Task<Void, Never>?
+    @State private var showsNewFolderDialog = false
+    @State private var newFolderName = ""
 
     private var isNativeSurgeModule: Bool {
         guard let url = URL(string: draft.sourceURL), !draft.sourceURL.isEmpty else {
@@ -40,12 +42,25 @@ struct ModuleEditorView: View {
                 Section("基本信息") {
                     TextField("显示名称", text: $draft.name, prompt: Text("例如：YouTube 去广告"))
                     TextField("模块标签（category）", text: $draft.category, prompt: Text("例如：广告过滤"))
-                    Picker("存放文件夹", selection: Binding(
-                        get: { ModuleOutputFolder.normalized(draft.outputFolder) },
-                        set: { draft.outputFolder = $0 }
-                    )) {
-                        ForEach(model.moduleOutputFolderOptions(preserving: draft.outputFolder), id: \.self) { folder in
-                            Text(ModuleOutputFolder.displayTitle(for: folder)).tag(folder)
+                    LabeledContent("存放文件夹") {
+                        HStack(spacing: 8) {
+                            Picker("", selection: Binding(
+                                get: { ModuleOutputFolder.normalized(draft.outputFolder) },
+                                set: { draft.outputFolder = $0 }
+                            )) {
+                                ForEach(model.moduleOutputFolderOptions(preserving: draft.outputFolder), id: \.self) { folder in
+                                    Text(ModuleOutputFolder.displayTitle(for: folder)).tag(folder)
+                                }
+                            }
+                            .labelsHidden()
+
+                            Button {
+                                newFolderName = ""
+                                showsNewFolderDialog = true
+                            } label: {
+                                Image(systemName: "folder.badge.plus")
+                            }
+                            .help("新建存放文件夹")
                         }
                     }
                     Toggle("包含在总模块中", isOn: $draft.isEnabled)
@@ -118,6 +133,15 @@ struct ModuleEditorView: View {
         } message: {
             Text(localError ?? "")
         }
+        .alert("新建存放文件夹", isPresented: $showsNewFolderDialog) {
+            TextField("文件夹名称", text: $newFolderName)
+            Button("创建") { createFolder() }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text(model.settings.storageMode == .local
+                ? "将在本地模块根目录下创建文件夹。"
+                : "GitHub 不支持空文件夹；该路径会先保存为选项，发布模块时自动创建。")
+        }
     }
 
     /// Auto-fills the name from the module's own `#!name=` metadata (Surge / Loon)
@@ -156,6 +180,15 @@ struct ModuleEditorView: View {
                 try model.addModule(from: draft)
             }
             dismiss()
+        } catch {
+            localError = error.localizedDescription
+        }
+    }
+
+    private func createFolder() {
+        do {
+            let folder = try model.createModuleOutputFolder(named: newFolderName)
+            draft.outputFolder = folder
         } catch {
             localError = error.localizedDescription
         }

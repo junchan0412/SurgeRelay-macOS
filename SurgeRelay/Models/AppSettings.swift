@@ -73,6 +73,7 @@ struct AppSettings: Codable, Equatable, Sendable {
     var localPublishedFilePaths: [String] = []
     var githubPublishedRepositoryKey: String?
     var githubPublishedFilePaths: [String] = []
+    var customModuleOutputFolders: [String] = []
     var webServerEnabled = false
     var webServerPort = 8787
     var webServerAllowRemoteAccess = false
@@ -99,6 +100,7 @@ struct AppSettings: Codable, Equatable, Sendable {
         localPublishedFilePaths = try container.decodeIfPresent([String].self, forKey: .localPublishedFilePaths) ?? []
         githubPublishedRepositoryKey = try container.decodeIfPresent(String.self, forKey: .githubPublishedRepositoryKey)
         githubPublishedFilePaths = try container.decodeIfPresent([String].self, forKey: .githubPublishedFilePaths) ?? []
+        customModuleOutputFolders = try container.decodeIfPresent([String].self, forKey: .customModuleOutputFolders) ?? []
         webServerEnabled = try container.decodeIfPresent(Bool.self, forKey: .webServerEnabled) ?? false
         webServerPort = try container.decodeIfPresent(Int.self, forKey: .webServerPort) ?? 8787
         webServerAllowRemoteAccess = try container.decodeIfPresent(Bool.self, forKey: .webServerAllowRemoteAccess) ?? false

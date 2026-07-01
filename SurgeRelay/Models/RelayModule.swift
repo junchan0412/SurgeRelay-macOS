@@ -55,6 +55,10 @@ enum ModuleOutputFolder {
         return [normalizedFolder, normalizedFileName].filter { !$0.isEmpty }.joined(separator: "/")
     }
 
+    static func components(_ folder: String) -> [String] {
+        normalized(folder).split(separator: "/").map(String.init)
+    }
+
     static func options(from folders: [String], preserving selected: String? = nil) -> [String] {
         var values = Set([root])
         for folder in folders {
