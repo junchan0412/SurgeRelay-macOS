@@ -305,6 +305,10 @@ struct ModulesView: View {
             }
             .frame(width: 620, height: 560)
         }
+        .sheet(isPresented: $model.presentsUpdateChecker) {
+            CheckForUpdatesSheet()
+                .frame(width: 560)
+        }
         .confirmationDialog(
             "删除“\(deleteCandidate?.name ?? "")”？",
             isPresented: Binding(

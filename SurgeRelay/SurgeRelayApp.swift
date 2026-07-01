@@ -21,7 +21,9 @@ struct SurgeRelayApp: App {
         .defaultSize(width: 1240, height: 760)
         .commands {
             CommandGroup(after: .appInfo) {
-                CheckForUpdatesView()
+                CheckForUpdatesView {
+                    model.presentsUpdateChecker = true
+                }
             }
             CommandGroup(replacing: .appSettings) {
                 Button("设置…") { model.presentsSettings = true }

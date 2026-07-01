@@ -23,6 +23,7 @@ final class AppModel {
     /// Set to true to ask the main window to present the in-app settings sheet
     /// (used by the menu bar, the ⌘, command, and the toolbar gear button).
     var presentsSettings = false
+    var presentsUpdateChecker = false
     var synchronizationCompletedCount = 0
     var synchronizationTotalCount = 0
     var synchronizingModuleID: UUID?

@@ -44,7 +44,10 @@ struct MenuBarContent: View {
         Divider()
 
         Button("打开 Surge Relay") { activateMainWindow() }
-        CheckForUpdatesView()
+        CheckForUpdatesView {
+            activateMainWindow()
+            model.presentsUpdateChecker = true
+        }
         Button("设置…") {
             activateMainWindow()
             model.presentsSettings = true

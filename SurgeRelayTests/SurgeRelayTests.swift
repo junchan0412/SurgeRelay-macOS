@@ -229,6 +229,69 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertEqual(url.path, "/junchan0412/SurgeRelay-macOS/releases/latest")
     }
 
+    func testReleaseVersionComparisonHandlesMultiDigitComponents() {
+        XCTAssertEqual(
+            ReleaseUpdateAvailability.compare(current: "1.2.11", latest: "v1.2.12"),
+            .newerAvailable
+        )
+        XCTAssertEqual(
+            ReleaseUpdateAvailability.compare(current: "1.2.11", latest: "1.2.11"),
+            .upToDate
+        )
+        XCTAssertEqual(
+            ReleaseUpdateAvailability.compare(current: "1.2.11", latest: "1.2.10"),
+            .olderThanCurrent
+        )
+        XCTAssertFalse(ReleaseVersion("1.2.10") < ReleaseVersion("1.2.9"))
+    }
+
+    func testGitHubReleaseClientFetchesLatestReleaseAssets() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GitHubMockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        GitHubMockURLProtocol.reset()
+        defer { GitHubMockURLProtocol.reset() }
+        GitHubMockURLProtocol.handler = { request in
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "application/vnd.github+json")
+            switch (request.httpMethod ?? "GET", request.url?.path ?? "") {
+            case ("GET", "/repos/junchan0412/SurgeRelay-macOS/releases/latest"):
+                return (200, Data("""
+                {
+                  "tag_name": "v1.2.12",
+                  "name": "Surge Relay 1.2.12",
+                  "html_url": "https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.2.12",
+                  "published_at": "2026-07-02T10:00:00Z",
+                  "body": "Release notes",
+                  "assets": [
+                    {
+                      "name": "Surge-Relay-1.2.12.app.zip",
+                      "browser_download_url": "https://example.com/Surge-Relay-1.2.12.app.zip",
+                      "size": 7000000
+                    },
+                    {
+                      "name": "Surge-Relay-1.2.12.pkg",
+                      "browser_download_url": "https://example.com/Surge-Relay-1.2.12.pkg",
+                      "size": 7100000
+                    }
+                  ]
+                }
+                """.utf8))
+            default:
+                return (404, Data(#"{"message":"not found"}"#.utf8))
+            }
+        }
+
+        let release = try await GitHubReleaseClient(session: session).latestRelease()
+
+        XCTAssertEqual(release.version, "1.2.12")
+        XCTAssertEqual(release.packageAsset?.name, "Surge-Relay-1.2.12.pkg")
+        XCTAssertEqual(release.appZipAsset?.name, "Surge-Relay-1.2.12.app.zip")
+        XCTAssertEqual(release.notesPreview, "Release notes")
+        XCTAssertTrue(GitHubMockURLProtocol.requestedPaths.contains(
+            "GET /repos/junchan0412/SurgeRelay-macOS/releases/latest"
+        ))
+    }
+
     func testPrivateRepositoryRequiresCloudflareAndUsesItWhenConfigured() throws {
         var settings = GitHubSettings()
         settings.repositoryIsPrivate = true
