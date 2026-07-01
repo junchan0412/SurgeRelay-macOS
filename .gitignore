@@ -1,0 +1,12 @@
+.DS_Store
+Build/
+.build/
+.build-*/
+DerivedData/
+*.profraw
+*.dmg
+*.pdf
+*.pages
+xcuserdata/
+*.xcuserstate
+.wrangler/

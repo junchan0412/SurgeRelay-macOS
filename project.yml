@@ -1,0 +1,63 @@
+name: Surge Relay
+options:
+  bundleIdPrefix: com.allenmiao
+  deploymentTarget:
+    macOS: "26.0"
+  groupSortPosition: top
+  generateEmptyDirectories: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: 1.1.0
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: 2.9.3
+targets:
+  Surge Relay:
+    type: application
+    platform: macOS
+    deploymentTarget: "26.0"
+    info:
+      path: SurgeRelay/Info.plist
+      properties:
+        CFBundleDisplayName: Surge Relay
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSApplicationCategoryType: public.app-category.utilities
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+        SUFeedURL: https://raw.githubusercontent.com/EEliberto/SurgeRelay-macOS/main/appcast.xml
+        SUPublicEDKey: FEcOaL+hwqoGMoia0HFa+ejmGKDUH/NNyyUDf9kEOBQ=
+        SUEnableAutomaticChecks: true
+    sources:
+      - path: SurgeRelay
+      - path: Surge Relay.icon
+        buildPhase: resources
+    dependencies:
+      - sdk: JavaScriptCore.framework
+      - package: Sparkle
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.allenmiao.SurgeRelay
+        PRODUCT_NAME: Surge Relay
+        PRODUCT_MODULE_NAME: SurgeRelay
+        ASSETCATALOG_COMPILER_APPICON_NAME: Surge Relay
+        ENABLE_APP_SANDBOX: NO
+        SWIFT_STRICT_CONCURRENCY: complete
+  Surge RelayTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: SurgeRelayTests
+    dependencies:
+      - target: Surge Relay
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.allenmiao.SurgeRelayTests
+        GENERATE_INFOPLIST_FILE: YES

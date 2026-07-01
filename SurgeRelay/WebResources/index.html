@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <title>Surge Relay</title>
+  <link rel="icon" type="image/png" sizes="1024x1024" href="/app-icon.png?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=1">
+  <link rel="manifest" href="/manifest.webmanifest?v=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Surge Relay">
+  <link rel="stylesheet" href="/app.css?v=17">
+  <script src="/app.js?v=14" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="模块列表">
+      <div class="sidebar-top">
+        <div class="brand-row">
+          <span class="brand-mark"><img class="app-icon" src="/app-icon.png?v=1" alt=""></span>
+          <div class="brand-copy"><h1>Surge Relay</h1><p>Web 管理</p></div>
+          <div class="toolbar sidebar-toolbar">
+            <button class="icon-button" id="add-button" type="button" aria-label="添加模块" title="添加模块"><span class="symbol" data-symbol="plus"></span></button>
+            <button class="icon-button" id="refresh-button" type="button" aria-label="更新全部" title="更新全部"><span class="symbol" data-symbol="refresh"></span></button>
+          </div>
+        </div>
+        <label class="search-field"><span class="symbol" data-symbol="magnifyingglass"></span><input id="search-input" type="search" placeholder="搜索" autocomplete="off"></label>
+      </div>
+
+      <nav class="module-navigation">
+        <button class="summary-row" id="summary-row" type="button">
+          <span class="module-icon summary-icon"><img class="app-icon" src="/app-icon.png?v=1" alt=""></span>
+          <span class="module-copy"><strong>Surge Relay 汇总</strong><small id="summary-subtitle">正在载入…</small></span>
+          <span class="symbol disclosure" data-symbol="chevron.right"></span>
+        </button>
+        <div class="section-label">来源模块</div>
+        <div id="module-list" class="module-list"></div>
+      </nav>
+
+    </aside>
+
+    <div class="activity-shell">
+      <div class="activity-card" id="activity-card" aria-live="polite">
+        <div class="activity-line"><span id="activity-status">准备就绪</span><span id="activity-percent"></span></div>
+        <div class="progress-track" id="progress-track" hidden><span id="progress-fill"></span></div>
+        <div class="latest-update"><strong>最新更新时间</strong><span id="latest-update">尚未更新</span></div>
+      </div>
+    </div>
+
+    <main class="detail" id="detail">
+      <header class="mobile-header">
+        <button class="icon-button" id="mobile-back" type="button" aria-label="返回模块列表"><span class="symbol" data-symbol="chevron.left"></span></button>
+        <strong id="mobile-title">模块</strong><span class="mobile-header-spacer"></span>
+      </header>
+      <div id="detail-content" class="detail-content"></div>
+    </main>
+  </div>
+
+  <dialog id="module-dialog" class="sheet-dialog">
+    <form id="module-form">
+      <div class="dialog-header">
+        <div><h2 id="dialog-title">添加模块</h2><p>原始地址可以随时修改，已发布的稳定地址不会改变。</p></div>
+        <button class="icon-button close-module-dialog" type="button" aria-label="关闭"><span class="symbol" data-symbol="xmark"></span></button>
+      </div>
+      <div class="form-content">
+        <section class="editor-section">
+          <h3>基本信息</h3>
+          <div class="editor-group">
+            <label class="form-row"><span>显示名称</span><input name="name" type="text" required placeholder="例如：YouTube 去广告"></label>
+            <label class="form-row switch-row"><span>包含在总模块中</span><input name="isEnabled" type="checkbox" role="switch" checked><span class="toggle-track" aria-hidden="true"></span></label>
+          </div>
+        </section>
+        <section class="editor-section">
+          <h3>来源</h3>
+          <div class="editor-group">
+            <label class="form-row"><span>原始地址</span><input name="sourceURL" type="url" required placeholder="https://example.com/module.plugin"></label>
+            <label class="form-row"><span>来源格式</span><select name="sourceFormat"><option value="automatic">自动识别</option><option value="quantumultX">Quantumult X 重写</option><option value="loon">Loon 插件</option><option value="surge">Surge 模块</option></select></label>
+          </div>
+        </section>
+        <section class="editor-section advanced-editor">
+          <div class="editor-group">
+            <button class="advanced-master" id="advanced-master" type="button" aria-expanded="false"><span class="symbol" data-symbol="chevron.right"></span><strong>高级</strong></button>
+            <div class="advanced-master-content" id="advanced-master-content" aria-hidden="true">
+              <div class="advanced-master-inner">
+                <div class="native-module-note" id="native-module-note" hidden><span class="symbol" data-symbol="arrow.triangle.2.circlepath"></span><span>该地址是 Surge 模块，将直接参与合并，不经过 Script‑Hub；高级转换选项不会应用。</span></div>
+                <div id="advanced-options"></div>
+              </div>
+            </div>
+          </div>
+          <p class="section-footer">Loon 与 Quantumult X 来源可在这里使用 Script‑Hub 原有的转换控制。</p>
+        </section>
+      </div>
+      <div class="dialog-message" id="module-dialog-message" role="alert" hidden></div>
+      <div class="dialog-actions"><button class="button secondary close-module-dialog" type="button">取消</button><button class="button primary" type="submit" id="save-module-button">添加</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="confirm-dialog" class="confirm-dialog">
+    <div class="confirm-content"><span class="confirm-icon symbol" data-symbol="exclamationmark.triangle"></span><h2 id="confirm-title">确认操作</h2><p id="confirm-message"></p></div>
+    <div class="dialog-actions"><button class="button secondary" id="confirm-cancel" type="button">取消</button><button class="button destructive" id="confirm-accept" type="button">确认</button></div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
