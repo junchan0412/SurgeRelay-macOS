@@ -71,3 +71,14 @@ jobs:
             "${assets[@]}" \
             --repo "$GITHUB_REPOSITORY" \
             --clobber
+
+      - name: Verify uploaded GitHub Release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ inputs.tag }}"
+          VERSION="${VERSION#v}"
+          VERSION="$VERSION" ./script/verify_github_release_assets.sh \
+            --tag "${{ inputs.tag }}" \
+            --repo "$GITHUB_REPOSITORY"

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.18
+
+- 新增 `script/verify_github_release_assets.sh`，可直接校验 GitHub Release 线上资产列表、下载后的 sha256 sidecar、GitHub API digest 和包内结构。
+- GitHub Actions 打包工作流在上传 Release 资产后会自动运行线上校验，减少资产上传损坏、漏传或 digest 不一致的问题。
+- 线上校验脚本会继续复用本地 Release 验证，覆盖 App 版本号、构建号、签名清单、动态库依赖、pkg payload 和 postinstall。
+
 ## 1.2.17
 
 - App 内 GitHub Release 更新检查会下载 `.pkg.sha256` 与 `.app.zip.sha256` 小文件，并与 GitHub API 返回的资产 digest 比对。
