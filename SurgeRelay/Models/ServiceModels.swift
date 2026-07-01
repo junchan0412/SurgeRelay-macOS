@@ -59,6 +59,10 @@ struct PublishPreview: Identifiable, Equatable, Sendable {
     }
 }
 
+enum ReleaseUpdateChannel {
+    static let latestReleaseURL = URL(string: "https://github.com/junchan0412/SurgeRelay-macOS/releases/latest")!
+}
+
 enum UpdateHistoryOutcome: String, Codable, Sendable {
     case updated
     case unchanged
@@ -192,7 +196,7 @@ struct InstallationDiagnosticSnapshot: Codable, Equatable, Sendable {
     static func updateRecommendation(automaticChecksEnabled: Bool) -> String {
         automaticChecksEnabled
             ? "App 内自动检查更新已开启；如果 Sparkle appcast 未同步最新 Release，请优先使用 GitHub Release 中的 pkg。"
-            : "App 内自动检查更新已关闭；当前推荐使用 GitHub Release 中的 pkg 更新，安装器会自动清除隔离属性。"
+            : "App 内 Sparkle 自动检查更新已关闭；当前“查看更新…”会打开 GitHub Releases，推荐使用 pkg 更新，安装器会自动清除隔离属性。"
     }
 
     private static func runSystemCommand(_ executable: String, _ arguments: [String]) -> CommandResult {

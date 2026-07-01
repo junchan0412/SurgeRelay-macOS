@@ -1,4 +1,3 @@
-import Sparkle
 import SwiftUI
 
 enum SurgeRelayWindow {
@@ -8,15 +7,6 @@ enum SurgeRelayWindow {
 @main
 struct SurgeRelayApp: App {
     @State private var model = AppModel()
-    private let updaterController: SPUStandardUpdaterController
-
-    init() {
-        updaterController = SPUStandardUpdaterController(
-            startingUpdater: true,
-            updaterDelegate: nil,
-            userDriverDelegate: nil
-        )
-    }
 
     var body: some Scene {
         Window("Surge Relay", id: SurgeRelayWindow.main) {
@@ -31,7 +21,7 @@ struct SurgeRelayApp: App {
         .defaultSize(width: 1240, height: 760)
         .commands {
             CommandGroup(after: .appInfo) {
-                CheckForUpdatesView(updater: updaterController.updater)
+                CheckForUpdatesView()
             }
             CommandGroup(replacing: .appSettings) {
                 Button("设置…") { model.presentsSettings = true }
@@ -47,7 +37,7 @@ struct SurgeRelayApp: App {
         }
 
         MenuBarExtra("Surge Relay", systemImage: "repeat") {
-            MenuBarContent(updater: updaterController.updater)
+            MenuBarContent()
                 .environment(model)
         }
     }

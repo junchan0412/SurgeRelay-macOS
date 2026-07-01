@@ -192,6 +192,13 @@ final class SurgeRelayTests: XCTestCase {
         )
     }
 
+    func testReleaseUpdateChannelOpensLatestGitHubRelease() throws {
+        let url = ReleaseUpdateChannel.latestReleaseURL
+        XCTAssertEqual(url.scheme, "https")
+        XCTAssertEqual(url.host, "github.com")
+        XCTAssertEqual(url.path, "/junchan0412/SurgeRelay-macOS/releases/latest")
+    }
+
     func testPrivateRepositoryRequiresCloudflareAndUsesItWhenConfigured() throws {
         var settings = GitHubSettings()
         settings.repositoryIsPrivate = true

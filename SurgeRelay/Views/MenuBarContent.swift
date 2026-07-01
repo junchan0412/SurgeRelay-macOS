@@ -1,5 +1,4 @@
 import AppKit
-import Sparkle
 import SwiftUI
 
 /// Contents of the menu bar extra: quick status plus a few common actions and
@@ -7,7 +6,6 @@ import SwiftUI
 struct MenuBarContent: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
-    let updater: SPUUpdater
 
     var body: some View {
         Section("状态") {
@@ -46,7 +44,7 @@ struct MenuBarContent: View {
         Divider()
 
         Button("打开 Surge Relay") { activateMainWindow() }
-        CheckForUpdatesView(updater: updater)
+        CheckForUpdatesView()
         Button("设置…") {
             activateMainWindow()
             model.presentsSettings = true

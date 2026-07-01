@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.10
+
+- 菜单栏和应用菜单中的“查看更新…”改为直接打开 GitHub Releases 最新版本页，避免旧 Sparkle appcast 显示过期版本。
+- App 启动时不再启动 Sparkle updater；在完成可签名 appcast 前，更新路径统一收敛到 GitHub Release 中的 `.pkg` 安装包。
+- 文档同步说明当前更新策略：首次安装可用 `.app.zip`，更新已有安装优先使用 `.pkg`，无需重复手动执行 `xattr -cr`。
+
 ## 1.2.9
 
 - 汇总模块详情新增 GitHub 发布预览，可在上传前查看新增/更新文件和将删除的旧文件。
