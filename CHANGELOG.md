@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.15
+
+- Release 验证新增主程序动态库依赖解析检查，会读取 `LC_RPATH` 与 `otool -L`，确认 `@rpath` 依赖能够解析到 App bundle 内或系统库路径。
+- 发布包会明确验证 `@executable_path/../Frameworks` 运行时搜索路径，进一步覆盖 Sparkle framework 缺失或路径错误导致的启动即闪退问题。
+- `.app.zip` 与 `.pkg` payload 会复用同一套依赖解析检查，确保两种安装资产里的 App bundle 都能通过动态链接前置验证。
+
 ## 1.2.14
 
 - Release 验证新增嵌入代码签名清单检查，会确认 App、Sparkle framework、Updater 与 XPC 服务均为 ad-hoc 签名且没有混入其他 Team ID，避免安装后因动态库签名不一致而闪退。

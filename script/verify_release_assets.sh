@@ -153,6 +153,77 @@ verify_ad_hoc_signature_inventory() {
   done
 }
 
+binary_rpaths() {
+  local binary="$1"
+
+  otool -l "$binary" | awk '
+    $1 == "cmd" && $2 == "LC_RPATH" { in_rpath = 1; next }
+    in_rpath && $1 == "path" { print $2; in_rpath = 0 }
+  '
+}
+
+dependency_resolves() {
+  local dependency="$1"
+  local binary="$2"
+  local executable_dir
+  local loader_dir
+  local suffix
+  local rpath
+  local resolved_rpath
+  local candidate
+
+  executable_dir="$(dirname "$binary")"
+  loader_dir="$executable_dir"
+  case "$dependency" in
+    @rpath/*)
+      suffix="${dependency#@rpath/}"
+      while IFS= read -r rpath; do
+        [[ -n "$rpath" ]] || continue
+        resolved_rpath="${rpath//@executable_path/$executable_dir}"
+        resolved_rpath="${resolved_rpath//@loader_path/$loader_dir}"
+        candidate="$resolved_rpath/$suffix"
+        [[ -e "$candidate" ]] && return 0
+      done < <(binary_rpaths "$binary")
+      return 1
+      ;;
+    @executable_path/*)
+      suffix="${dependency#@executable_path/}"
+      [[ -e "$executable_dir/$suffix" ]]
+      ;;
+    @loader_path/*)
+      suffix="${dependency#@loader_path/}"
+      [[ -e "$loader_dir/$suffix" ]]
+      ;;
+    /*)
+      [[ "$dependency" == /System/* || "$dependency" == /usr/lib/* || -e "$dependency" ]]
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+verify_dynamic_library_linkage() {
+  local app_path="$1"
+  local binary="$app_path/Contents/MacOS/$APP_NAME"
+  local dependencies
+  local rpaths
+  local dependency
+
+  [[ -x "$binary" ]] || fail "missing executable: $binary"
+  dependencies="$(otool -L "$binary" | awk '/^[[:space:]]/ { print $1 }')"
+  if [[ "$dependencies" == *"@rpath/"* ]]; then
+    rpaths="$(binary_rpaths "$binary" | tr '\n' ' ')"
+    assert_contains "$binary rpaths" "@executable_path/../Frameworks" "$rpaths"
+  fi
+  while IFS= read -r dependency; do
+    [[ -n "$dependency" ]] || continue
+    dependency_resolves "$dependency" "$binary" \
+      || fail "$binary dependency does not resolve inside bundle or system paths: $dependency"
+  done <<< "$dependencies"
+  ok "verified dynamic library linkage"
+}
+
 launch_smoke_test() {
   local app_path="$1"
   local pids=""
@@ -200,6 +271,7 @@ verify_app_bundle() {
   archs="$(lipo -archs "$app_path/Contents/MacOS/$APP_NAME")"
   assert_contains "$app_path architectures" "arm64" " $archs "
   assert_contains "$app_path architectures" "x86_64" " $archs "
+  verify_dynamic_library_linkage "$app_path"
 }
 
 verify_app_zip() {
