@@ -15,9 +15,10 @@ APPCAST_PATH=""
 REQUIRE_SPARKLE_SIGNATURES="${REQUIRE_SPARKLE_SIGNATURES:-1}"
 EXPECT_ADHOC_SIGNATURE="${EXPECT_ADHOC_SIGNATURE:-1}"
 PKG_SIGNATURE_MODE="${PKG_SIGNATURE_MODE:-unsigned}"
+RUN_LAUNCH_SMOKE_TEST="${RUN_LAUNCH_SMOKE_TEST:-0}"
 
 usage() {
-  echo "Usage: $0 [--version VERSION] [--build BUILD] [--artifact-dir DIR] [--appcast PATH]" >&2
+  echo "Usage: $0 [--version VERSION] [--build BUILD] [--artifact-dir DIR] [--appcast PATH] [--launch-smoke-test]" >&2
   exit 2
 }
 
@@ -42,6 +43,10 @@ while [[ $# -gt 0 ]]; do
       [[ $# -ge 2 ]] || usage
       APPCAST_PATH="$2"
       shift 2
+      ;;
+    --launch-smoke-test)
+      RUN_LAUNCH_SMOKE_TEST=1
+      shift
       ;;
     -h|--help)
       usage
@@ -117,6 +122,57 @@ verify_sparkle_signature() {
   [[ -n "$signature" ]] || fail "$(basename "$signature_file") missing sparkle:edSignature"
 }
 
+assert_ad_hoc_signature() {
+  local code_path="$1"
+  local signature_detail
+
+  signature_detail="$(codesign -dvvv "$code_path" 2>&1)"
+  assert_contains "$code_path signature" "Signature=adhoc" "$signature_detail"
+  assert_contains "$code_path team identifier" "TeamIdentifier=not set" "$signature_detail"
+}
+
+verify_ad_hoc_signature_inventory() {
+  local app_path="$1"
+  local code_path
+  local autoupdate_path="$app_path/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate"
+  local seen_file="$TMP_DIR/signature-inventory-seen"
+
+  [[ "$EXPECT_ADHOC_SIGNATURE" == "1" ]] || return 0
+  : > "$seen_file"
+  {
+    echo "$app_path"
+    find "$app_path/Contents" \( -name "*.app" -o -name "*.framework" -o -name "*.xpc" \) -type d -print
+    [[ -f "$autoupdate_path" ]] && echo "$autoupdate_path"
+  } | while IFS= read -r code_path; do
+    [[ -n "$code_path" ]] || continue
+    if grep -Fxq "$code_path" "$seen_file"; then
+      continue
+    fi
+    echo "$code_path" >> "$seen_file"
+    assert_ad_hoc_signature "$code_path"
+  done
+}
+
+launch_smoke_test() {
+  local app_path="$1"
+  local pids=""
+
+  pkill -x "$APP_NAME" 2>/dev/null || true
+  sleep 1
+  open -n "$app_path"
+  for _ in {1..10}; do
+    pids="$(pgrep -x "$APP_NAME" || true)"
+    [[ -n "$pids" ]] && break
+    sleep 1
+  done
+  [[ -n "$pids" ]] || fail "launch smoke test did not start $APP_NAME"
+  sleep 3
+  pids="$(pgrep -x "$APP_NAME" || true)"
+  [[ -n "$pids" ]] || fail "launch smoke test started $APP_NAME, but it exited early"
+  pkill -x "$APP_NAME" 2>/dev/null || true
+  ok "verified launch smoke test"
+}
+
 verify_app_bundle() {
   local app_path="$1"
   local version
@@ -139,6 +195,7 @@ verify_app_bundle() {
   if [[ "$EXPECT_ADHOC_SIGNATURE" == "1" ]]; then
     assert_contains "$app_path signature" "Signature=adhoc" "$signature_detail"
   fi
+  verify_ad_hoc_signature_inventory "$app_path"
 
   archs="$(lipo -archs "$app_path/Contents/MacOS/$APP_NAME")"
   assert_contains "$app_path architectures" "arm64" " $archs "
@@ -153,7 +210,30 @@ verify_app_zip() {
   ditto -x -k "$APP_ZIP" "$tmp_dir"
   app_path="$tmp_dir/$APP_NAME.app"
   verify_app_bundle "$app_path"
+  if [[ "$RUN_LAUNCH_SMOKE_TEST" == "1" ]]; then
+    launch_smoke_test "$app_path"
+  fi
   ok "verified app zip bundle"
+}
+
+verify_postinstall_clears_staged_quarantine() {
+  local payload_app="$1"
+  local postinstall="$2"
+  local target_root="$3"
+  local target_app="$target_root/Applications/$APP_NAME.app"
+  local target_binary="$target_app/Contents/MacOS/$APP_NAME"
+
+  mkdir -p "$target_root/Applications"
+  ditto "$payload_app" "$target_app"
+  xattr -w com.apple.quarantine "0081;00000000;Surge Relay;00000000" "$target_app"
+  xattr -w com.apple.quarantine "0081;00000000;Surge Relay;00000000" "$target_binary"
+  "$postinstall" "$PKG_PATH" "/" "$target_root"
+  if xattr -p com.apple.quarantine "$target_app" >/dev/null 2>&1; then
+    fail "pkg postinstall did not clear quarantine from staged app bundle"
+  fi
+  if xattr -p com.apple.quarantine "$target_binary" >/dev/null 2>&1; then
+    fail "pkg postinstall did not clear quarantine from staged app executable"
+  fi
 }
 
 verify_pkg() {
@@ -169,8 +249,10 @@ verify_pkg() {
 
   postinstall="$(find "$tmp_dir" -path "*/Scripts/postinstall" -type f -print -quit)"
   [[ -n "$postinstall" ]] || fail "pkg missing postinstall script"
-  grep -Fq '/usr/bin/xattr -cr "/Applications/Surge Relay.app"' "$postinstall" \
+  [[ -x "$postinstall" ]] || fail "pkg postinstall is not executable"
+  grep -Fq '/usr/bin/xattr -cr "$app_path"' "$postinstall" \
     || fail "pkg postinstall does not clear quarantine"
+  verify_postinstall_clears_staged_quarantine "$payload_app" "$postinstall" "$tmp_dir/postinstall-target"
 
   signature_output="$(pkgutil --check-signature "$PKG_PATH" 2>&1 || true)"
   if [[ "$PKG_SIGNATURE_MODE" == "unsigned" ]]; then

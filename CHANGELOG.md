@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.14
+
+- Release 验证新增嵌入代码签名清单检查，会确认 App、Sparkle framework、Updater 与 XPC 服务均为 ad-hoc 签名且没有混入其他 Team ID，避免安装后因动态库签名不一致而闪退。
+- pkg 安装后的隔离属性清理脚本改为识别 installer 目标卷；发布验证会在临时安装根中实际执行 postinstall，确认 App bundle 与主程序的 quarantine 属性会被清理。
+- `verify_release_assets.sh` 新增 `--launch-smoke-test` 可选参数，可从 `.app.zip` 解包后的 App 执行启动冒烟测试，用于本地发布前确认 Release 构建不会启动即退出。
+
 ## 1.2.13
 
 - GitHub 发布在远端分支刚好被其他客户端更新时，会重新读取仓库 tree 并自动重试一次，减少非快进引用更新导致的发布失败。

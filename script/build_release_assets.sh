@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-VERSION="${VERSION:-1.2.13}"
+VERSION="${VERSION:-1.2.14}"
 DERIVED_DATA="$ROOT_DIR/build/DerivedDataRelease"
 SOURCE_PACKAGES="$ROOT_DIR/build/SourcePackages"
 DIST_DIR="$ROOT_DIR/dist/release-v$VERSION"
@@ -83,7 +83,13 @@ mkdir -p "$PKG_ROOT/Applications" "$PKG_SCRIPTS"
 ditto "$APP_PATH" "$PKG_ROOT/Applications/Surge Relay.app"
 cat > "$PKG_SCRIPTS/postinstall" <<'SCRIPT'
 #!/bin/sh
-/usr/bin/xattr -cr "/Applications/Surge Relay.app" 2>/dev/null || true
+target_volume="${3:-/}"
+if [ -z "$target_volume" ] || [ "$target_volume" = "/" ]; then
+  app_path="/Applications/Surge Relay.app"
+else
+  app_path="${target_volume%/}/Applications/Surge Relay.app"
+fi
+/usr/bin/xattr -cr "$app_path" 2>/dev/null || true
 exit 0
 SCRIPT
 chmod 755 "$PKG_SCRIPTS/postinstall"
