@@ -29,6 +29,7 @@ final class AppModel {
     var webServerState: WebServerRuntimeState = .stopped
     var updateHistory: [UpdateHistoryEntry]
     var githubModuleOutputFolders: [String] = [ModuleOutputFolder.root]
+    var pendingPublishPreview: PublishPreview?
 
     @ObservationIgnored private let scriptHubClient = ScriptHubClient()
     @ObservationIgnored private let sourceRevisionService = SourceRevisionService()
@@ -332,31 +333,36 @@ final class AppModel {
         if settings.storageMode == .local { Task { await rebuildCombinedFromCache() } }
     }
 
-    func scanExistingLocalModules() async throws -> [LocalModuleScanCandidate] {
+    func scanExistingLocalModules() async throws -> LocalModuleScanReport {
         statusMessage = "正在扫描本地模块根目录…"
         let rootDirectoryPath = settings.localModuleDirectory
         let combinedFileName = settings.combinedModuleFileName
         let existingModules = modules
         let publishedFilePaths = settings.localPublishedFilePaths
-        let candidates = try await Task.detached(priority: .userInitiated) {
-            try LocalModuleScanner.candidates(
+        let report = try await Task.detached(priority: .userInitiated) {
+            try LocalModuleScanner.report(
                 in: rootDirectoryPath,
                 combinedFileName: combinedFileName,
                 existingModules: existingModules,
                 publishedFilePaths: publishedFilePaths
             )
         }.value
-        statusMessage = candidates.isEmpty
-            ? "未发现可导入的新本地模块"
-            : "发现 \(candidates.count) 个可导入本地模块"
-        return candidates
+        if report.candidates.isEmpty {
+            statusMessage = report.skippedFiles.isEmpty
+                ? "未发现可导入的新本地模块"
+                : "未发现可导入的新本地模块；已跳过 \(report.skippedFiles.count) 个文件"
+        } else {
+            let skippedSuffix = report.skippedFiles.isEmpty ? "" : "，跳过 \(report.skippedFiles.count) 个文件"
+            statusMessage = "发现 \(report.candidates.count) 个可导入本地模块\(skippedSuffix)"
+        }
+        return report
     }
 
     func importExistingLocalModules() async {
         guard !isWorking else { return }
         do {
-            let candidates = try await scanExistingLocalModules()
-            await importLocalModules(candidates)
+            let report = try await scanExistingLocalModules()
+            await importLocalModules(report.candidates)
         } catch {
             presentedError = "扫描本地模块失败：\(error.localizedDescription)"
             statusMessage = "本地模块扫描失败"
@@ -933,6 +939,11 @@ final class AppModel {
                         ? "所有模块内容均未变化，无需发布"
                         : "模块内容未变化；\(failures) 个来源沿用上次版本，无需发布"
                 }
+            } else if pendingPublishPreview?.destination == .local {
+                let count = pendingPublishPreview?.deletedFiles.count ?? 0
+                statusMessage = failures == 0
+                    ? "总模块已更新，等待确认清理 \(count) 个本地旧文件"
+                    : "总模块已更新；\(failures) 个来源沿用上次版本，等待确认清理 \(count) 个本地旧文件"
             } else {
                 statusMessage = failures == 0 ? "总模块已由 \(components.count) 个来源合并完成" : "总模块已更新；\(failures) 个来源沿用上次成功版本"
             }
@@ -976,6 +987,12 @@ final class AppModel {
             self.isWorking = true
             defer { self.isWorking = false }
             do {
+                let preview = try await self.githubPublishPreview()
+                if preview.requiresDeletionConfirmation {
+                    self.pendingPublishPreview = preview
+                    self.statusMessage = "GitHub 发布需要确认删除 \(preview.deletedFiles.count) 个旧文件"
+                    return
+                }
                 let report = try await self.publishAllInternal()
                 guard !Task.isCancelled else { return }
                 self.statusMessage = report.changedFileCount == 0
@@ -1050,6 +1067,12 @@ final class AppModel {
         isWorking = true
         defer { isWorking = false }
         do {
+            let preview = try await githubPublishPreview()
+            if preview.requiresDeletionConfirmation {
+                pendingPublishPreview = preview
+                statusMessage = "发布前需要确认删除 \(preview.deletedFiles.count) 个旧文件"
+                return
+            }
             let report = try await publishAllInternal()
             statusMessage = report.changedFileCount == 0
                 ? "没有文件需要发布"
@@ -1059,7 +1082,69 @@ final class AppModel {
         }
     }
 
-    private func publishAllInternal() async throws -> PublishReport {
+    func previewPublish() async {
+        guard !isWorking else { return }
+        guard settings.storageMode == .gitHub else {
+            statusMessage = "本地模式会在合并时自动生成清理预览"
+            return
+        }
+        automaticPublishTask?.cancel()
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            let preview = try await githubPublishPreview()
+            pendingPublishPreview = preview
+            statusMessage = preview.hasChanges
+                ? "已生成 GitHub 发布预览（\(preview.changedFileCount) 个文件变更）"
+                : "GitHub 内容没有变化"
+        } catch {
+            presentedError = error.localizedDescription
+        }
+    }
+
+    func confirmPendingPublish() async {
+        guard let preview = pendingPublishPreview, !isWorking else { return }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            switch preview.destination {
+            case .gitHub:
+                let report = try await publishAllInternal(allowDeleting: true)
+                pendingPublishPreview = nil
+                statusMessage = report.changedFileCount == 0
+                    ? "没有文件需要发布"
+                    : "总模块与独立模块已发布到 GitHub（\(report.changedFileCount) 个文件变更）"
+                if let commit = report.commitSHA {
+                    recordHistory([UpdateHistoryEntry(
+                        moduleName: "GitHub",
+                        outcome: .published,
+                        duration: 0,
+                        message: "原子提交 \(commit.prefix(8))"
+                    )])
+                }
+            case .local:
+                _ = try await fileStore.exportPublishedFiles(
+                    [],
+                    toRootDirectory: preview.targetDescription,
+                    removingObsoleteRelativePaths: preview.deletedFiles
+                )
+                settings.localPublishedRootDirectory = preview.targetDescription
+                settings.localPublishedFilePaths = preview.activeFiles
+                pendingPublishPreview = nil
+                saveSettings()
+                statusMessage = "已清理 \(preview.deletedFiles.count) 个本地旧文件"
+            }
+        } catch {
+            presentedError = error.localizedDescription
+        }
+    }
+
+    func dismissPendingPublishPreview() {
+        pendingPublishPreview = nil
+        statusMessage = "已取消发布预览"
+    }
+
+    private func githubPublishPreview() async throws -> PublishPreview {
         try Task.checkCancellation()
         let isPrivate = try await githubClient.test(settings: settings.github, token: githubToken)
         try Task.checkCancellation()
@@ -1074,15 +1159,48 @@ final class AppModel {
         let stalePaths = settings.githubPublishedRepositoryKey == repositoryKey
             ? settings.githubPublishedFilePaths.filter { !currentPaths.contains($0) }
             : []
+        let report = try await githubClient.previewPublish(
+            files: files,
+            deleting: stalePaths,
+            settings: settings.github,
+            token: githubToken
+        )
+        return PublishPreview(
+            destination: .gitHub,
+            targetDescription: "\(settings.github.owner)/\(settings.github.repository)@\(settings.github.branch)/\(settings.github.directory)",
+            activeFiles: currentPaths,
+            changedFiles: report.publishedFiles,
+            deletedFiles: report.deletedFiles
+        )
+    }
+
+    private func publishAllInternal(allowDeleting: Bool = true) async throws -> PublishReport {
+        try Task.checkCancellation()
+        let isPrivate = try await githubClient.test(settings: settings.github, token: githubToken)
+        try Task.checkCancellation()
+        if settings.github.repositoryIsPrivate != isPrivate {
+            settings.github.repositoryIsPrivate = isPrivate
+            saveSettings()
+        }
+        let data = try await fileStore.readCombined()
+        let files = try await currentPublishedFiles(combinedData: data, includeAssets: true)
+        let currentPaths = files.map(\.name)
+        let repositoryKey = githubPublishRepositoryKey(settings.github)
+        let staleCandidates = settings.githubPublishedRepositoryKey == repositoryKey
+            ? settings.githubPublishedFilePaths.filter { !currentPaths.contains($0) }
+            : []
+        let stalePaths = allowDeleting ? staleCandidates : []
         let report = try await githubClient.publish(
             files: files,
             deleting: stalePaths,
             settings: settings.github,
             token: githubToken
         )
-        settings.githubPublishedRepositoryKey = repositoryKey
-        settings.githubPublishedFilePaths = currentPaths
-        saveSettings()
+        if staleCandidates.isEmpty || allowDeleting {
+            settings.githubPublishedRepositoryKey = repositoryKey
+            settings.githubPublishedFilePaths = currentPaths
+            saveSettings()
+        }
         return report
     }
 
@@ -1196,11 +1314,25 @@ final class AppModel {
             _ = try await fileStore.exportPublishedFiles(
                 files,
                 toRootDirectory: settings.localModuleDirectory,
-                removingObsoleteRelativePaths: stalePaths
+                removingObsoleteRelativePaths: []
             )
-            settings.localPublishedRootDirectory = settings.localModuleDirectory
-            settings.localPublishedFilePaths = currentPaths
-            saveSettings()
+            if stalePaths.isEmpty {
+                settings.localPublishedRootDirectory = settings.localModuleDirectory
+                settings.localPublishedFilePaths = currentPaths
+                if pendingPublishPreview?.destination == .local {
+                    pendingPublishPreview = nil
+                }
+                saveSettings()
+            } else {
+                pendingPublishPreview = PublishPreview(
+                    destination: .local,
+                    targetDescription: settings.localModuleDirectory,
+                    activeFiles: currentPaths,
+                    changedFiles: [],
+                    deletedFiles: stalePaths
+                )
+                statusMessage = "已写入本地模块，等待确认清理 \(stalePaths.count) 个旧文件"
+            }
         }
     }
 
@@ -1432,6 +1564,7 @@ final class AppModel {
     private func registerLocalChange() {
         localChangeGeneration &+= 1
         automaticPublishTask?.cancel()
+        pendingPublishPreview = nil
     }
 
     private func recordHistory(_ entries: [UpdateHistoryEntry]) {
@@ -1481,7 +1614,7 @@ final class AppModel {
         let unavailable = Set(modules.compactMap { module -> String? in
             module.id == excludedID ? nil : module.publishedRelativePath.lowercased()
         } + [combined])
-        var relativePath = ModuleOutputFolder.relativePath(fileName: normalized, folder: folder)
+        let relativePath = ModuleOutputFolder.relativePath(fileName: normalized, folder: folder)
         guard unavailable.contains(relativePath.lowercased()) else { return normalized }
 
         return uniqueOutputFileName(preferredFileName: normalized, folder: folder, unavailable: unavailable)
@@ -1581,6 +1714,18 @@ struct LocalModuleScanCandidate: Identifiable, Hashable, Sendable {
     var id: String { relativePath }
 }
 
+struct LocalModuleScanSkippedFile: Identifiable, Hashable, Sendable {
+    var relativePath: String
+    var reason: String
+
+    var id: String { "\(relativePath)-\(reason)" }
+}
+
+struct LocalModuleScanReport: Sendable {
+    var candidates: [LocalModuleScanCandidate]
+    var skippedFiles: [LocalModuleScanSkippedFile]
+}
+
 enum LocalModuleScanner {
     static func candidates(
         in rootDirectoryPath: String,
@@ -1588,6 +1733,20 @@ enum LocalModuleScanner {
         existingModules: [RelayModule],
         publishedFilePaths: [String]
     ) throws -> [LocalModuleScanCandidate] {
+        try report(
+            in: rootDirectoryPath,
+            combinedFileName: combinedFileName,
+            existingModules: existingModules,
+            publishedFilePaths: publishedFilePaths
+        ).candidates
+    }
+
+    static func report(
+        in rootDirectoryPath: String,
+        combinedFileName: String,
+        existingModules: [RelayModule],
+        publishedFilePaths: [String]
+    ) throws -> LocalModuleScanReport {
         let trimmedPath = rootDirectoryPath.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedPath.isEmpty else {
             throw RelayError.invalidOutput("请先设置本地模块根目录。")
@@ -1612,9 +1771,12 @@ enum LocalModuleScanner {
             at: root,
             includingPropertiesForKeys: [.isRegularFileKey],
             options: [.skipsHiddenFiles, .skipsPackageDescendants]
-        ) else { return [] }
+        ) else {
+            return LocalModuleScanReport(candidates: [], skippedFiles: [])
+        }
 
         var values: [LocalModuleScanCandidate] = []
+        var skipped: [LocalModuleScanSkippedFile] = []
         var seenPaths = Set<String>()
         for case let fileURL as URL in enumerator {
             let standardizedURL = fileURL.standardizedFileURL
@@ -1622,22 +1784,76 @@ enum LocalModuleScanner {
                   (try? standardizedURL.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else {
                 continue
             }
-            guard let relativePath = relativePath(for: standardizedURL, root: root) else { continue }
+            guard let relativePath = relativePath(for: standardizedURL, root: root) else {
+                skipped.append(LocalModuleScanSkippedFile(
+                    relativePath: standardizedURL.lastPathComponent,
+                    reason: "无法解析相对路径"
+                ))
+                continue
+            }
             let normalizedRelativePath = normalizeRelativePath(relativePath)
             let relativeKey = normalizedRelativePath.lowercased()
-            guard relativeKey != combined,
-                  !existingPaths.contains(relativeKey),
-                  seenPaths.insert(relativeKey).inserted else {
+            if relativeKey == combined {
+                skipped.append(LocalModuleScanSkippedFile(
+                    relativePath: normalizedRelativePath,
+                    reason: "这是当前总模块文件"
+                ))
+                continue
+            }
+            if existingPaths.contains(relativeKey) {
+                skipped.append(LocalModuleScanSkippedFile(
+                    relativePath: normalizedRelativePath,
+                    reason: "发布路径已纳入管理"
+                ))
+                continue
+            }
+            guard seenPaths.insert(relativeKey).inserted else {
+                skipped.append(LocalModuleScanSkippedFile(
+                    relativePath: normalizedRelativePath,
+                    reason: "扫描中发现重复路径"
+                ))
                 continue
             }
 
             let sourceURL = standardizedURL.absoluteString
             let sourceKey = ModuleSourceIdentity.canonicalValue(for: sourceURL)
-            guard existingSources.insert(sourceKey).inserted else { continue }
+            guard existingSources.insert(sourceKey).inserted else {
+                skipped.append(LocalModuleScanSkippedFile(
+                    relativePath: normalizedRelativePath,
+                    reason: "来源文件已纳入管理"
+                ))
+                continue
+            }
 
-            let data = try Data(contentsOf: standardizedURL)
-            guard !data.isEmpty, data.count <= 20 * 1024 * 1024,
-                  let content = String(data: data, encoding: .utf8) else {
+            let data: Data
+            do {
+                data = try Data(contentsOf: standardizedURL)
+            } catch {
+                skipped.append(LocalModuleScanSkippedFile(
+                    relativePath: normalizedRelativePath,
+                    reason: "无法读取文件：\(error.localizedDescription)"
+                ))
+                continue
+            }
+            guard !data.isEmpty else {
+                skipped.append(LocalModuleScanSkippedFile(
+                    relativePath: normalizedRelativePath,
+                    reason: "文件为空"
+                ))
+                continue
+            }
+            guard data.count <= 20 * 1024 * 1024 else {
+                skipped.append(LocalModuleScanSkippedFile(
+                    relativePath: normalizedRelativePath,
+                    reason: "文件超过 20 MB"
+                ))
+                continue
+            }
+            guard let content = String(data: data, encoding: .utf8) else {
+                skipped.append(LocalModuleScanSkippedFile(
+                    relativePath: normalizedRelativePath,
+                    reason: "不是有效的 UTF-8 文本"
+                ))
                 continue
             }
             let components = normalizedRelativePath.split(separator: "/").map(String.init)
@@ -1656,9 +1872,14 @@ enum LocalModuleScanner {
             ))
         }
 
-        return values.sorted { lhs, rhs in
-            lhs.relativePath.localizedStandardCompare(rhs.relativePath) == .orderedAscending
-        }
+        return LocalModuleScanReport(
+            candidates: values.sorted { lhs, rhs in
+                lhs.relativePath.localizedStandardCompare(rhs.relativePath) == .orderedAscending
+            },
+            skippedFiles: skipped.sorted { lhs, rhs in
+                lhs.relativePath.localizedStandardCompare(rhs.relativePath) == .orderedAscending
+            }
+        )
     }
 
     private static func relativePath(for fileURL: URL, root: URL) -> String? {

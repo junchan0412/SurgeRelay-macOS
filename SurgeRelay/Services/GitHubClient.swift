@@ -83,6 +83,11 @@ actor GitHubClient {
         let moduleDirectories: [String]
         let isTruncated: Bool
     }
+    private struct RemotePublishDiff {
+        let snapshot: RemoteTreeSnapshot
+        let changedFiles: [PublishFile]
+        let deletedFiles: [String]
+    }
 
     private let session: URLSession
 
@@ -109,6 +114,28 @@ actor GitHubClient {
         return snapshot.moduleDirectories
     }
 
+    func previewPublish(
+        files: [PublishFile],
+        deleting obsoleteFileNames: [String] = [],
+        settings: GitHubSettings,
+        token: String
+    ) async throws -> PublishReport {
+        guard settings.isConfigured else { throw RelayError.githubNotConfigured }
+        guard !token.isEmpty else { throw RelayError.githubTokenMissing }
+        guard !files.isEmpty || !obsoleteFileNames.isEmpty else { throw RelayError.noFilesToPublish }
+
+        let diff = try await publishDiff(
+            files: files,
+            deleting: obsoleteFileNames,
+            settings: settings,
+            token: token
+        )
+        return PublishReport(
+            publishedFiles: diff.changedFiles.map(\.name),
+            deletedFiles: diff.deletedFiles
+        )
+    }
+
     func publish(
         files: [PublishFile],
         deleting obsoleteFileNames: [String] = [],
@@ -119,38 +146,15 @@ actor GitHubClient {
         guard !token.isEmpty else { throw RelayError.githubTokenMissing }
         guard !files.isEmpty || !obsoleteFileNames.isEmpty else { throw RelayError.noFilesToPublish }
 
-        let snapshot = try await remoteTreeSnapshot(settings: settings, token: token)
-        let currentFileNames = Set(files.map(\.name))
-        var changedFiles: [PublishFile] = []
-        var deletedFiles: [String] = []
-        if snapshot.isTruncated {
-            for file in files {
-                try Task.checkCancellation()
-                let sha = try await existingSHA(fileName: file.name, settings: settings, token: token)
-                if sha != file.data.gitBlobSHA1 { changedFiles.append(file) }
-            }
-            for fileName in Set(obsoleteFileNames).sorted() where !currentFileNames.contains(fileName) {
-                try Task.checkCancellation()
-                if try await existingSHA(fileName: fileName, settings: settings, token: token) != nil {
-                    deletedFiles.append(fileName)
-                }
-            }
-        } else {
-            for file in files {
-                try Task.checkCancellation()
-                let path = repositoryPath(for: file.name, settings: settings)
-                if snapshot.blobsByRepositoryPath[path] != file.data.gitBlobSHA1 {
-                    changedFiles.append(file)
-                }
-            }
-            for fileName in Set(obsoleteFileNames).sorted() where !currentFileNames.contains(fileName) {
-                try Task.checkCancellation()
-                let path = repositoryPath(for: fileName, settings: settings)
-                if snapshot.blobsByRepositoryPath[path] != nil {
-                    deletedFiles.append(fileName)
-                }
-            }
-        }
+        let diff = try await publishDiff(
+            files: files,
+            deleting: obsoleteFileNames,
+            settings: settings,
+            token: token
+        )
+        let snapshot = diff.snapshot
+        let changedFiles = diff.changedFiles
+        let deletedFiles = diff.deletedFiles
         guard !changedFiles.isEmpty || !deletedFiles.isEmpty else {
             return PublishReport(publishedFiles: [])
         }
@@ -201,6 +205,51 @@ actor GitHubClient {
             publishedFiles: changedFiles.map(\.name),
             deletedFiles: deletedFiles,
             commitSHA: commit.sha
+        )
+    }
+
+    private func publishDiff(
+        files: [PublishFile],
+        deleting obsoleteFileNames: [String],
+        settings: GitHubSettings,
+        token: String
+    ) async throws -> RemotePublishDiff {
+        let snapshot = try await remoteTreeSnapshot(settings: settings, token: token)
+        let currentFileNames = Set(files.map(\.name))
+        var changedFiles: [PublishFile] = []
+        var deletedFiles: [String] = []
+        if snapshot.isTruncated {
+            for file in files {
+                try Task.checkCancellation()
+                let sha = try await existingSHA(fileName: file.name, settings: settings, token: token)
+                if sha != file.data.gitBlobSHA1 { changedFiles.append(file) }
+            }
+            for fileName in Set(obsoleteFileNames).sorted() where !currentFileNames.contains(fileName) {
+                try Task.checkCancellation()
+                if try await existingSHA(fileName: fileName, settings: settings, token: token) != nil {
+                    deletedFiles.append(fileName)
+                }
+            }
+        } else {
+            for file in files {
+                try Task.checkCancellation()
+                let path = repositoryPath(for: file.name, settings: settings)
+                if snapshot.blobsByRepositoryPath[path] != file.data.gitBlobSHA1 {
+                    changedFiles.append(file)
+                }
+            }
+            for fileName in Set(obsoleteFileNames).sorted() where !currentFileNames.contains(fileName) {
+                try Task.checkCancellation()
+                let path = repositoryPath(for: fileName, settings: settings)
+                if snapshot.blobsByRepositoryPath[path] != nil {
+                    deletedFiles.append(fileName)
+                }
+            }
+        }
+        return RemotePublishDiff(
+            snapshot: snapshot,
+            changedFiles: changedFiles,
+            deletedFiles: deletedFiles
         )
     }
 

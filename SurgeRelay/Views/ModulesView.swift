@@ -12,6 +12,7 @@ struct ModulesView: View {
     @State private var isScanningLocalModules = false
     @State private var showsLocalImportPreview = false
     @State private var localImportCandidates: [LocalModuleScanCandidate] = []
+    @State private var localImportSkippedFiles: [LocalModuleScanSkippedFile] = []
     @State private var selectedLocalImportCandidateIDs = Set<String>()
 
     private enum DetailTab: Hashable { case info, preview }
@@ -287,6 +288,7 @@ struct ModulesView: View {
         .sheet(isPresented: $showsLocalImportPreview) {
             LocalModuleImportPreviewView(
                 candidates: localImportCandidates,
+                skippedFiles: localImportSkippedFiles,
                 selectedCandidateIDs: $selectedLocalImportCandidateIDs
             )
             .environment(model)
@@ -317,7 +319,7 @@ struct ModulesView: View {
             }
             Button("取消", role: .cancel) { deleteCandidate = nil }
         } message: {
-            Text("该来源会从总模块中移除；GitHub 上的旧版本会保留到下次发布。")
+            Text("该来源会从总模块中移除；下次发布如需删除旧文件，会先显示预览并要求确认。")
         }
     }
 
@@ -332,10 +334,11 @@ struct ModulesView: View {
         Task { @MainActor in
             defer { isScanningLocalModules = false }
             do {
-                let candidates = try await model.scanExistingLocalModules()
-                guard !candidates.isEmpty else { return }
-                localImportCandidates = candidates
-                selectedLocalImportCandidateIDs = Set(candidates.map(\.id))
+                let report = try await model.scanExistingLocalModules()
+                guard !report.candidates.isEmpty || !report.skippedFiles.isEmpty else { return }
+                localImportCandidates = report.candidates
+                localImportSkippedFiles = report.skippedFiles
+                selectedLocalImportCandidateIDs = Set(report.candidates.map(\.id))
                 showsLocalImportPreview = true
             } catch {
                 model.presentedError = "扫描本地模块失败：\(error.localizedDescription)"
@@ -437,8 +440,54 @@ private struct CombinedModuleDetailView: View {
                     }
                 }
             }
+
+            publishPreviewSection
         }
         .formStyle(.grouped)
+    }
+
+    @ViewBuilder
+    private var publishPreviewSection: some View {
+        let preview = relevantPublishPreview
+        if model.settings.storageMode == .gitHub || preview != nil {
+            Section(model.settings.storageMode == .gitHub ? "GitHub 发布" : "本地清理") {
+                if model.settings.storageMode == .gitHub {
+                    Button("预览发布…", systemImage: "square.and.arrow.up") {
+                        Task { await model.previewPublish() }
+                    }
+                    .disabled(model.isWorking || !model.settings.github.isConfigured || model.githubToken.isEmpty)
+                }
+
+                if let preview {
+                    PublishPreviewSummaryView(preview: preview)
+                    HStack {
+                        Button(preview.destination == .gitHub ? "确认发布" : "删除旧文件", systemImage: "checkmark.circle") {
+                            Task { await model.confirmPendingPublish() }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(model.isWorking || !preview.hasChanges)
+
+                        Button("取消预览", role: .cancel) {
+                            model.dismissPendingPublishPreview()
+                        }
+                        .disabled(model.isWorking)
+                    }
+                } else if model.settings.storageMode == .gitHub {
+                    Label("发布前可预览新增、更新和删除的文件；包含删除项时会要求确认。", systemImage: "info.circle")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private var relevantPublishPreview: PublishPreview? {
+        guard let preview = model.pendingPublishPreview else { return nil }
+        switch (model.settings.storageMode, preview.destination) {
+        case (.gitHub, .gitHub), (.local, .local):
+            return preview
+        default:
+            return nil
+        }
     }
 
     private func detailRow(_ label: String, value: String, icon: String) -> some View {
@@ -449,6 +498,60 @@ private struct CombinedModuleDetailView: View {
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+private struct PublishPreviewSummaryView: View {
+    let preview: PublishPreview
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            detail("目标", value: preview.targetDescription)
+            detail("结果清单", value: "\(preview.activeFiles.count) 个文件")
+            if preview.hasChanges {
+                if !preview.changedFiles.isEmpty {
+                    fileList("将上传/写入", files: preview.changedFiles)
+                }
+                if !preview.deletedFiles.isEmpty {
+                    fileList("将删除", files: preview.deletedFiles, isDestructive: true)
+                }
+            } else {
+                Label("没有文件变化", systemImage: "checkmark.circle")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func detail(_ label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label)
+                .font(.caption.weight(.medium))
+            Text(value)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+                .lineLimit(2)
+        }
+    }
+
+    private func fileList(_ title: String, files: [String], isDestructive: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Label("\(title) \(files.count) 个文件", systemImage: isDestructive ? "trash" : "arrow.up.doc")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(isDestructive ? .orange : .primary)
+            ForEach(Array(files.prefix(8)), id: \.self) { file in
+                Text(file)
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+            if files.count > 8 {
+                Text("另有 \(files.count - 8) 个文件")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
         }
     }
 }
@@ -468,10 +571,16 @@ private struct LocalModuleImportPreviewView: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var selectedCandidateIDs: Set<String>
     @State private var candidates: [LocalModuleScanCandidate]
+    private let skippedFiles: [LocalModuleScanSkippedFile]
     @State private var isImporting = false
 
-    init(candidates: [LocalModuleScanCandidate], selectedCandidateIDs: Binding<Set<String>>) {
+    init(
+        candidates: [LocalModuleScanCandidate],
+        skippedFiles: [LocalModuleScanSkippedFile],
+        selectedCandidateIDs: Binding<Set<String>>
+    ) {
         _candidates = State(initialValue: candidates)
+        self.skippedFiles = skippedFiles
         _selectedCandidateIDs = selectedCandidateIDs
     }
 
@@ -487,7 +596,7 @@ private struct LocalModuleImportPreviewView: View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("导入本地模块").font(.title2.bold())
-                Text("确认要纳入 Surge Relay 管理的 `.sgmodule` 文件，可先调整名称、标签和存放文件夹。")
+                Text("发现 \(candidates.count) 个可导入文件，跳过 \(skippedFiles.count) 个文件。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -497,8 +606,29 @@ private struct LocalModuleImportPreviewView: View {
             Divider()
 
             List {
-                ForEach(candidates.indices, id: \.self) { index in
-                    importCandidateRow(index: index)
+                if !candidates.isEmpty {
+                    Section("可导入") {
+                        ForEach(candidates.indices, id: \.self) { index in
+                            importCandidateRow(index: index)
+                        }
+                    }
+                }
+
+                if !skippedFiles.isEmpty {
+                    Section("已跳过") {
+                        ForEach(skippedFiles) { file in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(file.relativePath)
+                                    .font(.caption)
+                                    .textSelection(.enabled)
+                                Text(file.reason)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .textSelection(.enabled)
+                            }
+                            .padding(.vertical, 5)
+                        }
+                    }
                 }
             }
             .frame(minHeight: 300)
@@ -513,7 +643,7 @@ private struct LocalModuleImportPreviewView: View {
                     selectedCandidateIDs.removeAll()
                 }
                 Spacer()
-                Text(hasInvalidSelection ? "已选择项需要填写名称" : "已选择 \(selectedCandidates.count) / \(candidates.count)")
+                Text(selectionSummary)
                     .font(.caption)
                     .foregroundStyle(hasInvalidSelection ? .red : .secondary)
                 Button("取消", role: .cancel) { dismiss() }
@@ -526,6 +656,12 @@ private struct LocalModuleImportPreviewView: View {
             .padding(20)
         }
         .frame(width: 780, height: 560)
+    }
+
+    private var selectionSummary: String {
+        if hasInvalidSelection { return "已选择项需要填写名称" }
+        guard !candidates.isEmpty else { return "没有可导入文件" }
+        return "已选择 \(selectedCandidates.count) / \(candidates.count)"
     }
 
     private func importCandidateRow(index: Int) -> some View {

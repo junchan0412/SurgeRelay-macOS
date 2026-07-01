@@ -334,7 +334,7 @@ final class SurgeRelayTests: XCTestCase {
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: root) }
         let store = ModuleFileStore()
-        try await store.exportPublishedFiles([
+        _ = try await store.exportPublishedFiles([
             PublishFile(name: "Old.sgmodule", data: Data("old".utf8)),
             PublishFile(name: "Folder/Current.sgmodule", data: Data("current".utf8))
         ], toRootDirectory: root.path)
@@ -475,6 +475,33 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertEqual(candidates[0].outputFileName, "YouTube.sgmodule")
     }
 
+    func testLocalModuleScannerReportsSkippedFiles() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data("#!name=Combined\n[General]\n".utf8).write(to: root.appending(path: "Surge-Relay.sgmodule"))
+        try Data().write(to: root.appending(path: "Empty.sgmodule"))
+        try Data("#!name=Managed\n[General]\n".utf8).write(to: root.appending(path: "Managed.sgmodule"))
+
+        let report = try LocalModuleScanner.report(
+            in: root.path,
+            combinedFileName: "Surge Relay",
+            existingModules: [],
+            publishedFilePaths: ["Managed.sgmodule"]
+        )
+
+        XCTAssertTrue(report.candidates.isEmpty)
+        XCTAssertEqual(
+            Dictionary(uniqueKeysWithValues: report.skippedFiles.map { ($0.relativePath, $0.reason) }),
+            [
+                "Empty.sgmodule": "文件为空",
+                "Managed.sgmodule": "发布路径已纳入管理",
+                "Surge-Relay.sgmodule": "这是当前总模块文件"
+            ]
+        )
+    }
+
     func testLocalModuleFolderScannerFindsNestedFolders() throws {
         let root = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
@@ -587,6 +614,57 @@ final class SurgeRelayTests: XCTestCase {
             GitHubMockURLProtocol.requestedPaths.filter { $0 == "POST /repos/someone/relay/git/blobs" }.count,
             1
         )
+    }
+
+    func testGitHubPreviewPublishDiffsWithoutWriting() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GitHubMockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        GitHubMockURLProtocol.reset()
+        defer { GitHubMockURLProtocol.reset() }
+        let sameSHA = Data("same".utf8).gitBlobSHA1
+        let oldSHA = Data("old".utf8).gitBlobSHA1
+        GitHubMockURLProtocol.handler = { request in
+            let path = request.url?.path ?? ""
+            switch (request.httpMethod ?? "GET", path) {
+            case ("GET", "/repos/someone/relay/git/ref/heads/main"):
+                return (200, Data(#"{"object":{"sha":"commit1"}}"#.utf8))
+            case ("GET", "/repos/someone/relay/git/commits/commit1"):
+                return (200, Data(#"{"sha":"commit1","tree":{"sha":"tree1"}}"#.utf8))
+            case ("GET", "/repos/someone/relay/git/trees/tree1"):
+                return (200, Data("""
+                {
+                  "tree": [
+                    {"path": "modules/Same.sgmodule", "type": "blob", "sha": "\(sameSHA)"},
+                    {"path": "modules/Changed.sgmodule", "type": "blob", "sha": "\(oldSHA)"},
+                    {"path": "modules/Stale.sgmodule", "type": "blob", "sha": "\(oldSHA)"}
+                  ],
+                  "truncated": false
+                }
+                """.utf8))
+            default:
+                return (404, Data(#"{"message":"not found"}"#.utf8))
+            }
+        }
+        var settings = GitHubSettings()
+        settings.owner = "someone"
+        settings.repository = "relay"
+        settings.branch = "main"
+        settings.directory = "modules"
+
+        let report = try await GitHubClient(session: session).previewPublish(
+            files: [
+                PublishFile(name: "Same.sgmodule", data: Data("same".utf8)),
+                PublishFile(name: "Changed.sgmodule", data: Data("new".utf8))
+            ],
+            deleting: ["Stale.sgmodule"],
+            settings: settings,
+            token: "token"
+        )
+
+        XCTAssertEqual(report.publishedFiles, ["Changed.sgmodule"])
+        XCTAssertEqual(report.deletedFiles, ["Stale.sgmodule"])
+        XCTAssertFalse(GitHubMockURLProtocol.requestedPaths.contains { $0.hasPrefix("POST ") || $0.hasPrefix("PATCH ") })
     }
 
     func testModuleArgumentsAreMaterializedAndMetadataIsRemoved() {
