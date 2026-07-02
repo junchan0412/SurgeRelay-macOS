@@ -123,6 +123,16 @@ struct ModulesView: View {
                             .lineLimit(2)
                     }
                 }
+                if model.workActivity.canCancel {
+                    Button {
+                        model.cancelCurrentWork()
+                    } label: {
+                        Label(model.workCancellationRequested ? "正在取消…" : "取消当前任务", systemImage: "xmark.circle")
+                    }
+                    .buttonStyle(.borderless)
+                    .controlSize(.small)
+                    .disabled(!model.canCancelCurrentWork)
+                }
                 Divider()
             }
 
@@ -235,7 +245,7 @@ struct ModulesView: View {
                             Label("添加模块", systemImage: "plus")
                         }
                         Button {
-                            Task { await model.updateAll() }
+                            model.startUpdateAll()
                         } label: {
                             Label("更新全部", systemImage: "arrow.clockwise")
                         }

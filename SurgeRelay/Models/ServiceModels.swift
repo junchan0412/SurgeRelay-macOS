@@ -249,6 +249,16 @@ enum WorkActivityKind: String, Codable, Equatable, Sendable {
             true
         }
     }
+
+    var canCancelByDefault: Bool {
+        switch self {
+        case .updatingModules, .scanningLocalModules, .importingLocalModules, .refreshingScriptHub,
+             .testingGitHub, .publishing, .automaticPublishing, .previewingPublish, .confirmingPublish:
+            true
+        case .idle, .savingPreview, .restoringPreview, .checkingKeychain:
+            false
+        }
+    }
 }
 
 struct WorkActivity: Codable, Equatable, Sendable {
@@ -256,6 +266,7 @@ struct WorkActivity: Codable, Equatable, Sendable {
     var title: String
     var startedAt: Date?
     var blocksUpdates: Bool
+    var canCancel: Bool
 
     var isActive: Bool {
         kind != .idle
@@ -265,19 +276,22 @@ struct WorkActivity: Codable, Equatable, Sendable {
         kind: .idle,
         title: WorkActivityKind.idle.title,
         startedAt: nil,
-        blocksUpdates: false
+        blocksUpdates: false,
+        canCancel: false
     )
 
     init(
         kind: WorkActivityKind,
         title: String? = nil,
         startedAt: Date? = .now,
-        blocksUpdates: Bool? = nil
+        blocksUpdates: Bool? = nil,
+        canCancel: Bool? = nil
     ) {
         self.kind = kind
         self.title = title ?? kind.title
         self.startedAt = kind == .idle ? nil : startedAt
         self.blocksUpdates = blocksUpdates ?? kind.blocksUpdatesByDefault
+        self.canCancel = canCancel ?? kind.canCancelByDefault
     }
 
     func updateBlockedReason(statusMessage: String) -> String? {
@@ -416,6 +430,8 @@ struct DiagnosticReport: Codable, Sendable {
     var activeWorkStatus: String?
     var activeWorkStartedAt: Date?
     var activeWorkBlocksUpdates: Bool
+    var activeWorkCanCancel: Bool
+    var activeWorkCancellationRequested: Bool
     var modules: [DiagnosticModuleSnapshot]
     var history: [UpdateHistoryEntry]
 }

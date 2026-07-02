@@ -37,8 +37,22 @@ enum WebManagementAPI {
                         reason: "Conflict"
                     )
                 }
-                Task { await model.updateAll() }
+                model.startUpdateAll()
                 return .json(ActionPayload(ok: true, message: admission.message), status: 202, reason: "Accepted")
+            case ("POST", "/api/cancel-work"):
+                guard model.workActivity.isActive, model.workActivity.canCancel else {
+                    return .json(
+                        ActionPayload(ok: false, message: "当前没有可取消的任务。"),
+                        status: 409,
+                        reason: "Conflict"
+                    )
+                }
+                let accepted = model.cancelCurrentWork()
+                return .json(
+                    ActionPayload(ok: accepted, message: model.statusMessage),
+                    status: accepted ? 202 : 409,
+                    reason: accepted ? "Accepted" : "Conflict"
+                )
             case ("POST", "/api/modules"):
                 let mutation = try request.decodeBody(WebModuleMutation.self)
                 try model.addModule(from: mutation.draft())
@@ -111,7 +125,7 @@ enum WebManagementAPI {
                     reason: "Conflict"
                 )
             }
-            Task { await model.update(moduleID: id) }
+            model.startUpdate(moduleID: id)
             return .json(ActionPayload(ok: true, message: admission.message), status: 202, reason: "Accepted")
         case ("GET", "preview"):
             return .text(try await model.previewContent(for: module))
@@ -221,6 +235,8 @@ enum WebManagementAPI {
                 currentModuleID: model.synchronizingModuleID?.uuidString.lowercased(),
                 startedAt: model.workActivity.startedAt,
                 blocksUpdates: model.workActivity.blocksUpdates,
+                canCancel: model.workActivity.canCancel,
+                cancellationRequested: model.workCancellationRequested,
                 canStartUpdate: updateAdmission.isAccepted,
                 updateBlockedReason: updateAdmission.blockedReason,
                 enabledModuleCount: enabledCount,
@@ -346,6 +362,8 @@ private struct WebActivityPayload: Encodable {
     let currentModuleID: String?
     let startedAt: Date?
     let blocksUpdates: Bool
+    let canCancel: Bool
+    let cancellationRequested: Bool
     let canStartUpdate: Bool
     let updateBlockedReason: String?
     let enabledModuleCount: Int

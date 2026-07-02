@@ -19,9 +19,16 @@ struct MenuBarContent: View {
         Divider()
 
         Button("更新全部模块") {
-            Task { await model.updateAll() }
+            model.startUpdateAll()
         }
         .disabled(!model.updateAdmission.isAccepted)
+
+        if model.workActivity.isActive, model.workActivity.canCancel {
+            Button(model.workCancellationRequested ? "正在取消…" : "取消当前任务") {
+                model.cancelCurrentWork()
+            }
+            .disabled(!model.canCancelCurrentWork)
+        }
 
         if let url = model.combinedRawURL {
             Button("拷贝总订阅地址") {

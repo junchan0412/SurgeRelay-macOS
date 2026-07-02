@@ -13,6 +13,7 @@ const ui = {
   percent: document.querySelector('#activity-percent'),
   progressTrack: document.querySelector('#progress-track'),
   progressFill: document.querySelector('#progress-fill'),
+  cancelActivity: document.querySelector('#activity-cancel'),
   latestUpdate: document.querySelector('#latest-update'),
   moduleDialog: document.querySelector('#module-dialog'),
   moduleDialogMessage: document.querySelector('#module-dialog-message'),
@@ -131,6 +132,7 @@ ui.advancedOptions.innerHTML = `<p class="advanced-intro">这些选项由 App �
 ui.search.addEventListener('input', renderSidebar);
 ui.add.addEventListener('click', () => openEditor());
 ui.refresh.addEventListener('click', updateAll);
+ui.cancelActivity.addEventListener('click', cancelCurrentWork);
 ui.summaryRow.addEventListener('click', () => selectItem('combined'));
 ui.back.addEventListener('click', navigateBackToList);
 ui.advancedMaster.addEventListener('click', () => animateAdvancedResize(ui.advancedMaster.getAttribute('aria-expanded') !== 'true'));
@@ -367,6 +369,10 @@ function renderActivity() {
   ui.refresh.disabled = !canStartUpdate;
   ui.refresh.title = canStartUpdate ? '更新全部' : updateBlockedReason;
   ui.refresh.setAttribute('aria-label', canStartUpdate ? '更新全部' : `无法更新：${updateBlockedReason}`);
+  const canCancel = activity.canCancel === true && activity.cancellationRequested !== true && activity.kind !== 'idle';
+  ui.cancelActivity.hidden = activity.canCancel !== true || activity.kind === 'idle';
+  ui.cancelActivity.disabled = !canCancel;
+  ui.cancelActivity.querySelector('span:last-child').textContent = activity.cancellationRequested ? '正在取消' : '取消';
   if (activity.isWorking && activity.progress !== null) {
     const percent = Math.round(activity.progress * 100);
     ui.percent.textContent = `${percent}%`;
@@ -814,6 +820,11 @@ async function saveModule(event) {
 
 async function updateAll() {
   try { const result = await api('/api/update-all', { method: 'POST' }); showToast(result.message); await loadState(false, false); }
+  catch (error) { showToast(error.message, true); }
+}
+
+async function cancelCurrentWork() {
+  try { const result = await api('/api/cancel-work', { method: 'POST' }); showToast(result.message); await loadState(false, false); }
   catch (error) { showToast(error.message, true); }
 }
 

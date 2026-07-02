@@ -35,6 +35,7 @@ final class AppModel {
     var pendingPublishPreview: PublishPreview?
     var automaticPublishScheduledAt: Date?
     var automaticPublishRunsAt: Date?
+    var workCancellationRequested = false
 
     @ObservationIgnored private let scriptHubClient = ScriptHubClient()
     @ObservationIgnored private let sourceRevisionService = SourceRevisionService()
@@ -45,6 +46,8 @@ final class AppModel {
     @ObservationIgnored private let iconStore = ModuleIconStore()
     @ObservationIgnored private let processingWorker = ModuleProcessingWorker()
     @ObservationIgnored private let webServer = WebManagementServer()
+    @ObservationIgnored private var foregroundWorkTask: Task<Void, Never>?
+    @ObservationIgnored private var foregroundWorkIdentifier = UUID()
     @ObservationIgnored private var schedulerTask: Task<Void, Never>?
     @ObservationIgnored private var automaticUpdateTask: Task<Void, Never>?
     @ObservationIgnored private var automaticPublishTask: Task<Void, Never>?
@@ -255,6 +258,54 @@ final class AppModel {
         )
     }
 
+    var canCancelCurrentWork: Bool {
+        workActivity.isActive && workActivity.canCancel && !workCancellationRequested
+    }
+
+    func startUpdateAll() {
+        let admission = updateAdmission
+        guard admission.isAccepted else {
+            statusMessage = admission.message
+            return
+        }
+        startForegroundWork { model in
+            await model.updateAll()
+        }
+    }
+
+    func startUpdate(moduleID: UUID) {
+        guard let module = modules.first(where: { $0.id == moduleID }) else { return }
+        let admission = updateAdmission(for: module)
+        guard admission.isAccepted else {
+            statusMessage = admission.message
+            return
+        }
+        startForegroundWork { model in
+            await model.update(moduleID: moduleID)
+        }
+    }
+
+    @discardableResult
+    func cancelCurrentWork() -> Bool {
+        guard workActivity.isActive else {
+            statusMessage = "没有正在执行的任务可取消"
+            return false
+        }
+        guard workActivity.canCancel else {
+            statusMessage = "当前任务不能取消"
+            return false
+        }
+        guard !workCancellationRequested else { return true }
+        workCancellationRequested = true
+        statusMessage = "正在取消\(workActivity.title)…"
+        foregroundWorkTask?.cancel()
+        automaticUpdateTask?.cancel()
+        if workActivity.kind == .automaticPublishing {
+            automaticPublishTask?.cancel()
+        }
+        return true
+    }
+
     func saveGitHubToken() {
         githubToken = githubToken.trimmingCharacters(in: .whitespacesAndNewlines)
         do {
@@ -376,6 +427,9 @@ final class AppModel {
                 publishedFilePaths: publishedFilePaths
             )
         }.value
+        guard shouldContinueCurrentWork() else {
+            return LocalModuleScanReport(candidates: [], skippedFiles: [])
+        }
         if report.candidates.isEmpty {
             statusMessage = report.skippedFiles.isEmpty
                 ? "未发现可导入的新本地模块"
@@ -418,6 +472,7 @@ final class AppModel {
         unavailablePaths.insert(combinedPath)
 
         for candidate in candidates {
+            guard shouldContinueCurrentWork() else { return }
             let name = candidate.name.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !name.isEmpty else {
                 failures.append("\(candidate.relativePath)：模块名称不能为空")
@@ -460,9 +515,12 @@ final class AppModel {
                 module.lastError = nil
                 imported.append(module)
             } catch {
+                guard shouldContinueCurrentWork() else { return }
                 failures.append("\(candidate.relativePath)：\(error.localizedDescription)")
             }
         }
+
+        guard shouldContinueCurrentWork() else { return }
 
         guard !imported.isEmpty else {
             statusMessage = "本地模块扫描完成，但没有可导入项目"
@@ -761,10 +819,7 @@ final class AppModel {
         if settings.automaticallyUpdateScriptHub || missingEngine {
             await refreshScriptHubInternal()
         }
-        guard updateGeneration == localChangeGeneration, !Task.isCancelled else {
-            statusMessage = "检测到新的修改，已放弃旧更新"
-            return
-        }
+        guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
 
         if settings.github.repositoryIsPrivate == nil,
            settings.github.isConfigured,
@@ -773,10 +828,7 @@ final class AppModel {
             settings.github.repositoryIsPrivate = isPrivate
             saveSettings()
         }
-        guard updateGeneration == localChangeGeneration, !Task.isCancelled else {
-            statusMessage = "检测到新的修改，已放弃旧更新"
-            return
-        }
+        guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
 
         var components: [(RelayModule, String)] = []
         var failures = 0
@@ -785,6 +837,7 @@ final class AppModel {
         var newHistory: [UpdateHistoryEntry] = []
 
         for moduleValue in enabledModules {
+            guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
             var module = moduleValue
             let startedAt = Date.now
             var revisionSnapshot: SourceRevisionSnapshot?
@@ -831,13 +884,14 @@ final class AppModel {
                         // A failed lightweight check must not prevent the normal conversion path.
                     }
                 }
+                guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
                 statusMessage = "正在内置转换 \(module.name)…"
                 let result = try await scriptHubClient.convert(
                     module: module,
                     github: settings.github.isConfigured ? settings.github : nil
                 )
-                guard updateGeneration == localChangeGeneration, !Task.isCancelled,
-                      let currentIndex = modules.firstIndex(where: { $0.id == module.id }),
+                guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
+                guard let currentIndex = modules.firstIndex(where: { $0.id == module.id }),
                       modules[currentIndex].isEnabled else {
                     statusMessage = "检测到新的修改，已放弃旧更新"
                     return
@@ -845,8 +899,8 @@ final class AppModel {
                 try await fileStore.replaceAssets(result.assets, id: module.id)
                 try await fileStore.writeComponent(result.content, id: module.id)
                 let effectiveContent = try await fileStore.readComponent(id: module.id)
-                guard updateGeneration == localChangeGeneration, !Task.isCancelled,
-                      let latestIndex = modules.firstIndex(where: { $0.id == module.id }),
+                guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
+                guard let latestIndex = modules.firstIndex(where: { $0.id == module.id }),
                       modules[latestIndex].isEnabled else {
                     statusMessage = "检测到新的修改，已放弃旧更新"
                     return
@@ -904,10 +958,7 @@ final class AppModel {
                 )
                 components.append((module, materialized))
             } catch {
-                guard updateGeneration == localChangeGeneration, !Task.isCancelled else {
-                    statusMessage = "检测到新的修改，已放弃旧更新"
-                    return
-                }
+                guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
                 failures += 1
                 setState(id: module.id, state: .failed, error: error.localizedDescription)
                 if let cached = try? await fileStore.readComponent(id: module.id) {
@@ -942,10 +993,7 @@ final class AppModel {
         recordHistory(newHistory)
         try? persistModules()
 
-        guard updateGeneration == localChangeGeneration, !Task.isCancelled else {
-            statusMessage = "检测到新的修改，已放弃旧更新"
-            return
-        }
+        guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
 
         guard missingCache.isEmpty else {
             statusMessage = "无法重建总模块：\(missingCache.joined(separator: "、")) 尚无可用缓存"
@@ -955,15 +1003,9 @@ final class AppModel {
 
         do {
             try await writeCombinedModule(components)
-            guard updateGeneration == localChangeGeneration, !Task.isCancelled else {
-                statusMessage = "检测到新的修改，已放弃旧更新"
-                return
-            }
+            guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
             await cleanupLegacyOutputFiles()
-            guard updateGeneration == localChangeGeneration, !Task.isCancelled else {
-                statusMessage = "检测到新的修改，已放弃旧更新"
-                return
-            }
+            guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
             if settings.storageMode == .gitHub, settings.automaticallyPublish, settings.github.isConfigured, !githubToken.isEmpty {
                 if contentChanged {
                     scheduleAutomaticPublish()
@@ -984,6 +1026,7 @@ final class AppModel {
                 statusMessage = failures == 0 ? "总模块已由 \(components.count) 个来源合并完成" : "总模块已更新；\(failures) 个来源沿用上次成功版本"
             }
         } catch {
+            if isCurrentWorkCancellation(error) { return }
             presentedError = "合并失败，当前总模块未被覆盖：\(error.localizedDescription)"
         }
     }
@@ -1039,20 +1082,22 @@ final class AppModel {
                 self.automaticPublishTask = nil
             }
             do {
+                guard self.shouldContinueCurrentWork() else { return }
                 let preview = try await self.githubPublishPreview()
+                guard self.shouldContinueCurrentWork() else { return }
                 if preview.requiresDeletionConfirmation {
                     self.pendingPublishPreview = preview
                     self.statusMessage = "GitHub 发布需要确认删除 \(preview.deletedFiles.count) 个旧文件"
                     return
                 }
                 let report = try await self.publishAllInternal()
-                guard !Task.isCancelled else { return }
+                guard self.shouldContinueCurrentWork() else { return }
                 self.statusMessage = report.changedFileCount == 0
                     ? "GitHub 内容没有变化，无需上传"
                     : "\(self.githubPublishRetryPrefix(report))已合并发布到 GitHub（\(report.changedFileCount) 个文件变更）"
                 self.recordGitHubPublish(report)
             } catch {
-                guard !Task.isCancelled else { return }
+                guard !self.isCurrentWorkCancellation(error) else { return }
                 self.presentedError = "GitHub 自动发布失败：\(error.localizedDescription)"
             }
         }
@@ -1062,6 +1107,12 @@ final class AppModel {
         guard !isWorking || !showProgress else { return }
         if showProgress { beginWork(.refreshingScriptHub) }
         await refreshScriptHubInternal()
+        if showProgress {
+            guard shouldContinueCurrentWork() else {
+                endWork(.refreshingScriptHub)
+                return
+            }
+        }
         if showProgress { endWork(.refreshingScriptHub) }
     }
 
@@ -1097,11 +1148,15 @@ final class AppModel {
         defer { if showProgress { endWork(.testingGitHub) } }
         do {
             let isPrivate = try await githubClient.test(settings: settings.github, token: githubToken)
+            if showProgress {
+                guard shouldContinueCurrentWork() else { return }
+            }
             settings.github.repositoryIsPrivate = isPrivate
             saveSettings()
             await refreshModuleOutputFolders(force: true)
             statusMessage = isPrivate ? "GitHub 私有仓库连接成功，需要配置 Cloudflare Worker" : "GitHub 公开仓库连接成功，将直接使用 Raw 地址"
         } catch {
+            if showProgress, isCurrentWorkCancellation(error) { return }
             presentedError = error.localizedDescription
         }
     }
@@ -1113,17 +1168,20 @@ final class AppModel {
         defer { endWork(.publishing) }
         do {
             let preview = try await githubPublishPreview()
+            guard shouldContinueCurrentWork() else { return }
             if preview.requiresDeletionConfirmation {
                 pendingPublishPreview = preview
                 statusMessage = "发布前需要确认删除 \(preview.deletedFiles.count) 个旧文件"
                 return
             }
             let report = try await publishAllInternal()
+            guard shouldContinueCurrentWork() else { return }
             statusMessage = report.changedFileCount == 0
                 ? "没有文件需要发布"
                 : "\(githubPublishRetryPrefix(report))总模块与独立模块已发布到 GitHub（\(report.changedFileCount) 个文件变更）"
             recordGitHubPublish(report)
         } catch {
+            if isCurrentWorkCancellation(error) { return }
             presentedError = error.localizedDescription
         }
     }
@@ -1139,11 +1197,13 @@ final class AppModel {
         defer { endWork(.previewingPublish) }
         do {
             let preview = try await githubPublishPreview()
+            guard shouldContinueCurrentWork() else { return }
             pendingPublishPreview = preview
             statusMessage = preview.hasChanges
                 ? "已生成 GitHub 发布预览（\(preview.changedFileCount) 个文件变更）"
                 : "GitHub 内容没有变化"
         } catch {
+            if isCurrentWorkCancellation(error) { return }
             presentedError = error.localizedDescription
         }
     }
@@ -1156,12 +1216,16 @@ final class AppModel {
             switch preview.destination {
             case .gitHub:
                 let report = try await publishAllInternal(allowDeleting: true)
+                guard shouldContinueCurrentWork() else { return }
                 pendingPublishPreview = nil
                 statusMessage = report.changedFileCount == 0
                     ? "没有文件需要发布"
                     : "\(githubPublishRetryPrefix(report))总模块与独立模块已发布到 GitHub（\(report.changedFileCount) 个文件变更）"
                 recordGitHubPublish(report)
             case .local:
+                try enterNonCancellableWorkPhase(
+                    statusMessage: "正在清理本地旧文件，已进入不可取消阶段…"
+                )
                 _ = try await fileStore.exportPublishedFiles(
                     [],
                     toRootDirectory: preview.targetDescription,
@@ -1174,6 +1238,7 @@ final class AppModel {
                 statusMessage = "已清理 \(preview.deletedFiles.count) 个本地旧文件"
             }
         } catch {
+            if isCurrentWorkCancellation(error) { return }
             presentedError = error.localizedDescription
         }
     }
@@ -1184,15 +1249,19 @@ final class AppModel {
     }
 
     private func githubPublishPreview() async throws -> PublishPreview {
+        try checkCurrentWorkCancellation()
         try Task.checkCancellation()
         let isPrivate = try await githubClient.test(settings: settings.github, token: githubToken)
+        try checkCurrentWorkCancellation()
         try Task.checkCancellation()
         if settings.github.repositoryIsPrivate != isPrivate {
             settings.github.repositoryIsPrivate = isPrivate
             saveSettings()
         }
         let data = try await fileStore.readCombined()
+        try checkCurrentWorkCancellation()
         let files = try await currentPublishedFiles(combinedData: data, includeAssets: true)
+        try checkCurrentWorkCancellation()
         let currentPaths = files.map(\.name)
         let repositoryKey = githubPublishRepositoryKey(settings.github)
         let stalePaths = settings.githubPublishedRepositoryKey == repositoryKey
@@ -1214,21 +1283,28 @@ final class AppModel {
     }
 
     private func publishAllInternal(allowDeleting: Bool = true) async throws -> PublishReport {
+        try checkCurrentWorkCancellation()
         try Task.checkCancellation()
         let isPrivate = try await githubClient.test(settings: settings.github, token: githubToken)
+        try checkCurrentWorkCancellation()
         try Task.checkCancellation()
         if settings.github.repositoryIsPrivate != isPrivate {
             settings.github.repositoryIsPrivate = isPrivate
             saveSettings()
         }
         let data = try await fileStore.readCombined()
+        try checkCurrentWorkCancellation()
         let files = try await currentPublishedFiles(combinedData: data, includeAssets: true)
+        try checkCurrentWorkCancellation()
         let currentPaths = files.map(\.name)
         let repositoryKey = githubPublishRepositoryKey(settings.github)
         let staleCandidates = settings.githubPublishedRepositoryKey == repositoryKey
             ? settings.githubPublishedFilePaths.filter { !currentPaths.contains($0) }
             : []
         let stalePaths = allowDeleting ? staleCandidates : []
+        try enterNonCancellableWorkPhase(
+            statusMessage: "正在提交 GitHub 发布，已进入不可取消阶段…"
+        )
         let report = try await githubClient.publish(
             files: files,
             deleting: stalePaths,
@@ -1322,6 +1398,7 @@ final class AppModel {
             )
         ]
         for module in modules where module.publishesStandalone {
+            try checkCurrentWorkCancellation()
             try Task.checkCancellation()
             guard let content = try? await fileStore.readComponent(id: module.id) else { continue }
             let materialized = await processingWorker.materialize(content, overrides: module.argumentOverrides)
@@ -1333,6 +1410,7 @@ final class AppModel {
             files.append(PublishFile(name: module.publishedRelativePath, data: Data(namedContent.utf8)))
         }
         if includeAssets {
+            try checkCurrentWorkCancellation()
             let assetModuleIDs = Set(
                 modules
                     .filter { $0.isEnabled || $0.publishesStandalone }
@@ -1612,6 +1690,8 @@ final class AppModel {
             activeWorkStatus: workActivity.isActive ? statusMessage : nil,
             activeWorkStartedAt: workActivity.startedAt,
             activeWorkBlocksUpdates: workActivity.blocksUpdates,
+            activeWorkCanCancel: workActivity.canCancel,
+            activeWorkCancellationRequested: workCancellationRequested,
             modules: modules.map {
                 DiagnosticModuleSnapshot(
                     id: $0.id,
@@ -1665,7 +1745,57 @@ final class AppModel {
         pendingPublishPreview = nil
     }
 
+    private func startForegroundWork(_ operation: @escaping @MainActor (AppModel) async -> Void) {
+        foregroundWorkTask?.cancel()
+        let identifier = UUID()
+        foregroundWorkIdentifier = identifier
+        foregroundWorkTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            await operation(self)
+            if self.foregroundWorkIdentifier == identifier {
+                self.foregroundWorkTask = nil
+            }
+        }
+    }
+
+    private func shouldContinueCurrentWork(
+        generation: Int? = nil,
+        staleMessage: String = "检测到新的修改，已放弃旧更新"
+    ) -> Bool {
+        if workCancellationRequested || Task.isCancelled {
+            statusMessage = "正在取消\(workActivity.title)…"
+            return false
+        }
+        if let generation, generation != localChangeGeneration {
+            statusMessage = staleMessage
+            return false
+        }
+        return true
+    }
+
+    private func checkCurrentWorkCancellation() throws {
+        guard !workCancellationRequested, !Task.isCancelled else {
+            throw CancellationError()
+        }
+    }
+
+    private func enterNonCancellableWorkPhase(statusMessage message: String) throws {
+        try checkCurrentWorkCancellation()
+        guard workActivity.isActive else { return }
+        workCancellationRequested = false
+        workActivity.canCancel = false
+        statusMessage = message
+    }
+
+    private func isCurrentWorkCancellation(_ error: any Error) -> Bool {
+        error is CancellationError || workCancellationRequested || Task.isCancelled
+    }
+
     private func cancelAutomaticPublishSchedule() {
+        if workActivity.kind == .automaticPublishing, !workActivity.canCancel {
+            clearAutomaticPublishSchedule()
+            return
+        }
         automaticPublishTask?.cancel()
         automaticPublishTask = nil
         clearAutomaticPublishSchedule()
@@ -1678,14 +1808,21 @@ final class AppModel {
 
     private func beginWork(_ kind: WorkActivityKind, blocksUpdates: Bool? = nil) {
         let activity = WorkActivity(kind: kind, blocksUpdates: blocksUpdates)
+        workCancellationRequested = false
         workActivity = activity
         isWorking = activity.blocksUpdates
     }
 
     private func endWork(_ kind: WorkActivityKind? = nil) {
         if kind == nil || workActivity.kind == kind {
+            let wasCancelling = workCancellationRequested || Task.isCancelled
+            let title = workActivity.title
             workActivity = .idle
             isWorking = false
+            workCancellationRequested = false
+            if wasCancelling {
+                statusMessage = "已取消\(title)"
+            }
         }
     }
 

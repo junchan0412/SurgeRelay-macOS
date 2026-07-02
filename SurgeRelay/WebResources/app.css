@@ -228,6 +228,17 @@ button { color: inherit; }
 .latest-update strong { color: var(--label); }
 .progress-track { height: 4px; margin-top: 8px; overflow: hidden; border-radius: 99px; background: var(--fill); }
 .progress-track span { width: 0; height: 100%; display: block; border-radius: inherit; background: var(--accent); transition: width 300ms ease; }
+.activity-cancel {
+  width: 100%; min-height: 28px; margin-top: 9px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border: 1px solid color-mix(in srgb, var(--separator) 80%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--fill) 70%, transparent);
+  color: var(--label);
+  font: inherit; font-size: 12px; font-weight: 600;
+}
+.activity-cancel[hidden] { display: none; }
+.activity-cancel:disabled { color: var(--tertiary-label); }
 
 .detail { min-width: 0; min-height: 100dvh; }
 .mobile-header { display: none; }

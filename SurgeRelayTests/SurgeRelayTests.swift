@@ -89,6 +89,7 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertEqual(publishing.title, "GitHub 发布")
         XCTAssertEqual(publishing.startedAt, startedAt)
         XCTAssertTrue(publishing.blocksUpdates)
+        XCTAssertTrue(publishing.canCancel)
         XCTAssertEqual(
             publishing.updateBlockedReason(statusMessage: "正在生成 GitHub 发布预览…"),
             "Surge Relay 正在执行“GitHub 发布”任务：正在生成 GitHub 发布预览…"
@@ -97,8 +98,15 @@ final class SurgeRelayTests: XCTestCase {
         let keychain = WorkActivity(kind: .checkingKeychain)
         XCTAssertTrue(keychain.isActive)
         XCTAssertFalse(keychain.blocksUpdates)
+        XCTAssertFalse(keychain.canCancel)
         XCTAssertNil(keychain.updateBlockedReason(statusMessage: "正在写入、读取并清理临时诊断项。"))
         XCTAssertFalse(WorkActivity.idle.isActive)
+        XCTAssertFalse(WorkActivity.idle.canCancel)
+    }
+
+    func testWorkActivityCanOverrideCancellationAvailability() {
+        XCTAssertFalse(WorkActivity(kind: .updatingModules, canCancel: false).canCancel)
+        XCTAssertTrue(WorkActivity(kind: .savingPreview, canCancel: true).canCancel)
     }
 
     func testUpdateAdmissionExplainsBlockedAndAcceptedStates() {

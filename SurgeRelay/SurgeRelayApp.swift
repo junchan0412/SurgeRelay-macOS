@@ -31,7 +31,7 @@ struct SurgeRelayApp: App {
             }
             CommandGroup(after: .newItem) {
                 Button("更新全部模块") {
-                    Task { await model.updateAll() }
+                    model.startUpdateAll()
                 }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
                 .disabled(!model.updateAdmission.isAccepted)
