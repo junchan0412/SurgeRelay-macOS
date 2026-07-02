@@ -3,6 +3,22 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.2.40</title>
+            <pubDate>Fri, 03 Jul 2026 02:24:39 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.2.40</link>
+            <sparkle:version>42</sparkle:version>
+            <sparkle:shortVersionString>1.2.40</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.2.40
+
+
+- 本地根目录已有 `file://` 模块仍保留独立发布开关，GitHub 发布时可以继续按同一文件夹逻辑生成独立模块。
+- 本地发布目标为本地根目录时，如果独立模块输出路径正好就是源文件自身，会跳过该文件写入，避免覆盖原模块或再次制造重复副本。
+- 本地扫描导入的已有模块默认继续可独立发布；防重复逻辑改为按发布目标判断，而不是修改模块配置。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.2.40/Surge-Relay-1.2.40.app.zip" length="8128297" type="application/zip" sparkle:edSignature="IIhpINpzEWoikzebZdpZEmIQQXEBQE5UgsTwLJXraLB2t+GgaKsYA8mRqZRMw4tgKkvjc9XjmwJpNRcLKWROCw=="/>
+        </item>
+        <item>
             <title>1.2.39</title>
             <pubDate>Fri, 03 Jul 2026 01:53:15 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.2.39</link>

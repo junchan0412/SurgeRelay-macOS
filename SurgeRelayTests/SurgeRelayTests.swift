@@ -65,6 +65,46 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertEqual(module.publishedRelativePath, "Local Modules/Local Demo.sgmodule")
     }
 
+    func testLocalRootFileSkipsOnlyLocalSelfExport() {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let source = root.appending(path: "Ads/YouTube Ads.sgmodule")
+        let module = RelayModule(
+            name: "YouTube",
+            sourceURL: source.absoluteString,
+            sourceFormat: .surge,
+            outputFileName: "YouTube Ads.sgmodule",
+            outputFolder: "Ads",
+            publishesStandalone: true
+        )
+
+        XCTAssertTrue(module.publishesStandalone)
+        XCTAssertTrue(AppModel.shouldSkipStandaloneLocalExport(
+            module,
+            storageMode: .local,
+            localModuleDirectory: root.path
+        ))
+        XCTAssertFalse(AppModel.shouldSkipStandaloneLocalExport(
+            module,
+            storageMode: .gitHub,
+            localModuleDirectory: root.path
+        ))
+
+        let copiedModule = RelayModule(
+            name: "YouTube Copy",
+            sourceURL: source.absoluteString,
+            sourceFormat: .surge,
+            outputFileName: "YouTube Copy.sgmodule",
+            outputFolder: "Ads",
+            publishesStandalone: true
+        )
+        XCTAssertFalse(AppModel.shouldSkipStandaloneLocalExport(
+            copiedModule,
+            storageMode: .local,
+            localModuleDirectory: root.path
+        ))
+    }
+
     func testModuleOutputFolderBuildsRelativePaths() {
         XCTAssertEqual(ModuleOutputFolder.normalized(" /Ads/Video/ "), "Ads/Video")
         XCTAssertEqual(ModuleOutputFolder.normalized("../Ads"), "Ads")

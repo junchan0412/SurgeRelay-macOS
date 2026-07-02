@@ -526,7 +526,6 @@ final class AppModel {
                 outputFileName: outputFileName,
                 category: candidate.category,
                 outputFolder: outputFolder,
-                publishesStandalone: false,
                 isEnabled: true,
                 detectedSourceFormat: .surge,
                 sourceContentHash: candidate.sourceContentHash,
@@ -1446,6 +1445,13 @@ final class AppModel {
         for module in modules where module.publishesStandalone {
             try checkCurrentWorkCancellation()
             try Task.checkCancellation()
+            if Self.shouldSkipStandaloneLocalExport(
+                module,
+                storageMode: settings.storageMode,
+                localModuleDirectory: settings.localModuleDirectory
+            ) {
+                continue
+            }
             guard let content = try? await fileStore.readComponent(id: module.id) else { continue }
             let materialized = await processingWorker.materialize(content, overrides: module.argumentOverrides)
             let namedContent = await processingWorker.applyingModuleMetadata(
@@ -2024,20 +2030,39 @@ final class AppModel {
             }
             used.insert(relative.lowercased())
             module.outputFileName = candidate
-            if localSourceFileName != nil {
-                module.publishesStandalone = false
-            }
             return module
         }
     }
 
+    nonisolated static func shouldSkipStandaloneLocalExport(
+        _ module: RelayModule,
+        storageMode: StorageMode,
+        localModuleDirectory: String
+    ) -> Bool {
+        guard storageMode == .local,
+              let sourceRelativePath = localSourceRelativePath(
+                for: module.sourceURL,
+                rootDirectoryPath: localModuleDirectory
+              ) else {
+            return false
+        }
+        return sourceRelativePath.lowercased() == module.publishedRelativePath.lowercased()
+    }
+
     private static func localSourceFileName(for sourceURL: String, rootDirectoryPath: String) -> String? {
+        guard let relativePath = localSourceRelativePath(for: sourceURL, rootDirectoryPath: rootDirectoryPath) else {
+            return nil
+        }
+        return relativePath.split(separator: "/").last.map(String.init)
+    }
+
+    nonisolated private static func localSourceRelativePath(for sourceURL: String, rootDirectoryPath: String) -> String? {
         guard let url = URL(string: sourceURL), url.isFileURL else { return nil }
         let root = URL(filePath: rootDirectoryPath, directoryHint: .isDirectory).standardizedFileURL
         let source = url.standardizedFileURL
         let rootPath = root.path.hasSuffix("/") ? root.path : root.path + "/"
         guard source.path.hasPrefix(rootPath) else { return nil }
-        return source.lastPathComponent
+        return ModuleOutputFolder.normalized(String(source.path.dropFirst(rootPath.count)))
     }
 
 }
