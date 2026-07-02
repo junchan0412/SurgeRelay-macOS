@@ -86,6 +86,30 @@ struct SettingsView: View {
                     diagnosticLabel("签名", value: diagnostics.signatureStatus, systemImage: "signature")
                     diagnosticLabel("Gatekeeper", value: diagnostics.gatekeeperStatus, systemImage: "lock.shield")
                     diagnosticLabel("隔离属性", value: diagnostics.quarantineStatus, systemImage: "shield.lefthalf.filled")
+                    diagnosticLabel("崩溃报告", value: diagnostics.recentCrashReportStatus, systemImage: "waveform.path.ecg")
+                    if !diagnostics.recentCrashReports.isEmpty {
+                        DisclosureGroup("最近崩溃报告") {
+                            ForEach(diagnostics.recentCrashReports) { report in
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(report.fileName)
+                                        .font(.caption.weight(.medium))
+                                        .textSelection(.enabled)
+                                    if let modifiedAt = report.modifiedAt {
+                                        Text(modifiedAt.formatted(date: .abbreviated, time: .shortened))
+                                            .font(.caption2)
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                    Text(report.path)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .textSelection(.enabled)
+                                        .lineLimit(2)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 2)
+                            }
+                        }
+                    }
                     LabeledContent("自动检查更新") {
                         Label(
                             diagnostics.sparkleAutomaticChecksEnabled ? "开启" : "关闭",

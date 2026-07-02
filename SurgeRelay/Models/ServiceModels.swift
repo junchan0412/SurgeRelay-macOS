@@ -233,6 +233,14 @@ struct InstallationDiagnosticSnapshot: Codable, Equatable, Sendable {
         var output: String
     }
 
+    struct RecentCrashReport: Codable, Equatable, Identifiable, Sendable {
+        var fileName: String
+        var path: String
+        var modifiedAt: Date?
+
+        var id: String { path }
+    }
+
     var appPath: String
     var appVersion: String
     var buildNumber: String
@@ -241,12 +249,16 @@ struct InstallationDiagnosticSnapshot: Codable, Equatable, Sendable {
     var signatureStatus: String
     var gatekeeperStatus: String
     var quarantineStatus: String
+    var recentCrashReportStatus: String
+    var recentCrashReports: [RecentCrashReport]
     var sparkleAutomaticChecksEnabled: Bool
     var sparkleFeedURL: String?
     var updateRecommendation: String
 
     static func current(
         bundle: Bundle = .main,
+        diagnosticDirectory: URL = defaultDiagnosticDirectory(),
+        now: Date = .now,
         runCommand: @Sendable (String, [String]) -> CommandResult = runSystemCommand
     ) -> InstallationDiagnosticSnapshot {
         let bundleURL = bundle.bundleURL.standardizedFileURL
@@ -254,12 +266,20 @@ struct InstallationDiagnosticSnapshot: Codable, Equatable, Sendable {
         let version = info["CFBundleShortVersionString"] as? String ?? "-"
         let build = info["CFBundleVersion"] as? String ?? "-"
         let identifier = bundle.bundleIdentifier ?? "-"
+        let appName = info["CFBundleDisplayName"] as? String
+            ?? info["CFBundleName"] as? String
+            ?? bundleURL.deletingPathExtension().lastPathComponent
         let automaticChecks = info["SUEnableAutomaticChecks"] as? Bool ?? false
         let feedURL = info["SUFeedURL"] as? String
 
         let codesign = runCommand("/usr/bin/codesign", ["-dvvv", "--entitlements", ":-", bundleURL.path])
         let spctl = runCommand("/usr/sbin/spctl", ["-a", "-vv", bundleURL.path])
         let xattr = runCommand("/usr/bin/xattr", ["-p", "com.apple.quarantine", bundleURL.path])
+        let crashReports = recentCrashReports(
+            appName: appName,
+            diagnosticDirectory: diagnosticDirectory,
+            since: now.addingTimeInterval(-24 * 60 * 60)
+        )
 
         return InstallationDiagnosticSnapshot(
             appPath: bundleURL.path,
@@ -270,6 +290,8 @@ struct InstallationDiagnosticSnapshot: Codable, Equatable, Sendable {
             signatureStatus: signatureSummary(from: codesign),
             gatekeeperStatus: gatekeeperSummary(from: spctl),
             quarantineStatus: quarantineSummary(from: xattr),
+            recentCrashReportStatus: crashReportStatus(from: crashReports),
+            recentCrashReports: crashReports,
             sparkleAutomaticChecksEnabled: automaticChecks,
             sparkleFeedURL: feedURL,
             updateRecommendation: updateRecommendation(automaticChecksEnabled: automaticChecks)
@@ -305,6 +327,49 @@ struct InstallationDiagnosticSnapshot: Codable, Equatable, Sendable {
             : "App 内 Sparkle 自动检查更新已关闭；当前“查看更新…”会打开 GitHub Releases，推荐使用 pkg 更新，安装器会自动清除隔离属性。"
     }
 
+    static func recentCrashReports(
+        appName: String,
+        diagnosticDirectory: URL = defaultDiagnosticDirectory(),
+        since: Date = .now.addingTimeInterval(-24 * 60 * 60),
+        fileManager: FileManager = .default
+    ) -> [RecentCrashReport] {
+        guard let files = try? fileManager.contentsOfDirectory(
+            at: diagnosticDirectory,
+            includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+
+        let appNameVariants = Set([
+            appName,
+            appName.replacingOccurrences(of: " ", with: "_"),
+            appName.replacingOccurrences(of: "_", with: " "),
+        ])
+        let reports = files.compactMap { url -> RecentCrashReport? in
+            let fileName = url.lastPathComponent
+            let extensionName = url.pathExtension.lowercased()
+            guard extensionName == "crash" || extensionName == "ips" else { return nil }
+            guard appNameVariants.contains(where: { fileName.hasPrefix($0) }) else { return nil }
+            guard let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .isRegularFileKey]),
+                  values.isRegularFile == true else { return nil }
+            if let modifiedAt = values.contentModificationDate, modifiedAt < since { return nil }
+            return RecentCrashReport(
+                fileName: fileName,
+                path: url.path,
+                modifiedAt: values.contentModificationDate
+            )
+        }
+        .sorted {
+            ($0.modifiedAt ?? .distantPast) > ($1.modifiedAt ?? .distantPast)
+        }
+        return Array(reports.prefix(5))
+    }
+
+    static func crashReportStatus(from reports: [RecentCrashReport]) -> String {
+        reports.isEmpty
+            ? "最近 24 小时未发现崩溃报告"
+            : "最近 24 小时发现 \(reports.count) 个崩溃报告"
+    }
+
     private static func runSystemCommand(_ executable: String, _ arguments: [String]) -> CommandResult {
         let process = Process()
         process.executableURL = URL(filePath: executable)
@@ -328,6 +393,11 @@ struct InstallationDiagnosticSnapshot: Codable, Equatable, Sendable {
               let match = expression.firstMatch(in: value, range: NSRange(value.startIndex..., in: value)),
               let range = Range(match.range(at: 1), in: value) else { return nil }
         return String(value[range])
+    }
+
+    private static func defaultDiagnosticDirectory() -> URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appending(path: "Library/Logs/DiagnosticReports", directoryHint: .isDirectory)
     }
 }
 

@@ -224,11 +224,48 @@ verify_dynamic_library_linkage() {
   ok "verified dynamic library linkage"
 }
 
+print_launch_smoke_diagnostics() {
+  local label="$1"
+  local app_path="$2"
+  local existing_pids="$3"
+  local current_pids="$4"
+  local new_pids="$5"
+  local diagnostic_dir="$HOME/Library/Logs/DiagnosticReports"
+  local pid
+
+  {
+    echo "launch smoke diagnostics ($label):"
+    echo "  app: $app_path"
+    echo "  existing pids: $(tr '\n' ' ' < "$existing_pids" 2>/dev/null || true)"
+    echo "  current pids: $(tr '\n' ' ' < "$current_pids" 2>/dev/null || true)"
+    echo "  new pids: $(tr '\n' ' ' < "$new_pids" 2>/dev/null || true)"
+    echo "  quarantine:"
+    /usr/bin/xattr -p com.apple.quarantine "$app_path" 2>&1 | sed 's/^/    /' || echo "    not present"
+    echo "  codesign:"
+    /usr/bin/codesign -dvvv "$app_path" 2>&1 | sed -n '1,12p' | sed 's/^/    /' || true
+    echo "  gatekeeper:"
+    /usr/sbin/spctl -a -vv "$app_path" 2>&1 | sed 's/^/    /' || true
+    echo "  matching processes:"
+    while IFS= read -r pid; do
+      [[ -n "$pid" ]] || continue
+      /bin/ps -p "$pid" -o pid=,stat=,command= 2>/dev/null | sed 's/^/    /' || true
+    done < "$current_pids"
+    if [[ -d "$diagnostic_dir" ]]; then
+      echo "  recent crash reports:"
+      find "$diagnostic_dir" -type f \( -name "$APP_NAME*.crash" -o -name "$APP_NAME*.ips" \) -mtime -1 -print 2>/dev/null \
+        | tail -5 \
+        | sed 's/^/    /'
+    fi
+  } >&2
+}
+
 launch_smoke_test() {
-  local app_path="$1"
-  local existing_pids="$TMP_DIR/launch-smoke-existing-pids"
-  local current_pids="$TMP_DIR/launch-smoke-current-pids"
-  local new_pids="$TMP_DIR/launch-smoke-new-pids"
+  local label="$1"
+  local app_path="$2"
+  local safe_label="${label// /-}"
+  local existing_pids="$TMP_DIR/launch-smoke-existing-pids-$safe_label"
+  local current_pids="$TMP_DIR/launch-smoke-current-pids-$safe_label"
+  local new_pids="$TMP_DIR/launch-smoke-new-pids-$safe_label"
   local new_pid=""
 
   pgrep -x "$APP_NAME" > "$existing_pids" 2>/dev/null || true
@@ -242,12 +279,17 @@ launch_smoke_test() {
     fi
     sleep 1
   done
-  [[ -n "$new_pid" ]] || fail "launch smoke test did not start a new $APP_NAME instance"
+  if [[ -z "$new_pid" ]]; then
+    print_launch_smoke_diagnostics "$label" "$app_path" "$existing_pids" "$current_pids" "$new_pids"
+    fail "$label launch smoke test did not start a new $APP_NAME instance"
+  fi
   sleep 3
-  kill -0 "$new_pid" 2>/dev/null \
-    || fail "launch smoke test started $APP_NAME pid $new_pid, but it exited early"
+  if ! kill -0 "$new_pid" 2>/dev/null; then
+    print_launch_smoke_diagnostics "$label" "$app_path" "$existing_pids" "$current_pids" "$new_pids"
+    fail "$label launch smoke test started $APP_NAME pid $new_pid, but it exited early"
+  fi
   kill "$new_pid" 2>/dev/null || true
-  ok "verified launch smoke test"
+  ok "verified $label launch smoke test"
 }
 
 verify_app_bundle() {
@@ -289,7 +331,7 @@ verify_app_zip() {
   app_path="$tmp_dir/$APP_NAME.app"
   verify_app_bundle "$app_path"
   if [[ "$RUN_LAUNCH_SMOKE_TEST" == "1" ]]; then
-    launch_smoke_test "$app_path"
+    launch_smoke_test "app zip" "$app_path"
   fi
   ok "verified app zip bundle"
 }
@@ -325,6 +367,9 @@ verify_pkg() {
   payload_app="$(find "$tmp_dir" -path "*/Applications/$APP_NAME.app" -type d -print -quit)"
   [[ -n "$payload_app" ]] || fail "pkg payload missing $APP_NAME.app"
   verify_app_bundle "$payload_app"
+  if [[ "$RUN_LAUNCH_SMOKE_TEST" == "1" ]]; then
+    launch_smoke_test "pkg payload" "$payload_app"
+  fi
 
   preinstall="$(find "$tmp_dir" -path "*/Scripts/preinstall" -type f -print -quit)"
   [[ -n "$preinstall" ]] || fail "pkg missing preinstall script"

@@ -510,6 +510,43 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertEqual(quarantine, "存在隔离属性，首次打开可能被拦截")
     }
 
+    func testInstallationDiagnosticsListsRecentCrashReports() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: "SurgeRelayCrashReports-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let recent = root.appending(path: "Surge Relay-2026-07-02-120000.ips")
+        let old = root.appending(path: "Surge Relay-2026-06-30-120000.crash")
+        let otherApp = root.appending(path: "Other App-2026-07-02-120000.ips")
+        try Data("recent".utf8).write(to: recent)
+        try Data("old".utf8).write(to: old)
+        try Data("other".utf8).write(to: otherApp)
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date(timeIntervalSince1970: 2_000)],
+            ofItemAtPath: recent.path
+        )
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date(timeIntervalSince1970: 500)],
+            ofItemAtPath: old.path
+        )
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date(timeIntervalSince1970: 2_100)],
+            ofItemAtPath: otherApp.path
+        )
+
+        let reports = InstallationDiagnosticSnapshot.recentCrashReports(
+            appName: "Surge Relay",
+            diagnosticDirectory: root,
+            since: Date(timeIntervalSince1970: 1_000)
+        )
+        XCTAssertEqual(reports.map(\.fileName), [recent.lastPathComponent])
+        XCTAssertEqual(
+            InstallationDiagnosticSnapshot.crashReportStatus(from: reports),
+            "最近 24 小时发现 1 个崩溃报告"
+        )
+    }
+
     func testCredentialDiagnosticsDescribeKeychainAccountsWithoutSecrets() {
         let checkedAt = Date(timeIntervalSince1970: 1_800)
         let diagnostics = CredentialDiagnosticSnapshot.current(
