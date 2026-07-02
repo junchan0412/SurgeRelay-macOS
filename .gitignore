@@ -1,5 +1,6 @@
 .DS_Store
 Build/
+build/
 .build/
 .build-*/
 DerivedData/

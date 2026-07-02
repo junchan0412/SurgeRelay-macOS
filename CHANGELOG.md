@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.35
+
+- 仓库忽略规则显式加入小写 `build/`，让 Git 与 ripgrep 文件枚举对 Xcode DerivedData、SourcePackages 和测试构建缓存保持一致。
+- 本地构建和 Release 产物继续保存在已忽略的 `build/` 与 `dist/` 目录中，减少搜索、diff 和发布准备时被派生产物刷屏的情况。
+
 ## 1.2.34
 
 - 新增结构化后台任务状态，可区分模块更新、本地扫描/导入、Script-Hub 更新、GitHub 测试、发布预览、确认发布、预览内容写入/恢复和钥匙串检查。
