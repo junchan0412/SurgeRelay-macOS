@@ -49,9 +49,15 @@ enum ModuleOutputFolder {
         return normalized.isEmpty ? "根目录" : normalized
     }
 
-    static func relativePath(fileName: String, folder: String) -> String {
+    static func relativePath(
+        fileName: String,
+        folder: String,
+        preservesExistingFileName: Bool = false
+    ) -> String {
         let normalizedFolder = normalized(folder)
-        let normalizedFileName = FilenameSanitizer.sgmoduleName(from: fileName)
+        let normalizedFileName = preservesExistingFileName
+            ? FilenameSanitizer.existingSgmoduleName(from: fileName)
+            : FilenameSanitizer.sgmoduleName(from: fileName)
         return [normalizedFolder, normalizedFileName].filter { !$0.isEmpty }.joined(separator: "/")
     }
 
@@ -204,7 +210,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         self.name = name
         self.sourceURL = sourceURL
         self.sourceFormat = sourceFormat
-        self.outputFileName = FilenameSanitizer.sgmoduleName(from: outputFileName)
+        self.outputFileName = Self.normalizedOutputFileName(outputFileName, sourceURL: sourceURL)
         self.category = category.trimmingCharacters(in: .whitespacesAndNewlines)
         self.outputFolder = ModuleOutputFolder.normalized(outputFolder)
         self.publishesStandalone = publishesStandalone
@@ -239,8 +245,9 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         name = try container.decode(String.self, forKey: .name)
         sourceURL = try container.decode(String.self, forKey: .sourceURL)
         sourceFormat = try container.decodeIfPresent(ModuleSourceFormat.self, forKey: .sourceFormat) ?? .automatic
-        outputFileName = try container.decodeIfPresent(String.self, forKey: .outputFileName)
+        let decodedOutputFileName = try container.decodeIfPresent(String.self, forKey: .outputFileName)
             ?? FilenameSanitizer.suggestedName(from: sourceURL)
+        outputFileName = Self.normalizedOutputFileName(decodedOutputFileName, sourceURL: sourceURL)
         category = try container.decodeIfPresent(String.self, forKey: .category)?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         outputFolder = ModuleOutputFolder.normalized(
@@ -274,7 +281,21 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     }
 
     var publishedRelativePath: String {
-        ModuleOutputFolder.relativePath(fileName: outputFileName, folder: outputFolder)
+        ModuleOutputFolder.relativePath(
+            fileName: outputFileName,
+            folder: outputFolder,
+            preservesExistingFileName: Self.preservesExistingFileName(for: sourceURL)
+        )
+    }
+
+    private static func normalizedOutputFileName(_ value: String, sourceURL: String) -> String {
+        preservesExistingFileName(for: sourceURL)
+            ? FilenameSanitizer.existingSgmoduleName(from: value)
+            : FilenameSanitizer.sgmoduleName(from: value)
+    }
+
+    private static func preservesExistingFileName(for sourceURL: String) -> Bool {
+        URL(string: sourceURL)?.isFileURL == true
     }
 }
 

@@ -3,6 +3,23 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.2.39</title>
+            <pubDate>Fri, 03 Jul 2026 01:53:15 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.2.39</link>
+            <sparkle:version>41</sparkle:version>
+            <sparkle:shortVersionString>1.2.39</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.2.39
+
+
+- 清理本地 Surge 根目录中可明确判定为本 App 新增的 11 个重复模块副本，保留原有正在使用的模块文件。
+- 本地根目录扫描导入的 `file://` Surge 模块会保留原始文件名，包括空格，不再把空格转换为连字符后生成旁路副本。
+- 启动时会把本地根目录内已有模块的输出文件名迁回源文件名，并关闭独立副本发布，避免下次更新或发布时再次写出重复文件。
+- 本地导入去重逻辑同步使用“保留已有文件名”规则，只在确实重名时追加编号。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.2.39/Surge-Relay-1.2.39.app.zip" length="8124488" type="application/zip" sparkle:edSignature="HL098Vbd7euWQ1AqsAfsePAfpNvc4elIcWQqAKB3lyOmHLeQuc6/DLMtgn3Wo+1MF1BFeIrmL6YsSoIleRsWBg=="/>
+        </item>
+        <item>
             <title>1.2.38</title>
             <pubDate>Fri, 03 Jul 2026 00:02:32 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.2.38</link>

@@ -5,7 +5,9 @@ import XCTest
 final class SurgeRelayTests: XCTestCase {
     func testFilenameSanitizerCreatesSurgeModuleExtension() {
         XCTAssertEqual(FilenameSanitizer.sgmoduleName(from: "YouTube Ads.sgmodule"), "YouTube-Ads.sgmodule")
+        XCTAssertEqual(FilenameSanitizer.existingSgmoduleName(from: "YouTube Ads.sgmodule"), "YouTube Ads.sgmodule")
         XCTAssertEqual(FilenameSanitizer.sgmoduleName(from: "folder/bad:name"), "folder-bad-name.sgmodule")
+        XCTAssertEqual(FilenameSanitizer.existingSgmoduleName(from: "folder/bad:name"), "bad-name.sgmodule")
     }
 
     func testAutomaticSourceFormat() throws {
@@ -50,11 +52,32 @@ final class SurgeRelayTests: XCTestCase {
         ))
     }
 
+    func testLocalFileModulePreservesExistingPublishedFileName() {
+        let module = RelayModule(
+            name: "Local Demo",
+            sourceURL: URL(filePath: "/tmp/Local Demo.sgmodule").absoluteString,
+            sourceFormat: .surge,
+            outputFileName: "Local Demo.sgmodule",
+            outputFolder: "Local Modules"
+        )
+
+        XCTAssertEqual(module.outputFileName, "Local Demo.sgmodule")
+        XCTAssertEqual(module.publishedRelativePath, "Local Modules/Local Demo.sgmodule")
+    }
+
     func testModuleOutputFolderBuildsRelativePaths() {
         XCTAssertEqual(ModuleOutputFolder.normalized(" /Ads/Video/ "), "Ads/Video")
         XCTAssertEqual(ModuleOutputFolder.normalized("../Ads"), "Ads")
         XCTAssertEqual(ModuleOutputFolder.components(" /Ads/Video/ "), ["Ads", "Video"])
         XCTAssertEqual(ModuleOutputFolder.relativePath(fileName: "YouTube Ads", folder: "Ads"), "Ads/YouTube-Ads.sgmodule")
+        XCTAssertEqual(
+            ModuleOutputFolder.relativePath(
+                fileName: "YouTube Ads.sgmodule",
+                folder: "Ads",
+                preservesExistingFileName: true
+            ),
+            "Ads/YouTube Ads.sgmodule"
+        )
         XCTAssertEqual(ModuleOutputFolder.displayTitle(for: ""), "根目录")
         XCTAssertEqual(
             ModuleOutputFolder.options(from: ["Video", "Ads/Video"], preserving: "Tools"),
@@ -962,7 +985,7 @@ final class SurgeRelayTests: XCTestCase {
         #!name=YouTube
         #!category=Video
         [General]
-        """.utf8).write(to: root.appending(path: "Ads/YouTube.sgmodule"))
+        """.utf8).write(to: root.appending(path: "Ads/YouTube Ads.sgmodule"))
         try Data("#!name=Combined\n[General]\n".utf8).write(to: root.appending(path: "Surge-Relay.sgmodule"))
 
         let candidates = try LocalModuleScanner.candidates(
@@ -973,12 +996,12 @@ final class SurgeRelayTests: XCTestCase {
         )
 
         XCTAssertEqual(candidates.count, 1)
-        XCTAssertEqual(candidates[0].relativePath, "Ads/YouTube.sgmodule")
-        XCTAssertEqual(candidates[0].id, "Ads/YouTube.sgmodule")
+        XCTAssertEqual(candidates[0].relativePath, "Ads/YouTube Ads.sgmodule")
+        XCTAssertEqual(candidates[0].id, "Ads/YouTube Ads.sgmodule")
         XCTAssertEqual(candidates[0].name, "YouTube")
         XCTAssertEqual(candidates[0].category, "Video")
         XCTAssertEqual(candidates[0].outputFolder, "Ads")
-        XCTAssertEqual(candidates[0].outputFileName, "YouTube.sgmodule")
+        XCTAssertEqual(candidates[0].outputFileName, "YouTube Ads.sgmodule")
     }
 
     func testLocalModuleScannerReportsSkippedFiles() throws {

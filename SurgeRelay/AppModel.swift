@@ -81,7 +81,8 @@ final class AppModel {
         ).filter { !$0.isEmpty }
         let loadedModules = Self.normalizedModuleNaming(
             PersistenceStore.loadModules(),
-            combinedFileName: loadedSettings.combinedModuleFileName
+            combinedFileName: loadedSettings.combinedModuleFileName,
+            localModuleDirectory: loadedSettings.localModuleDirectory
         )
         let legacyGitHubToken = loadedSettings.githubToken.trimmingCharacters(in: .whitespacesAndNewlines)
         modules = loadedModules
@@ -508,10 +509,15 @@ final class AppModel {
             let outputFileName = uniqueOutputFileName(
                 preferredFileName: candidate.outputFileName,
                 folder: outputFolder,
-                unavailable: unavailablePaths
+                unavailable: unavailablePaths,
+                preservesExistingFileName: true
             )
             unavailablePaths.insert(
-                ModuleOutputFolder.relativePath(fileName: outputFileName, folder: outputFolder).lowercased()
+                ModuleOutputFolder.relativePath(
+                    fileName: outputFileName,
+                    folder: outputFolder,
+                    preservesExistingFileName: true
+                ).lowercased()
             )
             var module = RelayModule(
                 name: name,
@@ -520,6 +526,7 @@ final class AppModel {
                 outputFileName: outputFileName,
                 category: candidate.category,
                 outputFolder: outputFolder,
+                publishesStandalone: false,
                 isEnabled: true,
                 detectedSourceFormat: .surge,
                 sourceContentHash: candidate.sourceContentHash,
@@ -1945,22 +1952,39 @@ final class AppModel {
     private func uniqueOutputFileName(
         preferredFileName: String,
         folder: String,
-        unavailable: Set<String>
+        unavailable: Set<String>,
+        preservesExistingFileName: Bool = false
     ) -> String {
-        let normalized = FilenameSanitizer.sgmoduleName(from: preferredFileName)
-        var relativePath = ModuleOutputFolder.relativePath(fileName: normalized, folder: folder)
+        let normalized = preservesExistingFileName
+            ? FilenameSanitizer.existingSgmoduleName(from: preferredFileName)
+            : FilenameSanitizer.sgmoduleName(from: preferredFileName)
+        var relativePath = ModuleOutputFolder.relativePath(
+            fileName: normalized,
+            folder: folder,
+            preservesExistingFileName: preservesExistingFileName
+        )
         guard unavailable.contains(relativePath.lowercased()) else { return normalized }
 
-        let base = FilenameSanitizer.baseName(from: normalized)
+        let base = preservesExistingFileName
+            ? FilenameSanitizer.existingFileBaseName(from: normalized)
+            : FilenameSanitizer.baseName(from: normalized)
         var suffix = 2
         repeat {
-            relativePath = ModuleOutputFolder.relativePath(fileName: "\(base)-\(suffix).sgmodule", folder: folder)
+            relativePath = ModuleOutputFolder.relativePath(
+                fileName: "\(base)-\(suffix).sgmodule",
+                folder: folder,
+                preservesExistingFileName: preservesExistingFileName
+            )
             if unavailable.contains(relativePath.lowercased()) { suffix += 1 } else { break }
         } while true
         return "\(base)-\(suffix).sgmodule"
     }
 
-    private static func normalizedModuleNaming(_ modules: [RelayModule], combinedFileName: String) -> [RelayModule] {
+    private static func normalizedModuleNaming(
+        _ modules: [RelayModule],
+        combinedFileName: String,
+        localModuleDirectory: String
+    ) -> [RelayModule] {
         var used = Set<String>()
         let combined = ModuleOutputFolder.relativePath(
             fileName: combinedFileName,
@@ -1969,22 +1993,51 @@ final class AppModel {
         return modules.map { value in
             var module = value
             module.outputFolder = ModuleOutputFolder.normalized(module.outputFolder)
-            let preferred = FilenameSanitizer.sgmoduleName(
-                from: module.outputFileName.isEmpty ? module.name : module.outputFileName
+            let localSourceFileName = Self.localSourceFileName(
+                for: module.sourceURL,
+                rootDirectoryPath: localModuleDirectory
             )
-            let base = FilenameSanitizer.baseName(from: preferred)
+            let preservesExistingFileName = URL(string: module.sourceURL)?.isFileURL == true
+            let preferredValue = localSourceFileName
+                ?? (module.outputFileName.isEmpty ? module.name : module.outputFileName)
+            let preferred = preservesExistingFileName
+                ? FilenameSanitizer.existingSgmoduleName(from: preferredValue)
+                : FilenameSanitizer.sgmoduleName(from: preferredValue)
+            let base = preservesExistingFileName
+                ? FilenameSanitizer.existingFileBaseName(from: preferred)
+                : FilenameSanitizer.baseName(from: preferred)
             var candidate = preferred
             var suffix = 2
-            var relative = ModuleOutputFolder.relativePath(fileName: candidate, folder: module.outputFolder)
+            var relative = ModuleOutputFolder.relativePath(
+                fileName: candidate,
+                folder: module.outputFolder,
+                preservesExistingFileName: preservesExistingFileName
+            )
             while used.contains(relative.lowercased()) || relative.lowercased() == combined {
                 candidate = "\(base)-\(suffix).sgmodule"
-                relative = ModuleOutputFolder.relativePath(fileName: candidate, folder: module.outputFolder)
+                relative = ModuleOutputFolder.relativePath(
+                    fileName: candidate,
+                    folder: module.outputFolder,
+                    preservesExistingFileName: preservesExistingFileName
+                )
                 suffix += 1
             }
             used.insert(relative.lowercased())
             module.outputFileName = candidate
+            if localSourceFileName != nil {
+                module.publishesStandalone = false
+            }
             return module
         }
+    }
+
+    private static func localSourceFileName(for sourceURL: String, rootDirectoryPath: String) -> String? {
+        guard let url = URL(string: sourceURL), url.isFileURL else { return nil }
+        let root = URL(filePath: rootDirectoryPath, directoryHint: .isDirectory).standardizedFileURL
+        let source = url.standardizedFileURL
+        let rootPath = root.path.hasSuffix("/") ? root.path : root.path + "/"
+        guard source.path.hasPrefix(rootPath) else { return nil }
+        return source.lastPathComponent
     }
 
 }
@@ -2187,7 +2240,7 @@ enum LocalModuleScanner {
                 relativePath: normalizedRelativePath,
                 sourceURL: sourceURL,
                 name: ModuleMetadataParser.displayName(in: content) ?? fallbackName,
-                outputFileName: FilenameSanitizer.sgmoduleName(from: outputFileName),
+                outputFileName: FilenameSanitizer.existingSgmoduleName(from: outputFileName),
                 category: ModuleMetadataParser.category(in: content) ?? "",
                 outputFolder: ModuleOutputFolder.normalized(outputFolder),
                 sourceContentHash: data.sha256String
