@@ -123,6 +123,8 @@ struct DiagnosticReport: Codable, Sendable {
     var webServerAccessMode: String
     var webManagementURL: String?
     var webAccessTokenStorageStatus: String
+    var automaticPublishScheduledAt: Date?
+    var automaticPublishRunsAt: Date?
     var modules: [DiagnosticModuleSnapshot]
     var history: [UpdateHistoryEntry]
 }

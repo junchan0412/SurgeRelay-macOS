@@ -124,6 +124,18 @@ struct ModulesView: View {
                 Divider()
             }
 
+            if let automaticPublishText {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "paperplane.circle.fill")
+                        .foregroundStyle(.blue)
+                    Text(automaticPublishText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Divider()
+            }
+
             VStack(alignment: .leading, spacing: 2) {
                 Text("最新更新时间")
                     .font(.caption.weight(.medium))
@@ -139,11 +151,17 @@ struct ModulesView: View {
         .padding(.bottom, 10)
         .animation(.snappy, value: model.isWorking)
         .animation(.snappy, value: model.presentedError)
+        .animation(.snappy, value: model.automaticPublishRunsAt)
     }
 
     private var latestUpdateText: String {
         guard let date = model.modules.compactMap(\.lastUpdatedAt).max() else { return "尚未更新" }
         return date.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    private var automaticPublishText: String? {
+        guard let runsAt = model.automaticPublishRunsAt else { return nil }
+        return "自动发布已排队，预计 \(runsAt.formatted(date: .omitted, time: .shortened)) 执行"
     }
 
     private var synchronizingModuleName: String? {

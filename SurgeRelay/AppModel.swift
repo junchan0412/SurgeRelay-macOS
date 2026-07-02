@@ -32,6 +32,8 @@ final class AppModel {
     var updateHistory: [UpdateHistoryEntry]
     var githubModuleOutputFolders: [String] = [ModuleOutputFolder.root]
     var pendingPublishPreview: PublishPreview?
+    var automaticPublishScheduledAt: Date?
+    var automaticPublishRunsAt: Date?
 
     @ObservationIgnored private let scriptHubClient = ScriptHubClient()
     @ObservationIgnored private let sourceRevisionService = SourceRevisionService()
@@ -49,6 +51,7 @@ final class AppModel {
     @ObservationIgnored private var hasStarted = false
     @ObservationIgnored private var githubModuleOutputFoldersLastRefreshedAt: Date?
     @ObservationIgnored private var githubModuleOutputFoldersConfiguration: GitHubSettings?
+    @ObservationIgnored private static let automaticPublishDelaySeconds = 30
 
     private struct GitHubTokenLoadResult {
         var token: String
@@ -228,8 +231,8 @@ final class AppModel {
     }
 
     func saveSettings() {
-        if !settings.automaticallyPublish {
-            automaticPublishTask?.cancel()
+        if settings.storageMode != .gitHub || !settings.automaticallyPublish {
+            cancelAutomaticPublishSchedule()
         }
         PersistenceStore.saveSettings(settings)
     }
@@ -979,8 +982,11 @@ final class AppModel {
     private func scheduleAutomaticPublish() {
         guard settings.storageMode == .gitHub, settings.automaticallyPublish, settings.github.isConfigured, !githubToken.isEmpty else { return }
         automaticPublishTask?.cancel()
+        let scheduledAt = Date.now
+        automaticPublishScheduledAt = scheduledAt
+        automaticPublishRunsAt = scheduledAt.addingTimeInterval(TimeInterval(Self.automaticPublishDelaySeconds))
         automaticPublishTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(30))
+            try? await Task.sleep(for: .seconds(Self.automaticPublishDelaySeconds))
             guard !Task.isCancelled, let self else { return }
             while self.isWorking, !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(250))
@@ -989,9 +995,16 @@ final class AppModel {
                   self.settings.storageMode == .gitHub,
                   self.settings.automaticallyPublish,
                   self.settings.github.isConfigured,
-                  !self.githubToken.isEmpty else { return }
+                  !self.githubToken.isEmpty else {
+                self.clearAutomaticPublishSchedule()
+                return
+            }
+            self.clearAutomaticPublishSchedule()
             self.isWorking = true
-            defer { self.isWorking = false }
+            defer {
+                self.isWorking = false
+                self.automaticPublishTask = nil
+            }
             do {
                 let preview = try await self.githubPublishPreview()
                 if preview.requiresDeletionConfirmation {
@@ -1069,7 +1082,7 @@ final class AppModel {
 
     func publishAll() async {
         guard !isWorking else { return }
-        automaticPublishTask?.cancel()
+        cancelAutomaticPublishSchedule()
         isWorking = true
         defer { isWorking = false }
         do {
@@ -1094,7 +1107,7 @@ final class AppModel {
             statusMessage = "本地模式会在合并时自动生成清理预览"
             return
         }
-        automaticPublishTask?.cancel()
+        cancelAutomaticPublishSchedule()
         isWorking = true
         defer { isWorking = false }
         do {
@@ -1560,6 +1573,8 @@ final class AppModel {
             webServerAccessMode: webManagementAccessModeTitle,
             webManagementURL: webManagementDisplayURL?.absoluteString,
             webAccessTokenStorageStatus: webAccessTokenStorageStatus.title,
+            automaticPublishScheduledAt: automaticPublishScheduledAt,
+            automaticPublishRunsAt: automaticPublishRunsAt,
             modules: modules.map {
                 DiagnosticModuleSnapshot(
                     id: $0.id,
@@ -1609,8 +1624,19 @@ final class AppModel {
 
     private func registerLocalChange() {
         localChangeGeneration &+= 1
-        automaticPublishTask?.cancel()
+        cancelAutomaticPublishSchedule()
         pendingPublishPreview = nil
+    }
+
+    private func cancelAutomaticPublishSchedule() {
+        automaticPublishTask?.cancel()
+        automaticPublishTask = nil
+        clearAutomaticPublishSchedule()
+    }
+
+    private func clearAutomaticPublishSchedule() {
+        automaticPublishScheduledAt = nil
+        automaticPublishRunsAt = nil
     }
 
     private func recordHistory(_ entries: [UpdateHistoryEntry]) {

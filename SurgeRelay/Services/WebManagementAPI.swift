@@ -191,6 +191,8 @@ enum WebManagementAPI {
                 status: model.statusMessage,
                 progress: progress,
                 currentModuleID: model.synchronizingModuleID?.uuidString.lowercased(),
+                automaticPublishScheduledAt: model.automaticPublishScheduledAt,
+                automaticPublishRunsAt: model.automaticPublishRunsAt,
                 error: model.presentedError
             )
         )
@@ -306,6 +308,8 @@ private struct WebActivityPayload: Encodable {
     let status: String
     let progress: Double?
     let currentModuleID: String?
+    let automaticPublishScheduledAt: Date?
+    let automaticPublishRunsAt: Date?
     let error: String?
 }
 

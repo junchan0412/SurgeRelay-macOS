@@ -223,6 +223,7 @@ button { color: inherit; }
 }
 .activity-line, .latest-update { display: flex; justify-content: space-between; gap: 12px; font-size: 11px; }
 .activity-line { font-weight: 600; }
+.activity-line span:first-child { min-width: 0; overflow-wrap: anywhere; }
 .latest-update { margin-top: 8px; color: var(--secondary-label); }
 .latest-update strong { color: var(--label); }
 .progress-track { height: 4px; margin-top: 8px; overflow: hidden; border-radius: 99px; background: var(--fill); }

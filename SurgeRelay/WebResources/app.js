@@ -343,7 +343,8 @@ function moduleRow(module) {
 function renderActivity() {
   if (!state) return;
   const activity = state.activity;
-  ui.status.textContent = activity.status || '准备就绪';
+  const autoPublishText = activity.automaticPublishRunsAt ? ` · 自动发布 ${formatTime(activity.automaticPublishRunsAt)}` : '';
+  ui.status.textContent = `${activity.status || '准备就绪'}${autoPublishText}`;
   ui.refresh.disabled = activity.isWorking;
   if (activity.isWorking && activity.progress !== null) {
     const percent = Math.round(activity.progress * 100);
@@ -851,5 +852,6 @@ function highlightCode(text) {
 
 function showToast(message, isError = false) { clearTimeout(toastTimer); ui.toast.textContent = message; ui.toast.classList.toggle('error', isError); ui.toast.classList.add('visible'); toastTimer = setTimeout(() => ui.toast.classList.remove('visible'), 2600); }
 function formatDate(value, fallback = '—') { if (!value) return fallback; const date = new Date(value); if (Number.isNaN(date.valueOf())) return fallback; return new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'medium' }).format(date); }
+function formatTime(value, fallback = '—') { if (!value) return fallback; const date = new Date(value); if (Number.isNaN(date.valueOf())) return fallback; return new Intl.DateTimeFormat('zh-CN', { timeStyle: 'medium' }).format(date); }
 function escapeHTML(value) { return String(value ?? '').replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]); }
 function escapeAttribute(value) { return escapeHTML(value); }
