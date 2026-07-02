@@ -19,6 +19,7 @@ final class AppModel {
     var webAccessToken: String
     var githubTokenStorageStatus: CredentialStorageStatus
     var webAccessTokenStorageStatus: CredentialStorageStatus
+    var keychainAccessProbe: KeychainAccessProbeSnapshot
     var navigationRequest: SidebarDestination?
     /// Set to true to ask the main window to present the in-app settings sheet
     /// (used by the menu bar, the ⌘, command, and the toolbar gear button).
@@ -86,6 +87,7 @@ final class AppModel {
         webAccessToken = webTokenLoad.token
         githubTokenStorageStatus = tokenLoad.storageStatus
         webAccessTokenStorageStatus = webTokenLoad.storageStatus
+        keychainAccessProbe = .notChecked
         selectedModuleID = Self.combinedModuleSelectionID
         let startupMessages = [tokenLoad.statusMessage, webTokenLoad.statusMessage].compactMap { $0 }
         if !startupMessages.isEmpty {
@@ -1508,8 +1510,22 @@ final class AppModel {
     func credentialDiagnostics() -> CredentialDiagnosticSnapshot {
         CredentialDiagnosticSnapshot.current(
             githubTokenStatus: githubTokenStorageStatus,
-            webAccessTokenStatus: webAccessTokenStorageStatus
+            webAccessTokenStatus: webAccessTokenStorageStatus,
+            keychainAccessProbe: keychainAccessProbe
         )
+    }
+
+    func refreshKeychainAccessProbe() {
+        keychainAccessProbe = .checking
+        Task { @MainActor in
+            let snapshot = await Task.detached(priority: .utility) {
+                KeychainAccessProbeSnapshot.current()
+            }.value
+            keychainAccessProbe = snapshot
+            statusMessage = snapshot.state == .available
+                ? "钥匙串读写检查通过"
+                : "钥匙串读写检查失败"
+        }
     }
 
     func localModuleRootDiagnostics() -> LocalModuleRootDiagnosticSnapshot {

@@ -452,15 +452,40 @@ final class SurgeRelayTests: XCTestCase {
     }
 
     func testCredentialDiagnosticsDescribeKeychainAccountsWithoutSecrets() {
+        let checkedAt = Date(timeIntervalSince1970: 1_800)
         let diagnostics = CredentialDiagnosticSnapshot.current(
             githubTokenStatus: .keychain,
-            webAccessTokenStatus: .memoryOnly
+            webAccessTokenStatus: .memoryOnly,
+            keychainAccessProbe: .from(
+                result: KeychainAccessProbeResult(isAvailable: true, message: "钥匙串读写正常。"),
+                checkedAt: checkedAt
+            )
         )
         XCTAssertEqual(diagnostics.keychainService, KeychainStore.defaultService)
+        XCTAssertEqual(diagnostics.keychainAccessState, .available)
+        XCTAssertEqual(diagnostics.keychainAccessStatus, "可用")
+        XCTAssertEqual(diagnostics.keychainAccessMessage, "钥匙串读写正常。")
+        XCTAssertEqual(diagnostics.keychainAccessCheckedAt, checkedAt)
         XCTAssertEqual(diagnostics.githubTokenAccount, KeychainStore.githubTokenAccount)
         XCTAssertEqual(diagnostics.webAccessTokenAccount, KeychainStore.webAccessTokenAccount)
         XCTAssertFalse(diagnostics.note.contains("ghp_"))
         XCTAssertFalse(diagnostics.note.contains("Bearer"))
+    }
+
+    func testKeychainProbeSnapshotDescribesUnavailableAccess() {
+        let checkedAt = Date(timeIntervalSince1970: 2_400)
+        let snapshot = KeychainAccessProbeSnapshot.from(
+            result: KeychainAccessProbeResult(
+                isAvailable: false,
+                message: "钥匙串保存失败：User interaction is not allowed."
+            ),
+            checkedAt: checkedAt
+        )
+
+        XCTAssertEqual(snapshot.state, .unavailable)
+        XCTAssertEqual(snapshot.state.title, "不可用")
+        XCTAssertEqual(snapshot.message, "钥匙串保存失败：User interaction is not allowed.")
+        XCTAssertEqual(snapshot.checkedAt, checkedAt)
     }
 
     func testStorageModeSelectsOnlyItsOwnCombinedOutput() throws {

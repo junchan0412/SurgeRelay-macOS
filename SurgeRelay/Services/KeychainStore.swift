@@ -5,6 +5,7 @@ enum KeychainStore {
     static let defaultService = "com.allenmiao.SurgeRelay"
     static let githubTokenAccount = "github-token"
     static let webAccessTokenAccount = "web-management-token"
+    private static let diagnosticProbeAccountPrefix = "diagnostic-probe"
 
     static func loadGitHubToken() throws -> String {
         try readPassword(account: githubTokenAccount) ?? ""
@@ -87,6 +88,29 @@ enum KeychainStore {
         }
     }
 
+    static func probeAccess(service: String = defaultService) -> KeychainAccessProbeResult {
+        let account = "\(diagnosticProbeAccountPrefix)-\(UUID().uuidString)"
+        let value = "probe-\(UUID().uuidString)"
+        do {
+            try savePassword(value, account: account, service: service)
+            let stored = try readPassword(account: account, service: service)
+            try deletePassword(account: account, service: service)
+            guard stored == value else {
+                return KeychainAccessProbeResult(
+                    isAvailable: false,
+                    message: "钥匙串读写探测失败：读取值与写入值不一致。"
+                )
+            }
+            return KeychainAccessProbeResult(isAvailable: true, message: "钥匙串读写正常。")
+        } catch {
+            try? deletePassword(account: account, service: service)
+            return KeychainAccessProbeResult(
+                isAvailable: false,
+                message: error.localizedDescription
+            )
+        }
+    }
+
     private static func baseQuery(account: String, service: String) -> [String: Any] {
         [
             kSecClass as String: kSecClassGenericPassword,
@@ -102,6 +126,11 @@ enum KeychainStore {
         default: "Surge Relay Password"
         }
     }
+}
+
+struct KeychainAccessProbeResult: Equatable, Sendable {
+    var isAvailable: Bool
+    var message: String
 }
 
 struct KeychainStoreError: LocalizedError, Sendable {

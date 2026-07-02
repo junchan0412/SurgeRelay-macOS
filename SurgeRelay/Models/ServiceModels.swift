@@ -349,8 +349,73 @@ enum CredentialStorageStatus: String, Codable, Equatable, Sendable {
     }
 }
 
+enum KeychainAccessProbeState: String, Codable, Equatable, Sendable {
+    case notChecked
+    case checking
+    case available
+    case unavailable
+
+    var title: String {
+        switch self {
+        case .notChecked: "尚未检查"
+        case .checking: "正在检查"
+        case .available: "可用"
+        case .unavailable: "不可用"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .notChecked: "questionmark.circle"
+        case .checking: "clock"
+        case .available: "checkmark.circle.fill"
+        case .unavailable: "exclamationmark.triangle.fill"
+        }
+    }
+}
+
+struct KeychainAccessProbeSnapshot: Codable, Equatable, Sendable {
+    var state: KeychainAccessProbeState
+    var message: String
+    var checkedAt: Date?
+
+    static let notChecked = KeychainAccessProbeSnapshot(
+        state: .notChecked,
+        message: "尚未主动检查钥匙串读写权限。",
+        checkedAt: nil
+    )
+
+    static let checking = KeychainAccessProbeSnapshot(
+        state: .checking,
+        message: "正在写入、读取并清理临时诊断项。",
+        checkedAt: nil
+    )
+
+    static func current(
+        service: String = KeychainStore.defaultService,
+        checkedAt: Date = .now
+    ) -> KeychainAccessProbeSnapshot {
+        from(result: KeychainStore.probeAccess(service: service), checkedAt: checkedAt)
+    }
+
+    static func from(
+        result: KeychainAccessProbeResult,
+        checkedAt: Date
+    ) -> KeychainAccessProbeSnapshot {
+        KeychainAccessProbeSnapshot(
+            state: result.isAvailable ? .available : .unavailable,
+            message: result.message,
+            checkedAt: checkedAt
+        )
+    }
+}
+
 struct CredentialDiagnosticSnapshot: Codable, Equatable, Sendable {
     var keychainService: String
+    var keychainAccessState: KeychainAccessProbeState
+    var keychainAccessStatus: String
+    var keychainAccessMessage: String
+    var keychainAccessCheckedAt: Date?
     var githubTokenAccount: String
     var githubTokenStatus: String
     var webAccessTokenAccount: String
@@ -359,15 +424,20 @@ struct CredentialDiagnosticSnapshot: Codable, Equatable, Sendable {
 
     static func current(
         githubTokenStatus: CredentialStorageStatus,
-        webAccessTokenStatus: CredentialStorageStatus
+        webAccessTokenStatus: CredentialStorageStatus,
+        keychainAccessProbe: KeychainAccessProbeSnapshot = .notChecked
     ) -> CredentialDiagnosticSnapshot {
         CredentialDiagnosticSnapshot(
             keychainService: KeychainStore.defaultService,
+            keychainAccessState: keychainAccessProbe.state,
+            keychainAccessStatus: keychainAccessProbe.state.title,
+            keychainAccessMessage: keychainAccessProbe.message,
+            keychainAccessCheckedAt: keychainAccessProbe.checkedAt,
             githubTokenAccount: KeychainStore.githubTokenAccount,
             githubTokenStatus: githubTokenStatus.title,
             webAccessTokenAccount: KeychainStore.webAccessTokenAccount,
             webAccessTokenStatus: webAccessTokenStatus.title,
-            note: "Surge Relay 只使用系统钥匙串保存 GitHub Token 和 Web 管理访问令牌，诊断报告不会导出令牌内容。"
+            note: "Surge Relay 只使用系统钥匙串保存 GitHub Token 和 Web 管理访问令牌；主动检查会创建一个临时诊断项并立即删除，诊断报告不会导出令牌内容。"
         )
     }
 }

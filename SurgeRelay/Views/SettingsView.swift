@@ -125,6 +125,21 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
                 }
+                LabeledContent("访问检查") {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Label(credentials.keychainAccessStatus, systemImage: credentials.keychainAccessState.systemImage)
+                            .foregroundStyle(keychainAccessProbeColor(credentials.keychainAccessState))
+                        if let checkedAt = credentials.keychainAccessCheckedAt {
+                            Text(checkedAt.formatted(date: .abbreviated, time: .shortened))
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                }
+                Text(credentials.keychainAccessMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
                 credentialLabel(
                     "GitHub Token",
                     account: credentials.githubTokenAccount,
@@ -138,6 +153,10 @@ struct SettingsView: View {
                 Label(credentials.note, systemImage: "key.fill")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Button("重新检查", systemImage: "arrow.clockwise") {
+                    model.refreshKeychainAccessProbe()
+                }
+                .disabled(credentials.keychainAccessState == .checking)
             }
 
             Section("Web 管理") {
@@ -381,6 +400,9 @@ struct SettingsView: View {
         .task {
             refreshInstallationDiagnostics()
             refreshLocalRootDiagnostics()
+            if model.keychainAccessProbe.state == .notChecked {
+                model.refreshKeychainAccessProbe()
+            }
         }
         .onChange(of: model.settings.localModuleDirectory) { _, _ in
             refreshLocalRootDiagnostics()
@@ -430,6 +452,14 @@ struct SettingsView: View {
 
     private var webAccessTokenStorageColor: Color {
         model.webAccessTokenStorageStatus == .keychain ? .green : .orange
+    }
+
+    private func keychainAccessProbeColor(_ state: KeychainAccessProbeState) -> Color {
+        switch state {
+        case .available: .green
+        case .unavailable: .orange
+        case .checking, .notChecked: .secondary
+        }
     }
 
     private func chooseLocalModuleDirectory() {
@@ -518,10 +548,17 @@ struct SettingsView: View {
     }
 
     private func credentialLabel(_ title: String, account: String, status: String) -> some View {
-        LabeledContent(title) {
+        let storedInKeychain = status == CredentialStorageStatus.keychain.title
+        let needsAttention = status != CredentialStorageStatus.notConfigured.title
+        return LabeledContent(title) {
             VStack(alignment: .trailing, spacing: 2) {
-                Label(status, systemImage: status.contains("钥匙串") ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                    .foregroundStyle(status.contains("钥匙串") ? .green : .secondary)
+                Label(
+                    status,
+                    systemImage: storedInKeychain
+                        ? "checkmark.circle.fill"
+                        : (needsAttention ? "exclamationmark.triangle.fill" : "circle")
+                )
+                .foregroundStyle(storedInKeychain ? .green : (needsAttention ? .orange : .secondary))
                 Text(account)
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
