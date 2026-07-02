@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.32
+
+- Release 打包脚本生成 `.app.zip` 和 `.pkg` payload 时使用无资源 fork、无扩展属性的复制与压缩路径，避免发布包混入本机元数据。
+- Release 验证新增 zip AppleDouble 元数据检查，避免发布包混入 `__MACOSX` 或 `._*` 条目。
+- Release 验证会检查 `.app.zip` 与 `.pkg` payload 中的 App 不带 `com.apple.quarantine` 属性，继续保证更新安装无需重复手动 `xattr -cr`。
+
 ## 1.2.31
 
 - Web 管理普通 API 响应默认增加 `Cache-Control: no-store`、`Pragma: no-cache` 与 `Expires: 0`，避免模块状态、预览内容或错误信息被浏览器缓存。

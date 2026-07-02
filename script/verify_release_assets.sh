@@ -224,6 +224,23 @@ verify_dynamic_library_linkage() {
   ok "verified dynamic library linkage"
 }
 
+verify_zip_metadata_clean() {
+  local entries
+
+  entries="$(zipinfo -1 "$APP_ZIP" | grep -E '(^|/)__MACOSX(/|$)|(^|/)\._' || true)"
+  [[ -z "$entries" ]] || fail "app zip contains AppleDouble metadata: $(echo "$entries" | tr '\n' ' ')"
+  ok "verified app zip metadata"
+}
+
+verify_no_quarantine_xattrs() {
+  local app_path="$1"
+  local label="$2"
+  local matches
+
+  matches="$(xattr -lr "$app_path" 2>/dev/null | grep -F 'com.apple.quarantine' || true)"
+  [[ -z "$matches" ]] || fail "$label contains quarantine xattrs: $(echo "$matches" | head -5 | tr '\n' ' ')"
+}
+
 print_launch_smoke_diagnostics() {
   local label="$1"
   local app_path="$2"
@@ -310,6 +327,7 @@ verify_app_bundle() {
     echo "$verify_output" >&2
     fail "$app_path code signature verification failed"
   fi
+  verify_no_quarantine_xattrs "$app_path" "$app_path"
   signature_detail="$(codesign -dvvv "$app_path" 2>&1)"
   if [[ "$EXPECT_ADHOC_SIGNATURE" == "1" ]]; then
     assert_contains "$app_path signature" "Signature=adhoc" "$signature_detail"
@@ -448,6 +466,7 @@ fi
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
+verify_zip_metadata_clean
 verify_app_zip "$TMP_DIR"
 verify_pkg "$TMP_DIR"
 verify_appcast

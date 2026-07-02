@@ -100,12 +100,12 @@ codesign --force --sign - --timestamp=none "$APP_PATH"
 codesign --verify --deep --strict --verbose=2 "$APP_PATH"
 
 ZIP_PATH="$ARTIFACT_DIR/Surge-Relay-$VERSION.app.zip"
-ditto -c -k --keepParent --sequesterRsrc --zlibCompressionLevel 9 "$APP_PATH" "$ZIP_PATH"
+ditto -c -k --keepParent --norsrc --noextattr --zlibCompressionLevel 9 "$APP_PATH" "$ZIP_PATH"
 
 PKG_ROOT="$DIST_DIR/pkg-root"
 PKG_SCRIPTS="$DIST_DIR/pkg-scripts"
 mkdir -p "$PKG_ROOT/Applications" "$PKG_SCRIPTS"
-ditto "$APP_PATH" "$PKG_ROOT/Applications/Surge Relay.app"
+ditto --norsrc --noextattr "$APP_PATH" "$PKG_ROOT/Applications/Surge Relay.app"
 cat > "$PKG_SCRIPTS/preinstall" <<'SCRIPT'
 #!/bin/sh
 /usr/bin/osascript -e 'tell application id "com.allenmiao.SurgeRelay" to quit' >/dev/null 2>&1 || true
