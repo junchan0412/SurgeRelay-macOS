@@ -14,6 +14,7 @@ ARTIFACT_DIR="${ARTIFACT_DIR:-}"
 APPCAST_PATH=""
 REQUIRE_SPARKLE_SIGNATURES="${REQUIRE_SPARKLE_SIGNATURES:-1}"
 EXPECT_ADHOC_SIGNATURE="${EXPECT_ADHOC_SIGNATURE:-1}"
+EXPECTED_CODESIGN_AUTHORITY="${EXPECTED_CODESIGN_AUTHORITY:-}"
 PKG_SIGNATURE_MODE="${PKG_SIGNATURE_MODE:-unsigned}"
 RUN_LAUNCH_SMOKE_TEST="${RUN_LAUNCH_SMOKE_TEST:-0}"
 
@@ -131,13 +132,23 @@ assert_ad_hoc_signature() {
   assert_contains "$code_path team identifier" "TeamIdentifier=not set" "$signature_detail"
 }
 
-verify_ad_hoc_signature_inventory() {
+assert_expected_codesign_authority() {
+  local code_path="$1"
+  local signature_detail
+
+  signature_detail="$(codesign -dvvv "$code_path" 2>&1)"
+  [[ "$signature_detail" != *"Signature=adhoc"* ]] \
+    || fail "$code_path is ad-hoc signed, expected authority '$EXPECTED_CODESIGN_AUTHORITY'"
+  assert_contains "$code_path authority" "Authority=$EXPECTED_CODESIGN_AUTHORITY" "$signature_detail"
+}
+
+verify_signature_inventory() {
   local app_path="$1"
   local code_path
   local autoupdate_path="$app_path/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate"
   local seen_file="$TMP_DIR/signature-inventory-seen"
 
-  [[ "$EXPECT_ADHOC_SIGNATURE" == "1" ]] || return 0
+  [[ "$EXPECT_ADHOC_SIGNATURE" == "1" || -n "$EXPECTED_CODESIGN_AUTHORITY" ]] || return 0
   : > "$seen_file"
   {
     echo "$app_path"
@@ -149,8 +160,26 @@ verify_ad_hoc_signature_inventory() {
       continue
     fi
     echo "$code_path" >> "$seen_file"
-    assert_ad_hoc_signature "$code_path"
+    if [[ -n "$EXPECTED_CODESIGN_AUTHORITY" ]]; then
+      assert_expected_codesign_authority "$code_path"
+    else
+      assert_ad_hoc_signature "$code_path"
+    fi
   done
+}
+
+verify_self_signed_runtime_entitlements() {
+  local app_path="$1"
+  local signature_detail="$2"
+  local entitlements
+
+  [[ -n "$EXPECTED_CODESIGN_AUTHORITY" ]] || return 0
+  [[ "$signature_detail" == *"TeamIdentifier=not set"* ]] || return 0
+  [[ "$signature_detail" == *"Runtime Version="* ]] || return 0
+
+  entitlements="$(codesign -d --entitlements :- "$app_path" 2>/dev/null || true)"
+  assert_contains "$app_path entitlements" "<key>com.apple.security.cs.disable-library-validation</key>" "$entitlements"
+  assert_contains "$app_path entitlements" "<true/>" "$entitlements"
 }
 
 binary_rpaths() {
@@ -332,7 +361,8 @@ verify_app_bundle() {
   if [[ "$EXPECT_ADHOC_SIGNATURE" == "1" ]]; then
     assert_contains "$app_path signature" "Signature=adhoc" "$signature_detail"
   fi
-  verify_ad_hoc_signature_inventory "$app_path"
+  verify_signature_inventory "$app_path"
+  verify_self_signed_runtime_entitlements "$app_path" "$signature_detail"
 
   archs="$(lipo -archs "$app_path/Contents/MacOS/$APP_NAME")"
   assert_contains "$app_path architectures" "arm64" " $archs "
@@ -432,12 +462,12 @@ verify_appcast() {
   enclosure_length="$(xmllint --xpath "string(/*[local-name()='rss']/*[local-name()='channel']/*[local-name()='item'][1]/*[local-name()='enclosure']/@length)" "$APPCAST_PATH")"
   enclosure_signature="$(xmllint --xpath "string(/*[local-name()='rss']/*[local-name()='channel']/*[local-name()='item'][1]/*[local-name()='enclosure']/@*[local-name()='edSignature'])" "$APPCAST_PATH")"
 
-  expected_length="$(stat -f '%z' "$PKG_PATH")"
-  expected_signature="$(sparkle_attribute "$PKG_SPARKLE" 'sparkle:edSignature')"
+  expected_length="$(stat -f '%z' "$APP_ZIP")"
+  expected_signature="$(sparkle_attribute "$APP_ZIP_SPARKLE" 'sparkle:edSignature')"
   assert_equal "appcast latest title" "$VERSION" "$title"
   assert_equal "appcast sparkle:version" "$BUILD" "$sparkle_version"
   assert_equal "appcast shortVersionString" "$VERSION" "$short_version"
-  assert_contains "appcast enclosure url" "/v$VERSION/Surge-Relay-$VERSION.pkg" "$enclosure_url"
+  assert_contains "appcast enclosure url" "/v$VERSION/Surge-Relay-$VERSION.app.zip" "$enclosure_url"
   assert_equal "appcast enclosure length" "$expected_length" "$enclosure_length"
   assert_equal "appcast enclosure edSignature" "$expected_signature" "$enclosure_signature"
   ok "verified appcast latest item"

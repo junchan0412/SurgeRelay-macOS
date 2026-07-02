@@ -498,11 +498,11 @@ final class SurgeRelayTests: XCTestCase {
 
         XCTAssertFalse(guidance.updateNeedsAttention)
         XCTAssertEqual(guidance.updateSystemImage, "shippingbox")
+        XCTAssertTrue(guidance.updateRecommendation.contains("Sparkle"))
         XCTAssertTrue(guidance.updateRecommendation.contains("pkg"))
-        XCTAssertTrue(guidance.updateRecommendation.contains("xattr -cr"))
         XCTAssertTrue(guidance.firstInstallRecommendation.contains("app.zip"))
-        XCTAssertTrue(guidance.trustNotice.contains("ad-hoc"))
-        XCTAssertTrue(guidance.trustNotice.contains("pkg 未签名"))
+        XCTAssertTrue(guidance.trustNotice.contains("固定自签名证书"))
+        XCTAssertTrue(guidance.trustNotice.contains("EdDSA"))
     }
 
     func testGitHubReleaseInstallGuidanceWarnsWhenPackageIsMissing() throws {
@@ -527,7 +527,7 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertTrue(guidance.updateNeedsAttention)
         XCTAssertEqual(guidance.updateSystemImage, "exclamationmark.triangle.fill")
         XCTAssertTrue(guidance.updateRecommendation.contains("缺少 pkg"))
-        XCTAssertTrue(guidance.updateRecommendation.contains("手动处理隔离属性"))
+        XCTAssertTrue(guidance.updateRecommendation.contains("Sparkle"))
     }
 
     func testPrivateRepositoryRequiresCloudflareAndUsesItWhenConfigured() throws {
@@ -592,6 +592,12 @@ final class SurgeRelayTests: XCTestCase {
             output: "Signature=adhoc\nTeamIdentifier=not set\n"
         ))
         XCTAssertEqual(signature, "ad-hoc 签名，未使用 Developer ID")
+
+        let selfSigned = InstallationDiagnosticSnapshot.signatureSummary(from: .init(
+            status: 0,
+            output: "Authority=Surge Relay Self-Signed Code Signing\nTeamIdentifier=not set\n"
+        ))
+        XCTAssertEqual(selfSigned, "固定证书签名（Surge Relay Self-Signed Code Signing）")
 
         let gatekeeper = InstallationDiagnosticSnapshot.gatekeeperSummary(from: .init(
             status: 1,
@@ -664,6 +670,18 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertEqual(diagnostics.webAccessTokenAccount, KeychainStore.webAccessTokenAccount)
         XCTAssertFalse(diagnostics.note.contains("ghp_"))
         XCTAssertFalse(diagnostics.note.contains("Bearer"))
+    }
+
+    func testCredentialDiagnosticsCanRepresentUncheckedStorage() {
+        let diagnostics = CredentialDiagnosticSnapshot.current(
+            githubTokenStatus: .notChecked,
+            webAccessTokenStatus: .notChecked,
+            keychainAccessProbe: .notChecked
+        )
+
+        XCTAssertEqual(diagnostics.githubTokenStatus, "尚未检查")
+        XCTAssertEqual(diagnostics.webAccessTokenStatus, "尚未检查")
+        XCTAssertEqual(diagnostics.keychainAccessStatus, "尚未检查")
     }
 
     func testKeychainProbeSnapshotDescribesUnavailableAccess() {

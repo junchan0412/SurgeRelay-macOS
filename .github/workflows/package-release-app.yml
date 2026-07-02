@@ -32,18 +32,47 @@ jobs:
           xcodebuild -version
           xcodebuild -showsdks
 
+      - name: Import self-signed signing certificate
+        env:
+          CODESIGN_CERTIFICATE_P12_BASE64: ${{ secrets.CODESIGN_CERTIFICATE_P12_BASE64 }}
+          CODESIGN_CERTIFICATE_PASSWORD: ${{ secrets.CODESIGN_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${CODESIGN_CERTIFICATE_P12_BASE64:-}" ]]; then
+            echo "::error::CODESIGN_CERTIFICATE_P12_BASE64 is required for release signing."
+            exit 66
+          fi
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          KEYCHAIN_PATH="$RUNNER_TEMP/surge-relay-signing.keychain-db"
+          CERTIFICATE_PATH="$RUNNER_TEMP/surge-relay-signing.p12"
+          printf '%s' "$CODESIGN_CERTIFICATE_P12_BASE64" | base64 --decode > "$CERTIFICATE_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" \
+            -k "$KEYCHAIN_PATH" \
+            -P "${CODESIGN_CERTIFICATE_PASSWORD:-}" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+
       - name: Build and verify release assets
         env:
           SPARKLE_ED_KEY: ${{ secrets.SPARKLE_ED_KEY }}
+          CODESIGN_IDENTITY: ${{ vars.CODESIGN_IDENTITY || 'Surge Relay Self-Signed Code Signing' }}
         run: |
           set -euo pipefail
           VERSION="${{ inputs.tag }}"
           VERSION="${VERSION#v}"
           if [[ -z "${SPARKLE_ED_KEY:-}" ]]; then
-            echo "SPARKLE_ED_KEY is not configured; building unsigned Sparkle metadata preview assets."
-            export SKIP_SPARKLE_SIGNING=1
-            export REQUIRE_SPARKLE_SIGNATURES=0
+            echo "::error::SPARKLE_ED_KEY is required for Sparkle EdDSA update signatures."
+            exit 65
           fi
+          export REQUIRE_SPARKLE_SIGNATURES=1
+          export REQUIRE_STABLE_CODESIGN=1
+          export VERIFY_APPCAST=1
           if [[ "${{ inputs.launch_smoke_test }}" == "true" ]]; then
             export RUN_LAUNCH_SMOKE_TEST=1
           fi
@@ -83,6 +112,9 @@ jobs:
       - name: Verify uploaded GitHub Release assets
         env:
           GH_TOKEN: ${{ github.token }}
+          REQUIRE_SPARKLE_SIGNATURES: "1"
+          EXPECT_ADHOC_SIGNATURE: "0"
+          EXPECTED_CODESIGN_AUTHORITY: ${{ vars.CODESIGN_IDENTITY || 'Surge Relay Self-Signed Code Signing' }}
         run: |
           set -euo pipefail
           VERSION="${{ inputs.tag }}"

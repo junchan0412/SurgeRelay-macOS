@@ -51,7 +51,8 @@ struct MenuBarContent: View {
         Divider()
 
         Button("打开 Surge Relay") { activateMainWindow() }
-        CheckForUpdatesView {
+        CheckForUpdatesView()
+        Button("查看 GitHub Release 资产…") {
             activateMainWindow()
             model.presentsUpdateChecker = true
         }

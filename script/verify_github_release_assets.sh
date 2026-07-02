@@ -153,6 +153,10 @@ require_tool shasum
 for asset in "$APP_ZIP" "$APP_ZIP_SHA" "$PKG" "$PKG_SHA"; do
   verify_required_asset_exists "$asset"
 done
+if [[ "$REQUIRE_SPARKLE_SIGNATURES" == "1" ]]; then
+  verify_required_asset_exists "$APP_ZIP.sparkle.txt"
+  verify_required_asset_exists "$PKG.sparkle.txt"
+fi
 ok "verified GitHub release asset list"
 
 TMP_DIR="$(mktemp -d)"

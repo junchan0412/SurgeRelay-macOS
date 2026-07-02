@@ -391,6 +391,9 @@ struct SettingsView: View {
                         .textSelection(.enabled)
                 }
             }
+            .onAppear {
+                model.ensureGitHubTokenLoaded()
+            }
 
             if model.settings.github.repositoryIsPrivate == true {
                 Section("Cloudflare Worker") {
@@ -457,9 +460,6 @@ struct SettingsView: View {
         .task {
             refreshInstallationDiagnostics()
             refreshLocalRootDiagnostics()
-            if model.keychainAccessProbe.state == .notChecked {
-                model.refreshKeychainAccessProbe()
-            }
         }
         .onChange(of: model.settings.localModuleDirectory) { _, _ in
             refreshLocalRootDiagnostics()
@@ -502,13 +502,19 @@ struct SettingsView: View {
     }
 
     private var webAccessTokenStorageImage: String {
-        model.webAccessTokenStorageStatus == .keychain
-            ? "key.fill"
-            : "exclamationmark.triangle.fill"
+        switch model.webAccessTokenStorageStatus {
+        case .keychain: "key.fill"
+        case .notChecked, .notConfigured: "questionmark.circle"
+        case .legacyConfigurationFallback, .memoryOnly, .unavailable: "exclamationmark.triangle.fill"
+        }
     }
 
     private var webAccessTokenStorageColor: Color {
-        model.webAccessTokenStorageStatus == .keychain ? .green : .orange
+        switch model.webAccessTokenStorageStatus {
+        case .keychain: .green
+        case .notChecked, .notConfigured: .secondary
+        case .legacyConfigurationFallback, .memoryOnly, .unavailable: .orange
+        }
     }
 
     private func keychainAccessProbeColor(_ state: KeychainAccessProbeState) -> Color {
@@ -606,16 +612,17 @@ struct SettingsView: View {
 
     private func credentialLabel(_ title: String, account: String, status: String) -> some View {
         let storedInKeychain = status == CredentialStorageStatus.keychain.title
-        let needsAttention = status != CredentialStorageStatus.notConfigured.title
+        let neutral = status == CredentialStorageStatus.notConfigured.title ||
+            status == CredentialStorageStatus.notChecked.title
         return LabeledContent(title) {
             VStack(alignment: .trailing, spacing: 2) {
                 Label(
                     status,
                     systemImage: storedInKeychain
                         ? "checkmark.circle.fill"
-                        : (needsAttention ? "exclamationmark.triangle.fill" : "circle")
+                        : (neutral ? "questionmark.circle" : "exclamationmark.triangle.fill")
                 )
-                .foregroundStyle(storedInKeychain ? .green : (needsAttention ? .orange : .secondary))
+                .foregroundStyle(storedInKeychain ? .green : (neutral ? .secondary : .orange))
                 Text(account)
                     .font(.caption2)
                     .foregroundStyle(.tertiary)

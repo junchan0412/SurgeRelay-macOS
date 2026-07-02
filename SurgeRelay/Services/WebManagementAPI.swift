@@ -26,7 +26,6 @@ enum WebManagementAPI {
                     ]
                 )
             case ("GET", "/api/state"):
-                await model.refreshModuleOutputFolders()
                 return .json(statePayload(model: model))
             case ("POST", "/api/update-all"):
                 let admission = model.updateAdmission

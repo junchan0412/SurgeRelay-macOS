@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.38
+
+- 重新启用 Sparkle 2 App 内更新通道，“查看更新…”会优先使用 Sparkle；GitHub Release 资产面板保留为手动安装和诊断备用。
+- Release 打包支持固定自签名 Code Signing 证书，正式构建可要求 `REQUIRE_STABLE_CODESIGN=1`，验证会检查 App 与 Sparkle 嵌入组件使用同一签名身份。
+- 自签名 Hardened Runtime 发布包会给主 App 加入 `disable-library-validation` entitlement，避免 Sparkle framework 因自签名身份没有 Team ID 而在启动阶段被 dyld 拒绝。
+- Release 构建可用 `.app.zip` 的 Sparkle EdDSA 签名更新 `appcast.xml`，GitHub Actions 正式打包要求 Sparkle 私钥和自签名证书 `.p12` secret。
+- GitHub Token 与 Web 管理令牌改为按需读取/创建，启动和普通本地模式不再主动访问钥匙串；钥匙串诊断只在用户手动点击“重新检查”时执行。
+
 ## 1.2.37
 
 - 后台任务新增取消请求状态，模块更新、本地扫描/导入、Script-Hub 检查、GitHub 测试、发布预览、确认发布和自动发布会在安全边界尽快停止。

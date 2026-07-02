@@ -83,23 +83,17 @@ final class AppModel {
             PersistenceStore.loadModules(),
             combinedFileName: loadedSettings.combinedModuleFileName
         )
-        let tokenLoad = Self.loadGitHubToken(migratingLegacyToken: loadedSettings.githubToken)
-        let webTokenLoad = Self.loadWebAccessToken()
-        loadedSettings.githubToken = tokenLoad.shouldClearLegacyToken ? "" : loadedSettings.githubToken
+        let legacyGitHubToken = loadedSettings.githubToken.trimmingCharacters(in: .whitespacesAndNewlines)
         modules = loadedModules
         settings = loadedSettings
         upstreamState = PersistenceStore.loadUpstreamState()
         updateHistory = PersistenceStore.loadUpdateHistory()
-        githubToken = tokenLoad.token
-        webAccessToken = webTokenLoad.token
-        githubTokenStorageStatus = tokenLoad.storageStatus
-        webAccessTokenStorageStatus = webTokenLoad.storageStatus
+        githubToken = legacyGitHubToken
+        webAccessToken = ""
+        githubTokenStorageStatus = legacyGitHubToken.isEmpty ? .notChecked : .legacyConfigurationFallback
+        webAccessTokenStorageStatus = .notChecked
         keychainAccessProbe = .notChecked
         selectedModuleID = Self.combinedModuleSelectionID
-        let startupMessages = [tokenLoad.statusMessage, webTokenLoad.statusMessage].compactMap { $0 }
-        if !startupMessages.isEmpty {
-            statusMessage = startupMessages.joined(separator: "；")
-        }
         PersistenceStore.saveSettings(loadedSettings)
         try? PersistenceStore.saveModules(loadedModules)
     }
@@ -176,6 +170,42 @@ final class AppModel {
         }
         return UUID().uuidString.replacingOccurrences(of: "-", with: "")
             + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+    }
+
+    @discardableResult
+    func ensureGitHubTokenLoaded(showStatusMessage: Bool = false) -> String {
+        let legacyToken = settings.githubToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        let shouldLoad = githubTokenStorageStatus == .notChecked ||
+            (githubTokenStorageStatus == .legacyConfigurationFallback && !legacyToken.isEmpty)
+        guard shouldLoad else {
+            return githubToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        let tokenLoad = Self.loadGitHubToken(migratingLegacyToken: settings.githubToken)
+        githubToken = tokenLoad.token
+        githubTokenStorageStatus = tokenLoad.storageStatus
+        if tokenLoad.shouldClearLegacyToken {
+            settings.githubToken = ""
+            PersistenceStore.saveSettings(settings)
+        }
+        if showStatusMessage, let message = tokenLoad.statusMessage {
+            statusMessage = message
+        }
+        return tokenLoad.token.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    @discardableResult
+    private func ensureWebAccessTokenLoaded(showStatusMessage: Bool = false) -> String {
+        let current = webAccessToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard current.isEmpty || webAccessTokenStorageStatus == .notChecked else { return current }
+
+        let tokenLoad = Self.loadWebAccessToken()
+        webAccessToken = tokenLoad.token
+        webAccessTokenStorageStatus = tokenLoad.storageStatus
+        if showStatusMessage, let message = tokenLoad.statusMessage {
+            statusMessage = message
+        }
+        return tokenLoad.token.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     func resetWebAccessToken() {
@@ -334,20 +364,16 @@ final class AppModel {
             return
         }
 
-        if webAccessToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            webAccessToken = Self.generateWebAccessToken()
-            do {
-                try KeychainStore.saveWebAccessToken(webAccessToken)
-                webAccessTokenStorageStatus = .keychain
-            } catch {
-                webAccessTokenStorageStatus = .memoryOnly
-            }
+        let token = ensureWebAccessTokenLoaded(showStatusMessage: true)
+        guard !token.isEmpty else {
+            webServerState = .failed("无法生成 Web 管理访问令牌。")
+            return
         }
 
         let configuration = WebServerConfiguration(
             port: port,
             allowRemoteAccess: settings.webServerAllowRemoteAccess,
-            accessToken: webAccessToken
+            accessToken: token
         )
         do {
             try webServer.start(
@@ -605,7 +631,8 @@ final class AppModel {
             return
         }
         do {
-            let folders = try await githubClient.listDirectories(settings: settings.github, token: githubToken)
+            let token = githubTokenStorageStatus == .notChecked ? "" : githubToken
+            let folders = try await githubClient.listDirectories(settings: settings.github, token: token)
             githubModuleOutputFolders = ModuleOutputFolder.options(
                 from: folders + modules.map(\.outputFolder)
             )
@@ -823,6 +850,7 @@ final class AppModel {
 
         if settings.github.repositoryIsPrivate == nil,
            settings.github.isConfigured,
+           githubTokenStorageStatus != .notChecked,
            !githubToken.isEmpty,
            let isPrivate = try? await githubClient.test(settings: settings.github, token: githubToken) {
             settings.github.repositoryIsPrivate = isPrivate
@@ -1006,7 +1034,8 @@ final class AppModel {
             guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
             await cleanupLegacyOutputFiles()
             guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
-            if settings.storageMode == .gitHub, settings.automaticallyPublish, settings.github.isConfigured, !githubToken.isEmpty {
+            if settings.storageMode == .gitHub, settings.automaticallyPublish, settings.github.isConfigured,
+               !ensureGitHubTokenLoaded(showStatusMessage: false).isEmpty {
                 if contentChanged {
                     scheduleAutomaticPublish()
                     statusMessage = failures == 0
@@ -1056,7 +1085,8 @@ final class AppModel {
     }
 
     private func scheduleAutomaticPublish() {
-        guard settings.storageMode == .gitHub, settings.automaticallyPublish, settings.github.isConfigured, !githubToken.isEmpty else { return }
+        guard settings.storageMode == .gitHub, settings.automaticallyPublish, settings.github.isConfigured else { return }
+        guard !ensureGitHubTokenLoaded(showStatusMessage: false).isEmpty else { return }
         automaticPublishTask?.cancel()
         let scheduledAt = Date.now
         automaticPublishScheduledAt = scheduledAt
@@ -1070,8 +1100,11 @@ final class AppModel {
             guard !Task.isCancelled,
                   self.settings.storageMode == .gitHub,
                   self.settings.automaticallyPublish,
-                  self.settings.github.isConfigured,
-                  !self.githubToken.isEmpty else {
+                  self.settings.github.isConfigured else {
+                self.clearAutomaticPublishSchedule()
+                return
+            }
+            guard !self.ensureGitHubTokenLoaded(showStatusMessage: false).isEmpty else {
                 self.clearAutomaticPublishSchedule()
                 return
             }
@@ -1147,7 +1180,9 @@ final class AppModel {
         if showProgress { beginWork(.testingGitHub) }
         defer { if showProgress { endWork(.testingGitHub) } }
         do {
-            let isPrivate = try await githubClient.test(settings: settings.github, token: githubToken)
+            let token = ensureGitHubTokenLoaded(showStatusMessage: showProgress)
+            guard !token.isEmpty else { throw RelayError.githubTokenMissing }
+            let isPrivate = try await githubClient.test(settings: settings.github, token: token)
             if showProgress {
                 guard shouldContinueCurrentWork() else { return }
             }
@@ -1251,7 +1286,9 @@ final class AppModel {
     private func githubPublishPreview() async throws -> PublishPreview {
         try checkCurrentWorkCancellation()
         try Task.checkCancellation()
-        let isPrivate = try await githubClient.test(settings: settings.github, token: githubToken)
+        let token = ensureGitHubTokenLoaded(showStatusMessage: false)
+        guard !token.isEmpty else { throw RelayError.githubTokenMissing }
+        let isPrivate = try await githubClient.test(settings: settings.github, token: token)
         try checkCurrentWorkCancellation()
         try Task.checkCancellation()
         if settings.github.repositoryIsPrivate != isPrivate {
@@ -1271,7 +1308,7 @@ final class AppModel {
             files: files,
             deleting: stalePaths,
             settings: settings.github,
-            token: githubToken
+            token: token
         )
         return PublishPreview(
             destination: .gitHub,
@@ -1285,7 +1322,9 @@ final class AppModel {
     private func publishAllInternal(allowDeleting: Bool = true) async throws -> PublishReport {
         try checkCurrentWorkCancellation()
         try Task.checkCancellation()
-        let isPrivate = try await githubClient.test(settings: settings.github, token: githubToken)
+        let token = ensureGitHubTokenLoaded(showStatusMessage: false)
+        guard !token.isEmpty else { throw RelayError.githubTokenMissing }
+        let isPrivate = try await githubClient.test(settings: settings.github, token: token)
         try checkCurrentWorkCancellation()
         try Task.checkCancellation()
         if settings.github.repositoryIsPrivate != isPrivate {
@@ -1309,7 +1348,7 @@ final class AppModel {
             files: files,
             deleting: stalePaths,
             settings: settings.github,
-            token: githubToken
+            token: token
         )
         if staleCandidates.isEmpty || allowDeleting {
             settings.githubPublishedRepositoryKey = repositoryKey

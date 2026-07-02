@@ -3,6 +3,23 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.2.38</title>
+            <pubDate>Fri, 03 Jul 2026 00:02:32 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.2.38</link>
+            <sparkle:version>40</sparkle:version>
+            <sparkle:shortVersionString>1.2.38</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.2.38
+
+
+- 重新启用 Sparkle 2 App 内更新通道，“查看更新…”会优先使用 Sparkle；GitHub Release 资产面板保留为手动安装和诊断备用。
+- Release 打包支持固定自签名 Code Signing 证书，正式构建可要求 `REQUIRE_STABLE_CODESIGN=1`，验证会检查 App 与 Sparkle 嵌入组件使用同一签名身份。
+- Release 构建可用 `.app.zip` 的 Sparkle EdDSA 签名更新 `appcast.xml`，GitHub Actions 正式打包要求 Sparkle 私钥和自签名证书 `.p12` secret。
+- GitHub Token 与 Web 管理令牌改为按需读取/创建，启动和普通本地模式不再主动访问钥匙串；钥匙串诊断只在用户手动点击“重新检查”时执行。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.2.38/Surge-Relay-1.2.38.app.zip" length="8114281" type="application/zip" sparkle:edSignature="qQH3c2jbsGH80KN9No16O4pCVJYgxTMuKBZEVIPkp815+0uUap37nw0NxA/8OV5H2wu63xIPJunQJpTFnupCCQ=="/>
+        </item>
+        <item>
             <title>1.2.3</title>
             <pubDate>Thu, 02 Jul 2026 02:21:00 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.2.3</link>

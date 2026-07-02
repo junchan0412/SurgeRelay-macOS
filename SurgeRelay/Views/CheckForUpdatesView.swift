@@ -1,13 +1,35 @@
 import AppKit
+import Sparkle
 import SwiftUI
+
+@MainActor
+final class SparkleUpdateController {
+    static let shared = SparkleUpdateController()
+
+    private let controller = SPUStandardUpdaterController(
+        startingUpdater: true,
+        updaterDelegate: nil,
+        userDriverDelegate: nil
+    )
+
+    private init() {}
+
+    func start() {}
+
+    func checkForUpdates() {
+        controller.checkForUpdates(nil)
+    }
+}
 
 struct CheckForUpdatesView: View {
     var action: () -> Void
 
-    init(action: @escaping () -> Void = {
-        NSWorkspace.shared.open(ReleaseUpdateChannel.latestReleaseURL)
-    }) {
-        self.action = action
+    init(action: (() -> Void)? = nil) {
+        self.action = action ?? {
+            Task { @MainActor in
+                SparkleUpdateController.shared.checkForUpdates()
+            }
+        }
     }
 
     var body: some View {
@@ -252,12 +274,12 @@ struct GitHubRelease: Decodable, Equatable, Sendable {
     var installGuidance: ReleaseInstallGuidance {
         ReleaseInstallGuidance(
             updateRecommendation: packageAsset == nil
-                ? "此 Release 缺少 pkg 更新包；使用 app.zip 更新前请先查看 Release 说明，可能需要手动处理隔离属性。"
-                : "更新已有安装请优先使用 pkg；安装器会替换 /Applications/Surge Relay.app 并清除隔离属性，后续无需手动运行 xattr -cr。",
+                ? "后续更新优先使用 App 内 Sparkle；此 Release 缺少 pkg 手动更新包，请只在首次安装或排障时使用 app.zip。"
+                : "后续更新优先使用 App 内 Sparkle；手动更新已有安装时可使用 pkg，安装器会替换 /Applications/Surge Relay.app 并清除隔离属性。",
             firstInstallRecommendation: appZipAsset == nil
                 ? "此 Release 缺少 app.zip；首次安装请使用 pkg 或打开 Release 页面查看说明。"
                 : "首次安装可使用 app.zip；如果 macOS 首次拦截，可右键打开或按文档处理一次隔离属性。",
-            trustNotice: "当前发布资产为 ad-hoc 签名，未做 Developer ID 公证；pkg 未签名，macOS 拦截安装器时可在 Finder 中右键打开。",
+            trustNotice: "当前发布资产使用固定自签名证书和 Sparkle EdDSA 更新签名，未做 Developer ID 公证；首次手动安装仍可能需要信任一次。",
             updateSystemImage: packageAsset == nil ? "exclamationmark.triangle.fill" : "shippingbox",
             updateNeedsAttention: packageAsset == nil
         )

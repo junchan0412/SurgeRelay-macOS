@@ -12,7 +12,10 @@ struct SurgeRelayApp: App {
         Window("Surge Relay", id: SurgeRelayWindow.main) {
             RootView()
                 .environment(model)
-                .task { model.start() }
+                .task {
+                    SparkleUpdateController.shared.start()
+                    model.start()
+                }
                 .frame(minWidth: 700)
         }
         .windowStyle(.automatic)
@@ -21,7 +24,8 @@ struct SurgeRelayApp: App {
         .defaultSize(width: 1240, height: 760)
         .commands {
             CommandGroup(after: .appInfo) {
-                CheckForUpdatesView {
+                CheckForUpdatesView()
+                Button("查看 GitHub Release 资产…") {
                     model.presentsUpdateChecker = true
                 }
             }

@@ -610,6 +610,13 @@ struct InstallationDiagnosticSnapshot: Codable, Equatable, Sendable {
     static func signatureSummary(from result: CommandResult) -> String {
         guard result.status == 0 else { return "无法读取签名信息" }
         if result.output.contains("Signature=adhoc") { return "ad-hoc 签名，未使用 Developer ID" }
+        if let authority = firstCapture(in: result.output, pattern: #"Authority=([^\n]+)"#),
+           !authority.isEmpty {
+            if authority.contains("Developer ID") {
+                return authority
+            }
+            return "固定证书签名（\(authority)）"
+        }
         if let team = firstCapture(in: result.output, pattern: #"TeamIdentifier=([^\n]+)"#),
            team != "not set" {
             return "Developer ID 或团队签名（Team \(team)）"
@@ -632,8 +639,8 @@ struct InstallationDiagnosticSnapshot: Codable, Equatable, Sendable {
 
     static func updateRecommendation(automaticChecksEnabled: Bool) -> String {
         automaticChecksEnabled
-            ? "App 内自动检查更新已开启；如果 Sparkle appcast 未同步最新 Release，请优先使用 GitHub Release 中的 pkg。"
-            : "App 内 Sparkle 自动检查更新已关闭；当前“查看更新…”会打开 GitHub Releases，推荐使用 pkg 更新，安装器会自动清除隔离属性。"
+            ? "App 内 Sparkle 自动检查更新已开启；后续更新会优先通过已签名 appcast 完成，避免反复手动下载新包。"
+            : "App 内 Sparkle 自动检查更新已关闭；手动从浏览器下载新版仍可能带隔离属性。"
     }
 
     static func recentCrashReports(
@@ -711,6 +718,7 @@ struct InstallationDiagnosticSnapshot: Codable, Equatable, Sendable {
 }
 
 enum CredentialStorageStatus: String, Codable, Equatable, Sendable {
+    case notChecked
     case keychain
     case notConfigured
     case legacyConfigurationFallback
@@ -719,6 +727,7 @@ enum CredentialStorageStatus: String, Codable, Equatable, Sendable {
 
     var title: String {
         switch self {
+        case .notChecked: "尚未检查"
         case .keychain: "已保存到系统钥匙串"
         case .notConfigured: "未配置"
         case .legacyConfigurationFallback: "钥匙串不可用，暂用旧配置"
