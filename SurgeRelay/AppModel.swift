@@ -412,6 +412,7 @@ final class AppModel {
             try PersistenceStore.saveModules(modules)
             PersistenceStore.saveSettings(settings)
             PersistenceStore.saveUpstreamState(upstreamState)
+            PersistenceStore.saveUpdateHistory(updateHistory)
             statusMessage = "配置和手动编辑内容已迁移到新的同步目录"
         } catch {
             presentedError = "无法更改配置目录：\(error.localizedDescription)"

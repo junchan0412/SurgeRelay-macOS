@@ -3,6 +3,22 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.2.41</title>
+            <pubDate>Fri, 03 Jul 2026 03:08:26 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.2.41</link>
+            <sparkle:version>43</sparkle:version>
+            <sparkle:shortVersionString>1.2.41</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.2.41
+
+
+- 更改“配置储存目录”时会迁移完整的 Surge Relay 管理数据，包括 `modules.json`、`settings.json`、`script-hub-state.json`、`update-history.json`、`Backups` 和 `Overrides`。
+- 目标目录已有配置文件时会先保存到 `Backups/configuration-migration/`，再写入迁移后的版本，避免静默覆盖。
+- 迁移成功后会从旧配置目录移除 Surge Relay 自己的配置文件和管理目录，让 Surge 根目录保持干净；原始 `.sgmodule`、`Surge.conf` 和分类文件夹不会被清理逻辑触碰。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.2.41/Surge-Relay-1.2.41.app.zip" length="8135909" type="application/zip" sparkle:edSignature="t4OuD98NMboKAqm6CwcTSrow88kN256q+6OY823/BC9jdPknso5pFQmDWEP6laGRqaxjyKMmmEs6L66IJwr3DA=="/>
+        </item>
+        <item>
             <title>1.2.40</title>
             <pubDate>Fri, 03 Jul 2026 02:24:39 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.2.40</link>

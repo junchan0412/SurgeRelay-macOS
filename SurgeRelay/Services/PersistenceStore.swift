@@ -4,6 +4,16 @@ enum PersistenceStore {
     private static let configurationDirectoryKey = "SurgeRelay.configurationDirectory.v1"
     private static let legacySettingsKey = "SurgeRelay.settings.v1"
     private static let legacyUpstreamKey = "SurgeRelay.upstream.v1"
+    private static let configurationFileNames = [
+        "modules.json",
+        "settings.json",
+        "script-hub-state.json",
+        "update-history.json"
+    ]
+    private static let configurationDirectoryNames = [
+        "Backups",
+        "Overrides"
+    ]
 
     static var configurationDirectoryURL: URL {
         let path = UserDefaults.standard.string(forKey: configurationDirectoryKey)
@@ -99,20 +109,105 @@ enum PersistenceStore {
         let sourceDirectory = configurationDirectoryURL
         let directory = URL(filePath: trimmed, directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        try migrateOverrides(from: sourceDirectory, to: directory)
+        try migrateConfigurationFiles(from: sourceDirectory, to: directory)
         UserDefaults.standard.set(directory.path, forKey: configurationDirectoryKey)
+        try removeMigratedConfigurationFiles(from: sourceDirectory, to: directory)
     }
 
-    static func migrateOverrides(from sourceDirectory: URL, to destinationDirectory: URL) throws {
+    static func migrateConfigurationFiles(from sourceDirectory: URL, to destinationDirectory: URL) throws {
         let sourceDirectory = sourceDirectory.standardizedFileURL
         let destinationDirectory = destinationDirectory.standardizedFileURL
         guard sourceDirectory != destinationDirectory else { return }
 
         let fileManager = FileManager.default
-        let sourceRoot = sourceDirectory.appending(path: "Overrides", directoryHint: .isDirectory)
+        try fileManager.createDirectory(at: destinationDirectory, withIntermediateDirectories: true)
+
+        for fileName in configurationFileNames {
+            try copyConfigurationFileIfNeeded(
+                named: fileName,
+                from: sourceDirectory,
+                to: destinationDirectory
+            )
+        }
+        for directoryName in configurationDirectoryNames {
+            try copyConfigurationDirectoryIfNeeded(
+                named: directoryName,
+                from: sourceDirectory,
+                to: destinationDirectory
+            )
+        }
+    }
+
+    static func removeMigratedConfigurationFiles(from sourceDirectory: URL, to destinationDirectory: URL) throws {
+        let sourceDirectory = sourceDirectory.standardizedFileURL
+        let destinationDirectory = destinationDirectory.standardizedFileURL
+        guard sourceDirectory != destinationDirectory else { return }
+
+        let fileManager = FileManager.default
+        for fileName in configurationFileNames {
+            let sourceURL = sourceDirectory.appending(path: fileName)
+            let destinationURL = destinationDirectory.appending(path: fileName)
+            guard sourceURL.standardizedFileURL != destinationURL.standardizedFileURL,
+                  fileManager.fileExists(atPath: sourceURL.path) else {
+                continue
+            }
+            try fileManager.removeItem(at: sourceURL)
+        }
+
+        for directoryName in configurationDirectoryNames {
+            let sourceURL = sourceDirectory.appending(path: directoryName, directoryHint: .isDirectory)
+            guard fileManager.fileExists(atPath: sourceURL.path),
+                  !destinationDirectory.isDescendant(of: sourceURL) else {
+                continue
+            }
+            try fileManager.removeItem(at: sourceURL)
+        }
+    }
+
+    static func migrateOverrides(from sourceDirectory: URL, to destinationDirectory: URL) throws {
+        try copyConfigurationDirectoryIfNeeded(
+            named: "Overrides",
+            from: sourceDirectory.standardizedFileURL,
+            to: destinationDirectory.standardizedFileURL
+        )
+    }
+
+    private static func copyConfigurationFileIfNeeded(
+        named fileName: String,
+        from sourceDirectory: URL,
+        to destinationDirectory: URL
+    ) throws {
+        let fileManager = FileManager.default
+        let sourceURL = sourceDirectory.appending(path: fileName)
+        guard fileManager.fileExists(atPath: sourceURL.path) else { return }
+
+        let destinationURL = destinationDirectory.appending(path: fileName)
+        try fileManager.createDirectory(
+            at: destinationURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let sourceData = try Data(contentsOf: sourceURL)
+        if let destinationData = try? Data(contentsOf: destinationURL) {
+            guard destinationData != sourceData else { return }
+            try backupExistingDestinationFile(destinationURL, data: destinationData, root: destinationDirectory)
+        }
+        try sourceData.write(to: destinationURL, options: .atomic)
+    }
+
+    private static func copyConfigurationDirectoryIfNeeded(
+        named directoryName: String,
+        from sourceDirectory: URL,
+        to destinationDirectory: URL
+    ) throws {
+        let sourceDirectory = sourceDirectory.standardizedFileURL
+        let destinationDirectory = destinationDirectory.standardizedFileURL
+        guard sourceDirectory != destinationDirectory else { return }
+
+        let fileManager = FileManager.default
+        let sourceRoot = sourceDirectory.appending(path: directoryName, directoryHint: .isDirectory)
         guard fileManager.fileExists(atPath: sourceRoot.path) else { return }
 
-        let destinationRoot = destinationDirectory.appending(path: "Overrides", directoryHint: .isDirectory)
+        let destinationRoot = destinationDirectory.appending(path: directoryName, directoryHint: .isDirectory)
         try fileManager.createDirectory(at: destinationRoot, withIntermediateDirectories: true)
         for relativePath in try fileManager.subpathsOfDirectory(atPath: sourceRoot.path) {
             let sourceURL = sourceRoot.appending(path: relativePath)
@@ -125,9 +220,28 @@ enum PersistenceStore {
                     at: destinationURL.deletingLastPathComponent(),
                     withIntermediateDirectories: true
                 )
-                try Data(contentsOf: sourceURL).write(to: destinationURL, options: .atomic)
+                let sourceData = try Data(contentsOf: sourceURL)
+                if let destinationData = try? Data(contentsOf: destinationURL),
+                   destinationData != sourceData {
+                    try backupExistingDestinationFile(destinationURL, data: destinationData, root: destinationDirectory)
+                }
+                try sourceData.write(to: destinationURL, options: .atomic)
             }
         }
+    }
+
+    private static func backupExistingDestinationFile(_ url: URL, data: Data, root: URL) throws {
+        let relativePath = url.standardizedFileURL.path
+            .replacingOccurrences(of: root.standardizedFileURL.path + "/", with: "")
+            .replacingOccurrences(of: "/", with: "__")
+        let directory = root
+            .appending(path: "Backups", directoryHint: .isDirectory)
+            .appending(path: "configuration-migration", directoryHint: .isDirectory)
+            .appending(path: relativePath, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let stamp = ISO8601DateFormatter().string(from: .now).replacingOccurrences(of: ":", with: "-")
+        let destination = directory.appending(path: "\(stamp)-\(UUID().uuidString.prefix(6)).backup")
+        try data.write(to: destination, options: .atomic)
     }
 
     private static func decodeFile<Value: Decodable>(at url: URL) -> Value? {
@@ -208,5 +322,17 @@ enum PersistenceStore {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return decoder
+    }
+}
+
+private extension URL {
+    func isDescendant(of ancestor: URL) -> Bool {
+        let ancestorPath = ancestor.standardizedFileURL.path.hasSuffix("/")
+            ? ancestor.standardizedFileURL.path
+            : ancestor.standardizedFileURL.path + "/"
+        let path = standardizedFileURL.path.hasSuffix("/")
+            ? standardizedFileURL.path
+            : standardizedFileURL.path + "/"
+        return path.hasPrefix(ancestorPath)
     }
 }

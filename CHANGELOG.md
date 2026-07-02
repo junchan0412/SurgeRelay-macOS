@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.41
+
+- 更改“配置储存目录”时会迁移完整的 Surge Relay 管理数据，包括 `modules.json`、`settings.json`、`script-hub-state.json`、`update-history.json`、`Backups` 和 `Overrides`。
+- 目标目录已有配置文件时会先保存到 `Backups/configuration-migration/`，再写入迁移后的版本，避免静默覆盖。
+- 迁移成功后会从旧配置目录移除 Surge Relay 自己的配置文件和管理目录，让 Surge 根目录保持干净；原始 `.sgmodule`、`Surge.conf` 和分类文件夹不会被清理逻辑触碰。
+
 ## 1.2.40
 
 - 本地根目录已有 `file://` 模块仍保留独立发布开关，GitHub 发布时可以继续按同一文件夹逻辑生成独立模块。
