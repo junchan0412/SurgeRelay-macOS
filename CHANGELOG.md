@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.23
+
+- Release 打包脚本不再硬编码默认版本号，改为从 `project.yml` 读取 `MARKETING_VERSION` 和 `CURRENT_PROJECT_VERSION`，减少发布时漏改脚本版本的风险。
+- 打包前会校验传入的 `VERSION`/`BUILD` 与项目版本一致，并确认 Xcode 工程中的版本号已同步；CI 或本地 tag 填错会在构建前失败。
+- Release 校验调用会显式传入版本号与构建号，避免 `.app.zip`、`.pkg` 和项目元数据之间出现隐性漂移。
+
 ## 1.2.22
 
 - App 内 GitHub Release 更新面板新增“安装建议”，会明确提示更新已有安装优先使用 `pkg`，安装器会清除隔离属性，后续无需手动运行 `xattr -cr`。

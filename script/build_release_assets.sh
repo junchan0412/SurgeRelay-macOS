@@ -2,7 +2,21 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-VERSION="${VERSION:-1.2.22}"
+
+project_value() {
+  local key="$1"
+  awk -F': *' -v key="$key" '$1 ~ key { gsub(/"/, "", $2); print $2; exit }' "$ROOT_DIR/project.yml"
+}
+
+fail() {
+  echo "error: $*" >&2
+  exit 1
+}
+
+PROJECT_VERSION="$(project_value MARKETING_VERSION)"
+PROJECT_BUILD="$(project_value CURRENT_PROJECT_VERSION)"
+VERSION="${VERSION:-$PROJECT_VERSION}"
+BUILD="${BUILD:-$PROJECT_BUILD}"
 DERIVED_DATA="$ROOT_DIR/build/DerivedDataRelease"
 SOURCE_PACKAGES="$ROOT_DIR/build/SourcePackages"
 DIST_DIR="$ROOT_DIR/dist/release-v$VERSION"
@@ -12,6 +26,17 @@ SPARKLE_ED_KEY="${SPARKLE_ED_KEY:-}"
 SKIP_SPARKLE_SIGNING="${SKIP_SPARKLE_SIGNING:-0}"
 REQUIRE_SPARKLE_SIGNATURES="${REQUIRE_SPARKLE_SIGNATURES:-1}"
 SPARKLE_SIGN_UPDATE="$ROOT_DIR/build/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update"
+
+[[ -n "$PROJECT_VERSION" ]] || fail "project.yml is missing MARKETING_VERSION"
+[[ -n "$PROJECT_BUILD" ]] || fail "project.yml is missing CURRENT_PROJECT_VERSION"
+[[ "$VERSION" == "$PROJECT_VERSION" ]] \
+  || fail "VERSION '$VERSION' does not match project MARKETING_VERSION '$PROJECT_VERSION'"
+[[ "$BUILD" == "$PROJECT_BUILD" ]] \
+  || fail "BUILD '$BUILD' does not match project CURRENT_PROJECT_VERSION '$PROJECT_BUILD'"
+grep -Fq "MARKETING_VERSION = $PROJECT_VERSION;" "$ROOT_DIR/Surge Relay.xcodeproj/project.pbxproj" \
+  || fail "Xcode project MARKETING_VERSION is not synced with project.yml ($PROJECT_VERSION)"
+grep -Fq "CURRENT_PROJECT_VERSION = $PROJECT_BUILD;" "$ROOT_DIR/Surge Relay.xcodeproj/project.pbxproj" \
+  || fail "Xcode project CURRENT_PROJECT_VERSION is not synced with project.yml ($PROJECT_BUILD)"
 
 if [[ -d "/Volumes/TR 5000/Applications/Xcode.app/Contents/Developer" ]]; then
   export DEVELOPER_DIR="${DEVELOPER_DIR:-/Volumes/TR 5000/Applications/Xcode.app/Contents/Developer}"
@@ -133,6 +158,7 @@ fi
 
 "$ROOT_DIR/script/verify_release_assets.sh" \
   --version "$VERSION" \
+  --build "$BUILD" \
   --artifact-dir "$ARTIFACT_DIR"
 
 echo "Artifacts written to $ARTIFACT_DIR"
