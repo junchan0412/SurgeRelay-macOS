@@ -180,10 +180,18 @@ async function api(path, options = {}) {
   const headers = new Headers(options.headers || {});
   let body = options.body;
   if (options.json !== undefined) { headers.set('Content-Type', 'application/json'); body = JSON.stringify(options.json); }
-  if (webAccessToken) headers.set('Authorization', `Bearer ${webAccessToken}`);
-  const response = await fetch(path, { method: options.method || 'GET', headers, body });
+  if (options.includeAccessToken && webAccessToken) headers.set('Authorization', `Bearer ${webAccessToken}`);
+  const response = await fetch(path, {
+    method: options.method || 'GET',
+    headers,
+    body,
+    credentials: 'same-origin'
+  });
   if (response.status === 401 && await promptForAccessToken()) {
-    if (path !== '/api/session') await establishSession();
+    if (path !== '/api/session') {
+      await establishSession();
+      return api(path, options);
+    }
     return api(path, options);
   }
   if (!response.ok) {
@@ -250,7 +258,7 @@ function startStateEvents() {
 
 async function establishSession() {
   if (!webAccessToken) return;
-  await api('/api/session', { method: 'POST' });
+  await api('/api/session', { method: 'POST', includeAccessToken: true });
 }
 
 function initializeAccessToken() {

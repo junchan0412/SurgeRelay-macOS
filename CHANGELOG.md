@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.30
+
+- Web 管理普通 API 改为会话 cookie 访问，访问令牌只用于 `POST /api/session` 建立会话，前端后续请求不再反复发送 `Authorization` 明文令牌。
+- Web 管理对 `POST`、`PUT`、`PATCH`、`DELETE` 增加同源 `Origin` 校验，降低已建立会话后被跨站请求触发管理操作的风险。
+- Web 服务会对同一客户端连续认证失败做短时间限速，减少令牌猜测或误配置客户端反复撞库时的暴露面。
+
 ## 1.2.29
 
 - Web 管理前端启动时会用访问令牌建立 `HttpOnly` 会话 cookie，后续实时状态事件流不再把令牌放进 `/api/events` 的 query string。

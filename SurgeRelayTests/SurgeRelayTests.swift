@@ -1242,13 +1242,17 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertTrue(parsed.isLoopback)
     }
 
-    func testWebRequestSecurityAllowsLoopbackWithValidToken() {
+    func testWebRequestSecurityAllowsSessionBootstrapWithValidToken() {
         let configuration = WebServerConfiguration(port: 8787, allowRemoteAccess: false, accessToken: "secret")
         let request = WebHTTPRequest(
-            method: "GET",
-            path: "/api/state",
-            query: ["token": "secret"],
-            headers: [:],
+            method: "POST",
+            path: "/api/session",
+            query: [:],
+            headers: [
+                "authorization": "Bearer secret",
+                "host": "127.0.0.1:8787",
+                "origin": "http://127.0.0.1:8787"
+            ],
             body: Data(),
             isLoopback: true
         )
@@ -1256,27 +1260,41 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertNil(WebRequestSecurity.rejection(for: request, configuration: configuration))
     }
 
-    func testWebRequestSecurityRejectsMissingOrWrongToken() {
+    func testWebRequestSecurityRejectsMissingOrWrongSessionBootstrapToken() {
         let configuration = WebServerConfiguration(port: 8787, allowRemoteAccess: true, accessToken: "secret")
         let missing = WebHTTPRequest(
-            method: "GET",
-            path: "/api/state",
+            method: "POST",
+            path: "/api/session",
             query: [:],
-            headers: [:],
+            headers: ["host": "127.0.0.1:8787", "origin": "http://127.0.0.1:8787"],
             body: Data(),
             isLoopback: true
         )
         let wrong = WebHTTPRequest(
-            method: "GET",
-            path: "/api/state",
+            method: "POST",
+            path: "/api/session",
             query: ["token": "wrong"],
-            headers: [:],
+            headers: ["host": "127.0.0.1:8787", "origin": "http://127.0.0.1:8787"],
             body: Data(),
             isLoopback: true
         )
 
         XCTAssertEqual(WebRequestSecurity.rejection(for: missing, configuration: configuration)?.status, 401)
         XCTAssertEqual(WebRequestSecurity.rejection(for: wrong, configuration: configuration)?.status, 401)
+    }
+
+    func testWebRequestSecurityRejectsRawTokenForRegularAPI() {
+        let configuration = WebServerConfiguration(port: 8787, allowRemoteAccess: true, accessToken: "secret")
+        let request = WebHTTPRequest(
+            method: "GET",
+            path: "/api/state",
+            query: ["token": "secret"],
+            headers: ["authorization": "Bearer secret"],
+            body: Data(),
+            isLoopback: true
+        )
+
+        XCTAssertEqual(WebRequestSecurity.rejection(for: request, configuration: configuration)?.status, 401)
     }
 
     func testWebRequestSecurityAllowsSessionCookieWithoutQueryToken() {
@@ -1318,6 +1336,66 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertTrue(header.contains("Path=/api"))
     }
 
+    func testWebRequestSecurityRejectsCrossOriginUnsafeRequests() {
+        let configuration = WebServerConfiguration(port: 8787, allowRemoteAccess: true, accessToken: "secret")
+        let session = WebRequestSecurity.sessionCookieValue(for: "secret")
+        let request = WebHTTPRequest(
+            method: "POST",
+            path: "/api/update-all",
+            query: [:],
+            headers: [
+                "cookie": "\(WebRequestSecurity.sessionCookieName)=\(session)",
+                "host": "127.0.0.1:8787",
+                "origin": "http://evil.example"
+            ],
+            body: Data(),
+            isLoopback: true
+        )
+
+        XCTAssertEqual(WebRequestSecurity.rejection(for: request, configuration: configuration)?.status, 403)
+    }
+
+    func testWebRequestSecurityAllowsSameOriginUnsafeRequestsWithSessionCookie() {
+        let configuration = WebServerConfiguration(port: 8787, allowRemoteAccess: true, accessToken: "secret")
+        let session = WebRequestSecurity.sessionCookieValue(for: "secret")
+        let request = WebHTTPRequest(
+            method: "POST",
+            path: "/api/update-all",
+            query: [:],
+            headers: [
+                "cookie": "\(WebRequestSecurity.sessionCookieName)=\(session)",
+                "host": "127.0.0.1:8787",
+                "origin": "http://127.0.0.1:8787"
+            ],
+            body: Data(),
+            isLoopback: true
+        )
+
+        XCTAssertNil(WebRequestSecurity.rejection(for: request, configuration: configuration))
+    }
+
+    func testWebAuthenticationThrottleLimitsRepeatedFailuresAndClearsOnSuccess() {
+        let throttle = WebAuthenticationThrottle(maxFailures: 2, window: 60)
+        let now = Date(timeIntervalSince1970: 1_000)
+        let request = WebHTTPRequest(
+            method: "GET",
+            path: "/api/state",
+            query: [:],
+            headers: [:],
+            body: Data(),
+            isLoopback: false,
+            clientIdentifier: "192.0.2.10"
+        )
+
+        XCTAssertNil(throttle.rejection(for: request, now: now))
+        throttle.recordFailure(for: request, now: now)
+        XCTAssertNil(throttle.rejection(for: request, now: now.addingTimeInterval(1)))
+        throttle.recordFailure(for: request, now: now.addingTimeInterval(2))
+        XCTAssertEqual(throttle.rejection(for: request, now: now.addingTimeInterval(3))?.status, 429)
+        throttle.recordSuccess(for: request)
+        XCTAssertNil(throttle.rejection(for: request, now: now.addingTimeInterval(4)))
+    }
+
     func testWebRequestSecurityRejectsRemoteWhenDisabled() {
         let configuration = WebServerConfiguration(port: 8787, allowRemoteAccess: false, accessToken: "secret")
         let request = WebHTTPRequest(
@@ -1332,13 +1410,18 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertEqual(WebRequestSecurity.rejection(for: request, configuration: configuration)?.status, 403)
     }
 
-    func testWebRequestSecurityAllowsRemoteWhenEnabledAndTokenMatchesHeader() {
+    func testWebRequestSecurityAllowsRemoteWhenEnabledAndSessionCookieMatches() {
         let configuration = WebServerConfiguration(port: 8787, allowRemoteAccess: true, accessToken: "secret")
+        let session = WebRequestSecurity.sessionCookieValue(for: "secret")
         let request = WebHTTPRequest(
             method: "POST",
             path: "/api/update-all",
             query: [:],
-            headers: ["authorization": "Bearer secret"],
+            headers: [
+                "cookie": "\(WebRequestSecurity.sessionCookieName)=\(session)",
+                "host": "relay.local:8787",
+                "origin": "http://relay.local:8787"
+            ],
             body: Data(),
             isLoopback: false
         )

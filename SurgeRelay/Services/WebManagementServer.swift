@@ -69,6 +69,25 @@ struct WebHTTPRequest: Sendable {
     let headers: [String: String]
     let body: Data
     let isLoopback: Bool
+    let clientIdentifier: String
+
+    init(
+        method: String,
+        path: String,
+        query: [String: String],
+        headers: [String: String],
+        body: Data,
+        isLoopback: Bool,
+        clientIdentifier: String = "loopback"
+    ) {
+        self.method = method
+        self.path = path
+        self.query = query
+        self.headers = headers
+        self.body = body
+        self.isLoopback = isLoopback
+        self.clientIdentifier = clientIdentifier
+    }
 
     func decodeBody<Value: Decodable>(_ type: Value.Type) throws -> Value {
         try JSONDecoder().decode(type, from: body)
@@ -138,6 +157,7 @@ struct WebHTTPResponse: Sendable {
         case 404: "Not Found"
         case 405: "Method Not Allowed"
         case 409: "Conflict"
+        case 429: "Too Many Requests"
         default: "Internal Server Error"
         }
         return .json(Payload(error: message, message: message), status: status, reason: reason)
@@ -152,6 +172,9 @@ enum WebRequestSecurity {
             return .error(status: 403, message: "Web 管理仅允许从本机访问。")
         }
         guard request.path.hasPrefix("/api/") else { return nil }
+        if isUnsafeMethod(request.method), !isTrustedOrigin(request) {
+            return .error(status: 403, message: "Web 管理拒绝跨来源请求。")
+        }
         guard isAuthorized(request, configuration: configuration) else {
             return .error(status: 401, message: "Web 管理访问令牌无效或缺失。")
         }
@@ -161,7 +184,9 @@ enum WebRequestSecurity {
     static func isAuthorized(_ request: WebHTTPRequest, configuration: WebServerConfiguration) -> Bool {
         let expected = configuration.accessToken.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !expected.isEmpty else { return false }
-        if let provided = accessToken(in: request), timingSafeEqual(provided, expected) {
+        if allowsAccessTokenBootstrap(request),
+           let provided = accessToken(in: request),
+           timingSafeEqual(provided, expected) {
             return true
         }
         guard let session = sessionCookie(in: request) else { return false }
@@ -180,6 +205,41 @@ enum WebRequestSecurity {
     static func sessionCookieValue(for accessToken: String) -> String {
         let token = accessToken.trimmingCharacters(in: .whitespacesAndNewlines)
         return Data("surge-relay-web-session-v1:\(token)".utf8).sha256String
+    }
+
+    private static func allowsAccessTokenBootstrap(_ request: WebHTTPRequest) -> Bool {
+        request.method == "POST" && request.path == "/api/session"
+    }
+
+    private static func isUnsafeMethod(_ method: String) -> Bool {
+        ["POST", "PUT", "PATCH", "DELETE"].contains(method.uppercased())
+    }
+
+    private static func isTrustedOrigin(_ request: WebHTTPRequest) -> Bool {
+        guard let origin = request.headers["origin"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !origin.isEmpty else {
+            return true
+        }
+        guard origin.lowercased() != "null",
+              let originComponents = URLComponents(string: origin),
+              originComponents.scheme?.lowercased() == "http",
+              let originHost = originComponents.host?.lowercased(),
+              let expected = normalizedHostPort(from: request.headers["host"]) else {
+            return false
+        }
+        let originPort = originComponents.port ?? 80
+        let expectedPort = expected.port ?? 80
+        return originHost == expected.host && originPort == expectedPort
+    }
+
+    private static func normalizedHostPort(from value: String?) -> (host: String, port: Int?)? {
+        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !value.isEmpty,
+              let components = URLComponents(string: "http://\(value)"),
+              let host = components.host?.lowercased() else {
+            return nil
+        }
+        return (host, components.port)
     }
 
     private static func accessToken(in request: WebHTTPRequest) -> String? {
@@ -225,6 +285,51 @@ enum WebRequestSecurity {
     }
 }
 
+final class WebAuthenticationThrottle {
+    private let maxFailures: Int
+    private let window: TimeInterval
+    private let lock = NSLock()
+    private var failuresByClient: [String: [Date]] = [:]
+
+    init(maxFailures: Int = 8, window: TimeInterval = 60) {
+        self.maxFailures = maxFailures
+        self.window = window
+    }
+
+    func rejection(for request: WebHTTPRequest, now: Date = .now) -> WebHTTPResponse? {
+        guard request.path.hasPrefix("/api/") else { return nil }
+        let isLimited = lock.withLock {
+            pruneFailures(for: request.clientIdentifier, now: now).count >= maxFailures
+        }
+        return isLimited
+            ? .error(status: 429, message: "Web 管理认证失败次数过多，请稍后再试。")
+            : nil
+    }
+
+    func recordFailure(for request: WebHTTPRequest, now: Date = .now) {
+        guard request.path.hasPrefix("/api/") else { return }
+        lock.withLock {
+            var values = pruneFailures(for: request.clientIdentifier, now: now)
+            values.append(now)
+            failuresByClient[request.clientIdentifier] = values
+        }
+    }
+
+    func recordSuccess(for request: WebHTTPRequest) {
+        guard request.path.hasPrefix("/api/") else { return }
+        lock.withLock {
+            failuresByClient.removeValue(forKey: request.clientIdentifier)
+        }
+    }
+
+    private func pruneFailures(for clientIdentifier: String, now: Date) -> [Date] {
+        let cutoff = now.addingTimeInterval(-window)
+        let values = failuresByClient[clientIdentifier, default: []].filter { $0 >= cutoff }
+        failuresByClient[clientIdentifier] = values
+        return values
+    }
+}
+
 final class WebManagementServer: @unchecked Sendable {
     typealias RequestHandler = @Sendable (WebHTTPRequest) async -> WebHTTPResponse
     typealias EventHandler = @Sendable () async -> String
@@ -238,6 +343,7 @@ final class WebManagementServer: @unchecked Sendable {
     private var eventHandler: EventHandler?
     private var stateHandler: StateHandler?
     private var eventTasks: [UUID: Task<Void, Never>] = [:]
+    private let authenticationThrottle = WebAuthenticationThrottle()
     private let maximumRequestSize = 4 * 1024 * 1024
 
     func start(
@@ -302,6 +408,7 @@ final class WebManagementServer: @unchecked Sendable {
 
     private func accept(_ connection: NWConnection) {
         let isLoopback = Self.isLoopback(endpoint: connection.endpoint)
+        let clientIdentifier = Self.clientIdentifier(endpoint: connection.endpoint)
         guard lock.withLock({ self.configuration }) != nil else {
             connection.cancel()
             return
@@ -310,10 +417,15 @@ final class WebManagementServer: @unchecked Sendable {
             if case .failed = state { connection.cancel() }
         }
         connection.start(queue: queue)
-        receive(on: connection, accumulated: Data(), isLoopback: isLoopback)
+        receive(on: connection, accumulated: Data(), isLoopback: isLoopback, clientIdentifier: clientIdentifier)
     }
 
-    private func receive(on connection: NWConnection, accumulated: Data, isLoopback: Bool) {
+    private func receive(
+        on connection: NWConnection,
+        accumulated: Data,
+        isLoopback: Bool,
+        clientIdentifier: String
+    ) {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { [weak self] data, _, complete, error in
             guard let self else {
                 connection.cancel()
@@ -325,12 +437,21 @@ final class WebManagementServer: @unchecked Sendable {
                 send(.error(status: 400, message: "请求内容过大。"), over: connection)
                 return
             }
-            if let request = Self.parseRequest(buffer, isLoopback: isLoopback) {
+            if let request = Self.parseRequest(
+                buffer,
+                isLoopback: isLoopback,
+                clientIdentifier: clientIdentifier
+            ) {
                 dispatch(request, over: connection)
             } else if complete || error != nil {
                 send(.error(status: 400, message: "无效的 HTTP 请求。"), over: connection)
             } else {
-                receive(on: connection, accumulated: buffer, isLoopback: isLoopback)
+                receive(
+                    on: connection,
+                    accumulated: buffer,
+                    isLoopback: isLoopback,
+                    clientIdentifier: clientIdentifier
+                )
             }
         }
     }
@@ -340,10 +461,18 @@ final class WebManagementServer: @unchecked Sendable {
             send(.error(status: 500, message: "Web 服务尚未就绪。"), over: connection)
             return
         }
+        if let throttled = authenticationThrottle.rejection(for: request) {
+            send(throttled, over: connection)
+            return
+        }
         if let rejection = WebRequestSecurity.rejection(for: request, configuration: configuration) {
+            if rejection.status == 401 {
+                authenticationThrottle.recordFailure(for: request)
+            }
             send(rejection, over: connection)
             return
         }
+        authenticationThrottle.recordSuccess(for: request)
 
         if request.method == "GET", request.path == "/api/events",
            let eventHandler = lock.withLock({ self.eventHandler }) {
@@ -432,7 +561,11 @@ final class WebManagementServer: @unchecked Sendable {
         lock.withLock { stateHandler }?(state)
     }
 
-    static func parseRequest(_ data: Data, isLoopback: Bool) -> WebHTTPRequest? {
+    static func parseRequest(
+        _ data: Data,
+        isLoopback: Bool,
+        clientIdentifier: String = "loopback"
+    ) -> WebHTTPRequest? {
         let separator = Data("\r\n\r\n".utf8)
         guard let headerRange = data.range(of: separator),
               let headerText = String(data: data[..<headerRange.lowerBound], encoding: .utf8) else { return nil }
@@ -466,13 +599,18 @@ final class WebManagementServer: @unchecked Sendable {
             query: query,
             headers: headers,
             body: body,
-            isLoopback: isLoopback
+            isLoopback: isLoopback,
+            clientIdentifier: clientIdentifier
         )
     }
 
+    private static func clientIdentifier(endpoint: NWEndpoint) -> String {
+        guard case let .hostPort(host, _) = endpoint else { return "unknown" }
+        return String(describing: host).trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+    }
+
     private static func isLoopback(endpoint: NWEndpoint) -> Bool {
-        guard case let .hostPort(host, _) = endpoint else { return false }
-        let value = String(describing: host).trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+        let value = clientIdentifier(endpoint: endpoint)
         return value == "127.0.0.1" || value == "::1" || value == "localhost"
     }
 
