@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.24
+
+- Release 验证脚本的 `--launch-smoke-test` 不再先结束所有正在运行的 Surge Relay，而是记录已有进程、启动 Release 包中的新实例，并只检查和关闭新实例。
+- 本地或线上发布资产现在可以在用户已有 App 正在运行时执行启动冒烟验证，降低验证流程打断当前工作的风险。
+- 启动冒烟失败时会明确报告“未启动新实例”或“新实例提前退出”，方便区分启动被系统阻止和启动后崩溃。
+
 ## 1.2.23
 
 - Release 打包脚本不再硬编码默认版本号，改为从 `project.yml` 读取 `MARKETING_VERSION` 和 `CURRENT_PROJECT_VERSION`，减少发布时漏改脚本版本的风险。

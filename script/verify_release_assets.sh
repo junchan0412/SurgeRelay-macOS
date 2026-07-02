@@ -226,21 +226,27 @@ verify_dynamic_library_linkage() {
 
 launch_smoke_test() {
   local app_path="$1"
-  local pids=""
+  local existing_pids="$TMP_DIR/launch-smoke-existing-pids"
+  local current_pids="$TMP_DIR/launch-smoke-current-pids"
+  local new_pids="$TMP_DIR/launch-smoke-new-pids"
+  local new_pid=""
 
-  pkill -x "$APP_NAME" 2>/dev/null || true
-  sleep 1
+  pgrep -x "$APP_NAME" > "$existing_pids" 2>/dev/null || true
   open -n "$app_path"
   for _ in {1..10}; do
-    pids="$(pgrep -x "$APP_NAME" || true)"
-    [[ -n "$pids" ]] && break
+    pgrep -x "$APP_NAME" > "$current_pids" 2>/dev/null || true
+    grep -Fvx -f "$existing_pids" "$current_pids" > "$new_pids" 2>/dev/null || true
+    if [[ -s "$new_pids" ]]; then
+      new_pid="$(head -n 1 "$new_pids")"
+      break
+    fi
     sleep 1
   done
-  [[ -n "$pids" ]] || fail "launch smoke test did not start $APP_NAME"
+  [[ -n "$new_pid" ]] || fail "launch smoke test did not start a new $APP_NAME instance"
   sleep 3
-  pids="$(pgrep -x "$APP_NAME" || true)"
-  [[ -n "$pids" ]] || fail "launch smoke test started $APP_NAME, but it exited early"
-  pkill -x "$APP_NAME" 2>/dev/null || true
+  kill -0 "$new_pid" 2>/dev/null \
+    || fail "launch smoke test started $APP_NAME pid $new_pid, but it exited early"
+  kill "$new_pid" 2>/dev/null || true
   ok "verified launch smoke test"
 }
 
