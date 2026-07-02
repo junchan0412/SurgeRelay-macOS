@@ -7,6 +7,11 @@ on:
         description: "Release tag to package, for example v1.2.0"
         required: true
         type: string
+      launch_smoke_test:
+        description: "Launch the app.zip and pkg payload during release verification"
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: write
@@ -38,6 +43,9 @@ jobs:
             echo "SPARKLE_ED_KEY is not configured; building unsigned Sparkle metadata preview assets."
             export SKIP_SPARKLE_SIGNING=1
             export REQUIRE_SPARKLE_SIGNATURES=0
+          fi
+          if [[ "${{ inputs.launch_smoke_test }}" == "true" ]]; then
+            export RUN_LAUNCH_SMOKE_TEST=1
           fi
           VERSION="$VERSION" ./script/build_release_assets.sh
 
@@ -79,6 +87,11 @@ jobs:
           set -euo pipefail
           VERSION="${{ inputs.tag }}"
           VERSION="${VERSION#v}"
-          VERSION="$VERSION" ./script/verify_github_release_assets.sh \
-            --tag "${{ inputs.tag }}" \
+          verify_args=(
+            --tag "${{ inputs.tag }}"
             --repo "$GITHUB_REPOSITORY"
+          )
+          if [[ "${{ inputs.launch_smoke_test }}" == "true" ]]; then
+            verify_args+=(--launch-smoke-test)
+          fi
+          VERSION="$VERSION" ./script/verify_github_release_assets.sh "${verify_args[@]}"

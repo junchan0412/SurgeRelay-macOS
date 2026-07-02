@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.36
+
+- Release 构建脚本新增 `RUN_LAUNCH_SMOKE_TEST=1` 开关，可在生成 `.app.zip` 与 `.pkg` 后自动启动验证两种安装资产。
+- GitHub Actions 手动打包流程默认启用启动冒烟，并在上传 Release 后对线上资产再次执行同样的启动验证。
+- 工作流保留 `launch_smoke_test` 输入，可在 CI 图形会话异常时临时关闭启动冒烟，其余 sha256、签名清单、动态库和安装脚本校验仍会继续执行。
+
 ## 1.2.35
 
 - 仓库忽略规则显式加入小写 `build/`，让 Git 与 ripgrep 文件枚举对 Xcode DerivedData、SourcePackages 和测试构建缓存保持一致。

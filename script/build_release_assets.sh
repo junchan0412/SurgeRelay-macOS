@@ -25,6 +25,7 @@ SPARKLE_ACCOUNT="${SPARKLE_ACCOUNT:-junchan0412.SurgeRelay}"
 SPARKLE_ED_KEY="${SPARKLE_ED_KEY:-}"
 SKIP_SPARKLE_SIGNING="${SKIP_SPARKLE_SIGNING:-0}"
 REQUIRE_SPARKLE_SIGNATURES="${REQUIRE_SPARKLE_SIGNATURES:-1}"
+RUN_LAUNCH_SMOKE_TEST="${RUN_LAUNCH_SMOKE_TEST:-0}"
 SPARKLE_SIGN_UPDATE="$ROOT_DIR/build/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update"
 
 [[ -n "$PROJECT_VERSION" ]] || fail "project.yml is missing MARKETING_VERSION"
@@ -156,10 +157,16 @@ if [[ "$SKIP_SPARKLE_SIGNING" != "1" && -x "$SPARKLE_SIGN_UPDATE" ]]; then
   fi
 fi
 
-"$ROOT_DIR/script/verify_release_assets.sh" \
-  --version "$VERSION" \
-  --build "$BUILD" \
+verify_args=(
+  --version "$VERSION"
+  --build "$BUILD"
   --artifact-dir "$ARTIFACT_DIR"
+)
+if [[ "$RUN_LAUNCH_SMOKE_TEST" == "1" ]]; then
+  verify_args+=(--launch-smoke-test)
+fi
+
+"$ROOT_DIR/script/verify_release_assets.sh" "${verify_args[@]}"
 
 echo "Artifacts written to $ARTIFACT_DIR"
 ls -lh "$ARTIFACT_DIR"
