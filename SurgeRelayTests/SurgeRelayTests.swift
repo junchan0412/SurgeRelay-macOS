@@ -1279,6 +1279,45 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertEqual(WebRequestSecurity.rejection(for: wrong, configuration: configuration)?.status, 401)
     }
 
+    func testWebRequestSecurityAllowsSessionCookieWithoutQueryToken() {
+        let configuration = WebServerConfiguration(port: 8787, allowRemoteAccess: true, accessToken: "secret")
+        let session = WebRequestSecurity.sessionCookieValue(for: "secret")
+        let request = WebHTTPRequest(
+            method: "GET",
+            path: "/api/events",
+            query: [:],
+            headers: ["cookie": "other=value; \(WebRequestSecurity.sessionCookieName)=\(session)"],
+            body: Data(),
+            isLoopback: true
+        )
+
+        XCTAssertNil(WebRequestSecurity.rejection(for: request, configuration: configuration))
+    }
+
+    func testWebRequestSecurityRejectsWrongSessionCookie() {
+        let configuration = WebServerConfiguration(port: 8787, allowRemoteAccess: true, accessToken: "secret")
+        let request = WebHTTPRequest(
+            method: "GET",
+            path: "/api/events",
+            query: [:],
+            headers: ["cookie": "\(WebRequestSecurity.sessionCookieName)=wrong"],
+            body: Data(),
+            isLoopback: true
+        )
+
+        XCTAssertEqual(WebRequestSecurity.rejection(for: request, configuration: configuration)?.status, 401)
+    }
+
+    func testWebSessionCookieHeaderDoesNotExposeRawToken() {
+        let header = WebRequestSecurity.sessionCookieHeader(accessToken: "secret-token")
+
+        XCTAssertFalse(header.contains("secret-token"))
+        XCTAssertTrue(header.contains("\(WebRequestSecurity.sessionCookieName)="))
+        XCTAssertTrue(header.contains("HttpOnly"))
+        XCTAssertTrue(header.contains("SameSite=Strict"))
+        XCTAssertTrue(header.contains("Path=/api"))
+    }
+
     func testWebRequestSecurityRejectsRemoteWhenDisabled() {
         let configuration = WebServerConfiguration(port: 8787, allowRemoteAccess: false, accessToken: "secret")
         let request = WebHTTPRequest(

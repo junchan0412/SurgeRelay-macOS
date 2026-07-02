@@ -165,7 +165,9 @@ ui.detail.addEventListener('click', handleDetailClick);
 ui.detail.addEventListener('change', handleDetailChange);
 window.addEventListener('popstate', handleHistoryNavigation);
 
-loadState(true, true).finally(startStateEvents);
+establishSession()
+  .catch(error => showToast(error.message, true))
+  .finally(() => loadState(true, true).finally(startStateEvents));
 
 function textField(key, label, prompt = '', help = '', multiline = false) { return { type: multiline ? 'textarea' : 'text', key, label, prompt, help }; }
 function toggleField(key, label) { return { type: 'toggle', key, label }; }
@@ -181,6 +183,7 @@ async function api(path, options = {}) {
   if (webAccessToken) headers.set('Authorization', `Bearer ${webAccessToken}`);
   const response = await fetch(path, { method: options.method || 'GET', headers, body });
   if (response.status === 401 && await promptForAccessToken()) {
+    if (path !== '/api/session') await establishSession();
     return api(path, options);
   }
   if (!response.ok) {
@@ -229,7 +232,7 @@ function startStateEvents() {
     return;
   }
   if (stateEvents) stateEvents.close();
-  stateEvents = new EventSource(authenticatedPath('/api/events'));
+  stateEvents = new EventSource('/api/events');
   stateEvents.addEventListener('state', event => {
     try { applyState(JSON.parse(event.data), false, false); }
     catch (_) { /* The next event contains a complete state snapshot. */ }
@@ -238,9 +241,16 @@ function startStateEvents() {
     stateEvents?.close();
     stateEvents = null;
     if (!document.hidden) {
-      loadState(false, false).finally(() => setTimeout(startStateEvents, 3000));
+      establishSession()
+        .catch(() => {})
+        .finally(() => loadState(false, false).finally(() => setTimeout(startStateEvents, 3000)));
     }
   };
+}
+
+async function establishSession() {
+  if (!webAccessToken) return;
+  await api('/api/session', { method: 'POST' });
 }
 
 function initializeAccessToken() {
@@ -272,12 +282,6 @@ async function promptForAccessToken() {
   if (!token) return false;
   storeAccessToken(token);
   return true;
-}
-
-function authenticatedPath(path) {
-  const url = new URL(path, location.href);
-  if (webAccessToken) url.searchParams.set('token', webAccessToken);
-  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 function patchLiveState(previous, next) {

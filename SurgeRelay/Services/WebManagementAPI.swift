@@ -17,6 +17,14 @@ enum WebManagementAPI {
 
         do {
             switch (request.method, request.path) {
+            case ("POST", "/api/session"):
+                return .json(
+                    ActionPayload(ok: true, message: "Web 管理会话已建立。"),
+                    headers: [
+                        "Cache-Control": "no-store",
+                        "Set-Cookie": WebRequestSecurity.sessionCookieHeader(accessToken: model.webAccessToken)
+                    ]
+                )
             case ("GET", "/api/state"):
                 await model.refreshModuleOutputFolders()
                 return .json(statePayload(model: model))

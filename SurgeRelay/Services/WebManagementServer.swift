@@ -94,12 +94,17 @@ struct WebHTTPResponse: Sendable {
         self.body = body
     }
 
-    static func json<Value: Encodable>(_ value: Value, status: Int = 200, reason: String = "OK") -> WebHTTPResponse {
+    static func json<Value: Encodable>(
+        _ value: Value,
+        status: Int = 200,
+        reason: String = "OK",
+        headers: [String: String] = [:]
+    ) -> WebHTTPResponse {
         do {
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .iso8601
             encoder.outputFormatting = [.withoutEscapingSlashes]
-            return WebHTTPResponse(status: status, reason: reason, body: try encoder.encode(value))
+            return WebHTTPResponse(status: status, reason: reason, headers: headers, body: try encoder.encode(value))
         } catch {
             return .error(status: 500, message: error.localizedDescription)
         }
@@ -140,6 +145,8 @@ struct WebHTTPResponse: Sendable {
 }
 
 enum WebRequestSecurity {
+    static let sessionCookieName = "SurgeRelayWebSession"
+
     static func rejection(for request: WebHTTPRequest, configuration: WebServerConfiguration) -> WebHTTPResponse? {
         if !configuration.allowRemoteAccess && !request.isLoopback {
             return .error(status: 403, message: "Web 管理仅允许从本机访问。")
@@ -153,8 +160,26 @@ enum WebRequestSecurity {
 
     static func isAuthorized(_ request: WebHTTPRequest, configuration: WebServerConfiguration) -> Bool {
         let expected = configuration.accessToken.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !expected.isEmpty, let provided = accessToken(in: request) else { return false }
-        return timingSafeEqual(provided, expected)
+        guard !expected.isEmpty else { return false }
+        if let provided = accessToken(in: request), timingSafeEqual(provided, expected) {
+            return true
+        }
+        guard let session = sessionCookie(in: request) else { return false }
+        return timingSafeEqual(session, sessionCookieValue(for: expected))
+    }
+
+    static func sessionCookieHeader(configuration: WebServerConfiguration) -> String {
+        sessionCookieHeader(accessToken: configuration.accessToken)
+    }
+
+    static func sessionCookieHeader(accessToken: String) -> String {
+        let value = sessionCookieValue(for: accessToken)
+        return "\(sessionCookieName)=\(value); Path=/api; HttpOnly; SameSite=Strict; Max-Age=2592000"
+    }
+
+    static func sessionCookieValue(for accessToken: String) -> String {
+        let token = accessToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        return Data("surge-relay-web-session-v1:\(token)".utf8).sha256String
     }
 
     private static func accessToken(in request: WebHTTPRequest) -> String? {
@@ -172,6 +197,21 @@ enum WebRequestSecurity {
             return String(authorization.dropFirst("Bearer ".count)).trimmingCharacters(in: .whitespacesAndNewlines)
         }
         return authorization
+    }
+
+    private static func sessionCookie(in request: WebHTTPRequest) -> String? {
+        guard let cookie = request.headers["cookie"] else { return nil }
+        let values = cookie
+            .split(separator: ";")
+            .compactMap { item -> (String, String)? in
+                let parts = item.split(separator: "=", maxSplits: 1).map(String.init)
+                guard parts.count == 2 else { return nil }
+                return (
+                    parts[0].trimmingCharacters(in: .whitespacesAndNewlines),
+                    parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
+                )
+            }
+        return values.first(where: { $0.0 == sessionCookieName })?.1
     }
 
     private static func timingSafeEqual(_ lhs: String, _ rhs: String) -> Bool {
