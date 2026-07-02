@@ -188,7 +188,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         category: String = "",
         outputFolder: String = ModuleOutputFolder.root,
         publishesStandalone: Bool = true,
-        isEnabled: Bool = true,
+        isEnabled: Bool = false,
         scriptHubOptions: ScriptHubOptions = ScriptHubOptions(),
         argumentOverrides: [String: String] = [:],
         iconURL: String? = nil,
@@ -254,7 +254,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
             try container.decodeIfPresent(String.self, forKey: .outputFolder) ?? ModuleOutputFolder.root
         )
         publishesStandalone = try container.decodeIfPresent(Bool.self, forKey: .publishesStandalone) ?? true
-        isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
+        isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? false
         scriptHubOptions = try container.decodeIfPresent(ScriptHubOptions.self, forKey: .scriptHubOptions) ?? ScriptHubOptions()
         argumentOverrides = try container.decodeIfPresent([String: String].self, forKey: .argumentOverrides) ?? [:]
         iconURL = try container.decodeIfPresent(String.self, forKey: .iconURL)
@@ -307,7 +307,7 @@ struct ModuleDraft: Sendable {
     var category = ""
     var outputFolder = ModuleOutputFolder.root
     var publishesStandalone = true
-    var isEnabled = true
+    var isEnabled = false
     var scriptHubOptions = ScriptHubOptions()
 
     init() {}

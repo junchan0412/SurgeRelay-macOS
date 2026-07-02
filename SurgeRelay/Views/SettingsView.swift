@@ -42,7 +42,13 @@ struct SettingsView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     Button("选择…") { chooseDirectory() }
                 }
-                TextField("总模块文件名", text: combinedFileNameBinding)
+                Toggle("使用总模块功能", isOn: Binding(
+                    get: { model.settings.combinedModuleEnabled },
+                    set: { model.setCombinedModuleEnabled($0) }
+                ))
+                if model.settings.combinedModuleEnabled {
+                    TextField("总模块文件名", text: combinedFileNameBinding)
+                }
             }
 
             Section("自动化") {
@@ -310,7 +316,7 @@ struct SettingsView: View {
             }
 
             Section("存储位置") {
-                Picker("总模块保存到", selection: storageModeBinding) {
+                Picker("模块发布到", selection: storageModeBinding) {
                     Text("本地").tag(StorageMode.local)
                     Text("GitHub").tag(StorageMode.gitHub)
                 }
@@ -325,7 +331,7 @@ struct SettingsView: View {
                                 .foregroundStyle(.secondary)
                                 .textSelection(.enabled)
                                 .lineLimit(2)
-                            Text("总模块保存在根目录；独立模块可选择根目录下的文件夹")
+                            Text(model.settings.combinedModuleEnabled ? "总模块保存在根目录；独立模块可选择根目录下的文件夹" : "独立模块可选择根目录下的文件夹")
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
                         }

@@ -63,7 +63,9 @@ struct ModuleEditorView: View {
                             .help("新建存放文件夹")
                         }
                     }
-                    Toggle("包含在总模块中", isOn: $draft.isEnabled)
+                    if model.settings.combinedModuleEnabled {
+                        Toggle("包含在总模块中", isOn: $draft.isEnabled)
+                    }
                     Toggle("发布为独立模块", isOn: $draft.publishesStandalone)
                 }
                 Section("来源") {

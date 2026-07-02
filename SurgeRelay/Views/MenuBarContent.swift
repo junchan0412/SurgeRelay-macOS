@@ -13,7 +13,7 @@ struct MenuBarContent: View {
                 Text(workingText)
             }
             Text("最新更新：\(latestUpdateText)")
-            Text("启用来源：\(model.modules.filter(\.isEnabled).count) / \(model.modules.count)")
+            Text(moduleScopeText)
         }
 
         Divider()
@@ -69,6 +69,13 @@ struct MenuBarContent: View {
     private var latestUpdateText: String {
         guard let date = model.modules.compactMap(\.lastUpdatedAt).max() else { return "尚未更新" }
         return date.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    private var moduleScopeText: String {
+        if model.settings.combinedModuleEnabled {
+            return "包含来源：\(model.modules.filter(\.isEnabled).count) / \(model.modules.count)"
+        }
+        return "独立模块：\(model.modules.filter(\.publishesStandalone).count) / \(model.modules.count)"
     }
 
     private var workingText: String {

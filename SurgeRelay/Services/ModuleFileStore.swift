@@ -206,19 +206,18 @@ actor ModuleFileStore {
         return files.sorted { $0.name < $1.name }
     }
 
-    func removeLegacyPublishedFiles(in directoryPath: String) throws {
+    func removeLegacyPublishedFiles(in directoryPath: String, relativePaths: [String]) throws -> [String] {
         let directory = URL(filePath: directoryPath, directoryHint: .isDirectory)
-        guard FileManager.default.fileExists(atPath: directory.path) else { return }
-        let contents = try FileManager.default.contentsOfDirectory(
-            at: directory,
-            includingPropertiesForKeys: [.isRegularFileKey, .isDirectoryKey],
-            options: [.skipsHiddenFiles]
-        )
-        for url in contents {
-            if url.pathExtension.lowercased() == "sgmodule" || url.lastPathComponent == "assets" {
-                try FileManager.default.removeItem(at: url)
-            }
+        guard FileManager.default.fileExists(atPath: directory.path) else { return [] }
+        var removedPaths: [String] = []
+        for relativePath in Set(relativePaths).sorted() {
+            let destination = try exportURL(root: directory, relativePath: relativePath)
+            guard FileManager.default.fileExists(atPath: destination.path) else { continue }
+            try FileManager.default.removeItem(at: destination)
+            removedPaths.append(relativePath)
+            try removeEmptyParentDirectories(startingAt: destination.deletingLastPathComponent(), root: directory)
         }
+        return removedPaths
     }
 
     private func componentURL(for id: UUID) -> URL {

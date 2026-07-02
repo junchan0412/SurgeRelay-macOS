@@ -57,6 +57,7 @@ struct AppSettings: Codable, Equatable, Sendable {
     // Kept only to find and remove files created by early development builds.
     var outputDirectory: String = AppSettings.defaultOutputDirectory
     var scriptHubModuleURL = "https://raw.githubusercontent.com/Script-Hub-Org/Script-Hub/main/modules/script-hub.surge.sgmodule"
+    var combinedModuleEnabled = false
     var combinedModuleFileName = "Surge-Relay.sgmodule"
     // Retained so existing settings decode cleanly during migration.
     var scriptHubBaseURL = "http://script.hub"
@@ -85,6 +86,7 @@ struct AppSettings: Codable, Equatable, Sendable {
         outputDirectory = try container.decodeIfPresent(String.self, forKey: .outputDirectory) ?? Self.defaultOutputDirectory
         scriptHubModuleURL = try container.decodeIfPresent(String.self, forKey: .scriptHubModuleURL)
             ?? "https://raw.githubusercontent.com/Script-Hub-Org/Script-Hub/main/modules/script-hub.surge.sgmodule"
+        combinedModuleEnabled = try container.decodeIfPresent(Bool.self, forKey: .combinedModuleEnabled) ?? false
         combinedModuleFileName = try container.decodeIfPresent(String.self, forKey: .combinedModuleFileName) ?? "Surge-Relay.sgmodule"
         scriptHubBaseURL = try container.decodeIfPresent(String.self, forKey: .scriptHubBaseURL) ?? "http://script.hub"
         managedEngineFileName = try container.decodeIfPresent(String.self, forKey: .managedEngineFileName) ?? "Script-Hub-Relay.sgmodule"
@@ -128,7 +130,7 @@ struct AppSettings: Codable, Equatable, Sendable {
     }
 
     var localCombinedModuleURL: URL? {
-        guard storageMode == .local else { return nil }
+        guard combinedModuleEnabled, storageMode == .local else { return nil }
         let directory = localModuleDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !directory.isEmpty else { return nil }
         return URL(filePath: directory, directoryHint: .isDirectory)

@@ -175,7 +175,11 @@ enum WebManagementAPI {
 
     private static func statePayload(model: AppModel) -> WebStatePayload {
         let newestUpdate = model.modules.compactMap(\.lastUpdatedAt).max()
-        let enabledCount = model.modules.filter(\.isEnabled).count
+        let combinedEnabled = model.settings.combinedModuleEnabled
+        let enabledCount = combinedEnabled ? model.modules.filter(\.isEnabled).count : 0
+        let updateableCount = model.modules.filter {
+            (combinedEnabled && $0.isEnabled) || $0.publishesStandalone
+        }.count
         let updateAdmission = model.updateAdmission
         let progress: Double? = if model.synchronizationTotalCount > 0 {
             min(
@@ -188,11 +192,14 @@ enum WebManagementAPI {
         return WebStatePayload(
             combined: WebCombinedPayload(
                 name: "Surge Relay 汇总",
+                isEnabled: combinedEnabled,
                 fileName: FilenameSanitizer.sgmoduleName(from: model.settings.combinedModuleFileName),
                 sourceCount: model.modules.count,
                 enabledCount: enabledCount,
                 lastUpdatedAt: newestUpdate,
-                subscriptionURL: model.combinedRawURL?.absoluteString ?? model.combinedLocalFileURL?.absoluteString
+                subscriptionURL: combinedEnabled
+                    ? model.combinedRawURL?.absoluteString ?? model.combinedLocalFileURL?.absoluteString
+                    : nil
             ),
             moduleOutputFolders: model.moduleOutputFolderOptions(),
             modules: model.modules.map { module in
@@ -238,7 +245,7 @@ enum WebManagementAPI {
                 cancellationRequested: model.workCancellationRequested,
                 canStartUpdate: updateAdmission.isAccepted,
                 updateBlockedReason: updateAdmission.blockedReason,
-                enabledModuleCount: enabledCount,
+                enabledModuleCount: updateableCount,
                 automaticPublishScheduledAt: model.automaticPublishScheduledAt,
                 automaticPublishRunsAt: model.automaticPublishRunsAt,
                 latestGitHubPublish: model.latestGitHubPublish,
@@ -316,6 +323,7 @@ private struct WebStatePayload: Encodable {
 
 private struct WebCombinedPayload: Encodable {
     let name: String
+    let isEnabled: Bool
     let fileName: String
     let sourceCount: Int
     let enabledCount: Int

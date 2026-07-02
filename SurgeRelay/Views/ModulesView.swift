@@ -23,7 +23,10 @@ struct ModulesView: View {
     }
 
     private var selectionKind: SelectionKind? {
-        if model.selectedModuleID == AppModel.combinedModuleSelectionID { return .combined }
+        if model.settings.combinedModuleEnabled,
+           model.selectedModuleID == AppModel.combinedModuleSelectionID {
+            return .combined
+        }
         if let id = model.selectedModuleID,
            let module = model.modules.first(where: { $0.id == id }) {
             return .module(module)
@@ -204,9 +207,11 @@ struct ModulesView: View {
         @Bindable var model = model
         NavigationSplitView(columnVisibility: $columnVisibility) {
             List(selection: $model.selectedModuleID) {
-                Section {
-                    CombinedModuleRow()
-                        .tag(AppModel.combinedModuleSelectionID)
+                if model.settings.combinedModuleEnabled {
+                    Section {
+                        CombinedModuleRow()
+                            .tag(AppModel.combinedModuleSelectionID)
+                    }
                 }
 
                 Section {
@@ -229,7 +234,7 @@ struct ModulesView: View {
                     ContentUnavailableView(
                         model.modules.isEmpty ? "还没有模块" : "没有搜索结果",
                         systemImage: "shippingbox",
-                        description: Text(model.modules.isEmpty ? "添加第一个原始地址，Surge Relay 会把所有来源合并成一份总模块。" : "换个关键词试试。")
+                        description: Text(model.modules.isEmpty ? "添加第一个原始地址，Surge Relay 会生成模块输出。" : "换个关键词试试。")
                     )
                 }
             }
@@ -354,14 +359,14 @@ struct ModulesView: View {
                 set: { if !$0 { deleteCandidate = nil } }
             )
         ) {
-            Button("删除来源并重新合并", role: .destructive) {
+            Button(model.settings.combinedModuleEnabled ? "删除来源并重新合并" : "删除来源并刷新输出", role: .destructive) {
                 guard let id = deleteCandidate?.id else { return }
                 deleteCandidate = nil
                 Task { await model.deleteModule(id: id) }
             }
             Button("取消", role: .cancel) { deleteCandidate = nil }
         } message: {
-            Text("该来源会从总模块中移除；下次发布如需删除旧文件，会先显示预览并要求确认。")
+            Text(model.settings.combinedModuleEnabled ? "该来源会从总模块中移除；下次发布如需删除旧文件，会先显示预览并要求确认。" : "该来源会从 Surge Relay 管理列表中移除；下次发布如需删除旧文件，会先显示预览并要求确认。")
         }
     }
 
@@ -867,16 +872,18 @@ private struct ModuleRow: View {
                 ProgressView()
                     .controlSize(.small)
             }
-            Toggle("包含", isOn: Binding(
-                get: { module.isEnabled },
-                set: { model.setModuleEnabled(id: module.id, enabled: $0) }
-            ))
-            .labelsHidden()
-            .toggleStyle(.switch)
-            .controlSize(.mini)
+            if model.settings.combinedModuleEnabled {
+                Toggle("包含", isOn: Binding(
+                    get: { module.isEnabled },
+                    set: { model.setModuleEnabled(id: module.id, enabled: $0) }
+                ))
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+            }
         }
         .padding(.vertical, 5)
-        .opacity(module.isEnabled ? 1 : 0.55)
+        .opacity(model.settings.combinedModuleEnabled && !module.isEnabled ? 0.55 : 1)
     }
 }
 
@@ -892,11 +899,14 @@ private struct ModuleDetailView: View {
                     detailRow("原始地址", value: module.sourceURL, icon: "link")
                     detailRow("来源格式", value: module.sourceFormatDisplayTitle, icon: "doc.text")
                     detailRow("独立模块", value: module.publishesStandalone ? "发布" : "不发布", icon: "doc.badge.gearshape")
-                    detailRow(
-                        model.settings.storageMode == .local ? "汇总文件" : "汇总订阅",
-                        value: combinedOutputLocation,
-                        icon: "square.stack.3d.up"
-                    )
+                    if model.settings.combinedModuleEnabled {
+                        detailRow("总模块", value: module.isEnabled ? "包含" : "不包含", icon: "square.stack.3d.up")
+                        detailRow(
+                            model.settings.storageMode == .local ? "汇总文件" : "汇总订阅",
+                            value: combinedOutputLocation,
+                            icon: "square.stack.3d.up"
+                        )
+                    }
                     detailRow("上次更新", value: module.lastUpdatedAt?.formatted(date: .long, time: .standard) ?? "从未更新", icon: "clock")
                     Button("编辑模块…", systemImage: "pencil", action: onEdit)
                 }
@@ -968,7 +978,7 @@ private struct ModuleDetailView: View {
                             Label("更新失败", systemImage: "exclamationmark.triangle.fill")
                                 .foregroundStyle(.red)
                             Text(error).textSelection(.enabled)
-                            Text("如果该来源有缓存，总模块会继续沿用它上一次成功版本。")
+                            Text(failureCacheNote)
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
@@ -991,6 +1001,12 @@ private struct ModuleDetailView: View {
     private var combinedOutputLocation: String {
         if let localURL = model.combinedLocalFileURL { return localURL.path }
         return model.combinedRawURL?.absoluteString ?? "等待 GitHub 发布配置"
+    }
+
+    private var failureCacheNote: String {
+        model.settings.combinedModuleEnabled
+            ? "如果该来源有缓存，总模块会继续沿用它上一次成功版本。"
+            : "如果该来源有缓存，模块输出会继续沿用它上一次成功版本。"
     }
 
     @ViewBuilder

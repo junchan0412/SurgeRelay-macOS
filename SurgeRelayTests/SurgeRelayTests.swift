@@ -46,10 +46,33 @@ final class SurgeRelayTests: XCTestCase {
         draft.sourceFormat = .automatic
 
         XCTAssertNil(draft.validationMessage)
+        XCTAssertFalse(draft.isEnabled)
         XCTAssertTrue(ModuleSourceIdentity.matches(
             draft.sourceURL,
             URL(filePath: "/tmp/./Local Demo.sgmodule").standardizedFileURL.absoluteString
         ))
+    }
+
+    func testRelayModuleDefaultsDoNotJoinCombinedModule() throws {
+        let module = RelayModule(
+            name: "Default",
+            sourceURL: "https://example.com/default.sgmodule",
+            outputFileName: "Default"
+        )
+        XCTAssertFalse(module.isEnabled)
+
+        let legacyData = Data("""
+        {
+          "id": "11111111-1111-1111-1111-111111111111",
+          "name": "Legacy",
+          "sourceURL": "https://example.com/legacy.sgmodule",
+          "sourceFormat": "automatic",
+          "outputFileName": "Legacy",
+          "publishesStandalone": true
+        }
+        """.utf8)
+        let decoded = try JSONDecoder().decode(RelayModule.self, from: legacyData)
+        XCTAssertFalse(decoded.isEnabled)
     }
 
     func testLocalFileModulePreservesExistingPublishedFileName() {
@@ -175,7 +198,7 @@ final class SurgeRelayTests: XCTestCase {
     func testUpdateAdmissionExplainsBlockedAndAcceptedStates() {
         let busy = UpdateAdmission.allModules(
             isWorking: true,
-            enabledModuleCount: 2,
+            updateableModuleCount: 2,
             statusMessage: "正在检查 Demo…"
         )
         XCTAssertFalse(busy.isAccepted)
@@ -183,11 +206,11 @@ final class SurgeRelayTests: XCTestCase {
 
         let empty = UpdateAdmission.allModules(
             isWorking: false,
-            enabledModuleCount: 0,
+            updateableModuleCount: 0,
             statusMessage: "准备就绪"
         )
         XCTAssertFalse(empty.isAccepted)
-        XCTAssertEqual(empty.message, "没有启用的模块可更新。")
+        XCTAssertEqual(empty.message, "没有可更新的模块。请开启独立发布，或启用总模块并选择包含来源。")
 
         let disabled = RelayModule(
             name: "Demo",
@@ -197,12 +220,13 @@ final class SurgeRelayTests: XCTestCase {
         )
         let disabledAdmission = UpdateAdmission.module(
             disabled,
+            moduleIsUpdateable: false,
             isWorking: false,
-            enabledModuleCount: 0,
+            updateableModuleCount: 0,
             statusMessage: "准备就绪"
         )
         XCTAssertFalse(disabledAdmission.isAccepted)
-        XCTAssertEqual(disabledAdmission.message, "“Demo”已停用，请先启用后再更新。")
+        XCTAssertEqual(disabledAdmission.message, "“Demo”没有可生成的输出，请开启独立发布，或启用总模块并将其包含后再更新。")
 
         let enabled = RelayModule(
             name: "Demo",
@@ -212,8 +236,9 @@ final class SurgeRelayTests: XCTestCase {
         )
         let accepted = UpdateAdmission.module(
             enabled,
+            moduleIsUpdateable: true,
             isWorking: false,
-            enabledModuleCount: 1,
+            updateableModuleCount: 1,
             statusMessage: "准备就绪"
         )
         XCTAssertTrue(accepted.isAccepted)
@@ -223,7 +248,7 @@ final class SurgeRelayTests: XCTestCase {
     func testUpdateAdmissionUsesStructuredWorkActivity() {
         let busy = UpdateAdmission.allModules(
             activity: WorkActivity(kind: .previewingPublish),
-            enabledModuleCount: 2,
+            updateableModuleCount: 2,
             statusMessage: "正在生成 GitHub 发布预览…"
         )
         XCTAssertFalse(busy.isAccepted)
@@ -234,7 +259,7 @@ final class SurgeRelayTests: XCTestCase {
 
         let checkingKeychain = UpdateAdmission.allModules(
             activity: WorkActivity(kind: .checkingKeychain),
-            enabledModuleCount: 1,
+            updateableModuleCount: 1,
             statusMessage: "正在写入、读取并清理临时诊断项。"
         )
         XCTAssertTrue(checkingKeychain.isAccepted)
@@ -781,6 +806,7 @@ final class SurgeRelayTests: XCTestCase {
 
     func testStorageModeSelectsOnlyItsOwnCombinedOutput() throws {
         var settings = AppSettings()
+        settings.combinedModuleEnabled = true
         settings.combinedModuleFileName = "My Relay"
         settings.localModuleDirectory = "/tmp/Surge Relay"
         settings.github.repositoryIsPrivate = false
@@ -798,6 +824,12 @@ final class SurgeRelayTests: XCTestCase {
             try XCTUnwrap(settings.publishedURL(for: "My-Relay.sgmodule")).host,
             "raw.githubusercontent.com"
         )
+    }
+
+    func testAppSettingsDefaultDisablesCombinedModule() throws {
+        let settings = try JSONDecoder().decode(AppSettings.self, from: Data("{}".utf8))
+        XCTAssertFalse(settings.combinedModuleEnabled)
+        XCTAssertNil(settings.localCombinedModuleURL)
     }
 
     func testConfigurationMigrationCopiesOverridesWithoutRemovingDestinationFiles() throws {
@@ -960,6 +992,46 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: root.appending(path: "Manual.sgmodule").path))
     }
 
+    func testLegacyPublishedCleanupRemovesOnlyExplicitPaths() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = ModuleFileStore()
+        try FileManager.default.createDirectory(
+            at: root.appending(path: "assets/custom", directoryHint: .isDirectory),
+            withIntermediateDirectories: true
+        )
+        try Data("combined".utf8).write(to: root.appending(path: "Surge-Relay.sgmodule"))
+        try Data("manual".utf8).write(to: root.appending(path: "Manual.sgmodule"))
+        try Data("asset".utf8).write(to: root.appending(path: "assets/custom/file.js"))
+
+        let removed = try await store.removeLegacyPublishedFiles(
+            in: root.path,
+            relativePaths: ["Surge-Relay.sgmodule"]
+        )
+
+        XCTAssertEqual(removed, ["Surge-Relay.sgmodule"])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appending(path: "Surge-Relay.sgmodule").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appending(path: "Manual.sgmodule").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appending(path: "assets/custom/file.js").path))
+    }
+
+    func testLegacyOutputCleanupDirectoriesSkipActiveLocalModuleRoot() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let localRoot = root.appending(path: "SurgeRoot", directoryHint: .isDirectory)
+        let configuration = localRoot.appending(path: "Surge Relay", directoryHint: .isDirectory)
+
+        let directories = AppModel.legacyOutputCleanupDirectories(
+            outputDirectory: localRoot.path,
+            configurationDirectory: configuration.path,
+            localModuleDirectory: localRoot.path
+        )
+
+        XCTAssertEqual(directories, [configuration.standardizedFileURL.path])
+    }
+
     func testGeneratedAssetFilesCanBeFilteredByModuleID() async throws {
         let includedID = try XCTUnwrap(UUID(uuidString: "11111111-1111-1111-1111-111111111111"))
         let excludedID = try XCTUnwrap(UUID(uuidString: "22222222-2222-2222-2222-222222222222"))
@@ -1005,6 +1077,7 @@ final class SurgeRelayTests: XCTestCase {
         let decoded = try JSONDecoder().decode(RelayModule.self, from: legacyData)
 
         XCTAssertEqual(decoded.name, "Legacy")
+        XCTAssertFalse(decoded.isEnabled)
         XCTAssertEqual(decoded.scriptHubOptions, ScriptHubOptions())
         XCTAssertTrue(decoded.argumentOverrides.isEmpty)
         XCTAssertNil(decoded.iconURL)
@@ -1774,6 +1847,7 @@ final class SurgeRelayTests: XCTestCase {
 
     func testAppSettingsDecodesWebManagementDefaults() throws {
         let settings = try JSONDecoder().decode(AppSettings.self, from: Data("{}".utf8))
+        XCTAssertFalse(settings.combinedModuleEnabled)
         XCTAssertFalse(settings.webServerEnabled)
         XCTAssertEqual(settings.webServerPort, 8787)
         XCTAssertFalse(settings.webServerAllowRemoteAccess)

@@ -3,6 +3,25 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.2.42</title>
+            <pubDate>Fri, 03 Jul 2026 03:51:14 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.2.42</link>
+            <sparkle:version>44</sparkle:version>
+            <sparkle:shortVersionString>1.2.42</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.2.42
+
+
+- 总模块功能改为在设置中手动开启，默认关闭；关闭时桌面端、菜单栏和 Web 管理端会隐藏总模块入口与包含开关。
+- 新增模块、扫描导入的本地模块以及缺少旧字段的历史模块默认不加入总模块，只有用户明确勾选后才参与汇总。
+- 更新逻辑改为按“会生成总模块或独立模块输出”判断可更新模块，关闭总模块后独立模块仍可正常转换、预览和发布。
+- 启动和更新后的旧输出清理改为白名单路径清理，只会删除旧版固定生成的总模块文件，不再扫描删除目录中的任意 `.sgmodule`。
+- 旧输出清理会跳过当前本地模块根目录，避免把用户原始模块或分类文件夹当作历史生成物处理。
+- `assets` 目录不再由启动清理泛删；本地和 GitHub 发布仍使用发布清单与确认流程清理真正过期的生成文件。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.2.42/Surge-Relay-1.2.42.app.zip" length="8165377" type="application/zip" sparkle:edSignature="6n5NcKvHBq7HjtXvJgQ7PkEZvZsbi6JgNzskg0vM088imnamoMHHFXlSMEpSBkm21rbyqggYgeJee0vxeDmtBg=="/>
+        </item>
+        <item>
             <title>1.2.41</title>
             <pubDate>Fri, 03 Jul 2026 03:08:26 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.2.41</link>

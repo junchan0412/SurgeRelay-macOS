@@ -94,7 +94,9 @@ final class AppModel {
         githubTokenStorageStatus = legacyGitHubToken.isEmpty ? .notChecked : .legacyConfigurationFallback
         webAccessTokenStorageStatus = .notChecked
         keychainAccessProbe = .notChecked
-        selectedModuleID = Self.combinedModuleSelectionID
+        selectedModuleID = loadedSettings.combinedModuleEnabled
+            ? Self.combinedModuleSelectionID
+            : loadedModules.first?.id
         PersistenceStore.saveSettings(loadedSettings)
         try? PersistenceStore.saveModules(loadedModules)
     }
@@ -243,22 +245,22 @@ final class AppModel {
                     )
             ) {
                 await refreshScriptHub(showProgress: false)
-            } else if modules.contains(where: \.isEnabled) {
+            } else if modules.contains(where: shouldUpdateModule) {
                 statusMessage = "模块仍在刷新周期内，无需重新加载"
             }
         }
     }
 
     private func shouldUpdateModulesOnLaunch() async -> Bool {
-        let enabledModules = modules.filter(\.isEnabled)
-        guard !enabledModules.isEmpty else { return false }
+        let updateModules = modules.filter(shouldUpdateModule)
+        guard !updateModules.isEmpty else { return false }
 
-        for module in enabledModules {
+        for module in updateModules {
             if module.lastUpdatedAt == nil { return true }
             if !(await fileStore.hasComponent(id: module.id)) { return true }
         }
 
-        let oldestUpdate = enabledModules.compactMap(\.lastUpdatedAt).min()
+        let oldestUpdate = updateModules.compactMap(\.lastUpdatedAt).min()
         return RefreshPolicy.isDue(
             lastUpdatedAt: oldestUpdate,
             intervalMinutes: settings.refreshIntervalMinutes
@@ -272,10 +274,31 @@ final class AppModel {
         PersistenceStore.saveSettings(settings)
     }
 
+    private func shouldContributeToCombined(_ module: RelayModule) -> Bool {
+        settings.combinedModuleEnabled && module.isEnabled
+    }
+
+    private func shouldUpdateModule(_ module: RelayModule) -> Bool {
+        shouldContributeToCombined(module) || module.publishesStandalone
+    }
+
+    func setCombinedModuleEnabled(_ enabled: Bool) {
+        guard settings.combinedModuleEnabled != enabled else { return }
+        settings.combinedModuleEnabled = enabled
+        if !enabled, selectedModuleID == Self.combinedModuleSelectionID {
+            selectedModuleID = modules.first?.id
+        } else if enabled, selectedModuleID == nil {
+            selectedModuleID = Self.combinedModuleSelectionID
+        }
+        saveSettings()
+        statusMessage = enabled ? "总模块功能已开启，正在准备合并" : "总模块功能已关闭"
+        Task { await rebuildCombinedFromCache() }
+    }
+
     var updateAdmission: UpdateAdmission {
         UpdateAdmission.allModules(
             activity: workActivity,
-            enabledModuleCount: modules.filter(\.isEnabled).count,
+            updateableModuleCount: modules.filter(shouldUpdateModule).count,
             statusMessage: statusMessage
         )
     }
@@ -283,8 +306,9 @@ final class AppModel {
     func updateAdmission(for module: RelayModule) -> UpdateAdmission {
         UpdateAdmission.module(
             module,
+            moduleIsUpdateable: shouldUpdateModule(module),
             activity: workActivity,
-            enabledModuleCount: modules.filter(\.isEnabled).count,
+            updateableModuleCount: modules.filter(shouldUpdateModule).count,
             statusMessage: statusMessage
         )
     }
@@ -527,7 +551,7 @@ final class AppModel {
                 outputFileName: outputFileName,
                 category: candidate.category,
                 outputFolder: outputFolder,
-                isEnabled: true,
+                isEnabled: false,
                 detectedSourceFormat: .surge,
                 sourceContentHash: candidate.sourceContentHash,
                 sourceCheckedAt: .now
@@ -765,8 +789,8 @@ final class AppModel {
         try persistModules()
         statusMessage = sourceChanged
             ? "已保存 \(modules[index].name)，即将自动更新"
-            : "已保存 \(modules[index].name)，正在重新合并"
-        if sourceChanged, modules[index].isEnabled {
+            : "已保存 \(modules[index].name)，正在刷新输出"
+        if sourceChanged, shouldUpdateModule(modules[index]) {
             scheduleAutomaticUpdate()
         } else {
             Task { await rebuildCombinedFromCache() }
@@ -779,8 +803,12 @@ final class AppModel {
         registerLocalChange()
         modules[index].isEnabled = enabled
         try? persistModules()
-        statusMessage = enabled ? "已启用 \(modules[index].name)，即将自动更新" : "已停用 \(modules[index].name)，正在自动合并"
-        if enabled {
+        if settings.combinedModuleEnabled {
+            statusMessage = enabled ? "已将 \(modules[index].name) 加入总模块" : "已将 \(modules[index].name) 从总模块移除"
+        } else {
+            statusMessage = enabled ? "已记录 \(modules[index].name) 将在开启总模块后加入" : "已记录 \(modules[index].name) 不加入总模块"
+        }
+        if enabled, shouldUpdateModule(modules[index]) {
             scheduleAutomaticUpdate()
         } else {
             Task { await rebuildCombinedFromCache() }
@@ -794,7 +822,7 @@ final class AppModel {
         modules = reordered
         do {
             try persistModules()
-            statusMessage = "已调整模块优先级，正在重新合并"
+            statusMessage = "已调整模块优先级，正在刷新输出"
             Task { await rebuildCombinedFromCache() }
         } catch {
             presentedError = "保存模块顺序失败：\(error.localizedDescription)"
@@ -811,7 +839,7 @@ final class AppModel {
         modules = reordered
         do {
             try persistModules()
-            statusMessage = "已调整模块优先级，正在重新合并"
+            statusMessage = "已调整模块优先级，正在刷新输出"
             Task { await rebuildCombinedFromCache() }
         } catch {
             presentedError = "保存模块顺序失败：\(error.localizedDescription)"
@@ -828,7 +856,7 @@ final class AppModel {
         try? persistModules()
         selectedModuleID = modules.first?.id
         await rebuildCombinedFromCache()
-        statusMessage = "已删除 \(module.name)，总模块已重新合并"
+        statusMessage = "已删除 \(module.name)，输出已刷新"
     }
 
     func updateAll() async {
@@ -837,12 +865,12 @@ final class AppModel {
             statusMessage = admission.message
             return
         }
-        let enabledModules = modules.filter(\.isEnabled)
+        let updateModules = modules.filter(shouldUpdateModule)
         automaticPublishTask?.cancel()
         let updateGeneration = localChangeGeneration
         beginWork(.updatingModules)
         synchronizationCompletedCount = 0
-        synchronizationTotalCount = enabledModules.count
+        synchronizationTotalCount = updateModules.count
         synchronizingModuleID = nil
         defer {
             synchronizingModuleID = nil
@@ -871,7 +899,7 @@ final class AppModel {
         var contentChanged = false
         var newHistory: [UpdateHistoryEntry] = []
 
-        for moduleValue in enabledModules {
+        for moduleValue in updateModules {
             guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
             var module = moduleValue
             let startedAt = Date.now
@@ -900,7 +928,9 @@ final class AppModel {
                                 replace(module)
                                 let cached = try await fileStore.readComponent(id: module.id)
                                 let materialized = await processingWorker.materialize(cached, overrides: module.argumentOverrides)
-                                components.append((module, materialized))
+                                if shouldContributeToCombined(module) {
+                                    components.append((module, materialized))
+                                }
                                 newHistory.append(UpdateHistoryEntry(
                                     moduleID: module.id,
                                     moduleName: module.name,
@@ -927,7 +957,7 @@ final class AppModel {
                 )
                 guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
                 guard let currentIndex = modules.firstIndex(where: { $0.id == module.id }),
-                      modules[currentIndex].isEnabled else {
+                      shouldUpdateModule(modules[currentIndex]) else {
                     statusMessage = "检测到新的修改，已放弃旧更新"
                     return
                 }
@@ -936,7 +966,7 @@ final class AppModel {
                 let effectiveContent = try await fileStore.readComponent(id: module.id)
                 guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
                 guard let latestIndex = modules.firstIndex(where: { $0.id == module.id }),
-                      modules[latestIndex].isEnabled else {
+                      shouldUpdateModule(modules[latestIndex]) else {
                     statusMessage = "检测到新的修改，已放弃旧更新"
                     return
                 }
@@ -991,7 +1021,9 @@ final class AppModel {
                     effectiveContent,
                     overrides: module.argumentOverrides
                 )
-                components.append((module, materialized))
+                if shouldContributeToCombined(module) {
+                    components.append((module, materialized))
+                }
             } catch {
                 guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
                 failures += 1
@@ -1002,7 +1034,9 @@ final class AppModel {
                         cached,
                         overrides: current.argumentOverrides
                     )
-                    components.append((current, materialized))
+                    if shouldContributeToCombined(current) {
+                        components.append((current, materialized))
+                    }
                     newHistory.append(UpdateHistoryEntry(
                         moduleID: module.id,
                         moduleName: module.name,
@@ -1012,7 +1046,9 @@ final class AppModel {
                         usedCache: true
                     ))
                 } else {
-                    missingCache.append(module.name)
+                    if shouldContributeToCombined(module) {
+                        missingCache.append(module.name)
+                    }
                     newHistory.append(UpdateHistoryEntry(
                         moduleID: module.id,
                         moduleName: module.name,
@@ -1037,7 +1073,12 @@ final class AppModel {
         }
 
         do {
-            try await writeCombinedModule(components)
+            if settings.combinedModuleEnabled {
+                try await writeCombinedModule(components)
+            } else {
+                try? await fileStore.removeCombined()
+                try await publishCurrentFiles(combinedData: nil, includeAssets: false)
+            }
             guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
             await cleanupLegacyOutputFiles()
             guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
@@ -1046,8 +1087,8 @@ final class AppModel {
                 if contentChanged {
                     scheduleAutomaticPublish()
                     statusMessage = failures == 0
-                        ? "总模块已更新，等待合并发布"
-                        : "总模块已更新；\(failures) 个来源沿用上次版本，等待合并发布"
+                        ? "模块输出已更新，等待发布"
+                        : "模块输出已更新；\(failures) 个来源沿用上次版本，等待发布"
                 } else {
                     statusMessage = failures == 0
                         ? "所有模块内容均未变化，无需发布"
@@ -1056,19 +1097,25 @@ final class AppModel {
             } else if pendingPublishPreview?.destination == .local {
                 let count = pendingPublishPreview?.deletedFiles.count ?? 0
                 statusMessage = failures == 0
-                    ? "总模块已更新，等待确认清理 \(count) 个本地旧文件"
-                    : "总模块已更新；\(failures) 个来源沿用上次版本，等待确认清理 \(count) 个本地旧文件"
+                    ? "模块输出已更新，等待确认清理 \(count) 个本地旧文件"
+                    : "模块输出已更新；\(failures) 个来源沿用上次版本，等待确认清理 \(count) 个本地旧文件"
             } else {
-                statusMessage = failures == 0 ? "总模块已由 \(components.count) 个来源合并完成" : "总模块已更新；\(failures) 个来源沿用上次成功版本"
+                statusMessage = if settings.combinedModuleEnabled {
+                    failures == 0 ? "总模块已由 \(components.count) 个来源合并完成" : "总模块已更新；\(failures) 个来源沿用上次成功版本"
+                } else {
+                    failures == 0 ? "模块输出已刷新" : "模块输出已刷新；\(failures) 个来源沿用上次成功版本"
+                }
             }
         } catch {
             if isCurrentWorkCancellation(error) { return }
-            presentedError = "合并失败，当前总模块未被覆盖：\(error.localizedDescription)"
+            presentedError = settings.combinedModuleEnabled
+                ? "合并失败，当前总模块未被覆盖：\(error.localizedDescription)"
+                : "刷新模块输出失败：\(error.localizedDescription)"
         }
     }
 
     func update(moduleID: UUID) async {
-        // 单个来源改变也会影响同一份输出，因此始终安全地重建全部启用来源。
+        // 单个来源改变可能影响总模块，也可能触发独立模块输出，因此统一走批量更新路径。
         guard let module = modules.first(where: { $0.id == moduleID }) else { return }
         let admission = updateAdmission(for: module)
         guard admission.isAccepted else {
@@ -1220,7 +1267,7 @@ final class AppModel {
             guard shouldContinueCurrentWork() else { return }
             statusMessage = report.changedFileCount == 0
                 ? "没有文件需要发布"
-                : "\(githubPublishRetryPrefix(report))总模块与独立模块已发布到 GitHub（\(report.changedFileCount) 个文件变更）"
+                : githubPublishSuccessMessage(report)
             recordGitHubPublish(report)
         } catch {
             if isCurrentWorkCancellation(error) { return }
@@ -1262,7 +1309,7 @@ final class AppModel {
                 pendingPublishPreview = nil
                 statusMessage = report.changedFileCount == 0
                     ? "没有文件需要发布"
-                    : "\(githubPublishRetryPrefix(report))总模块与独立模块已发布到 GitHub（\(report.changedFileCount) 个文件变更）"
+                    : githubPublishSuccessMessage(report)
                 recordGitHubPublish(report)
             case .local:
                 try enterNonCancellableWorkPhase(
@@ -1302,7 +1349,7 @@ final class AppModel {
             settings.github.repositoryIsPrivate = isPrivate
             saveSettings()
         }
-        let data = try await fileStore.readCombined()
+        let data = settings.combinedModuleEnabled ? try await fileStore.readCombined() : nil
         try checkCurrentWorkCancellation()
         let files = try await currentPublishedFiles(combinedData: data, includeAssets: true)
         try checkCurrentWorkCancellation()
@@ -1338,7 +1385,7 @@ final class AppModel {
             settings.github.repositoryIsPrivate = isPrivate
             saveSettings()
         }
-        let data = try await fileStore.readCombined()
+        let data = settings.combinedModuleEnabled ? try await fileStore.readCombined() : nil
         try checkCurrentWorkCancellation()
         let files = try await currentPublishedFiles(combinedData: data, includeAssets: true)
         try checkCurrentWorkCancellation()
@@ -1367,20 +1414,11 @@ final class AppModel {
 
     private func rebuildCombinedFromCache() async {
         let rebuildGeneration = localChangeGeneration
-        let enabled = modules.filter(\.isEnabled)
+        let enabled = settings.combinedModuleEnabled ? modules.filter(\.isEnabled) : []
         guard !enabled.isEmpty else {
             try? await fileStore.removeCombined()
-            if settings.storageMode == .local,
-               settings.localPublishedRootDirectory == settings.localModuleDirectory {
-                _ = try? await fileStore.exportPublishedFiles(
-                    [],
-                    toRootDirectory: settings.localModuleDirectory,
-                    removingObsoleteRelativePaths: settings.localPublishedFilePaths
-                )
-                settings.localPublishedRootDirectory = settings.localModuleDirectory
-                settings.localPublishedFilePaths = []
-                saveSettings()
-            }
+            try? await publishCurrentFiles(combinedData: nil, includeAssets: false)
+            scheduleAutomaticPublish()
             return
         }
         var components: [(RelayModule, String)] = []
@@ -1436,13 +1474,14 @@ final class AppModel {
         if changed { try? persistModules() }
     }
 
-    private func currentPublishedFiles(combinedData: Data, includeAssets: Bool) async throws -> [PublishFile] {
-        var files = [
-            PublishFile(
+    private func currentPublishedFiles(combinedData: Data?, includeAssets: Bool) async throws -> [PublishFile] {
+        var files: [PublishFile] = []
+        if settings.combinedModuleEnabled, let combinedData {
+            files.append(PublishFile(
                 name: FilenameSanitizer.sgmoduleName(from: settings.combinedModuleFileName),
                 data: combinedData
-            )
-        ]
+            ))
+        }
         for module in modules where module.publishesStandalone {
             try checkCurrentWorkCancellation()
             try Task.checkCancellation()
@@ -1466,7 +1505,7 @@ final class AppModel {
             try checkCurrentWorkCancellation()
             let assetModuleIDs = Set(
                 modules
-                    .filter { $0.isEnabled || $0.publishesStandalone }
+                    .filter(shouldUpdateModule)
                     .map(\.id)
             )
             files.append(contentsOf: try await fileStore.generatedAssetFiles(for: assetModuleIDs))
@@ -1480,8 +1519,12 @@ final class AppModel {
             engineRevision: upstreamState.revision
         )
         try await fileStore.writeCombined(merged)
+        try await publishCurrentFiles(combinedData: Data(merged.utf8), includeAssets: false)
+    }
+
+    private func publishCurrentFiles(combinedData: Data?, includeAssets: Bool) async throws {
         if settings.storageMode == .local {
-            let files = try await currentPublishedFiles(combinedData: Data(merged.utf8), includeAssets: false)
+            let files = try await currentPublishedFiles(combinedData: combinedData, includeAssets: includeAssets)
             let currentPaths = files.map(\.name)
             let stalePaths = settings.localPublishedRootDirectory == settings.localModuleDirectory
                 ? settings.localPublishedFilePaths.filter { !currentPaths.contains($0) }
@@ -1512,14 +1555,59 @@ final class AppModel {
     }
 
     private func cleanupLegacyOutputFiles() async {
-        try? await fileStore.removeLegacyPublishedFiles(in: settings.outputDirectory)
-        if settings.outputDirectory != configurationDirectoryPath {
-            try? await fileStore.removeLegacyPublishedFiles(in: configurationDirectoryPath)
+        let paths = legacyPublishedRelativePaths()
+        for directory in legacyOutputCleanupDirectories() {
+            _ = try? await fileStore.removeLegacyPublishedFiles(in: directory, relativePaths: paths)
         }
     }
 
+    private func githubPublishSuccessMessage(_ report: PublishReport) -> String {
+        let scope = if settings.combinedModuleEnabled {
+            modules.contains(where: \.publishesStandalone) ? "总模块与独立模块" : "总模块"
+        } else {
+            "独立模块"
+        }
+        return "\(githubPublishRetryPrefix(report))\(scope)已发布到 GitHub（\(report.changedFileCount) 个文件变更）"
+    }
+
+    private func legacyOutputCleanupDirectories() -> [String] {
+        Self.legacyOutputCleanupDirectories(
+            outputDirectory: settings.outputDirectory,
+            configurationDirectory: configurationDirectoryPath,
+            localModuleDirectory: settings.localModuleDirectory
+        )
+    }
+
+    nonisolated static func legacyOutputCleanupDirectories(
+        outputDirectory: String,
+        configurationDirectory: String,
+        localModuleDirectory: String
+    ) -> [String] {
+        let localRoot = URL(filePath: localModuleDirectory, directoryHint: .isDirectory)
+            .standardizedFileURL
+            .path
+        var seen = Set<String>()
+        return [outputDirectory, configurationDirectory].compactMap { path in
+            let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return nil }
+            let standardized = URL(filePath: trimmed, directoryHint: .isDirectory).standardizedFileURL.path
+            guard standardized != localRoot, seen.insert(standardized).inserted else { return nil }
+            return standardized
+        }
+    }
+
+    private func legacyPublishedRelativePaths() -> [String] {
+        [
+            settings.combinedModuleFileName,
+            "Surge-Relay.sgmodule",
+            settings.managedEngineFileName,
+            "Script-Hub-Relay.sgmodule"
+        ].map(FilenameSanitizer.sgmoduleName(from:))
+    }
+
     var combinedRawURL: URL? {
-        settings.publishedURL(for: FilenameSanitizer.sgmoduleName(from: settings.combinedModuleFileName))
+        guard settings.combinedModuleEnabled else { return nil }
+        return settings.publishedURL(for: FilenameSanitizer.sgmoduleName(from: settings.combinedModuleFileName))
     }
 
     var combinedLocalFileURL: URL? {
@@ -1611,6 +1699,9 @@ final class AppModel {
     }
 
     func combinedPreviewContent() async throws -> String {
+        guard settings.combinedModuleEnabled else {
+            throw RelayError.invalidOutput("总模块功能已关闭。")
+        }
         let data = try await fileStore.readCombined()
         guard let content = String(data: data, encoding: .utf8) else {
             throw RelayError.invalidOutput("最终模块缓存不是有效的 UTF-8 文本。")

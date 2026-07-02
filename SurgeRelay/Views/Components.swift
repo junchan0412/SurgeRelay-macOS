@@ -322,11 +322,12 @@ struct CombinedPreviewPane: View {
     @State private var errorMessage: String?
 
     private var enabledModules: [RelayModule] {
-        model.modules.filter(\.isEnabled)
+        guard model.settings.combinedModuleEnabled else { return [] }
+        return model.modules.filter(\.isEnabled)
     }
 
     private var reloadToken: String {
-        enabledModules.map { "\($0.id.uuidString)-\($0.contentHash ?? "")" }.joined()
+        "\(model.settings.combinedModuleEnabled)-" + enabledModules.map { "\($0.id.uuidString)-\($0.contentHash ?? "")" }.joined()
     }
 
     var body: some View {

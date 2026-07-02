@@ -108,7 +108,7 @@ const advancedGroups = [
 ];
 
 let state = null;
-let selectedID = 'combined';
+let selectedID = null;
 let detailTab = 'info';
 let editingID = null;
 let previewText = '';
@@ -133,7 +133,7 @@ ui.search.addEventListener('input', renderSidebar);
 ui.add.addEventListener('click', () => openEditor());
 ui.refresh.addEventListener('click', updateAll);
 ui.cancelActivity.addEventListener('click', cancelCurrentWork);
-ui.summaryRow.addEventListener('click', () => selectItem('combined'));
+ui.summaryRow.addEventListener('click', () => { if (combinedEnabled()) selectItem('combined'); });
 ui.back.addEventListener('click', navigateBackToList);
 ui.advancedMaster.addEventListener('click', () => animateAdvancedResize(ui.advancedMaster.getAttribute('aria-expanded') !== 'true'));
 ui.advancedOptions.addEventListener('click', event => {
@@ -214,19 +214,24 @@ async function loadState(initial = false, renderCurrentDetail = false) {
 
 function applyState(next, initial = false, renderCurrentDetail = false) {
     const previous = state;
+    const previousSelectedID = selectedID;
     state = next;
     if (initial) {
       const requested = new URL(location.href).searchParams.get('module');
-      if (requested === 'combined' || (requested && next.modules.some(module => module.id === requested))) {
+      if ((requested === 'combined' && combinedEnabled(next)) || (requested && next.modules.some(module => module.id === requested))) {
         selectedID = requested;
         ui.body.classList.add('has-selection');
       } else if (mobileLayout.matches) {
         selectedID = null;
         ui.body.classList.remove('has-selection');
+      } else {
+        selectedID = fallbackSelection(next);
+        ui.body.classList.toggle('has-selection', Boolean(selectedID));
       }
     }
-    if (selectedID && selectedID !== 'combined' && !next.modules.some(module => module.id === selectedID)) selectedID = 'combined';
-    if (initial || renderCurrentDetail) {
+    const selectionChanged = normalizeSelection(next) || previousSelectedID !== selectedID;
+    ui.body.classList.toggle('has-selection', Boolean(selectedID));
+    if (initial || renderCurrentDetail || selectionChanged) {
       renderSidebar();
       renderActivity();
       renderDetail(false);
@@ -234,6 +239,26 @@ function applyState(next, initial = false, renderCurrentDetail = false) {
       patchLiveState(previous, next);
       renderActivity();
     }
+}
+
+function combinedEnabled(snapshot = state) {
+  return Boolean(snapshot?.combined?.isEnabled);
+}
+
+function fallbackSelection(snapshot = state) {
+  if (!snapshot || mobileLayout.matches) return null;
+  if (combinedEnabled(snapshot)) return 'combined';
+  return snapshot.modules[0]?.id || null;
+}
+
+function normalizeSelection(snapshot = state) {
+  const before = selectedID;
+  if (selectedID === 'combined' && !combinedEnabled(snapshot)) selectedID = fallbackSelection(snapshot);
+  if (selectedID && selectedID !== 'combined' && !snapshot.modules.some(module => module.id === selectedID)) {
+    selectedID = fallbackSelection(snapshot);
+  }
+  if (!selectedID && !mobileLayout.matches) selectedID = fallbackSelection(snapshot);
+  return before !== selectedID;
 }
 
 function startStateEvents() {
@@ -300,12 +325,19 @@ function patchLiveState(previous, next) {
     return;
   }
 
-  const previousList = previous.modules.map(module => [module.id, module.name, module.sourceFormatTitle, module.iconURL].join('|')).join('\n');
-  const nextList = next.modules.map(module => [module.id, module.name, module.sourceFormatTitle, module.iconURL].join('|')).join('\n');
+  const previousList = [
+    previous.combined?.isEnabled ? 'combined-on' : 'combined-off',
+    previous.modules.map(module => [module.id, module.name, module.sourceFormatTitle, module.iconURL, module.isEnabled, module.publishesStandalone].join('|')).join('\n')
+  ].join('\n');
+  const nextList = [
+    next.combined?.isEnabled ? 'combined-on' : 'combined-off',
+    next.modules.map(module => [module.id, module.name, module.sourceFormatTitle, module.iconURL, module.isEnabled, module.publishesStandalone].join('|')).join('\n')
+  ].join('\n');
   if (previousList !== nextList) renderSidebar(); else patchSidebarLive();
 
   if (detailTab !== 'info') return;
   if (selectedID === 'combined') {
+    if (!next.combined.isEnabled) return;
     patchDetailValue('包含来源', `${next.combined.enabledCount} / ${next.combined.sourceCount}`);
     patchDetailValue('最新更新', formatDate(next.combined.lastUpdatedAt, '尚未更新'));
     return;
@@ -314,7 +346,7 @@ function patchLiveState(previous, next) {
   const module = next.modules.find(item => item.id === selectedID);
   if (!module) return;
   patchDetailValue('来源格式', module.sourceFormatTitle);
-  patchDetailValue('汇总订阅', next.combined.subscriptionURL || '等待发布配置');
+  if (next.combined.isEnabled) patchDetailValue('汇总订阅', next.combined.subscriptionURL || '等待发布配置');
   patchDetailValue('上次更新', formatDate(module.lastUpdatedAt, '从未更新'));
 }
 
@@ -326,11 +358,12 @@ function patchDetailValue(label, value) {
 }
 
 function patchSidebarLive() {
-  ui.summarySubtitle.textContent = `${state.combined.enabledCount} 个来源 · 总模块订阅`;
+  ui.summaryRow.hidden = !state.combined.isEnabled;
+  if (state.combined.isEnabled) ui.summarySubtitle.textContent = `${state.combined.enabledCount} 个来源 · 总模块订阅`;
   state.modules.forEach(module => {
     const row = ui.list.querySelector(`.module-row[data-id="${module.id}"]`);
     if (!row) return;
-    row.classList.toggle('disabled', !module.isEnabled);
+    row.classList.toggle('disabled', state.combined.isEnabled && !module.isEnabled);
     const toggle = row.querySelector('[data-module-toggle]');
     if (toggle && toggle.checked !== module.isEnabled) toggle.checked = module.isEnabled;
   });
@@ -340,17 +373,21 @@ function renderSidebar() {
   if (!state) return;
   const query = ui.search.value.trim().toLocaleLowerCase();
   const modules = state.modules.filter(module => [module.name, module.sourceURL, module.sourceFormatTitle, module.outputFileName, module.category, module.outputFolder, module.publishesStandalone ? '独立模块' : '不发布独立模块'].join('\n').toLocaleLowerCase().includes(query));
-  ui.summarySubtitle.textContent = `${state.combined.enabledCount} 个来源 · 总模块订阅`;
-  ui.summaryRow.classList.toggle('selected', selectedID === 'combined');
+  ui.summaryRow.hidden = !state.combined.isEnabled;
+  if (state.combined.isEnabled) ui.summarySubtitle.textContent = `${state.combined.enabledCount} 个来源 · 总模块订阅`;
+  ui.summaryRow.classList.toggle('selected', state.combined.isEnabled && selectedID === 'combined');
   ui.list.innerHTML = modules.length ? modules.map(moduleRow).join('') : `<div class="empty-state"><div><span class="symbol" data-symbol="magnifyingglass"></span><div>${query ? '没有搜索结果' : '还没有模块'}</div></div></div>`;
 }
 
 function moduleRow(module) {
   const icon = module.iconURL ? `<img src="${escapeAttribute(module.iconURL)}" alt="" loading="lazy">` : `<span class="symbol" data-symbol="shippingbox"></span>`;
-  return `<div class="module-row ${selectedID === module.id ? 'selected' : ''} ${module.isEnabled ? '' : 'disabled'}" data-id="${module.id}" role="button" tabindex="0">
+  const toggle = state.combined.isEnabled
+    ? `<label class="module-toggle" title="${module.isEnabled ? '从总模块中停用' : '包含在总模块中'}"><input type="checkbox" data-module-toggle="${module.id}" ${module.isEnabled ? 'checked' : ''} aria-label="包含 ${escapeAttribute(module.name)}"><span class="toggle-track" aria-hidden="true"></span></label>`
+    : '';
+  return `<div class="module-row ${selectedID === module.id ? 'selected' : ''} ${state.combined.isEnabled && !module.isEnabled ? 'disabled' : ''}" data-id="${module.id}" role="button" tabindex="0">
     <span class="module-icon ${module.iconURL ? '' : 'placeholder'}">${icon}</span>
     <span class="module-copy"><strong>${escapeHTML(module.name)}</strong><small>${escapeHTML(module.sourceFormatTitle)}</small></span>
-    <label class="module-toggle" title="${module.isEnabled ? '从总模块中停用' : '包含在总模块中'}"><input type="checkbox" data-module-toggle="${module.id}" ${module.isEnabled ? 'checked' : ''} aria-label="包含 ${escapeAttribute(module.name)}"><span class="toggle-track" aria-hidden="true"></span></label>
+    ${toggle}
   </div>`;
 }
 
@@ -389,6 +426,7 @@ function renderActivity() {
 function renderDetail(animate = true) {
   if (!state || !selectedID) { setDetailHTML(`<div class="empty-state"><div><span class="symbol" data-symbol="sidebar.left"></span><div>选择一个模块</div></div></div>`, animate); return; }
   if (selectedID === 'combined') {
+    if (!state.combined.isEnabled) { normalizeSelection(); renderDetail(animate); return; }
     ui.mobileTitle.textContent = state.combined.name;
     renderCombinedDetail(animate);
   }
@@ -417,6 +455,10 @@ function detailToolbar(module = null) {
 
 function renderCombinedDetail(animate = true) {
   const combined = state.combined;
+  if (!combined.isEnabled) {
+    setDetailHTML(`<div class="empty-state"><div><span class="symbol" data-symbol="square.stack.3d.up"></span><div>总模块功能未开启</div></div></div>`, animate);
+    return;
+  }
   if (detailTab === 'preview') {
     setDetailHTML(detailToolbar() + previewShell(combined.fileName, false), animate);
     loadPreview('/api/combined/preview', false);
@@ -465,8 +507,10 @@ function renderModuleDetail(module, animate = true) {
   const advanced = module.advancedSummary ? `<section class="form-section-view"><h3 class="section-heading">高级设置</h3><div class="group-box"><div class="detail-row"><div class="detail-label"><span class="symbol" data-symbol="slider.horizontal.3"></span><span>已应用</span></div><div class="detail-value advanced-summary">${escapeHTML(module.advancedSummary)}</div></div></div></section>` : '';
   const publishedTitle = module.publishedURL?.includes('workers.dev') ? 'Cloudflare' : 'GitHub';
   const published = module.publishedURL ? `<section class="form-section-view"><h3 class="section-heading">${publishedTitle}</h3><div class="group-box"><div class="detail-row action-row"><div class="detail-value monospaced">${escapeHTML(module.publishedURL)}</div><div><button class="button" data-action="copy" data-value="${escapeAttribute(module.publishedURL)}"><span class="symbol" data-symbol="copy"></span>拷贝地址</button></div></div></div></section>` : '';
-  const error = module.lastError ? `<section class="form-section-view"><h3 class="section-heading">最近一次更新失败</h3><div class="group-box"><div class="detail-row action-row error-box"><strong>更新失败</strong><div>${escapeHTML(module.lastError)}</div><small>如果该来源有缓存，总模块会继续沿用它上一次成功版本。</small></div></div></section>` : '';
+  const errorNote = state.combined.isEnabled ? '如果该来源有缓存，总模块会继续沿用它上一次成功版本。' : '如果该来源有缓存，模块输出会继续沿用它上一次成功版本。';
+  const error = module.lastError ? `<section class="form-section-view"><h3 class="section-heading">最近一次更新失败</h3><div class="group-box"><div class="detail-row action-row error-box"><strong>更新失败</strong><div>${escapeHTML(module.lastError)}</div><small>${escapeHTML(errorNote)}</small></div></div></section>` : '';
   const conflict = module.hasOverrideConflict ? `<section class="form-section-view"><h3 class="section-heading">本地编辑冲突</h3><div class="group-box"><div class="detail-row action-row error-box"><strong>上游内容已经变化</strong><div>当前仍在使用本地编辑。可在预览中比较内容后保留或恢复。</div><div><button class="button" data-action="accept-override">保留本地编辑</button><button class="button" data-action="tab-preview">前往预览</button></div></div></div></section>` : '';
+  const combinedRow = state.combined.isEnabled ? detailRow('square.stack.3d.up.fill', '汇总订阅', state.combined.subscriptionURL || '等待发布配置') : '';
   setDetailHTML(`${detailToolbar(module)}
     <section class="form-section-view"><h3 class="section-heading">模块信息</h3><div class="group-box">
       ${detailRow('link', '原始地址', `<a href="${escapeAttribute(module.sourceURL)}" target="_blank" rel="noreferrer">${escapeHTML(module.sourceURL)}</a>`, true)}
@@ -474,7 +518,7 @@ function renderModuleDetail(module, animate = true) {
       ${detailRow('shippingbox', '模块标签', module.category || '未设置')}
       ${detailRow('externaldrive', '存放文件夹', folderTitle(module.outputFolder))}
       ${detailRow('doc.text', '独立模块', module.publishesStandalone ? '发布' : '不发布')}
-      ${detailRow('square.stack.3d.up.fill', '汇总订阅', state.combined.subscriptionURL || '等待发布配置')}
+      ${combinedRow}
       ${detailRow('clock', '上次更新', formatDate(module.lastUpdatedAt, '从未更新'))}
     </div></section>
     ${advanced}<div id="arguments-section"></div>${conflict}${published}${error}`, animate);
@@ -671,6 +715,7 @@ function handleListClick(event) {
 async function handleListChange(event) {
   const input = event.target.closest('[data-module-toggle]');
   if (!input) return;
+  if (!combinedEnabled()) return;
   try { await api(`/api/modules/${input.dataset.moduleToggle}/enabled`, { method: 'POST', json: { enabled: input.checked } }); await loadState(false, true); }
   catch (error) { input.checked = !input.checked; showToast(error.message, true); }
 }
@@ -712,7 +757,9 @@ async function handleDetailChange(event) {
 
 function selectItem(id, pushHistory = true) {
   if (!state) return;
-  if (id !== 'combined' && !state.modules.some(module => module.id === id)) id = 'combined';
+  if (id === 'combined' && !state.combined.isEnabled) id = fallbackSelection();
+  if (id !== 'combined' && !state.modules.some(module => module.id === id)) id = fallbackSelection();
+  if (!id) { showModuleList(pushHistory); return; }
   const cameFromList = mobileLayout.matches && !ui.body.classList.contains('has-selection');
   selectedID = id; detailTab = 'info'; ui.body.classList.add('has-selection');
   resetHorizontalScroll();
@@ -747,6 +794,7 @@ function showModuleList(replaceHistory = false) {
   url.searchParams.delete('module');
   if (replaceHistory) history.replaceState({ surgeRelay: true, view: 'list', module: null }, '', url);
   renderSidebar();
+  renderDetail(false);
 }
 
 function navigateBackToList() {
@@ -761,7 +809,7 @@ function handleHistoryNavigation(event) {
     showModuleList(false);
     return;
   }
-  selectItem(module || 'combined', false);
+  selectItem(module || fallbackSelection(), false);
 }
 
 function openEditor(module = null) {
@@ -780,7 +828,9 @@ function openEditor(module = null) {
   manualNameEdited = Boolean(module);
   form.sourceURL.value = module?.sourceURL || '';
   form.sourceFormat.value = module?.sourceFormat || 'automatic';
-  form.isEnabled.checked = module?.isEnabled ?? true;
+  const includeRow = form.isEnabled?.closest('.switch-row');
+  if (includeRow) includeRow.hidden = !combinedEnabled();
+  form.isEnabled.checked = module?.isEnabled ?? false;
   form.publishesStandalone.checked = module?.publishesStandalone ?? true;
   populateScriptHubOptions(module?.scriptHubOptions || scriptHubDefaults);
   setAdvancedExpanded(Boolean(module?.advancedSummary || hasAdvancedValues(module?.scriptHubOptions)));
@@ -794,13 +844,14 @@ function openEditor(module = null) {
 async function saveModule(event) {
   event.preventDefault();
   const form = ui.moduleForm.elements;
+  const existingModule = editingID ? state.modules.find(module => module.id === editingID) : null;
   const payload = {
     name: form.name.value.trim(),
     sourceURL: form.sourceURL.value.trim(),
     sourceFormat: form.sourceFormat.value,
     category: form.category.value.trim(),
     outputFolder: form.outputFolder.value,
-    isEnabled: form.isEnabled.checked,
+    isEnabled: combinedEnabled() ? form.isEnabled.checked : (existingModule?.isEnabled ?? false),
     publishesStandalone: form.publishesStandalone.checked,
     scriptHubOptions: collectScriptHubOptions()
   };
@@ -829,9 +880,17 @@ async function cancelCurrentWork() {
 }
 
 async function deleteModule(module) {
-  const accepted = await askConfirmation('删除模块？', `“${module.name}”会从 Surge Relay 和总模块中移除。`, '删除');
+  const message = combinedEnabled()
+    ? `“${module.name}”会从 Surge Relay 和总模块中移除。`
+    : `“${module.name}”会从 Surge Relay 管理列表中移除。`;
+  const accepted = await askConfirmation('删除模块？', message, '删除');
   if (!accepted) return;
-  try { const result = await api(`/api/modules/${module.id}`, { method: 'DELETE' }); selectedID = 'combined'; showToast(result.message); await loadState(false, true); }
+  try {
+    const result = await api(`/api/modules/${module.id}`, { method: 'DELETE' });
+    selectedID = fallbackSelection({ ...state, modules: state.modules.filter(item => item.id !== module.id) });
+    showToast(result.message);
+    await loadState(false, true);
+  }
   catch (error) { showToast(error.message, true); }
 }
 

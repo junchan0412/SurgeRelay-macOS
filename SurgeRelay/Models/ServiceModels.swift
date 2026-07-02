@@ -314,64 +314,66 @@ struct UpdateAdmission: Equatable, Sendable {
 
     static func allModules(
         activity: WorkActivity,
-        enabledModuleCount: Int,
+        updateableModuleCount: Int,
         statusMessage: String
     ) -> UpdateAdmission {
         if let reason = activity.updateBlockedReason(statusMessage: statusMessage) {
             return .rejected(reason)
         }
-        guard enabledModuleCount > 0 else {
-            return .rejected("没有启用的模块可更新。")
+        guard updateableModuleCount > 0 else {
+            return .rejected("没有可更新的模块。请开启独立发布，或启用总模块并选择包含来源。")
         }
         return .accepted("已开始更新全部模块。")
     }
 
     static func allModules(
         isWorking: Bool,
-        enabledModuleCount: Int,
+        updateableModuleCount: Int,
         statusMessage: String
     ) -> UpdateAdmission {
         if isWorking {
             return .rejected(busyMessage(statusMessage: statusMessage))
         }
-        guard enabledModuleCount > 0 else {
-            return .rejected("没有启用的模块可更新。")
+        guard updateableModuleCount > 0 else {
+            return .rejected("没有可更新的模块。请开启独立发布，或启用总模块并选择包含来源。")
         }
         return .accepted("已开始更新全部模块。")
     }
 
     static func module(
         _ module: RelayModule,
+        moduleIsUpdateable: Bool,
         activity: WorkActivity,
-        enabledModuleCount: Int,
+        updateableModuleCount: Int,
         statusMessage: String
     ) -> UpdateAdmission {
         if let reason = activity.updateBlockedReason(statusMessage: statusMessage) {
             return .rejected(reason)
         }
-        guard module.isEnabled else {
-            return .rejected("“\(module.name)”已停用，请先启用后再更新。")
+        guard moduleIsUpdateable else {
+            return .rejected("“\(module.name)”没有可生成的输出，请开启独立发布，或启用总模块并将其包含后再更新。")
         }
-        guard enabledModuleCount > 0 else {
-            return .rejected("没有启用的模块可更新。")
+        guard updateableModuleCount > 0 else {
+            return .rejected("没有可更新的模块。请开启独立发布，或启用总模块并选择包含来源。")
         }
         return .accepted("已开始更新 \(module.name)。")
     }
 
     static func module(
         _ module: RelayModule,
+        moduleIsUpdateable: Bool,
         isWorking: Bool,
-        enabledModuleCount: Int,
+        updateableModuleCount: Int,
         statusMessage: String
     ) -> UpdateAdmission {
         if isWorking {
             return .rejected(busyMessage(statusMessage: statusMessage))
         }
-        guard module.isEnabled else {
-            return .rejected("“\(module.name)”已停用，请先启用后再更新。")
+        guard moduleIsUpdateable else {
+            return .rejected("“\(module.name)”没有可生成的输出，请开启独立发布，或启用总模块并将其包含后再更新。")
         }
-        guard enabledModuleCount > 0 else {
-            return .rejected("没有启用的模块可更新。")
+        guard updateableModuleCount > 0 else {
+            return .rejected("没有可更新的模块。请开启独立发布，或启用总模块并选择包含来源。")
         }
         return .accepted("已开始更新 \(module.name)。")
     }
