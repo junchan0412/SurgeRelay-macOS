@@ -375,6 +375,65 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertEqual(validation.checksumHash, "differenthash")
     }
 
+    func testGitHubReleaseInstallGuidancePrefersPackageForUpdates() throws {
+        let release = GitHubRelease(
+            tagName: "v1.2.22",
+            name: "Surge Relay 1.2.22",
+            htmlURL: try XCTUnwrap(URL(string: "https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.2.22")),
+            publishedAt: Date(timeIntervalSince1970: 1_800),
+            body: "",
+            assets: [
+                GitHubReleaseAsset(
+                    name: "Surge-Relay-1.2.22.pkg",
+                    downloadURL: try XCTUnwrap(URL(string: "https://example.com/Surge-Relay-1.2.22.pkg")),
+                    size: 7_100_000,
+                    digest: "sha256:pkgdigest"
+                ),
+                GitHubReleaseAsset(
+                    name: "Surge-Relay-1.2.22.app.zip",
+                    downloadURL: try XCTUnwrap(URL(string: "https://example.com/Surge-Relay-1.2.22.app.zip")),
+                    size: 7_000_000,
+                    digest: "sha256:appzipdigest"
+                )
+            ]
+        )
+
+        let guidance = release.installGuidance
+
+        XCTAssertFalse(guidance.updateNeedsAttention)
+        XCTAssertEqual(guidance.updateSystemImage, "shippingbox")
+        XCTAssertTrue(guidance.updateRecommendation.contains("pkg"))
+        XCTAssertTrue(guidance.updateRecommendation.contains("xattr -cr"))
+        XCTAssertTrue(guidance.firstInstallRecommendation.contains("app.zip"))
+        XCTAssertTrue(guidance.trustNotice.contains("ad-hoc"))
+        XCTAssertTrue(guidance.trustNotice.contains("pkg 未签名"))
+    }
+
+    func testGitHubReleaseInstallGuidanceWarnsWhenPackageIsMissing() throws {
+        let release = GitHubRelease(
+            tagName: "v1.2.22",
+            name: "Surge Relay 1.2.22",
+            htmlURL: try XCTUnwrap(URL(string: "https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.2.22")),
+            publishedAt: Date(timeIntervalSince1970: 1_800),
+            body: "",
+            assets: [
+                GitHubReleaseAsset(
+                    name: "Surge-Relay-1.2.22.app.zip",
+                    downloadURL: try XCTUnwrap(URL(string: "https://example.com/Surge-Relay-1.2.22.app.zip")),
+                    size: 7_000_000,
+                    digest: "sha256:appzipdigest"
+                )
+            ]
+        )
+
+        let guidance = release.installGuidance
+
+        XCTAssertTrue(guidance.updateNeedsAttention)
+        XCTAssertEqual(guidance.updateSystemImage, "exclamationmark.triangle.fill")
+        XCTAssertTrue(guidance.updateRecommendation.contains("缺少 pkg"))
+        XCTAssertTrue(guidance.updateRecommendation.contains("手动处理隔离属性"))
+    }
+
     func testPrivateRepositoryRequiresCloudflareAndUsesItWhenConfigured() throws {
         var settings = GitHubSettings()
         settings.repositoryIsPrivate = true

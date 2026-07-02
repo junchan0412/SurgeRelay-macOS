@@ -113,6 +113,8 @@ struct CheckForUpdatesSheet: View {
                     .foregroundStyle(availability.color)
             }
 
+            installationGuidanceView(release.installGuidance)
+
             if let package = release.packageAsset {
                 HStack(spacing: 10) {
                     Button("下载 pkg", systemImage: "shippingbox") {
@@ -158,6 +160,22 @@ struct CheckForUpdatesSheet: View {
             }
         }
         .frame(minHeight: 180, alignment: .topLeading)
+    }
+
+    private func installationGuidanceView(_ guidance: ReleaseInstallGuidance) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text("安装建议")
+                .font(.headline)
+            Label(guidance.updateRecommendation, systemImage: guidance.updateSystemImage)
+                .foregroundStyle(guidance.updateNeedsAttention ? .orange : .secondary)
+            Label(guidance.firstInstallRecommendation, systemImage: "arrow.down.app")
+                .foregroundStyle(.secondary)
+            Label(guidance.trustNotice, systemImage: "exclamationmark.triangle")
+                .foregroundStyle(.secondary)
+        }
+        .font(.caption)
+        .textSelection(.enabled)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private func assetIntegrityRow(_ asset: GitHubReleaseAsset, validation: ReleaseAssetChecksumValidation) -> some View {
@@ -231,6 +249,20 @@ struct GitHubRelease: Decodable, Equatable, Sendable {
         [packageAsset, appZipAsset].compactMap(\.self)
     }
 
+    var installGuidance: ReleaseInstallGuidance {
+        ReleaseInstallGuidance(
+            updateRecommendation: packageAsset == nil
+                ? "此 Release 缺少 pkg 更新包；使用 app.zip 更新前请先查看 Release 说明，可能需要手动处理隔离属性。"
+                : "更新已有安装请优先使用 pkg；安装器会替换 /Applications/Surge Relay.app 并清除隔离属性，后续无需手动运行 xattr -cr。",
+            firstInstallRecommendation: appZipAsset == nil
+                ? "此 Release 缺少 app.zip；首次安装请使用 pkg 或打开 Release 页面查看说明。"
+                : "首次安装可使用 app.zip；如果 macOS 首次拦截，可右键打开或按文档处理一次隔离属性。",
+            trustNotice: "当前发布资产为 ad-hoc 签名，未做 Developer ID 公证；pkg 未签名，macOS 拦截安装器时可在 Finder 中右键打开。",
+            updateSystemImage: packageAsset == nil ? "exclamationmark.triangle.fill" : "shippingbox",
+            updateNeedsAttention: packageAsset == nil
+        )
+    }
+
     func checksumAsset(for asset: GitHubReleaseAsset) -> GitHubReleaseAsset? {
         let expectedName = "\(asset.name).sha256".lowercased()
         return assets.first { $0.name.lowercased() == expectedName }
@@ -263,6 +295,14 @@ struct GitHubRelease: Decodable, Equatable, Sendable {
         case body
         case assets
     }
+}
+
+struct ReleaseInstallGuidance: Equatable, Sendable {
+    var updateRecommendation: String
+    var firstInstallRecommendation: String
+    var trustNotice: String
+    var updateSystemImage: String
+    var updateNeedsAttention: Bool
 }
 
 struct ReleaseAssetChecksumValidation: Equatable, Sendable {
