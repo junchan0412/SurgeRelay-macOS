@@ -638,6 +638,35 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: root.appending(path: "Manual.sgmodule").path))
     }
 
+    func testGeneratedAssetFilesCanBeFilteredByModuleID() async throws {
+        let includedID = try XCTUnwrap(UUID(uuidString: "11111111-1111-1111-1111-111111111111"))
+        let excludedID = try XCTUnwrap(UUID(uuidString: "22222222-2222-2222-2222-222222222222"))
+        let store = ModuleFileStore()
+        defer {
+            Task {
+                try? await store.removeAssets(id: includedID)
+                try? await store.removeAssets(id: excludedID)
+            }
+        }
+
+        try await store.replaceAssets([
+            GeneratedAsset(
+                relativePath: "assets/\(includedID.uuidString.lowercased())/keep.js",
+                data: Data("keep".utf8)
+            )
+        ], id: includedID)
+        try await store.replaceAssets([
+            GeneratedAsset(
+                relativePath: "assets/\(excludedID.uuidString.lowercased())/drop.js",
+                data: Data("drop".utf8)
+            )
+        ], id: excludedID)
+
+        let files = try await store.generatedAssetFiles(for: [includedID])
+
+        XCTAssertEqual(files.map(\.name), ["assets/\(includedID.uuidString.lowercased())/keep.js"])
+    }
+
     func testRelayModuleDecodesRegistryWithoutAdvancedOptions() throws {
         let original = RelayModule(
             name: "Legacy",
@@ -659,6 +688,7 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertNil(decoded.iconURL)
         XCTAssertEqual(decoded.category, "")
         XCTAssertEqual(decoded.outputFolder, "")
+        XCTAssertTrue(decoded.publishesStandalone)
         XCTAssertNil(decoded.sourceETag)
         XCTAssertNil(decoded.sourceContentHash)
         XCTAssertFalse(decoded.hasOverrideConflict)

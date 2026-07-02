@@ -575,6 +575,7 @@ final class AppModel {
             outputFileName: uniqueOutputFileName(for: draft, source: source),
             category: draft.category,
             outputFolder: draft.outputFolder,
+            publishesStandalone: draft.publishesStandalone,
             isEnabled: draft.isEnabled,
             scriptHubOptions: draft.scriptHubOptions,
             detectedSourceFormat: detectedFormat(for: draft.sourceFormat, source: source)
@@ -608,6 +609,7 @@ final class AppModel {
                 current.outputFileName != outputFileName ||
                 current.category != category ||
                 current.outputFolder != outputFolder ||
+                current.publishesStandalone != draft.publishesStandalone ||
                 current.isEnabled != draft.isEnabled ||
                 current.scriptHubOptions != draft.scriptHubOptions else {
             statusMessage = "没有需要保存的更改"
@@ -624,6 +626,7 @@ final class AppModel {
         modules[index].outputFileName = outputFileName
         modules[index].category = category
         modules[index].outputFolder = outputFolder
+        modules[index].publishesStandalone = draft.publishesStandalone
         modules[index].isEnabled = draft.isEnabled
         modules[index].scriptHubOptions = draft.scriptHubOptions
         modules[index].detectedSourceFormat = detectedSourceFormat
@@ -1285,7 +1288,7 @@ final class AppModel {
                 data: combinedData
             )
         ]
-        for module in modules {
+        for module in modules where module.publishesStandalone {
             try Task.checkCancellation()
             guard let content = try? await fileStore.readComponent(id: module.id) else { continue }
             let materialized = await processingWorker.materialize(content, overrides: module.argumentOverrides)
@@ -1297,7 +1300,12 @@ final class AppModel {
             files.append(PublishFile(name: module.publishedRelativePath, data: Data(namedContent.utf8)))
         }
         if includeAssets {
-            files.append(contentsOf: try await fileStore.generatedAssetFiles())
+            let assetModuleIDs = Set(
+                modules
+                    .filter { $0.isEnabled || $0.publishesStandalone }
+                    .map(\.id)
+            )
+            files.append(contentsOf: try await fileStore.generatedAssetFiles(for: assetModuleIDs))
         }
         return files
     }
@@ -1386,7 +1394,8 @@ final class AppModel {
     }
 
     func rawURL(for module: RelayModule) -> URL? {
-        settings.publishedURL(for: module.publishedRelativePath)
+        guard module.publishesStandalone else { return nil }
+        return settings.publishedURL(for: module.publishedRelativePath)
     }
 
     func previewContent(for module: RelayModule) async throws -> String {

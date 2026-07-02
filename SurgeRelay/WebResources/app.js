@@ -325,7 +325,7 @@ function patchSidebarLive() {
 function renderSidebar() {
   if (!state) return;
   const query = ui.search.value.trim().toLocaleLowerCase();
-  const modules = state.modules.filter(module => [module.name, module.sourceURL, module.sourceFormatTitle, module.outputFileName, module.category, module.outputFolder].join('\n').toLocaleLowerCase().includes(query));
+  const modules = state.modules.filter(module => [module.name, module.sourceURL, module.sourceFormatTitle, module.outputFileName, module.category, module.outputFolder, module.publishesStandalone ? '独立模块' : '不发布独立模块'].join('\n').toLocaleLowerCase().includes(query));
   ui.summarySubtitle.textContent = `${state.combined.enabledCount} 个来源 · 总模块订阅`;
   ui.summaryRow.classList.toggle('selected', selectedID === 'combined');
   ui.list.innerHTML = modules.length ? modules.map(moduleRow).join('') : `<div class="empty-state"><div><span class="symbol" data-symbol="magnifyingglass"></span><div>${query ? '没有搜索结果' : '还没有模块'}</div></div></div>`;
@@ -420,6 +420,7 @@ function renderModuleDetail(module, animate = true) {
       ${detailRow('doc.text', '来源格式', module.sourceFormatTitle)}
       ${detailRow('shippingbox', '模块标签', module.category || '未设置')}
       ${detailRow('externaldrive', '存放文件夹', folderTitle(module.outputFolder))}
+      ${detailRow('doc.text', '独立模块', module.publishesStandalone ? '发布' : '不发布')}
       ${detailRow('square.stack.3d.up.fill', '汇总订阅', state.combined.subscriptionURL || '等待发布配置')}
       ${detailRow('clock', '上次更新', formatDate(module.lastUpdatedAt, '从未更新'))}
     </div></section>
@@ -727,6 +728,7 @@ function openEditor(module = null) {
   form.sourceURL.value = module?.sourceURL || '';
   form.sourceFormat.value = module?.sourceFormat || 'automatic';
   form.isEnabled.checked = module?.isEnabled ?? true;
+  form.publishesStandalone.checked = module?.publishesStandalone ?? true;
   populateScriptHubOptions(module?.scriptHubOptions || scriptHubDefaults);
   setAdvancedExpanded(Boolean(module?.advancedSummary || hasAdvancedValues(module?.scriptHubOptions)));
   updateNativeModuleState();
@@ -746,6 +748,7 @@ async function saveModule(event) {
     category: form.category.value.trim(),
     outputFolder: form.outputFolder.value,
     isEnabled: form.isEnabled.checked,
+    publishesStandalone: form.publishesStandalone.checked,
     scriptHubOptions: collectScriptHubOptions()
   };
   ui.saveModule.disabled = true;

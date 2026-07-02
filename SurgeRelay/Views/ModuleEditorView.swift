@@ -64,6 +64,7 @@ struct ModuleEditorView: View {
                         }
                     }
                     Toggle("包含在总模块中", isOn: $draft.isEnabled)
+                    Toggle("发布为独立模块", isOn: $draft.publishesStandalone)
                 }
                 Section("来源") {
                     TextField("原始地址", text: $draft.sourceURL, prompt: Text("https://example.com/module.plugin 或 file:///.../Demo.sgmodule"))

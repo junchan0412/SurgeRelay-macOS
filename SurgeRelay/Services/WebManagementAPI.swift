@@ -166,6 +166,7 @@ enum WebManagementAPI {
                     outputFileName: module.outputFileName,
                     category: module.category,
                     outputFolder: module.outputFolder,
+                    publishesStandalone: module.publishesStandalone,
                     isEnabled: module.isEnabled,
                     state: module.state.rawValue,
                     stateTitle: module.state.title,
@@ -280,6 +281,7 @@ private struct WebModulePayload: Encodable {
     let outputFileName: String
     let category: String
     let outputFolder: String
+    let publishesStandalone: Bool
     let isEnabled: Bool
     let state: String
     let stateTitle: String
@@ -346,6 +348,7 @@ private struct WebModuleMutation: Decodable {
     let sourceFormat: String?
     let category: String?
     let outputFolder: String?
+    let publishesStandalone: Bool?
     let isEnabled: Bool?
     let policy: String?
     let includeKeywords: String?
@@ -368,6 +371,7 @@ private struct WebModuleMutation: Decodable {
         }
         if let category { draft.category = category }
         if let outputFolder { draft.outputFolder = outputFolder }
+        if let publishesStandalone { draft.publishesStandalone = publishesStandalone }
         if let isEnabled { draft.isEnabled = isEnabled }
         if let scriptHubOptions { draft.scriptHubOptions = scriptHubOptions }
         if let policy { draft.scriptHubOptions.policy = policy }

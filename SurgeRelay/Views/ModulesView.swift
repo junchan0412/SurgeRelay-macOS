@@ -800,6 +800,7 @@ private struct ModuleDetailView: View {
                 Section("模块信息") {
                     detailRow("原始地址", value: module.sourceURL, icon: "link")
                     detailRow("来源格式", value: module.sourceFormatDisplayTitle, icon: "doc.text")
+                    detailRow("独立模块", value: module.publishesStandalone ? "发布" : "不发布", icon: "doc.badge.gearshape")
                     detailRow(
                         model.settings.storageMode == .local ? "汇总文件" : "汇总订阅",
                         value: combinedOutputLocation,
@@ -851,7 +852,10 @@ private struct ModuleDetailView: View {
 
                 if model.settings.storageMode == .gitHub {
                     Section(model.settings.github.repositoryIsPrivate == true ? "Cloudflare" : "GitHub") {
-                        if let rawURL = model.rawURL(for: module) {
+                        if !module.publishesStandalone {
+                            Label("该模块未开启独立发布。", systemImage: "pause.circle")
+                                .foregroundStyle(.secondary)
+                        } else if let rawURL = model.rawURL(for: module) {
                             VStack(alignment: .leading, spacing: 10) {
                                 Text(rawURL.absoluteString)
                                     .font(.system(.callout, design: .monospaced))

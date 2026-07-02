@@ -154,6 +154,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     var outputFileName: String
     var category: String
     var outputFolder: String
+    var publishesStandalone: Bool
     var isEnabled: Bool
     var scriptHubOptions: ScriptHubOptions
     var argumentOverrides: [String: String]
@@ -180,6 +181,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         outputFileName: String,
         category: String = "",
         outputFolder: String = ModuleOutputFolder.root,
+        publishesStandalone: Bool = true,
         isEnabled: Bool = true,
         scriptHubOptions: ScriptHubOptions = ScriptHubOptions(),
         argumentOverrides: [String: String] = [:],
@@ -205,6 +207,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         self.outputFileName = FilenameSanitizer.sgmoduleName(from: outputFileName)
         self.category = category.trimmingCharacters(in: .whitespacesAndNewlines)
         self.outputFolder = ModuleOutputFolder.normalized(outputFolder)
+        self.publishesStandalone = publishesStandalone
         self.isEnabled = isEnabled
         self.scriptHubOptions = scriptHubOptions
         self.argumentOverrides = argumentOverrides
@@ -225,7 +228,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, sourceURL, sourceFormat, outputFileName, category, outputFolder, isEnabled, scriptHubOptions, argumentOverrides, iconURL, detectedSourceFormat
+        case id, name, sourceURL, sourceFormat, outputFileName, category, outputFolder, publishesStandalone, isEnabled, scriptHubOptions, argumentOverrides, iconURL, detectedSourceFormat
         case createdAt, lastUpdatedAt, contentHash, sourceETag, sourceLastModified, sourceContentHash, sourceCheckedAt
         case conversionEngineRevision, overrideBaseHash, hasOverrideConflict, state, lastError
     }
@@ -243,6 +246,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         outputFolder = ModuleOutputFolder.normalized(
             try container.decodeIfPresent(String.self, forKey: .outputFolder) ?? ModuleOutputFolder.root
         )
+        publishesStandalone = try container.decodeIfPresent(Bool.self, forKey: .publishesStandalone) ?? true
         isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
         scriptHubOptions = try container.decodeIfPresent(ScriptHubOptions.self, forKey: .scriptHubOptions) ?? ScriptHubOptions()
         argumentOverrides = try container.decodeIfPresent([String: String].self, forKey: .argumentOverrides) ?? [:]
@@ -281,6 +285,7 @@ struct ModuleDraft: Sendable {
     var outputFileName = ""
     var category = ""
     var outputFolder = ModuleOutputFolder.root
+    var publishesStandalone = true
     var isEnabled = true
     var scriptHubOptions = ScriptHubOptions()
 
@@ -293,6 +298,7 @@ struct ModuleDraft: Sendable {
         outputFileName = module.outputFileName
         category = module.category
         outputFolder = module.outputFolder
+        publishesStandalone = module.publishesStandalone
         isEnabled = module.isEnabled
         scriptHubOptions = module.scriptHubOptions
     }

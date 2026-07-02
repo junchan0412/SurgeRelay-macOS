@@ -182,7 +182,7 @@ actor ModuleFileStore {
         }
     }
 
-    func generatedAssetFiles() throws -> [PublishFile] {
+    func generatedAssetFiles(for moduleIDs: Set<UUID>? = nil) throws -> [PublishFile] {
         guard FileManager.default.fileExists(atPath: assetDirectory.path),
               let enumerator = FileManager.default.enumerator(
                 at: assetDirectory,
@@ -195,6 +195,12 @@ actor ModuleFileStore {
             let values = try fileURL.resourceValues(forKeys: [.isRegularFileKey])
             guard values.isRegularFile == true else { continue }
             let relative = fileURL.path.replacingOccurrences(of: assetDirectory.path + "/", with: "")
+            if let moduleIDs {
+                let components = relative.split(separator: "/", maxSplits: 1).map(String.init)
+                guard let idValue = components.first,
+                      let id = UUID(uuidString: idValue),
+                      moduleIDs.contains(id) else { continue }
+            }
             files.append(PublishFile(name: "assets/\(relative)", data: try Data(contentsOf: fileURL)))
         }
         return files.sorted { $0.name < $1.name }
