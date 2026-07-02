@@ -330,6 +330,54 @@ final class WebAuthenticationThrottle {
     }
 }
 
+enum WebResponseSecurity {
+    static let apiCacheControl = "no-store, no-cache, must-revalidate"
+    static let eventStreamCacheControl = "\(apiCacheControl), no-transform"
+
+    static func hardenedHeaders(
+        for request: WebHTTPRequest?,
+        responseHeaders: [String: String]
+    ) -> [String: String] {
+        var headers = responseHeaders
+        headers["X-Content-Type-Options"] = "nosniff"
+        headers["Referrer-Policy"] = "no-referrer"
+        headers["X-Frame-Options"] = "DENY"
+        headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        headers["Cross-Origin-Opener-Policy"] = "same-origin"
+
+        if request?.path.hasPrefix("/api/") == true,
+           !containsHeader("Cache-Control", in: headers) {
+            headers["Cache-Control"] = apiCacheControl
+            headers["Pragma"] = "no-cache"
+            headers["Expires"] = "0"
+        }
+        return headers
+    }
+
+    static func eventStreamHeaders() -> [String: String] {
+        var headers = hardenedHeaders(
+            for: WebHTTPRequest(
+                method: "GET",
+                path: "/api/events",
+                query: [:],
+                headers: [:],
+                body: Data(),
+                isLoopback: true
+            ),
+            responseHeaders: [
+                "Content-Type": "text/event-stream; charset=utf-8",
+                "Connection": "keep-alive"
+            ]
+        )
+        headers["Cache-Control"] = eventStreamCacheControl
+        return headers
+    }
+
+    private static func containsHeader(_ name: String, in headers: [String: String]) -> Bool {
+        headers.keys.contains { $0.caseInsensitiveCompare(name) == .orderedSame }
+    }
+}
+
 final class WebManagementServer: @unchecked Sendable {
     typealias RequestHandler = @Sendable (WebHTTPRequest) async -> WebHTTPResponse
     typealias EventHandler = @Sendable () async -> String
@@ -458,18 +506,18 @@ final class WebManagementServer: @unchecked Sendable {
 
     private func dispatch(_ request: WebHTTPRequest, over connection: NWConnection) {
         guard let configuration = lock.withLock({ self.configuration }) else {
-            send(.error(status: 500, message: "Web 服务尚未就绪。"), over: connection)
+            send(.error(status: 500, message: "Web 服务尚未就绪。"), for: request, over: connection)
             return
         }
         if let throttled = authenticationThrottle.rejection(for: request) {
-            send(throttled, over: connection)
+            send(throttled, for: request, over: connection)
             return
         }
         if let rejection = WebRequestSecurity.rejection(for: request, configuration: configuration) {
             if rejection.status == 401 {
                 authenticationThrottle.recordFailure(for: request)
             }
-            send(rejection, over: connection)
+            send(rejection, for: request, over: connection)
             return
         }
         authenticationThrottle.recordSuccess(for: request)
@@ -480,13 +528,13 @@ final class WebManagementServer: @unchecked Sendable {
             return
         }
         guard let requestHandler = lock.withLock({ self.requestHandler }) else {
-            send(.error(status: 500, message: "Web 服务尚未就绪。"), over: connection)
+            send(.error(status: 500, message: "Web 服务尚未就绪。"), for: request, over: connection)
             return
         }
 
         Task { [weak self] in
             let response = await requestHandler(request)
-            self?.send(response, over: connection)
+            self?.send(response, for: request, over: connection)
         }
     }
 
@@ -494,15 +542,11 @@ final class WebManagementServer: @unchecked Sendable {
         let identifier = UUID()
         let task = Task { [weak self] in
             guard let self else { return }
-            let head = """
-            HTTP/1.1 200 OK\r
-            Content-Type: text/event-stream; charset=utf-8\r
-            Cache-Control: no-cache, no-transform\r
-            Connection: keep-alive\r
-            X-Content-Type-Options: nosniff\r
-            \r
-
-            """
+            let head = Self.responseHead(
+                status: 200,
+                reason: "OK",
+                headers: WebResponseSecurity.eventStreamHeaders()
+            )
             do {
                 try await sendStreamData(Data(head.utf8), over: connection)
                 var previous = ""
@@ -542,19 +586,26 @@ final class WebManagementServer: @unchecked Sendable {
     }
 
     private func send(_ response: WebHTTPResponse, over connection: NWConnection) {
-        var headers = response.headers
+        send(response, for: nil, over: connection)
+    }
+
+    private func send(_ response: WebHTTPResponse, for request: WebHTTPRequest?, over connection: NWConnection) {
+        var headers = WebResponseSecurity.hardenedHeaders(for: request, responseHeaders: response.headers)
         headers["Content-Length"] = String(response.body.count)
         headers["Connection"] = "close"
-        headers["X-Content-Type-Options"] = "nosniff"
-        headers["Referrer-Policy"] = "no-referrer"
-        var head = "HTTP/1.1 \(response.status) \(response.reason)\r\n"
+        let head = Self.responseHead(status: response.status, reason: response.reason, headers: headers)
+        var payload = Data(head.utf8)
+        payload.append(response.body)
+        connection.send(content: payload, completion: .contentProcessed { _ in connection.cancel() })
+    }
+
+    private static func responseHead(status: Int, reason: String, headers: [String: String]) -> String {
+        var head = "HTTP/1.1 \(status) \(reason)\r\n"
         for (name, value) in headers.sorted(by: { $0.key < $1.key }) {
             head += "\(name): \(value)\r\n"
         }
         head += "\r\n"
-        var payload = Data(head.utf8)
-        payload.append(response.body)
-        connection.send(content: payload, completion: .contentProcessed { _ in connection.cancel() })
+        return head
     }
 
     private func notify(_ state: WebServerRuntimeState) {

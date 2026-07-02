@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.31
+
+- Web 管理普通 API 响应默认增加 `Cache-Control: no-store`、`Pragma: no-cache` 与 `Expires: 0`，避免模块状态、预览内容或错误信息被浏览器缓存。
+- Web 管理事件流改为使用同一套安全响应头，并保留 `no-transform`，减少代理或浏览器缓存实时状态流的风险。
+- Web 服务统一补充 `X-Frame-Options`、`Permissions-Policy`、`Cross-Origin-Opener-Policy`、`Referrer-Policy` 与 `X-Content-Type-Options`，降低被嵌入、能力误用或 MIME 嗅探的暴露面。
+
 ## 1.2.30
 
 - Web 管理普通 API 改为会话 cookie 访问，访问令牌只用于 `POST /api/session` 建立会话，前端后续请求不再反复发送 `Authorization` 明文令牌。

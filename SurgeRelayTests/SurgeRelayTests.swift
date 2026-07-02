@@ -1336,6 +1336,64 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertTrue(header.contains("Path=/api"))
     }
 
+    func testWebResponseSecurityAddsNoStoreAndBrowserHardeningHeadersToAPIResponses() {
+        let request = WebHTTPRequest(
+            method: "GET",
+            path: "/api/state",
+            query: [:],
+            headers: [:],
+            body: Data(),
+            isLoopback: true
+        )
+        let headers = WebResponseSecurity.hardenedHeaders(
+            for: request,
+            responseHeaders: ["Content-Type": "application/json; charset=utf-8"]
+        )
+
+        XCTAssertEqual(headers["Cache-Control"], WebResponseSecurity.apiCacheControl)
+        XCTAssertEqual(headers["Pragma"], "no-cache")
+        XCTAssertEqual(headers["Expires"], "0")
+        XCTAssertEqual(headers["X-Frame-Options"], "DENY")
+        XCTAssertEqual(headers["X-Content-Type-Options"], "nosniff")
+        XCTAssertEqual(headers["Referrer-Policy"], "no-referrer")
+        XCTAssertEqual(headers["Permissions-Policy"], "camera=(), microphone=(), geolocation=()")
+        XCTAssertEqual(headers["Cross-Origin-Opener-Policy"], "same-origin")
+    }
+
+    func testWebResponseSecurityPreservesExplicitCacheControl() {
+        let request = WebHTTPRequest(
+            method: "GET",
+            path: "/api/modules/11111111-1111-1111-1111-111111111111/icon",
+            query: [:],
+            headers: [:],
+            body: Data(),
+            isLoopback: true
+        )
+        let headers = WebResponseSecurity.hardenedHeaders(
+            for: request,
+            responseHeaders: ["cache-control": "private, max-age=3600"]
+        )
+
+        XCTAssertEqual(headers["cache-control"], "private, max-age=3600")
+        XCTAssertNil(headers["Cache-Control"])
+        XCTAssertNil(headers["Pragma"])
+        XCTAssertNil(headers["Expires"])
+        XCTAssertEqual(headers["X-Frame-Options"], "DENY")
+    }
+
+    func testWebResponseSecurityHardensEventStreamHeaders() {
+        let headers = WebResponseSecurity.eventStreamHeaders()
+
+        XCTAssertEqual(headers["Content-Type"], "text/event-stream; charset=utf-8")
+        XCTAssertEqual(headers["Cache-Control"], WebResponseSecurity.eventStreamCacheControl)
+        XCTAssertEqual(headers["Pragma"], "no-cache")
+        XCTAssertEqual(headers["Expires"], "0")
+        XCTAssertEqual(headers["Connection"], "keep-alive")
+        XCTAssertEqual(headers["X-Frame-Options"], "DENY")
+        XCTAssertEqual(headers["X-Content-Type-Options"], "nosniff")
+        XCTAssertEqual(headers["Referrer-Policy"], "no-referrer")
+    }
+
     func testWebRequestSecurityRejectsCrossOriginUnsafeRequests() {
         let configuration = WebServerConfiguration(port: 8787, allowRemoteAccess: true, accessToken: "secret")
         let session = WebRequestSecurity.sessionCookieValue(for: "secret")
