@@ -405,21 +405,40 @@ struct SettingsView: View {
                         Text("暂无记录").foregroundStyle(.secondary)
                     } else {
                         ForEach(model.updateHistory.prefix(20)) { entry in
-                            HStack(alignment: .firstTextBaseline) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(entry.moduleName)
-                                    Text(entry.message)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(2)
+                            VStack(alignment: .leading, spacing: 5) {
+                                HStack(alignment: .firstTextBaseline) {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(entry.moduleName)
+                                        Text(entry.message)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(2)
+                                    }
+                                    Spacer()
+                                    VStack(alignment: .trailing, spacing: 2) {
+                                        Text(entry.outcome.title)
+                                            .font(.caption)
+                                        Text(entry.date.formatted(date: .omitted, time: .shortened))
+                                            .font(.caption2)
+                                            .foregroundStyle(.tertiary)
+                                    }
                                 }
-                                Spacer()
-                                VStack(alignment: .trailing, spacing: 2) {
-                                    Text(entry.outcome.title)
-                                        .font(.caption)
-                                    Text(entry.date.formatted(date: .omitted, time: .shortened))
-                                        .font(.caption2)
-                                        .foregroundStyle(.tertiary)
+                                if entry.outcome == .published, entry.publishedChangeCount > 0 || entry.commitSHA != nil {
+                                    HStack(spacing: 8) {
+                                        if let commitSHA = entry.commitSHA, !commitSHA.isEmpty {
+                                            if let commitURL = githubCommitURL(for: commitSHA) {
+                                                Link("Commit \(commitSHA.prefix(8))", destination: commitURL)
+                                                    .font(.caption)
+                                            } else {
+                                                Text("Commit \(commitSHA.prefix(8))")
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                        }
+                                        Text("\(entry.publishedFiles.count) 个上传/更新 · \(entry.deletedFiles.count) 个删除")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
                                 }
                             }
                         }
@@ -603,6 +622,11 @@ struct SettingsView: View {
                     .textSelection(.enabled)
             }
         }
+    }
+
+    private func githubCommitURL(for commitSHA: String) -> URL? {
+        GitHubPublishSnapshot.commitURL(for: commitSHA, settings: model.settings.github)
+            .flatMap(URL.init(string:))
     }
 
     private func githubBinding(_ keyPath: WritableKeyPath<GitHubSettings, String>) -> Binding<String> {

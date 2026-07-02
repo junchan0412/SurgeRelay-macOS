@@ -1017,14 +1017,7 @@ final class AppModel {
                 self.statusMessage = report.changedFileCount == 0
                     ? "GitHub 内容没有变化，无需上传"
                     : "\(self.githubPublishRetryPrefix(report))已合并发布到 GitHub（\(report.changedFileCount) 个文件变更）"
-                if let commit = report.commitSHA {
-                    self.recordHistory([UpdateHistoryEntry(
-                        moduleName: "GitHub",
-                        outcome: .published,
-                        duration: 0,
-                        message: self.githubPublishHistoryMessage(commit: commit, report: report)
-                    )])
-                }
+                self.recordGitHubPublish(report)
             } catch {
                 guard !Task.isCancelled else { return }
                 self.presentedError = "GitHub 自动发布失败：\(error.localizedDescription)"
@@ -1096,6 +1089,7 @@ final class AppModel {
             statusMessage = report.changedFileCount == 0
                 ? "没有文件需要发布"
                 : "\(githubPublishRetryPrefix(report))总模块与独立模块已发布到 GitHub（\(report.changedFileCount) 个文件变更）"
+            recordGitHubPublish(report)
         } catch {
             presentedError = error.localizedDescription
         }
@@ -1133,14 +1127,7 @@ final class AppModel {
                 statusMessage = report.changedFileCount == 0
                     ? "没有文件需要发布"
                     : "\(githubPublishRetryPrefix(report))总模块与独立模块已发布到 GitHub（\(report.changedFileCount) 个文件变更）"
-                if let commit = report.commitSHA {
-                    recordHistory([UpdateHistoryEntry(
-                        moduleName: "GitHub",
-                        outcome: .published,
-                        duration: 0,
-                        message: githubPublishHistoryMessage(commit: commit, report: report)
-                    )])
-                }
+                recordGitHubPublish(report)
             case .local:
                 _ = try await fileStore.exportPublishedFiles(
                     [],
@@ -1375,6 +1362,10 @@ final class AppModel {
         settings.localCombinedModuleURL
     }
 
+    var latestGitHubPublish: GitHubPublishSnapshot? {
+        GitHubPublishSnapshot.latest(in: updateHistory, settings: settings.github)
+    }
+
     var webManagementURL: URL? {
         guard settings.webServerEnabled else { return nil }
         return WebManagementURLFactory.url(
@@ -1575,6 +1566,7 @@ final class AppModel {
             webAccessTokenStorageStatus: webAccessTokenStorageStatus.title,
             automaticPublishScheduledAt: automaticPublishScheduledAt,
             automaticPublishRunsAt: automaticPublishRunsAt,
+            latestGitHubPublish: latestGitHubPublish,
             modules: modules.map {
                 DiagnosticModuleSnapshot(
                     id: $0.id,
@@ -1663,9 +1655,24 @@ final class AppModel {
         report.retriedAfterConflict ? "远端分支已更新并重新同步；" : ""
     }
 
-    private func githubPublishHistoryMessage(commit: String, report: PublishReport) -> String {
+    private func recordGitHubPublish(_ report: PublishReport) {
+        guard report.changedFileCount > 0 || report.commitSHA != nil else { return }
+        recordHistory([UpdateHistoryEntry(
+            moduleName: "GitHub",
+            outcome: .published,
+            duration: 0,
+            message: githubPublishHistoryMessage(commit: report.commitSHA, report: report),
+            contentChanged: report.changedFileCount > 0,
+            publishedFiles: report.publishedFiles,
+            deletedFiles: report.deletedFiles,
+            commitSHA: report.commitSHA
+        )])
+    }
+
+    private func githubPublishHistoryMessage(commit: String?, report: PublishReport) -> String {
         let suffix = report.retriedAfterConflict ? "（已处理远端更新）" : ""
-        return "原子提交 \(commit.prefix(8))\(suffix)"
+        let commitText = commit.map { "原子提交 \($0.prefix(8))" } ?? "GitHub 内容已发布"
+        return "\(commitText)：上传/更新 \(report.publishedFiles.count) 个，删除 \(report.deletedFiles.count) 个\(suffix)"
     }
 
     private func redactedSourceURL(_ value: String) -> String {

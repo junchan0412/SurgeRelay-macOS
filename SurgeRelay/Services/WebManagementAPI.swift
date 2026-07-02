@@ -193,6 +193,7 @@ enum WebManagementAPI {
                 currentModuleID: model.synchronizingModuleID?.uuidString.lowercased(),
                 automaticPublishScheduledAt: model.automaticPublishScheduledAt,
                 automaticPublishRunsAt: model.automaticPublishRunsAt,
+                latestGitHubPublish: model.latestGitHubPublish,
                 error: model.presentedError
             )
         )
@@ -310,6 +311,7 @@ private struct WebActivityPayload: Encodable {
     let currentModuleID: String?
     let automaticPublishScheduledAt: Date?
     let automaticPublishRunsAt: Date?
+    let latestGitHubPublish: GitHubPublishSnapshot?
     let error: String?
 }
 

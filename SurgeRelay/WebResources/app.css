@@ -271,6 +271,16 @@ button { color: inherit; }
 .detail-row.action-row { grid-template-columns: 1fr; }
 .advanced-summary { white-space: pre-wrap; }
 .error-box { color: var(--red); }
+.publish-file-list { margin: 0 16px; padding: 12px 0; border-top: 1px solid var(--separator); display: grid; gap: 12px; }
+.publish-file-group { display: grid; gap: 5px; min-width: 0; }
+.publish-file-group strong { font-size: 12px; font-weight: 650; }
+.publish-file-group.destructive strong { color: var(--orange); }
+.publish-file-group code {
+  display: block; min-width: 0; color: var(--secondary-label);
+  font: 11px/1.45 "SFMono-Regular", "SF Mono", Menlo, monospace;
+  overflow-wrap: anywhere;
+}
+.publish-file-group small { color: var(--tertiary-label); }
 
 .argument-row { grid-template-columns: minmax(0, 1fr) minmax(220px, 44%); }
 .argument-name { min-width: 0; font-weight: 500; overflow-wrap: anywhere; }

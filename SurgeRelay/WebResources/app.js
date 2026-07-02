@@ -396,12 +396,37 @@ function renderCombinedDetail(animate = true) {
     return;
   }
   const subscription = combined.subscriptionURL ? `<div class="form-section-view"><h3 class="section-heading">总模块订阅地址</h3><div class="group-box"><div class="detail-row action-row"><div class="detail-value monospaced">${escapeHTML(combined.subscriptionURL)}</div><div><button class="button" data-action="copy" data-value="${escapeAttribute(combined.subscriptionURL)}"><span class="symbol" data-symbol="copy"></span>拷贝地址</button></div></div></div></div>` : '';
+  const latestPublish = latestPublishSection(state.activity?.latestGitHubPublish);
   setDetailHTML(`${detailToolbar()}
     <section class="form-section-view"><h3 class="section-heading">汇总模块</h3><div class="group-box">
       ${detailRow('square.stack.3d.up.fill', '名称', combined.name)}
       ${detailRow('shippingbox', '包含来源', `${combined.enabledCount} / ${combined.sourceCount}`)}
       ${detailRow('clock', '最新更新', formatDate(combined.lastUpdatedAt, '尚未更新'))}
-    </div></section>${subscription}`, animate);
+    </div></section>${subscription}${latestPublish}`, animate);
+}
+
+function latestPublishSection(publish) {
+  if (!publish) return '';
+  const publishedFiles = publish.publishedFiles || [];
+  const deletedFiles = publish.deletedFiles || [];
+  const commitText = publish.commitSHA ? publish.commitSHA.slice(0, 8) : '未记录';
+  const commitValue = publish.commitURL
+    ? `<a href="${escapeAttribute(publish.commitURL)}" target="_blank" rel="noreferrer">Commit ${escapeHTML(commitText)}</a>`
+    : `Commit ${escapeHTML(commitText)}`;
+  const files = publishFileList('上传/更新', publishedFiles) + publishFileList('删除', deletedFiles, true);
+  return `<section class="form-section-view"><h3 class="section-heading">最近 GitHub 发布</h3><div class="group-box">
+    ${detailRow('link', '提交', commitValue, true)}
+    ${detailRow('clock', '时间', formatDate(publish.date, '—'))}
+    ${detailRow('doc.on.doc', '变更', `${publishedFiles.length} 个上传/更新 · ${deletedFiles.length} 个删除`)}
+    ${files ? `<div class="publish-file-list">${files}</div>` : ''}
+  </div></section>`;
+}
+
+function publishFileList(title, files, destructive = false) {
+  if (!files?.length) return '';
+  const visible = files.slice(0, 8).map(file => `<code>${escapeHTML(file)}</code>`).join('');
+  const overflow = files.length > 8 ? `<small>另有 ${files.length - 8} 个文件</small>` : '';
+  return `<div class="publish-file-group ${destructive ? 'destructive' : ''}"><strong>${escapeHTML(title)} ${files.length} 个文件</strong>${visible}${overflow}</div>`;
 }
 
 function renderModuleDetail(module, animate = true) {

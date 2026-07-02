@@ -746,6 +746,46 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertTrue(decoded.usedCache)
     }
 
+    func testUpdateHistoryDecodesLegacyEntryWithoutPublishDetails() throws {
+        let data = Data(#"{"moduleName":"GitHub","outcome":"published","duration":0,"message":"legacy publish"}"#.utf8)
+
+        let entry = try JSONDecoder().decode(UpdateHistoryEntry.self, from: data)
+
+        XCTAssertEqual(entry.moduleName, "GitHub")
+        XCTAssertEqual(entry.outcome, .published)
+        XCTAssertEqual(entry.message, "legacy publish")
+        XCTAssertTrue(entry.publishedFiles.isEmpty)
+        XCTAssertTrue(entry.deletedFiles.isEmpty)
+        XCTAssertNil(entry.commitSHA)
+    }
+
+    func testGitHubPublishSnapshotBuildsCommitURLAndFileSummary() throws {
+        var settings = GitHubSettings()
+        settings.owner = "someone"
+        settings.repository = "relay"
+        let commit = "abcdef1234567890"
+        let entry = UpdateHistoryEntry(
+            date: Date(timeIntervalSince1970: 3_600),
+            moduleName: "GitHub",
+            outcome: .published,
+            duration: 0,
+            message: "原子提交 abcdef12：上传/更新 2 个，删除 1 个",
+            publishedFiles: ["Demo.sgmodule", "Folder/Tool.sgmodule"],
+            deletedFiles: ["Old.sgmodule"],
+            commitSHA: commit
+        )
+
+        let snapshot = try XCTUnwrap(GitHubPublishSnapshot.latest(in: [entry], settings: settings))
+
+        XCTAssertEqual(snapshot.commitSHA, commit)
+        XCTAssertEqual(snapshot.commitDisplay, "abcdef12")
+        XCTAssertEqual(snapshot.commitURL, "https://github.com/someone/relay/commit/\(commit)")
+        XCTAssertEqual(snapshot.changedFileCount, 3)
+        XCTAssertEqual(snapshot.fileSummary, "2 个上传/更新 · 1 个删除")
+        XCTAssertEqual(snapshot.publishedFiles, ["Demo.sgmodule", "Folder/Tool.sgmodule"])
+        XCTAssertEqual(snapshot.deletedFiles, ["Old.sgmodule"])
+    }
+
     func testSourceRevisionServiceRecognizesUnchangedContent() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [SourceRevisionURLProtocol.self]

@@ -463,9 +463,32 @@ private struct CombinedModuleDetailView: View {
                 }
             }
 
+            latestPublishSection
             publishPreviewSection
         }
         .formStyle(.grouped)
+    }
+
+    @ViewBuilder
+    private var latestPublishSection: some View {
+        if model.settings.storageMode == .gitHub, let publish = model.latestGitHubPublish {
+            Section("最近 GitHub 发布") {
+                detailRow("提交", value: publish.commitDisplay, icon: "arrow.triangle.branch")
+                detailRow("时间", value: publish.date.formatted(date: .long, time: .standard), icon: "clock")
+                detailRow("变更", value: publish.fileSummary, icon: "doc.on.doc")
+                if let commitURL = publish.commitURL.flatMap(URL.init(string:)) {
+                    Link(destination: commitURL) {
+                        Label("打开 Commit", systemImage: "arrow.up.right.square")
+                    }
+                }
+                if publish.changedFileCount > 0 {
+                    DisclosureGroup("文件清单") {
+                        publishFileList("上传/更新", files: publish.publishedFiles, systemImage: "arrow.up.doc")
+                        publishFileList("删除", files: publish.deletedFiles, systemImage: "trash", isDestructive: true)
+                    }
+                }
+            }
+        }
     }
 
     @ViewBuilder
@@ -574,6 +597,36 @@ private struct PublishPreviewSummaryView: View {
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
+        }
+    }
+}
+
+private func publishFileList(
+    _ title: String,
+    files: [String],
+    systemImage: String,
+    isDestructive: Bool = false
+) -> some View {
+    Group {
+        if !files.isEmpty {
+            VStack(alignment: .leading, spacing: 5) {
+                Label("\(title) \(files.count) 个文件", systemImage: systemImage)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(isDestructive ? .orange : .primary)
+                ForEach(Array(files.prefix(10)), id: \.self) { file in
+                    Text(file)
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+                if files.count > 10 {
+                    Text("另有 \(files.count - 10) 个文件")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 4)
         }
     }
 }
