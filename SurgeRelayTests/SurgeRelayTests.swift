@@ -465,6 +465,8 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertEqual(diagnostics.keychainAccessState, .available)
         XCTAssertEqual(diagnostics.keychainAccessStatus, "可用")
         XCTAssertEqual(diagnostics.keychainAccessMessage, "钥匙串读写正常。")
+        XCTAssertNil(diagnostics.keychainAccessStatusCode)
+        XCTAssertEqual(diagnostics.keychainAccessRecoverySuggestion, "")
         XCTAssertEqual(diagnostics.keychainAccessCheckedAt, checkedAt)
         XCTAssertEqual(diagnostics.githubTokenAccount, KeychainStore.githubTokenAccount)
         XCTAssertEqual(diagnostics.webAccessTokenAccount, KeychainStore.webAccessTokenAccount)
@@ -477,7 +479,9 @@ final class SurgeRelayTests: XCTestCase {
         let snapshot = KeychainAccessProbeSnapshot.from(
             result: KeychainAccessProbeResult(
                 isAvailable: false,
-                message: "钥匙串保存失败：User interaction is not allowed."
+                message: "钥匙串保存失败：User interaction is not allowed.",
+                statusCode: errSecInteractionNotAllowed,
+                recoverySuggestion: "请解锁登录钥匙串。"
             ),
             checkedAt: checkedAt
         )
@@ -485,7 +489,21 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertEqual(snapshot.state, .unavailable)
         XCTAssertEqual(snapshot.state.title, "不可用")
         XCTAssertEqual(snapshot.message, "钥匙串保存失败：User interaction is not allowed.")
+        XCTAssertEqual(snapshot.statusCode, errSecInteractionNotAllowed)
+        XCTAssertEqual(snapshot.recoverySuggestion, "请解锁登录钥匙串。")
         XCTAssertEqual(snapshot.checkedAt, checkedAt)
+    }
+
+    func testKeychainStoreErrorProvidesActionableRecoverySuggestion() {
+        let interactionError = KeychainStoreError(operation: "保存", status: errSecInteractionNotAllowed)
+        XCTAssertEqual(Int32(interactionError.status), errSecInteractionNotAllowed)
+        XCTAssertTrue(interactionError.localizedDescription.contains("钥匙串保存失败"))
+        XCTAssertTrue(interactionError.recoverySuggestion?.contains("登录") == true)
+        XCTAssertTrue(interactionError.recoverySuggestion?.contains("允许") == true)
+
+        let entitlementError = KeychainStoreError(operation: "读取", status: errSecMissingEntitlement)
+        XCTAssertTrue(entitlementError.recoverySuggestion?.contains("pkg") == true)
+        XCTAssertTrue(entitlementError.recoverySuggestion?.contains("重新保存 Token") == true)
     }
 
     func testStorageModeSelectsOnlyItsOwnCombinedOutput() throws {

@@ -140,6 +140,20 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
+                if let statusCode = credentials.keychainAccessStatusCode {
+                    LabeledContent("错误码") {
+                        Text("OSStatus \(statusCode)")
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
+                }
+                if !credentials.keychainAccessRecoverySuggestion.isEmpty {
+                    Label(credentials.keychainAccessRecoverySuggestion, systemImage: "wrench.and.screwdriver")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
                 credentialLabel(
                     "GitHub Token",
                     account: credentials.githubTokenAccount,

@@ -102,11 +102,20 @@ enum KeychainStore {
                 )
             }
             return KeychainAccessProbeResult(isAvailable: true, message: "钥匙串读写正常。")
+        } catch let error as KeychainStoreError {
+            try? deletePassword(account: account, service: service)
+            return KeychainAccessProbeResult(
+                isAvailable: false,
+                message: error.localizedDescription,
+                statusCode: Int32(error.status),
+                recoverySuggestion: error.recoverySuggestion ?? KeychainStoreError.genericRecoverySuggestion
+            )
         } catch {
             try? deletePassword(account: account, service: service)
             return KeychainAccessProbeResult(
                 isAvailable: false,
-                message: error.localizedDescription
+                message: error.localizedDescription,
+                recoverySuggestion: KeychainStoreError.genericRecoverySuggestion
             )
         }
     }
@@ -131,6 +140,8 @@ enum KeychainStore {
 struct KeychainAccessProbeResult: Equatable, Sendable {
     var isAvailable: Bool
     var message: String
+    var statusCode: Int32? = nil
+    var recoverySuggestion: String = ""
 }
 
 struct KeychainStoreError: LocalizedError, Sendable {
@@ -141,4 +152,23 @@ struct KeychainStoreError: LocalizedError, Sendable {
         let message = SecCopyErrorMessageString(status, nil) as String? ?? "OSStatus \(status)"
         return "钥匙串\(operation)失败：\(message)"
     }
+
+    var recoverySuggestion: String? {
+        switch status {
+        case errSecInteractionNotAllowed:
+            return "钥匙串当前不允许交互。请确认已登录 macOS 且“登录”钥匙串已解锁；重新打开 App 后，如系统提示访问钥匙串，请选择允许。"
+        case errSecAuthFailed:
+            return "钥匙串认证失败。请打开“钥匙串访问”，确认“登录”钥匙串已解锁，并检查是否曾拒绝 Surge Relay 访问相关项目。"
+        case errSecNotAvailable:
+            return "系统安全服务暂不可用。请稍后重试，或重新登录 macOS 后再打开 Surge Relay。"
+        case errSecMissingEntitlement:
+            return "当前 App 签名或权限无法访问钥匙串项目。更新已有安装请使用 pkg；仍失败时，可删除旧的 Surge Relay 钥匙串项目后重新保存 Token。"
+        case errSecDecode:
+            return "钥匙串项目数据无法解析。请重新保存 GitHub Token，或重置 Web 管理令牌以重建钥匙串项目。"
+        default:
+            return Self.genericRecoverySuggestion
+        }
+    }
+
+    static let genericRecoverySuggestion = "请退出并重新打开 App 后再试；若仍失败，可在“钥匙串访问”中搜索 Surge Relay，删除相关项目后回到 App 重新保存 GitHub Token 或重置 Web 管理令牌。"
 }

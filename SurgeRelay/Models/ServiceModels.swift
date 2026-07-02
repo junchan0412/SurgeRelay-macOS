@@ -377,17 +377,23 @@ enum KeychainAccessProbeState: String, Codable, Equatable, Sendable {
 struct KeychainAccessProbeSnapshot: Codable, Equatable, Sendable {
     var state: KeychainAccessProbeState
     var message: String
+    var statusCode: Int32?
+    var recoverySuggestion: String
     var checkedAt: Date?
 
     static let notChecked = KeychainAccessProbeSnapshot(
         state: .notChecked,
         message: "尚未主动检查钥匙串读写权限。",
+        statusCode: nil,
+        recoverySuggestion: "",
         checkedAt: nil
     )
 
     static let checking = KeychainAccessProbeSnapshot(
         state: .checking,
         message: "正在写入、读取并清理临时诊断项。",
+        statusCode: nil,
+        recoverySuggestion: "",
         checkedAt: nil
     )
 
@@ -405,6 +411,8 @@ struct KeychainAccessProbeSnapshot: Codable, Equatable, Sendable {
         KeychainAccessProbeSnapshot(
             state: result.isAvailable ? .available : .unavailable,
             message: result.message,
+            statusCode: result.statusCode,
+            recoverySuggestion: result.recoverySuggestion,
             checkedAt: checkedAt
         )
     }
@@ -415,6 +423,8 @@ struct CredentialDiagnosticSnapshot: Codable, Equatable, Sendable {
     var keychainAccessState: KeychainAccessProbeState
     var keychainAccessStatus: String
     var keychainAccessMessage: String
+    var keychainAccessStatusCode: Int32?
+    var keychainAccessRecoverySuggestion: String
     var keychainAccessCheckedAt: Date?
     var githubTokenAccount: String
     var githubTokenStatus: String
@@ -432,12 +442,14 @@ struct CredentialDiagnosticSnapshot: Codable, Equatable, Sendable {
             keychainAccessState: keychainAccessProbe.state,
             keychainAccessStatus: keychainAccessProbe.state.title,
             keychainAccessMessage: keychainAccessProbe.message,
+            keychainAccessStatusCode: keychainAccessProbe.statusCode,
+            keychainAccessRecoverySuggestion: keychainAccessProbe.recoverySuggestion,
             keychainAccessCheckedAt: keychainAccessProbe.checkedAt,
             githubTokenAccount: KeychainStore.githubTokenAccount,
             githubTokenStatus: githubTokenStatus.title,
             webAccessTokenAccount: KeychainStore.webAccessTokenAccount,
             webAccessTokenStatus: webAccessTokenStatus.title,
-            note: "Surge Relay 只使用系统钥匙串保存 GitHub Token 和 Web 管理访问令牌；主动检查会创建一个临时诊断项并立即删除，诊断报告不会导出令牌内容。"
+            note: "Surge Relay 只使用系统钥匙串保存 GitHub Token 和 Web 管理访问令牌；主动检查会创建一个临时诊断项并立即删除，诊断报告会导出错误码和修复建议，但不会导出令牌内容。"
         )
     }
 }
