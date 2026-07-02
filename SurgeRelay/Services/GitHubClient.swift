@@ -1,6 +1,10 @@
 import Foundation
 
 actor GitHubClient {
+    private enum PublishAttemptError: Error {
+        case verificationFailed
+    }
+
     private struct ExistingContent: Decodable { let sha: String }
     private struct GitHubMessage: Decodable { let message: String }
     private struct RepositoryMetadata: Decodable {
@@ -123,6 +127,7 @@ actor GitHubClient {
         guard settings.isConfigured else { throw RelayError.githubNotConfigured }
         guard !token.isEmpty else { throw RelayError.githubTokenMissing }
         guard !files.isEmpty || !obsoleteFileNames.isEmpty else { throw RelayError.noFilesToPublish }
+        try validateUniqueRepositoryPaths(files, settings: settings)
 
         let diff = try await publishDiff(
             files: files,
@@ -145,6 +150,7 @@ actor GitHubClient {
         guard settings.isConfigured else { throw RelayError.githubNotConfigured }
         guard !token.isEmpty else { throw RelayError.githubTokenMissing }
         guard !files.isEmpty || !obsoleteFileNames.isEmpty else { throw RelayError.noFilesToPublish }
+        try validateUniqueRepositoryPaths(files, settings: settings)
 
         var retriedAfterConflict = false
         for attempt in 0..<2 {
@@ -157,8 +163,17 @@ actor GitHubClient {
                 )
                 report.retriedAfterConflict = retriedAfterConflict
                 return report
-            } catch let error as RelayError where attempt == 0 && Self.isReferenceUpdateConflict(error) {
-                retriedAfterConflict = true
+            } catch {
+                guard attempt == 0, isRetryablePublishError(error) else {
+                    if error is PublishAttemptError {
+                        throw RelayError.invalidOutput("GitHub 提交后引用校验失败，未确认发布成功。")
+                    }
+                    throw error
+                }
+                if let relayError = error as? RelayError,
+                   Self.isReferenceUpdateConflict(relayError) {
+                    retriedAfterConflict = true
+                }
                 try Task.checkCancellation()
                 continue
             }
@@ -220,7 +235,7 @@ actor GitHubClient {
             token: token
         )
         let branch = encodedPathComponent(settings.branch)
-        let _: ReferenceResponse = try await requestJSON(
+        let updatedReference: ReferenceResponse = try await requestJSON(
             path: "git/refs/heads/\(branch)",
             method: "PATCH",
             body: UpdateReferenceRequest(sha: commit.sha),
@@ -228,11 +243,22 @@ actor GitHubClient {
             token: token
         )
         try Task.checkCancellation()
+        guard updatedReference.object.sha == commit.sha else {
+            throw PublishAttemptError.verificationFailed
+        }
         return PublishReport(
             publishedFiles: changedFiles.map(\.name),
             deletedFiles: deletedFiles,
             commitSHA: commit.sha
         )
+    }
+
+    private func isRetryablePublishError(_ error: Error) -> Bool {
+        if error is PublishAttemptError { return true }
+        if let relayError = error as? RelayError {
+            return Self.isReferenceUpdateConflict(relayError)
+        }
+        return false
     }
 
     private static func isReferenceUpdateConflict(_ error: RelayError) -> Bool {
@@ -289,6 +315,16 @@ actor GitHubClient {
             changedFiles: changedFiles,
             deletedFiles: deletedFiles
         )
+    }
+
+    private func validateUniqueRepositoryPaths(_ files: [PublishFile], settings: GitHubSettings) throws {
+        var paths = Set<String>()
+        for file in files {
+            let path = repositoryPath(for: file.name, settings: settings)
+            guard paths.insert(path).inserted else {
+                throw RelayError.invalidOutput("GitHub 发布列表包含重复路径：\(path)")
+            }
+        }
     }
 
     private func remoteTreeSnapshot(settings: GitHubSettings, token: String) async throws -> RemoteTreeSnapshot {

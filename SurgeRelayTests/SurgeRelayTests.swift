@@ -989,7 +989,109 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: root.appending(path: "Old.sgmodule").path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: root.appending(path: "Folder").path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: root.appending(path: "New.sgmodule").path))
+        XCTAssertTrue(
+            try String(contentsOf: root.appending(path: "New.sgmodule"), encoding: .utf8)
+                .contains("# Surge Relay managed output")
+        )
         XCTAssertTrue(FileManager.default.fileExists(atPath: root.appending(path: "Manual.sgmodule").path))
+    }
+
+    func testLocalPublishedExportRefusesUnmanagedSameNameFile() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let existing = root.appending(path: "Personal.sgmodule")
+        try Data("#!name=Personal\n[Rule]\nFINAL,DIRECT\n".utf8).write(to: existing)
+
+        let store = ModuleFileStore()
+        do {
+            _ = try await store.exportPublishedFiles(
+                [PublishFile(name: "Personal.sgmodule", data: Data("#!name=Relay\n[Rule]\nFINAL,REJECT\n".utf8))],
+                toRootDirectory: root.path
+            )
+            XCTFail("不应覆盖未被 Surge Relay 管理的同名文件")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("不属于 Surge Relay 管理"))
+        }
+
+        XCTAssertEqual(try String(contentsOf: existing, encoding: .utf8), "#!name=Personal\n[Rule]\nFINAL,DIRECT\n")
+    }
+
+    func testLocalPublishedExportMigratesKnownLegacyManagedFile() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let destination = root.appending(path: "Legacy.sgmodule")
+        try Data("#!name=Legacy\n[Rule]\nFINAL,DIRECT\n".utf8).write(to: destination)
+
+        let store = ModuleFileStore()
+        _ = try await store.exportPublishedFiles(
+            [PublishFile(name: "Legacy.sgmodule", data: Data("#!name=Legacy\n[Rule]\nFINAL,REJECT\n".utf8))],
+            toRootDirectory: root.path,
+            knownManagedRelativePaths: ["Legacy.sgmodule"]
+        )
+
+        let written = try String(contentsOf: destination, encoding: .utf8)
+        XCTAssertTrue(written.contains("# Surge Relay managed output"))
+        XCTAssertTrue(written.contains("FINAL,REJECT"))
+    }
+
+    func testLocalPublishedExportPreservesSurgeMetadataHeader() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+
+        let store = ModuleFileStore()
+        _ = try await store.exportPublishedFiles(
+            [
+                PublishFile(
+                    name: "Header.sgmodule",
+                    data: Data("""
+                    #!name=Header
+                    #!category=Ads
+                    [Rule]
+                    FINAL,REJECT
+
+                    """.utf8)
+                )
+            ],
+            toRootDirectory: root.path
+        )
+
+        let written = try String(contentsOf: root.appending(path: "Header.sgmodule"), encoding: .utf8)
+        XCTAssertTrue(written.hasPrefix("""
+        #!name=Header
+        #!category=Ads
+        # Surge Relay managed output
+        # surge-relay-relative-path: Header.sgmodule
+
+        """))
+    }
+
+    func testLocalPublishedCleanupRefusesUnmanagedStaleFile() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let stale = root.appending(path: "Manual.sgmodule")
+        try Data("#!name=Manual\n[Rule]\nFINAL,DIRECT\n".utf8).write(to: stale)
+
+        let store = ModuleFileStore()
+        do {
+            _ = try await store.exportPublishedFiles(
+                [],
+                toRootDirectory: root.path,
+                removingObsoleteRelativePaths: ["Manual.sgmodule"]
+            )
+            XCTFail("不应自动清理未被 Surge Relay 管理的旧文件")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("不属于 Surge Relay 管理"))
+        }
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: stale.path))
     }
 
     func testLegacyPublishedCleanupRemovesOnlyExplicitPaths() async throws {
@@ -1437,6 +1539,28 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertEqual(report.publishedFiles, ["Changed.sgmodule"])
         XCTAssertEqual(report.deletedFiles, ["Stale.sgmodule"])
         XCTAssertFalse(GitHubMockURLProtocol.requestedPaths.contains { $0.hasPrefix("POST ") || $0.hasPrefix("PATCH ") })
+    }
+
+    func testGitHubPublishRejectsDuplicateRepositoryPathsBeforeNetworkWrite() async throws {
+        var settings = GitHubSettings()
+        settings.owner = "someone"
+        settings.repository = "relay"
+        settings.branch = "main"
+        settings.directory = "modules"
+
+        do {
+            _ = try await GitHubClient().previewPublish(
+                files: [
+                    PublishFile(name: "Folder/Demo.sgmodule", data: Data("one".utf8)),
+                    PublishFile(name: "Folder/Demo.sgmodule", data: Data("two".utf8))
+                ],
+                settings: settings,
+                token: "token"
+            )
+            XCTFail("不应允许重复 GitHub 发布路径")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("重复路径"))
+        }
     }
 
     func testGitHubPublishRetriesOnceWhenReferenceMoves() async throws {

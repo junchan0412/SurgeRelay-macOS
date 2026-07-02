@@ -1318,7 +1318,10 @@ final class AppModel {
                 _ = try await fileStore.exportPublishedFiles(
                     [],
                     toRootDirectory: preview.targetDescription,
-                    removingObsoleteRelativePaths: preview.deletedFiles
+                    removingObsoleteRelativePaths: preview.deletedFiles,
+                    knownManagedRelativePaths: settings.localPublishedRootDirectory == preview.targetDescription
+                        ? settings.localPublishedFilePaths
+                        : []
                 )
                 settings.localPublishedRootDirectory = preview.targetDescription
                 settings.localPublishedFilePaths = preview.activeFiles
@@ -1526,13 +1529,17 @@ final class AppModel {
         if settings.storageMode == .local {
             let files = try await currentPublishedFiles(combinedData: combinedData, includeAssets: includeAssets)
             let currentPaths = files.map(\.name)
+            let knownManagedPaths = settings.localPublishedRootDirectory == settings.localModuleDirectory
+                ? settings.localPublishedFilePaths
+                : []
             let stalePaths = settings.localPublishedRootDirectory == settings.localModuleDirectory
                 ? settings.localPublishedFilePaths.filter { !currentPaths.contains($0) }
                 : []
             _ = try await fileStore.exportPublishedFiles(
                 files,
                 toRootDirectory: settings.localModuleDirectory,
-                removingObsoleteRelativePaths: []
+                removingObsoleteRelativePaths: [],
+                knownManagedRelativePaths: knownManagedPaths
             )
             if stalePaths.isEmpty {
                 settings.localPublishedRootDirectory = settings.localModuleDirectory

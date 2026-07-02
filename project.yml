@@ -9,8 +9,8 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     MACOSX_DEPLOYMENT_TARGET: "26.0"
-    CURRENT_PROJECT_VERSION: 44
-    MARKETING_VERSION: 1.2.42
+    CURRENT_PROJECT_VERSION: 45
+    MARKETING_VERSION: 1.2.43
     CODE_SIGN_STYLE: Automatic
     ENABLE_USER_SCRIPT_SANDBOXING: YES
 packages:
@@ -36,6 +36,11 @@ targets:
         SUEnableAutomaticChecks: true
     sources:
       - path: SurgeRelay
+        excludes:
+          - WebResources
+      - path: SurgeRelay/WebResources
+        type: folder
+        buildPhase: resources
       - path: Surge Relay.icon
         buildPhase: resources
     dependencies:

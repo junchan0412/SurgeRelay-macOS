@@ -3,6 +3,25 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.2.43</title>
+            <pubDate>Fri, 03 Jul 2026 04:44:23 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.2.43</link>
+            <sparkle:version>45</sparkle:version>
+            <sparkle:shortVersionString>1.2.43</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.2.43
+
+
+- 借鉴上游近期 WebResources 打包调整，Web 管理资源加载同时兼容 `WebResources` 文件夹资源和旧版扁平资源，避免项目文件生成方式不一致导致 Web 管理页面缺资源。
+- 本地发布新增 Surge Relay 管理标记和 iCloud 文件协调；默认拒绝覆盖同名但不属于本 App 管理的 `.sgmodule`，并拒绝自动清理未标记旧文件。
+- 管理标记会保留 `#!name`、`#!category` 等 Surge 模块头部在文件开头，避免影响 Surge 对模块元数据的识别。
+- 本地旧发布清单中的历史输出在下次写入时可迁移为带管理标记的文件，之后再由发布预览和确认流程管理清理。
+- GitHub 发布前会校验目标仓库路径是否重复，提交后会验证分支引用确实指向新 commit；引用校验异常会自动重试一次，仍失败时停止并提示未确认发布成功。
+- README 按当前软件能力重构，集中说明安装/更新、已有模块管理、本地与 GitHub 发布、总模块、Web 管理、钥匙串、开发和发布流程。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.2.43/Surge-Relay-1.2.43.app.zip" length="8189013" type="application/zip" sparkle:edSignature="0xNe/gM3D873BF3oqoeU7RqHafQBtknw6BV1ALOpdG4CZ72Jz2OniyzoY3GB+Hztny17iYX5CbyM3XbabrDrAw=="/>
+        </item>
+        <item>
             <title>1.2.42</title>
             <pubDate>Fri, 03 Jul 2026 03:51:14 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.2.42</link>

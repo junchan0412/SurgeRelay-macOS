@@ -1,422 +1,143 @@
-# Surge Relay (macOS)
-
-<p align="center">
-  <img width="160" alt="Surge Relay Icon" src="https://github.com/user-attachments/assets/3672fe08-3217-41f8-a592-9a4f473b216b" />
-</p>
-
-<p align="center">
-  一款用于集中管理、转换、编辑和发布 Surge 模块的 macOS 应用程序。
-</p>
-
-<p align="center">
-  基于 <a href="https://github.com/Script-Hub-Org">Script-Hub</a> 的本地转换能力构建。
-</p>
-
-Surge Relay 适合需要同时维护大量 Surge 模块的用户，尤其是经常通过 Script-Hub 将 Loon、Quantumult X 或其他代理工具格式转换为 Surge `.sgmodule` 的场景。
-
-它的目标是将模块转换、地址维护、规则编辑和多设备同步集中到一台 Mac 上完成。你只需要在 Surge Relay 中维护上游地址和转换规则，最终生成的 Surge 模块会被发布到稳定的分发地址，所有设备只需要订阅这些固定 URL。
-
-## Fork 修改说明
-
-此 fork 基于原项目的 Apache License 2.0 许可进行修改，保留原许可证与第三方声明。当前 fork 增加了本地/GitHub 模块根目录、每个模块的 Surge `category` 标签、按根目录子文件夹保存独立转换模块、独立模块发布开关、总模块功能默认关闭与按需开启、扫描本地根目录已有 `.sgmodule` 纳入统一管理、本地已有模块原文件名保留与重复副本防护、配置储存目录完整迁移与旧目录清理、安全的旧输出白名单清理、发布前预览与删除确认、自动发布排队状态、结构化后台任务状态、后台任务取消入口、最近 GitHub 发布状态、将 GitHub Token 存入系统钥匙串、GitHub/Web 凭据按需加载、Web 管理访问控制、会话 cookie、同源校验、认证失败限速、Web 响应安全头、API 与事件流禁缓存、Web 更新任务接纳状态、运行状态诊断、本地根目录诊断、安装与权限诊断、最近崩溃报告摘要、Sparkle 2 App 内自动更新、固定自签名证书签名、Sparkle EdDSA 更新签名、GitHub Release 更新检查、更新安装建议、Release 资产完整性校验可见性，以及本地和线上发布产物自动校验、动态库依赖验证、版本一致性预检、发布包扩展属性清理、安全启动冒烟、pkg payload 启动冒烟、GitHub Actions 默认启动冒烟、安装后处理验证和构建产物忽略规则校正能力。
-
-### v1.2.42 优化
-
-- 总模块功能改为在设置中手动开启，默认关闭；关闭时桌面端、菜单栏和 Web 管理端会隐藏总模块入口与包含开关。
-- 新增模块和扫描导入的本地模块默认不加入总模块，只有明确勾选后才参与汇总。
-- 关闭总模块后，独立模块仍可正常转换、预览和发布。
-- 启动和更新后的旧输出清理改为白名单路径清理，不再扫描删除目录中的任意 `.sgmodule`。
-- 旧输出清理会跳过当前本地模块根目录，避免误删用户原始模块、分类文件夹或手动维护的 `assets`。
-- 真正过期的本地/GitHub 生成文件仍通过发布清单、预览和确认流程清理。
-
-### v1.2.41 优化
-
-- 更改“配置储存目录”时会迁移完整的 Surge Relay 管理数据，包括模块清单、设置、Script-Hub 状态、更新历史、备份和手动编辑覆盖内容。
-- 目标目录已有同名配置文件时会先保存到 `Backups/configuration-migration/`，再写入迁移后的文件。
-- 迁移成功后会清理旧配置目录中的 Surge Relay 管理文件，保持 Surge 根目录干净；原始 `.sgmodule`、`Surge.conf` 和分类文件夹不会被删除。
-
-### v1.2.40 优化
-
-- 本地根目录已有 `file://` 模块仍保留独立发布开关，GitHub 发布时可以继续按同一文件夹逻辑生成独立模块。
-- 本地发布目标为本地根目录时，如果独立模块输出路径正好就是源文件自身，会跳过该文件写入，避免覆盖原模块或再次制造重复副本。
-- 本地扫描导入的已有模块默认继续可独立发布；防重复逻辑改为按发布目标判断，而不是修改模块配置。
-
-### v1.2.39 优化
-
-- 已清理本地 Surge 根目录中可明确判定为本 App 新增的 11 个重复模块副本，保留原有正在使用的模块文件。
-- 本地根目录扫描导入的 `file://` Surge 模块会保留原始文件名，包括空格，不再把空格转换为连字符后生成旁路副本。
-- 启动时会把本地根目录内已有模块的输出文件名迁回源文件名，并关闭独立副本发布，避免下次更新或发布时再次写出重复文件。
-- 本地导入去重逻辑同步使用“保留已有文件名”规则，只在确实重名时追加编号。
-
-### v1.2.38 优化
-
-- App 重新启用 Sparkle 2 自动更新通道，“查看更新…”会优先使用 App 内更新器；GitHub Release 资产面板保留为手动安装和诊断备用。
-- Release 打包脚本支持固定自签名 Code Signing 证书，正式构建可要求 `REQUIRE_STABLE_CODESIGN=1`，验证脚本会检查 App、Sparkle framework、Updater 与 XPC 服务使用同一签名身份。
-- 自签名 Hardened Runtime 发布包会给主 App 加入 `disable-library-validation` entitlement，避免 Sparkle framework 因自签名身份没有 Team ID 而在启动阶段被 dyld 拒绝。
-- Release 构建可用 `.app.zip` 的 Sparkle EdDSA 签名自动更新 `appcast.xml`；CI 正式打包要求 `SPARKLE_ED_KEY` 与 `CODESIGN_CERTIFICATE_P12_BASE64`，避免回到 ad-hoc 更新链路。
-- GitHub Token 与 Web 管理令牌改为按需读取/创建，启动和普通本地模式不再主动访问钥匙串；钥匙串读写诊断也只在用户点击“重新检查”时执行。
-
-### v1.2.37 优化
-
-- 后台任务新增取消请求状态，模块更新、本地扫描/导入、Script-Hub 检查、GitHub 测试、发布预览、确认发布和自动发布会在安全边界尽快停止。
-- 桌面状态卡、菜单栏和 Web 管理活动卡新增取消入口；取消请求发出后会显示“正在取消”，任务收尾后保留“已取消”状态。
-- Web 管理状态和诊断报告新增任务是否可取消、是否正在取消字段，远程管理时更容易判断刷新/发布是否仍在执行。
-- GitHub 提交和本地旧文件清理进入提交阶段后会临时关闭取消入口，确保已发布或已清理的结果会完整写回本地状态。
-
-### v1.2.36 优化
-
-- Release 构建脚本新增 `RUN_LAUNCH_SMOKE_TEST=1` 开关，可在生成 `.app.zip` 与 `.pkg` 后自动启动验证两种安装资产。
-- GitHub Actions 手动打包流程默认启用启动冒烟，并在上传 Release 后对线上资产再次执行同样的启动验证。
-- 工作流保留 `launch_smoke_test` 输入，可在 CI 图形会话异常时临时关闭启动冒烟，其余 sha256、签名清单、动态库和安装脚本校验仍会继续执行。
-
-### v1.2.35 优化
-
-- 仓库忽略规则显式加入小写 `build/`，让 Git 与 ripgrep 文件枚举对 Xcode DerivedData、SourcePackages 和测试构建缓存保持一致。
-- 本地构建和 Release 产物继续保存在已忽略的 `build/` 与 `dist/` 目录中，减少搜索、diff 和发布准备时被派生产物刷屏的情况。
-
-### v1.2.34 优化
-
-- 新增结构化后台任务状态，可区分模块更新、本地扫描/导入、Script-Hub 更新、GitHub 测试、发布预览、确认发布、预览内容写入/恢复和钥匙串检查。
-- Web 管理状态新增任务类型、任务标题、开始时间和是否阻塞更新字段；刷新按钮仍保留原有接纳状态，并能显示更具体的占用原因。
-- 桌面模块页、菜单栏和诊断报告同步使用结构化任务快照；钥匙串主动检查会作为非阻塞活动展示，不影响模块更新接纳。
-
-### v1.2.33 优化
-
-- Web 管理触发“更新全部”或单模块更新前会先判断当前是否正在执行任务、是否有启用模块，以及目标模块是否已停用，无法接纳时返回明确提示。
-- Web 管理状态新增更新接纳字段，刷新按钮会根据忙碌或无可更新模块自动禁用并显示原因，避免误显示“已开始更新”。
-- 桌面工具栏、菜单栏和应用菜单复用同一套更新接纳规则，多个入口的可点击状态保持一致。
-
-### v1.2.32 优化
-
-- Release 打包脚本生成 `.app.zip` 和 `.pkg` payload 时使用无资源 fork、无扩展属性的复制与压缩路径，避免发布包混入本机元数据。
-- Release 验证新增 zip AppleDouble 元数据检查，避免发布包混入 `__MACOSX` 或 `._*` 条目。
-- Release 验证会检查 `.app.zip` 与 `.pkg` payload 中的 App 不带 `com.apple.quarantine` 属性，继续保证更新安装无需重复手动 `xattr -cr`。
-
-### v1.2.31 优化
-
-- Web 管理普通 API 响应默认增加 `Cache-Control: no-store`、`Pragma: no-cache` 与 `Expires: 0`，避免模块状态、预览内容或错误信息被浏览器缓存。
-- Web 管理事件流改为使用同一套安全响应头，并保留 `no-transform`，减少代理或浏览器缓存实时状态流的风险。
-- Web 服务统一补充 `X-Frame-Options`、`Permissions-Policy`、`Cross-Origin-Opener-Policy`、`Referrer-Policy` 与 `X-Content-Type-Options`，降低被嵌入、能力误用或 MIME 嗅探的暴露面。
-
-### v1.2.30 优化
-
-- Web 管理普通 API 改为会话 cookie 访问，访问令牌只用于 `POST /api/session` 建立会话，前端后续请求不再反复发送 `Authorization` 明文令牌。
-- Web 管理对 `POST`、`PUT`、`PATCH`、`DELETE` 增加同源 `Origin` 校验，降低已建立会话后被跨站请求触发管理操作的风险。
-- Web 服务会对同一客户端连续认证失败做短时间限速，减少令牌猜测或误配置客户端反复撞库时的暴露面。
-
-### v1.2.29 优化
-
-- Web 管理前端启动时会用访问令牌建立 `HttpOnly` 会话 cookie，后续实时状态事件流不再把令牌放进 `/api/events` 的 query string。
-- 复制打开的访问链接仍可携带一次性 `?token=` 入口；页面读取后会立即移除地址栏中的 token，并用派生会话值访问 API。
-- Web 管理安全测试补充会话 cookie、错误 cookie 和 cookie 不暴露原始令牌的覆盖，减少远程管理时的令牌泄露面。
-
-### v1.2.28 优化
-
-- 模块汇总详情新增“最近 GitHub 发布”，会显示最近一次发布的 commit、发布时间以及上传/更新和删除文件数量。
-- 设置页“最近更新”会保存并展示 GitHub 发布的 commit 与文件变更摘要，手动发布、确认发布和自动发布三条路径保持一致。
-- Web 管理 API 与前端同步展示最近 GitHub 发布状态，诊断报告也会导出该快照，远程管理时更容易确认“已经发到哪个提交”。
-
-### v1.2.27 优化
-
-- 自动发布排队后，模块页底部状态卡会显示预计执行时间，减少“等待合并发布”但不知道何时上传的困惑。
-- Web 管理端活动状态同步显示自动发布预计时间，远程管理时也能看到发布队列状态。
-- 手动发布、预览发布、切换到本地模式或关闭自动发布时会立即取消排队状态；诊断报告也会导出自动发布排队时间。
-
-### v1.2.26 优化
-
-- 设置页“安装与权限”新增最近 24 小时崩溃报告摘要，会显示最近的 `.crash`/`.ips` 文件名、时间和路径，方便排查安装后打开即退出。
-- Release 验证脚本的 `--launch-smoke-test` 会分别验证 `app.zip` 解包后的 App 与 `pkg` payload 内的 App，覆盖两种安装资产的启动路径。
-- 启动冒烟失败时会输出 quarantine、codesign、Gatekeeper、进程列表和最近崩溃报告路径，便于区分系统拦截、签名问题和真实运行时崩溃。
-
-### v1.2.25 优化
-
-- 添加/编辑模块时新增“发布为独立模块”开关，可以将“包含在总模块中”和“是否生成独立订阅文件”分开控制。
-- 旧配置和新建模块默认继续发布独立模块，避免升级后意外删除既有稳定地址；关闭后，发布预览会列出需要清理的旧独立模块文件。
-- Web 管理端同步支持该开关，并且发布资产会只保留仍被总模块或独立模块引用的转换脚本资源。
-
-### v1.2.24 优化
-
-- Release 验证脚本的 `--launch-smoke-test` 不再先结束所有正在运行的 Surge Relay，而是记录已有进程、启动 Release 包中的新实例，并只检查和关闭新实例。
-- 本地或线上发布资产现在可以在用户已有 App 正在运行时执行启动冒烟验证，降低验证流程打断当前工作的风险。
-- 启动冒烟失败时会明确报告“未启动新实例”或“新实例提前退出”，方便区分启动被系统阻止和启动后崩溃。
-
-### v1.2.23 优化
-
-- Release 打包脚本不再硬编码默认版本号，改为从 `project.yml` 读取 `MARKETING_VERSION` 和 `CURRENT_PROJECT_VERSION`，减少发布时漏改脚本版本的风险。
-- 打包前会校验传入的 `VERSION`/`BUILD` 与项目版本一致，并确认 Xcode 工程中的版本号已同步；CI 或本地 tag 填错会在构建前失败。
-- Release 校验调用会显式传入版本号与构建号，避免 `.app.zip`、`.pkg` 和项目元数据之间出现隐性漂移。
-
-### v1.2.22 优化
-
-- App 内 GitHub Release 更新面板新增“安装建议”，会明确提示更新已有安装优先使用 `pkg`，安装器会清除隔离属性，后续无需手动运行 `xattr -cr`。
-- 更新面板会区分首次安装可用的 `app.zip` 与更新用的 `pkg`，当 Release 缺少 `pkg` 时会给出注意提示。
-- 更新面板补充当前发布资产的信任状态说明：App 为 ad-hoc 签名、`pkg` 未签名且未做 Developer ID 公证，减少下载安装前的信息落差。
-
-### v1.2.21 优化
-
-- 钥匙串主动访问检查新增 `OSStatus` 错误码与修复建议，方便区分钥匙串未解锁、交互被系统禁止、签名权限不匹配或旧项目损坏等情况。
-- 设置页“钥匙串”会在检查失败时显示错误码和下一步处理建议，减少排查 GitHub Token 或 Web 管理令牌保存失败时的来回猜测。
-- 诊断报告同步导出钥匙串错误码与修复建议，仍不会导出任何 GitHub Token 或 Web 管理令牌内容。
-
-### v1.2.20 优化
-
-- 设置页“钥匙串”新增主动访问检查，会写入、读取并清理一个临时诊断项，用于确认 GitHub Token 与 Web 管理令牌所需的系统钥匙串读写能力。
-- 诊断报告新增钥匙串访问检查状态、结果说明和检查时间，仍不会导出任何 GitHub Token 或 Web 管理令牌内容。
-- 修正钥匙串状态标签颜色，只有真正保存到系统钥匙串时显示为绿色；内存临时令牌或钥匙串不可用会显示为需要关注。
-
-### v1.2.19 优化
-
-- pkg 更新包新增 `preinstall`，安装前会请求正在运行的 Surge Relay 退出，短暂等待后仍未退出时再兜底结束进程，降低运行中替换 App bundle 导致更新不完整的风险。
-- Release 验证会检查 pkg `preinstall` 是否存在、是否可执行，并确认包含退出旧 App 的逻辑。
-- `postinstall` 仍负责清理隔离属性，更新已有安装继续无需手动执行 `xattr -cr`。
-
-### v1.2.18 优化
-
-- 新增 `script/verify_github_release_assets.sh`，可校验 GitHub Release 线上资产列表、下载后的 sha256 sidecar、GitHub API digest 和包内结构。
-- GitHub Actions 打包工作流上传 Release 资产后会自动运行线上校验，减少漏传、上传损坏或 digest 不一致的问题。
-- 线上校验会复用本地 Release 验证，继续覆盖 App 版本号、构建号、签名清单、动态库依赖、pkg payload 和 postinstall。
-
-### v1.2.17 优化
-
-- App 内 GitHub Release 更新检查会下载 `.pkg.sha256` 与 `.app.zip.sha256` 小文件，并与 GitHub API 返回的资产 digest 比对。
-- 更新面板的资产完整性状态会区分 sha256 匹配、不匹配、缺少 digest、缺少 sha256 或无法读取。
-- 补充 sha256 匹配和不匹配两类 Release API 回归测试。
-
-### v1.2.16 优化
-
-- App 内 GitHub Release 更新面板新增资产完整性区域，显示 `.pkg` 与 `.app.zip` 的文件大小、GitHub digest 和对应 `.sha256` 文件状态。
-- 更新面板会提示安装资产是否缺少 sha256 校验文件，下载安装前更容易发现 Release 资产不完整。
-- GitHub Release API 解码测试补充 `digest` 与 `.sha256` 配对覆盖。
-
-### v1.2.15 优化
-
-- Release 验证会读取主程序的 `LC_RPATH` 与 `otool -L`，确认 `@rpath` 依赖能解析到 App bundle 内或系统库路径。
-- 发布包会检查 `@executable_path/../Frameworks` 运行时搜索路径，覆盖 Sparkle framework 缺失或路径错误导致的启动即闪退风险。
-- `.app.zip` 和 `.pkg` payload 都会执行同一套动态链接前置验证。
-
-### v1.2.14 优化
-
-- Release 验证会检查 App、Sparkle framework、Updater 与 XPC 服务的签名清单，确保发布包里不会混入不同 Team ID 的嵌入代码。
-- `.pkg` 的 postinstall 会按 installer 目标卷清理 `Surge Relay.app` 的隔离属性；发布验证会在临时安装根中实际执行脚本，确认更新安装后无需手动 `xattr -cr`。
-- `verify_release_assets.sh` 支持 `--launch-smoke-test`，可在本地发布前从 `.app.zip` 解包并启动 App，确认 Release 构建不会启动即退出。
-
-### v1.2.13 优化
-
-- GitHub 发布在远端分支刚好被其他客户端更新时，会重新读取仓库 tree 并自动重试一次，减少非快进引用更新导致的发布失败。
-- 发布历史和状态栏会标记已处理远端更新，便于确认本次发布是否经历过重试。
-- 设置页本地模式新增根目录诊断，可查看目录是否存在、是否可写、已发现文件夹数量和 `.sgmodule` 数量；导出的诊断报告也会包含这些信息。
-
-### v1.2.12 优化
-
-- “查看更新…”改为 App 内 GitHub Release 检查面板，显示当前版本、最新版本、发布说明和可安装资产。
-- 更新面板会优先提供 `.pkg` 下载入口，用于更新已有安装并自动清除隔离属性；同时保留 `.app.zip` 与 Release 页面入口。
-- 新增 Release 版本比较与 GitHub Release API 解码测试，避免多位版本号比较错误。
-
-### v1.2.11 优化
-
-- 设置页 Web 管理区域新增服务状态、访问范围与令牌存储状态，可直接看到端口是否运行、是否开放局域网访问以及令牌是否保存在系统钥匙串。
-- Web 管理地址展示改为不含访问令牌；“打开”“拷贝访问链接”和二维码仍使用含令牌访问链接，方便访问但减少截图或诊断泄露风险。
-- 诊断报告新增 Web 服务运行状态、访问模式、无令牌管理地址和 Web 令牌存储状态，继续保证不会导出令牌内容。
-
-### v1.2.10 优化
-
-- 菜单栏和应用菜单中的“查看更新…”改为直接打开 GitHub Releases 最新版本页，避免旧 Sparkle appcast 显示过期版本。
-- App 启动时不再启动 Sparkle updater；在完成可签名 appcast 前，更新路径统一收敛到 GitHub Release 中的 `.pkg` 安装包。
-- 文档同步说明当前更新策略：首次安装可用 `.app.zip`，更新已有安装优先使用 `.pkg`，无需重复手动执行 `xattr -cr`。
-
-### v1.2.9 优化
-
-- 汇总模块详情新增 GitHub 发布预览，可在上传前查看新增/更新文件和将删除的旧文件。
-- 自动 GitHub 发布如果检测到需要删除旧文件，会暂停并等待用户确认，避免误删移动或改名后的历史路径。
-- 本地模式写入新模块时不再静默删除旧路径；如需清理旧文件，会在汇总模块详情显示待确认清理预览。
-- “扫描本地模块”的导入预览新增“已跳过”列表，显示空文件、总模块文件、已纳入管理路径、重复来源等跳过原因。
-
-### v1.2.8 优化
-
-- 设置页新增“安装与权限”诊断，可查看 App 路径、签名状态、Gatekeeper 评估、隔离属性、Sparkle 自动检查状态和推荐更新方式。
-- 设置页新增“钥匙串”诊断，明确 GitHub Token 与 Web 管理令牌只保存到 macOS 系统钥匙串，诊断报告不会导出令牌内容。
-- 诊断导出新增安装环境和钥匙串状态，方便排查首次安装打不开、更新后启动异常、钥匙串不可用等问题。
-- Sparkle 自动检查更新默认关闭；在最新 appcast 签名链路完成前，更新已有安装请优先使用 Release 中的 `.pkg`。
-
-### v1.2.7 优化
-
-- 本地模式的存放文件夹菜单改为递归读取本地模块根目录，可直接选择多级文件夹，例如 `Ads/Video`。
-- “扫描本地模块”的导入预览支持在导入前编辑模块名称、Surge `category` 标签和目标存放文件夹。
-- 导入本地模块时会按最终目标文件夹检查输出路径冲突；如果多个候选项最终落到同一路径，会自动给后导入项添加序号后缀。
-- 新增本地递归文件夹发现回归测试。
-
-### v1.2.6 优化
-
-- GitHub 存放文件夹菜单改为读取仓库递归 tree，可发现模块根目录下的多级文件夹，例如 `Ads/Video`。
-- GitHub 发布改为先获取仓库递归 tree 快照，再按 Git blob SHA 对比需要上传或删除的文件，减少大量模块发布时的 Contents API 请求。
-- 如果 GitHub 返回的递归 tree 被截断，发布流程会自动回退到逐文件查询，避免超大仓库下误判文件状态。
-- 递归文件夹发现会忽略 Surge Relay 生成脚本使用的内部 `assets` 目录，避免污染模块存放菜单。
-
-### v1.2.5 优化
-
-- 添加模块和编辑模块时可直接新建“存放文件夹”；本地模式会在根目录下创建目录，GitHub 模式会先保存为空路径选项，发布模块时自动创建对应路径。
-- 本地模块扫描改为后台扫描并先预览候选列表，显示模块名称、相对路径、分类与目标文件夹，确认勾选后再导入。
-- 自定义文件夹会写入配置，重启后仍会出现在存放文件夹菜单中。
-
-### v1.2.4 优化
-
-- Release 构建脚本会自动校验 `.app.zip`、`.pkg`、sha256、App 版本号、构建号、通用架构、ad-hoc 签名、pkg payload 与 postinstall 隔离属性清理脚本。
-- GitHub Actions 发布打包流程复用同一套 Release 脚本，可生成 `.app.zip`、`.pkg` 与 sha256；配置 `SPARKLE_ED_KEY` Secret 后可同时生成 Sparkle 签名元数据。
-- 本地 Release 构建会预检 Sparkle 私钥来源，私钥缺失时快速给出处理方式；如只需生成手动安装预览包，可显式跳过 Sparkle 签名校验。
-- 新增 `script/verify_release_assets.sh`，可在更新 appcast 后用 `--appcast appcast.xml` 继续校验 Sparkle 条目的包大小和 EdDSA 签名。
-
-### v1.2.3 优化
-
-- Web 管理新增访问令牌，所有接口与实时状态事件都需要令牌验证。
-- Web 管理默认仅允许本机访问；如需手机或局域网设备访问，需要在设置中显式开启“允许局域网访问”。
-- 设置页提供带令牌的访问链接、二维码、拷贝按钮与“重置令牌”操作，令牌保存在 macOS 系统钥匙串。
-
-### v1.2.2 优化
-
-- GitHub Token 改为保存到 macOS 系统钥匙串，不再写入 iCloud 同步配置文件。
-- 从旧版本升级时会自动迁移 `settings.json` 中已有的 GitHub Token；迁移成功后同步配置中的旧字段会被清空。
-- 如果钥匙串暂时不可用，App 会暂时沿用旧配置中的 Token，避免升级后丢失凭据。
-
-### v1.2.1 优化
-
-- 模块页新增“扫描本地模块”，可递归扫描本地模块根目录下已有的 `.sgmodule`，保留所在文件夹与 `#!category` 后纳入 Surge Relay 管理。
-- 本地文件模块支持 `file://` 来源，后续可以和远程模块一样参与启用、排序、编辑、汇总和发布。
-- Release 增加 `.pkg` 更新包；无 Apple 开发者账号场景下，更新安装会自动清除 `/Applications/Surge Relay.app` 的隔离属性，避免每次更新后手动执行 `xattr -cr`。
-- 1.2.1 起内置新的 Sparkle EdDSA 公钥，用于后续版本的 App 内更新签名。
-
-### v1.2.0 优化
-
-- 本地与 GitHub 发布会记录上次输出清单，模块改名、删除或移动文件夹后自动清理旧文件。
-- Web 管理端复用文件夹缓存，减少对 GitHub Contents API 的重复请求。
-- fork 构建的 Sparkle 更新源已指向本仓库。
-
-完整变更见 [CHANGELOG.md](CHANGELOG.md)。
-
-## 安装
-
-在 [Releases](https://github.com/junchan0412/SurgeRelay-macOS/releases) 下载最新版本。
-
-- 首次安装：下载 `Surge-Relay-*.app.zip`，解压后将 `Surge Relay.app` 拖入“应用程序”文件夹。由于没有 Apple Developer ID 公证，首次打开如遇到 macOS 安全提示，可按下方“App 已损坏”说明处理一次隔离属性。
-- 更新已有安装：优先使用 App 内“查看更新…”走 Sparkle 自动更新。手动更新备用路径是下载 `Surge-Relay-*.pkg` 并运行安装器，安装脚本会替换 `/Applications/Surge Relay.app` 并清除隔离属性。
-
-当前 fork 使用固定自签名 Code Signing 证书和 Sparkle EdDSA 更新签名，尚未使用 Developer ID 公证。`.pkg` 更新包同样未公证，如 macOS 拦截安装器，可在 Finder 中右键打开。1.2.38 起，App 菜单和菜单栏的“查看更新…”会调用 Sparkle 更新器；“查看 GitHub Release 资产…”保留为手动下载和排障入口。1.2.8 起可在 App 的“设置”>“安装与权限”中查看签名、Gatekeeper 和隔离属性状态。
-
-## 扫描本地已有模块
-
-在“设置”中确认本地模块根目录后，回到“模块”页点击工具栏的“扫描本地模块”。Surge Relay 会递归查找根目录下的 `.sgmodule` 文件，跳过当前汇总模块和已经纳入管理的文件，并按原路径生成“存放文件夹”。
-
-扫描导入会读取模块头部的 `#!name` 与 `#!category`，并在导入前展示可编辑预览。你可以先修改模块名称、标签和目标存放文件夹，再确认导入。1.2.9 起，扫描预览还会显示被跳过文件及原因，例如空文件、当前总模块文件、已纳入管理的发布路径或重复来源。导入后的模块来源会显示为本地 `file://` 地址，可以像远程模块一样排序、编辑并发布到本地目录或 GitHub；1.2.42 起默认不加入总模块，如需汇总，请先在设置中开启总模块功能，再为需要汇总的模块打开“包含在总模块中”。
-
-## GitHub Token 存储
-
-从 1.2.2 起，GitHub Token 保存到 macOS 系统钥匙串。旧版本写入同步配置的 Token 会在首次启动时自动迁移；迁移成功后，`settings.json` 中不再保留明文 Token。1.2.8 起可在“设置”>“钥匙串”查看 GitHub Token 与 Web 管理令牌的存储状态，诊断报告不会包含令牌内容。1.2.21 起，钥匙串主动检查失败时会显示 `OSStatus` 错误码和修复建议，便于判断是钥匙串未解锁、系统禁止交互、签名权限问题还是旧项目损坏。
-
-## 预览
-
-<p align="center">
-  <img width="760" alt="Surge Relay Preview" src="https://github.com/user-attachments/assets/aee0f362-146d-4bbf-9069-b6fda1f8f886" />
-</p>
-
-## 特性
-
-### 1. 集中化模块管理
-
-在传统流程中，如果上游作者修改了仓库地址、文件路径或目录结构，用户通常需要重新打开 Script-Hub，重新转换模块，再重新安装到 Surge。
-
-对于拥有多台设备的用户来说，这个过程需要在每台设备上重复操作。即便通过 iCloud 同步，也依然需要多次点击安装，维护成本很高。
-
-Surge Relay 将这些流程集中到一台 Mac 上完成。你只需要在 App 中维护上游地址、备用地址和转换规则，Surge 设备端无需关心原始模块来源。
-
-<p align="center">
-  <img width="375" alt="Surge Relay Module Editor" src="https://github.com/user-attachments/assets/444cbc3d-d4b8-4047-a569-607692123503" />
-  <img width="375" alt="Surge Relay Remote Management" src="https://github.com/user-attachments/assets/83509a1d-e505-4c28-b1c1-cdf6e9d80870" />
-</p>
-
-### 2. 稳定的模块分发地址
-
-Surge Relay 会将处理后的 Surge `.sgmodule` 文件发布到稳定的 GitHub 仓库地址 (私有仓库需配合 Cloudflare，否则 Surge 设备端无法推送私有仓库地址)，或保存到本地 iCloud Drive 目录。所有 iPhone、iPad、Apple TV 和 Mac 上的 Surge App 只需要订阅这些固定 URL。
-
-即使上游模块地址发生变化，你也只需要在 Surge Relay 中修改一次。设备端的订阅地址保持不变，不需要重新安装模块，也不需要逐台修改配置。
-
-<p align="center">
-  <img width="375" alt="image" src="https://github.com/user-attachments/assets/66c7c16a-f82c-4a55-b640-c5fcefb3cf99" />
-  <img width="375" alt="image" src="https://github.com/user-attachments/assets/6bb34ca7-c4c3-43b3-9b48-284eeeda8f65" />
-</p>
-
-
-### 3. 本地转换与自动发布
-
-Surge Relay 运行在你的 Mac 上，负责拉取上游模块、调用 Script-Hub 的本地转换逻辑、应用自定义规则，并生成最终可用的 Surge 模块。
-
-生成后的模块可以自动发布到 GitHub (如果你选择上传到 GitHub，则务必选择私有仓库并搭配 Cloudflare，否则 Surge 设备端无法推送私有仓库地址。如果你选择公开仓库，请确保已得到所有模块制作者同意)，或保存到 iCloud Drive (✅最推荐)。Mac 只负责构建和发布，用户设备读取的是已经发布好的稳定文件。因此，即使 Mac 关机或暂时无法连接，已经发布的模块仍然可以正常使用。
-
-### 4. 可视化编辑与规则控制
-
-Surge Relay 提供图形化界面，用于查看和编辑模块内容。
-
-你可以集中管理模块地址、删除不需要的模块、屏蔽指定 MITM hostname、禁用部分 Script 或 Rewrite 规则，并对模块参数进行可视化调整。
-
-相比手动编辑 `.sgmodule` 文件，Surge Relay 更适合长期维护大量模块。
-
-<p align="center">
-  <img width="375" alt="Surge Relay Module Editor" src="https://github.com/user-attachments/assets/236a7812-5c2e-48d2-8f49-cb12464cdf12" />
-  <img width="375" alt="Surge Relay Remote Management" src="https://github.com/user-attachments/assets/3d56e0c6-690c-4d09-9362-7bdab7c2b2fe" />
-</p>
-
-### 5. Web 端远程管理
-
-除了 macOS 原生 App，Surge Relay 也支持 Web 端远程管理。你可以通过浏览器查看模块状态、检查同步结果、调试转换问题，或远程修改模块配置。
-
-从 1.2.3 起，Web 管理默认仅允许本机访问，并要求访问令牌。若要从手机、平板或其他局域网设备访问，需要在设置中开启“允许局域网访问”，并使用设置页提供的链接或二维码。
-
-配合 Surge Ponte 功能，即使不在 Mac 旁边，也可以从你的任意一台设备访问 Surge Relay，完成状态查看、调试和编辑等操作。
-
-<p align="center">
-  <img width="62%" alt="image" src="https://github.com/user-attachments/assets/294ea6e5-4791-48bb-9e78-b0a2527eee32" />
-  <img width="24%" alt="image" src="https://github.com/user-attachments/assets/b0e782bb-984d-43ec-9af3-6820f4308b21" />
-</p>
-
-### 6. 多设备自动同步
-
-所有设备只需要订阅 Surge Relay 发布后的固定模块地址。后续模块更新、上游地址修复、MITM 调整、规则禁用等操作，都可以在 Surge Relay 中统一完成。
-
-当新的模块文件发布后，设备端会随着 Surge 的模块更新机制自动同步，避免重复配置和手动迁移。
-
-<p align="center">
-  <img width="62%" alt="Surge Relay Landscape Preview" src="https://github.com/user-attachments/assets/7dcee1b6-e2cf-4cee-9a20-293b075bf67b" />
-  <img width="24%" alt="Surge Relay Portrait Preview" src="https://github.com/user-attachments/assets/b7e8040a-7dfa-4dd0-bbba-89446e933ea1" />
-</p>
+# Surge Relay for macOS
+
+Surge Relay 是一款用于集中管理、转换、编辑和发布 Surge 模块的 macOS 应用。它适合需要长期维护大量 `.sgmodule`、从 Loon/Quantumult X 等格式转换到 Surge、并把最终模块同步到本地 Surge 目录或 GitHub 仓库的用户。
+
+本 fork 基于 [EEliberto/SurgeRelay-macOS](https://github.com/EEliberto/SurgeRelay-macOS) 修改，继续遵守 Apache License 2.0。转换能力基于 [Script-Hub](https://github.com/Script-Hub-Org) 的本地引擎。
+
+## 当前能力
+
+- 管理远程 HTTP/HTTPS 模块和本地 `file://` Surge 模块。
+- 使用内置 Script-Hub 引擎转换 Quantumult X、Loon 和 Surge 模块。
+- 为每个模块配置 Surge `category` 标签、输出文件名、输出文件夹和 Script-Hub 参数。
+- 本地发布根目录可配置，例如 iCloud Surge 目录；输出文件夹菜单会读取根目录下已有文件夹，也可以新建文件夹。
+- GitHub 发布使用与本地相同的文件夹逻辑，可发布到公开或私有仓库。
+- 总模块功能默认关闭，可在设置中手动开启；关闭后相关界面和“包含在总模块中”开关会隐藏，独立模块仍可转换和发布。
+- 支持扫描本地根目录已有 `.sgmodule`，在确认预览后纳入管理。
+- 支持 App 内 Web 管理、菜单栏操作、后台更新状态、任务取消、发布预览和删除确认。
+- GitHub Token 与 Web 管理令牌保存到 macOS 钥匙串，并按需读取。
+- 使用 Sparkle 2 App 内自动更新，Release 产物包含 `.app.zip` 和 `.pkg` 安装包。
 
 ## 安装与更新
 
-当前 fork 使用固定自签名 Code Signing 证书签名 App，并使用 Sparkle 2 的 EdDSA 签名校验 App 内更新包。没有 Apple Developer ID 公证时，从浏览器手动下载的新包仍可能带有 `com.apple.quarantine`，所以推荐路径是：首次安装手动信任一次，后续通过 App 内“查看更新…”完成自动更新。
+请从 [GitHub Releases](https://github.com/junchan0412/SurgeRelay-macOS/releases) 下载最新版本。
 
-如果首次安装遇到“App 已损坏，无法打开，你应将其移到废纸篓”，此提示并不代表 App 真的损坏。首次安装可以处理一次；后续 App 内自动更新通常不会再次走浏览器下载隔离流程。
-
-请按照以下提示操作：
-
-1.打开“终端”(“访达”>“应用程序”>“实用工具”>“终端”)。
-
-2.拷贝并粘贴至终端如下命令后按 Return (回车) 键：
+首次安装可以下载 `Surge-Relay-版本.app.zip`，解压后把 `Surge Relay.app` 拖到 `/Applications`。由于本项目当前使用固定自签名证书签名，没有 Apple Developer ID 公证，首次从浏览器下载后 macOS 可能拦截打开。可以在 Finder 中右键打开，或执行一次：
 
 ```bash
-  sudo xattr -rd com.apple.quarantine /Applications/Surge\ Relay.app
+xattr -dr com.apple.quarantine "/Applications/Surge Relay.app"
 ```
 
-3.输入 Mac 的开机密码 (输入时不会显示任何字符) 后按 Return (回车) 键。
+后续更新推荐在 App 内使用“查看更新…”。App 会通过 Sparkle 2 从 GitHub Releases 拉取更新包，并校验 Sparkle EdDSA 签名；由于不再由浏览器重新下载 App，通常不需要再次执行 `xattr`。
 
-4.重新打开 Surge Relay，即可正常使用。
+手动更新备用路径是下载 `Surge-Relay-版本.pkg` 并运行安装器。安装脚本会替换 `/Applications/Surge Relay.app`，并清理安装后 App bundle 的隔离属性。若 macOS 拦截未公证安装器，可在 Finder 中右键打开。
 
-如果需要手动更新已有安装，优先使用 Release 中的 `.pkg`，安装器会替换 `/Applications/Surge Relay.app` 并清理隔离属性。`.app.zip` 更适合首次安装或排障备用。
+## 管理已有模块
 
-## 声明
+这是当前 fork 最重要的安全边界：Surge Relay 要管理“你已有的原模块”，不是在根目录里制造同名副本。
 
-本项目展示页面中的模块、模块名称、作者名称及相关来源，仅用于说明 Surge Relay 的模块管理、转换、汇总和分发能力，不代表本项目对任何模块内容、使用方式、适用场景或安全性的推荐、背书、指导或保证。
+扫描本地根目录时，App 会读取已有 `.sgmodule` 的 `#!name` 和 `#!category`，并在导入前展示预览。确认导入后，模块来源保存为 `file://` 地址，原文件仍留在原位置，不会被复制到另一个同名位置。
 
-示例中展示的模块来源可能包括但不限于：Surge Relay、@小白脸、@xream、@keywos、@ckyb、Ethan、[RuCu6](https://github.com/RuCu6)、[Maasea](https://github.com/Maasea)、[fmz200](https://github.com/fmz200)、[kelv1n1n](https://github.com/kelv1n1n)、[可莉🅥](https://github.com/luestr/ProxyResource/blob/main/README.md)、[zmqcherish](https://github.com/zmqcherish)、[VirgilClyne](https://github.com/VirgilClyne)、[zirawell](https://github.com/zirawell)、wish、奶思等。
+本地模式发布时，如果某个本地 `file://` 模块的输出路径正好就是它自己的原始路径，App 会跳过写入，避免覆盖你正在使用的原模块。只有当你把模块发布到另一个文件名或另一个文件夹时，才会生成新的独立输出文件。
 
-所有模块的版权、署名、许可协议和使用限制均归原作者或原项目所有。Surge Relay 仅提供本地化的模块管理、转换、编辑和发布工具能力。用户在使用、转换、编辑、分发或订阅相关模块前，应自行确认对应模块的来源、许可、用途、风险和合规性。
+新生成的本地输出会写入 Surge Relay 管理标记。之后 App 只会自动覆盖或清理带有该标记的文件；遇到同名但没有标记的文件，会停止并报错。旧版本已经记录在发布清单中的输出可以在下一次写入时迁移为带标记文件，但删除旧文件仍需要走发布预览和确认流程。
 
-## 反馈
+如果你看到清理提示，请先看清楚“将删除的旧文件”列表。App 的目标是清理自己生成过的输出，而不是删除手动维护的原模块、`Surge.conf`、分类文件夹或 `assets` 目录。
 
-如果你有任何问题，请在 Github 提交 Issue。
+## 本地发布
+
+在设置中选择“本地”储存模式后，需要配置本地模块根目录。常见路径类似：
+
+```text
+/Users/你的用户名/Library/Mobile Documents/iCloud~com~nssurge~inc
+```
+
+根目录可以直接存放模块，也可以建立分类文件夹，例如 `Ads`、`Rewrite/Media`、`Privacy`。添加或编辑模块时，“存放文件夹”菜单会显示根目录本身和已发现的子文件夹。选择根目录时，模块输出到根目录；选择文件夹时，模块输出到对应相对路径。
+
+更改“配置储存目录”时，App 会迁移 `modules.json`、`settings.json`、Script-Hub 状态、更新历史、备份和手动覆盖内容。迁移成功后，旧目录中的 Surge Relay 配置文件会被清理；原始 `.sgmodule`、`Surge.conf` 和用户文件夹不会被删除。
+
+## GitHub 发布
+
+GitHub 模式需要配置 owner、repository、branch、目录和 Token。模块的输出文件夹逻辑与本地模式一致：根目录表示仓库配置的模块目录本身，子文件夹表示该目录下的相对路径。
+
+公开仓库会直接生成 GitHub Raw 订阅地址。私有仓库需要配合 Cloudflare Worker 转发访问，相关 Worker 示例在 [Deployment/CloudflareWorker](./Deployment/CloudflareWorker)。
+
+发布前可以生成预览，查看将新增、更新和删除的文件。若检测到需要删除旧路径，App 会要求确认；自动发布也会在需要删除时暂停等待确认。发布时会校验同一次提交中是否存在重复目标路径，并在更新 Git ref 后确认远端指向本次 commit。
+
+## 总模块
+
+总模块是可选功能，默认关闭。关闭时：
+
+- 新增模块和扫描导入的模块默认不加入总模块。
+- 桌面端、菜单栏和 Web 管理端会隐藏总模块入口和“包含在总模块中”开关。
+- 独立模块仍可正常转换、预览、发布和自动发布。
+
+开启后，可以为需要汇总的模块打开“包含在总模块中”。总模块文件名可在设置中配置，发布路径会和独立模块一起进入本地或 GitHub 发布流程。
+
+## Web 管理
+
+启用 Web 管理后，App 会在本机启动一个管理服务。默认仅监听本机地址；如果允许局域网访问，建议只在可信网络内使用。
+
+Web 管理使用访问令牌建立 `HttpOnly` 会话 cookie，普通 API 和事件流禁用缓存，并对写操作做同源校验。访问令牌不会出现在诊断报告中。你可以在设置中查看 Web 服务状态、访问范围和令牌存储状态。
+
+## 钥匙串与权限
+
+Surge Relay 只在需要时访问钥匙串：
+
+- 保存和读取 GitHub Token。
+- 保存和读取 Web 管理令牌。
+- 用户手动触发钥匙串诊断时写入、读取并清理临时测试项。
+
+为了减少更新后反复弹出钥匙串授权，Release 构建使用同一个固定自签名 Code Signing 证书，并保持 `CFBundleIdentifier` 为 `com.allenmiao.SurgeRelay`。从旧的未签名或 ad-hoc 版本升级到自签名版本时，首次访问钥匙串仍可能需要重新允许一次。
+
+## 开发
+
+本项目是 Xcode macOS App。推荐使用命令行构建，当前维护环境使用：
+
+```bash
+DEVELOPER_DIR="/Volumes/TR 5000/Applications/Xcode.app/Contents/Developer" \
+xcodebuild build \
+  -project "Surge Relay.xcodeproj" \
+  -scheme "Surge Relay" \
+  -destination "platform=macOS,arch=arm64" \
+  -skipPackagePluginValidation
+```
+
+测试构建：
+
+```bash
+DEVELOPER_DIR="/Volumes/TR 5000/Applications/Xcode.app/Contents/Developer" \
+xcodebuild build-for-testing \
+  -project "Surge Relay.xcodeproj" \
+  -scheme "Surge Relay" \
+  -destination "platform=macOS,arch=arm64" \
+  -derivedDataPath build/DerivedDataTest \
+  -skipPackagePluginValidation
+```
+
+## 发布
+
+正式发布需要 Sparkle EdDSA 私钥和固定自签名 Code Signing 证书。构建脚本会生成 `.app.zip`、`.pkg`、sha256 文件和 Sparkle 签名元数据，并可更新 `appcast.xml`。
+
+```bash
+REQUIRE_SPARKLE_SIGNATURES=1 \
+REQUIRE_STABLE_CODESIGN=1 \
+VERIFY_APPCAST=1 \
+UPDATE_APPCAST=1 \
+DEVELOPER_DIR="/Volumes/TR 5000/Applications/Xcode.app/Contents/Developer" \
+./script/build_release_assets.sh
+```
+
+本地验证会检查版本号、构建号、签名身份、Sparkle 签名、动态库依赖、zip 元数据、pkg payload 和安装脚本。线上发布后可继续验证 GitHub Release 资产：
+
+```bash
+REQUIRE_SPARKLE_SIGNATURES=1 \
+EXPECT_ADHOC_SIGNATURE=0 \
+EXPECTED_CODESIGN_AUTHORITY="Surge Relay Self-Signed Code Signing" \
+./script/verify_github_release_assets.sh \
+  --repo junchan0412/SurgeRelay-macOS \
+  --tag v1.2.43
+```
+
+## 开源协议
+
+本 fork 继续遵守原项目 Apache License 2.0。仓库中的第三方依赖、图标与资源声明见 [LICENSE](./LICENSE) 和 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)。
