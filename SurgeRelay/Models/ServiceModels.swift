@@ -206,12 +206,110 @@ struct GitHubPublishSnapshot: Codable, Equatable, Sendable {
     }
 }
 
+enum WorkActivityKind: String, Codable, Equatable, Sendable {
+    case idle
+    case updatingModules
+    case scanningLocalModules
+    case importingLocalModules
+    case refreshingScriptHub
+    case testingGitHub
+    case publishing
+    case automaticPublishing
+    case previewingPublish
+    case confirmingPublish
+    case savingPreview
+    case restoringPreview
+    case checkingKeychain
+
+    var title: String {
+        switch self {
+        case .idle: "空闲"
+        case .updatingModules: "模块更新"
+        case .scanningLocalModules: "本地模块扫描"
+        case .importingLocalModules: "本地模块导入"
+        case .refreshingScriptHub: "Script-Hub 引擎更新"
+        case .testingGitHub: "GitHub 连接测试"
+        case .publishing: "GitHub 发布"
+        case .automaticPublishing: "GitHub 自动发布"
+        case .previewingPublish: "发布预览"
+        case .confirmingPublish: "确认发布"
+        case .savingPreview: "预览内容写入"
+        case .restoringPreview: "预览内容恢复"
+        case .checkingKeychain: "钥匙串检查"
+        }
+    }
+
+    var blocksUpdatesByDefault: Bool {
+        switch self {
+        case .idle, .checkingKeychain:
+            false
+        case .updatingModules, .scanningLocalModules, .importingLocalModules, .refreshingScriptHub,
+             .testingGitHub, .publishing, .automaticPublishing, .previewingPublish, .confirmingPublish,
+             .savingPreview, .restoringPreview:
+            true
+        }
+    }
+}
+
+struct WorkActivity: Codable, Equatable, Sendable {
+    var kind: WorkActivityKind
+    var title: String
+    var startedAt: Date?
+    var blocksUpdates: Bool
+
+    var isActive: Bool {
+        kind != .idle
+    }
+
+    static let idle = WorkActivity(
+        kind: .idle,
+        title: WorkActivityKind.idle.title,
+        startedAt: nil,
+        blocksUpdates: false
+    )
+
+    init(
+        kind: WorkActivityKind,
+        title: String? = nil,
+        startedAt: Date? = .now,
+        blocksUpdates: Bool? = nil
+    ) {
+        self.kind = kind
+        self.title = title ?? kind.title
+        self.startedAt = kind == .idle ? nil : startedAt
+        self.blocksUpdates = blocksUpdates ?? kind.blocksUpdatesByDefault
+    }
+
+    func updateBlockedReason(statusMessage: String) -> String? {
+        guard blocksUpdates else { return nil }
+        let status = statusMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !status.isEmpty, status != "准备就绪", status != title else {
+            return "Surge Relay 正在执行“\(title)”任务。"
+        }
+        return "Surge Relay 正在执行“\(title)”任务：\(status)"
+    }
+}
+
 struct UpdateAdmission: Equatable, Sendable {
     var isAccepted: Bool
     var message: String
 
     var blockedReason: String? {
         isAccepted ? nil : message
+    }
+
+    static func allModules(
+        activity: WorkActivity,
+        enabledModuleCount: Int,
+        statusMessage: String
+    ) -> UpdateAdmission {
+        if let reason = activity.updateBlockedReason(statusMessage: statusMessage) {
+            return .rejected(reason)
+        }
+        guard enabledModuleCount > 0 else {
+            return .rejected("没有启用的模块可更新。")
+        }
+        return .accepted("已开始更新全部模块。")
     }
 
     static func allModules(
@@ -226,6 +324,24 @@ struct UpdateAdmission: Equatable, Sendable {
             return .rejected("没有启用的模块可更新。")
         }
         return .accepted("已开始更新全部模块。")
+    }
+
+    static func module(
+        _ module: RelayModule,
+        activity: WorkActivity,
+        enabledModuleCount: Int,
+        statusMessage: String
+    ) -> UpdateAdmission {
+        if let reason = activity.updateBlockedReason(statusMessage: statusMessage) {
+            return .rejected(reason)
+        }
+        guard module.isEnabled else {
+            return .rejected("“\(module.name)”已停用，请先启用后再更新。")
+        }
+        guard enabledModuleCount > 0 else {
+            return .rejected("没有启用的模块可更新。")
+        }
+        return .accepted("已开始更新 \(module.name)。")
     }
 
     static func module(
@@ -295,6 +411,11 @@ struct DiagnosticReport: Codable, Sendable {
     var automaticPublishScheduledAt: Date?
     var automaticPublishRunsAt: Date?
     var latestGitHubPublish: GitHubPublishSnapshot?
+    var activeWorkKind: String
+    var activeWorkTitle: String?
+    var activeWorkStatus: String?
+    var activeWorkStartedAt: Date?
+    var activeWorkBlocksUpdates: Bool
     var modules: [DiagnosticModuleSnapshot]
     var history: [UpdateHistoryEntry]
 }

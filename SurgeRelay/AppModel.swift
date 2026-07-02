@@ -14,6 +14,7 @@ final class AppModel {
     var selectedModuleID: UUID?
     var isWorking = false
     var statusMessage = "准备就绪"
+    var workActivity: WorkActivity = .idle
     var presentedError: String?
     var githubToken: String
     var webAccessToken: String
@@ -239,7 +240,7 @@ final class AppModel {
 
     var updateAdmission: UpdateAdmission {
         UpdateAdmission.allModules(
-            isWorking: isWorking,
+            activity: workActivity,
             enabledModuleCount: modules.filter(\.isEnabled).count,
             statusMessage: statusMessage
         )
@@ -248,7 +249,7 @@ final class AppModel {
     func updateAdmission(for module: RelayModule) -> UpdateAdmission {
         UpdateAdmission.module(
             module,
-            isWorking: isWorking,
+            activity: workActivity,
             enabledModuleCount: modules.filter(\.isEnabled).count,
             statusMessage: statusMessage
         )
@@ -357,6 +358,11 @@ final class AppModel {
     }
 
     func scanExistingLocalModules() async throws -> LocalModuleScanReport {
+        guard !isWorking else {
+            throw RelayError.invalidOutput(updateAdmission.message)
+        }
+        beginWork(.scanningLocalModules)
+        defer { endWork(.scanningLocalModules) }
         statusMessage = "正在扫描本地模块根目录…"
         let rootDirectoryPath = settings.localModuleDirectory
         let combinedFileName = settings.combinedModuleFileName
@@ -398,8 +404,8 @@ final class AppModel {
             statusMessage = "没有选择需要导入的本地模块"
             return
         }
-        isWorking = true
-        defer { isWorking = false }
+        beginWork(.importingLocalModules)
+        defer { endWork(.importingLocalModules) }
 
         registerLocalChange()
         var imported: [RelayModule] = []
@@ -742,13 +748,13 @@ final class AppModel {
         let enabledModules = modules.filter(\.isEnabled)
         automaticPublishTask?.cancel()
         let updateGeneration = localChangeGeneration
-        isWorking = true
+        beginWork(.updatingModules)
         synchronizationCompletedCount = 0
         synchronizationTotalCount = enabledModules.count
         synchronizingModuleID = nil
         defer {
             synchronizingModuleID = nil
-            isWorking = false
+            endWork(.updatingModules)
         }
 
         let missingEngine = !(await engineStore.hasScript(named: "Rewrite-Parser.js"))
@@ -1027,9 +1033,9 @@ final class AppModel {
                 return
             }
             self.clearAutomaticPublishSchedule()
-            self.isWorking = true
+            self.beginWork(.automaticPublishing)
             defer {
-                self.isWorking = false
+                self.endWork(.automaticPublishing)
                 self.automaticPublishTask = nil
             }
             do {
@@ -1054,9 +1060,9 @@ final class AppModel {
 
     func refreshScriptHub(showProgress: Bool = true) async {
         guard !isWorking || !showProgress else { return }
-        if showProgress { isWorking = true }
+        if showProgress { beginWork(.refreshingScriptHub) }
         await refreshScriptHubInternal()
-        if showProgress { isWorking = false }
+        if showProgress { endWork(.refreshingScriptHub) }
     }
 
     private func refreshScriptHubInternal() async {
@@ -1087,8 +1093,8 @@ final class AppModel {
 
     func testGitHub(showProgress: Bool = true) async {
         guard !isWorking || !showProgress else { return }
-        if showProgress { isWorking = true }
-        defer { if showProgress { isWorking = false } }
+        if showProgress { beginWork(.testingGitHub) }
+        defer { if showProgress { endWork(.testingGitHub) } }
         do {
             let isPrivate = try await githubClient.test(settings: settings.github, token: githubToken)
             settings.github.repositoryIsPrivate = isPrivate
@@ -1103,8 +1109,8 @@ final class AppModel {
     func publishAll() async {
         guard !isWorking else { return }
         cancelAutomaticPublishSchedule()
-        isWorking = true
-        defer { isWorking = false }
+        beginWork(.publishing)
+        defer { endWork(.publishing) }
         do {
             let preview = try await githubPublishPreview()
             if preview.requiresDeletionConfirmation {
@@ -1129,8 +1135,8 @@ final class AppModel {
             return
         }
         cancelAutomaticPublishSchedule()
-        isWorking = true
-        defer { isWorking = false }
+        beginWork(.previewingPublish)
+        defer { endWork(.previewingPublish) }
         do {
             let preview = try await githubPublishPreview()
             pendingPublishPreview = preview
@@ -1144,8 +1150,8 @@ final class AppModel {
 
     func confirmPendingPublish() async {
         guard let preview = pendingPublishPreview, !isWorking else { return }
-        isWorking = true
-        defer { isWorking = false }
+        beginWork(.confirmingPublish)
+        defer { endWork(.confirmingPublish) }
         do {
             switch preview.destination {
             case .gitHub:
@@ -1492,8 +1498,8 @@ final class AppModel {
             statusMessage = "内容没有变化"
             return
         }
-        isWorking = true
-        defer { isWorking = false }
+        beginWork(.savingPreview)
+        defer { endWork(.savingPreview) }
         registerLocalChange()
         try await fileStore.writeComponentOverride(namedContent, id: module.id)
         if let index = modules.firstIndex(where: { $0.id == module.id }),
@@ -1508,8 +1514,8 @@ final class AppModel {
 
     func restorePreviewContent(for module: RelayModule) async throws -> String {
         guard !isWorking else { throw RelayError.invalidOutput("当前正在更新，请稍后再恢复。") }
-        isWorking = true
-        defer { isWorking = false }
+        beginWork(.restoringPreview)
+        defer { endWork(.restoringPreview) }
         registerLocalChange()
         let content = try await fileStore.restoreComponent(id: module.id)
         if let index = modules.firstIndex(where: { $0.id == module.id }) {
@@ -1557,11 +1563,18 @@ final class AppModel {
 
     func refreshKeychainAccessProbe() {
         keychainAccessProbe = .checking
+        let tracksActivity = !workActivity.blocksUpdates
+        if tracksActivity {
+            beginWork(.checkingKeychain, blocksUpdates: false)
+        }
         Task { @MainActor in
             let snapshot = await Task.detached(priority: .utility) {
                 KeychainAccessProbeSnapshot.current()
             }.value
             keychainAccessProbe = snapshot
+            if tracksActivity {
+                endWork(.checkingKeychain)
+            }
             statusMessage = snapshot.state == .available
                 ? "钥匙串读写检查通过"
                 : "钥匙串读写检查失败"
@@ -1594,6 +1607,11 @@ final class AppModel {
             automaticPublishScheduledAt: automaticPublishScheduledAt,
             automaticPublishRunsAt: automaticPublishRunsAt,
             latestGitHubPublish: latestGitHubPublish,
+            activeWorkKind: workActivity.kind.rawValue,
+            activeWorkTitle: workActivity.isActive ? workActivity.title : nil,
+            activeWorkStatus: workActivity.isActive ? statusMessage : nil,
+            activeWorkStartedAt: workActivity.startedAt,
+            activeWorkBlocksUpdates: workActivity.blocksUpdates,
             modules: modules.map {
                 DiagnosticModuleSnapshot(
                     id: $0.id,
@@ -1656,6 +1674,19 @@ final class AppModel {
     private func clearAutomaticPublishSchedule() {
         automaticPublishScheduledAt = nil
         automaticPublishRunsAt = nil
+    }
+
+    private func beginWork(_ kind: WorkActivityKind, blocksUpdates: Bool? = nil) {
+        let activity = WorkActivity(kind: kind, blocksUpdates: blocksUpdates)
+        workActivity = activity
+        isWorking = activity.blocksUpdates
+    }
+
+    private func endWork(_ kind: WorkActivityKind? = nil) {
+        if kind == nil || workActivity.kind == kind {
+            workActivity = .idle
+            isWorking = false
+        }
     }
 
     private func recordHistory(_ entries: [UpdateHistoryEntry]) {

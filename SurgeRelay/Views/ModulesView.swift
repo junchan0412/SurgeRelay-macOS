@@ -93,8 +93,10 @@ struct ModulesView: View {
                 Divider()
             }
 
-            if model.isWorking {
-                if let name = synchronizingModuleName, model.synchronizationTotalCount > 0 {
+            if model.workActivity.isActive {
+                if model.workActivity.kind == .updatingModules,
+                   let name = synchronizingModuleName,
+                   model.synchronizationTotalCount > 0 {
                     VStack(alignment: .leading, spacing: 5) {
                         HStack(spacing: 8) {
                             Text(name)
@@ -116,7 +118,7 @@ struct ModulesView: View {
                     HStack(spacing: 8) {
                         ProgressView()
                             .controlSize(.small)
-                        Text(model.statusMessage)
+                        Text(workActivityStatusText)
                             .font(.caption)
                             .lineLimit(2)
                     }
@@ -149,7 +151,7 @@ struct ModulesView: View {
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .padding(.horizontal, 10)
         .padding(.bottom, 10)
-        .animation(.snappy, value: model.isWorking)
+        .animation(.snappy, value: model.workActivity)
         .animation(.snappy, value: model.presentedError)
         .animation(.snappy, value: model.automaticPublishRunsAt)
     }
@@ -162,6 +164,13 @@ struct ModulesView: View {
     private var automaticPublishText: String? {
         guard let runsAt = model.automaticPublishRunsAt else { return nil }
         return "自动发布已排队，预计 \(runsAt.formatted(date: .omitted, time: .shortened)) 执行"
+    }
+
+    private var workActivityStatusText: String {
+        let title = model.workActivity.title
+        let status = model.statusMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !status.isEmpty, status != "准备就绪", status != title else { return title }
+        return "\(title)：\(status)"
     }
 
     private var synchronizingModuleName: String? {

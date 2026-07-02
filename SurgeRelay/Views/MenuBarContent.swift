@@ -9,7 +9,7 @@ struct MenuBarContent: View {
 
     var body: some View {
         Section("状态") {
-            if model.isWorking {
+            if model.workActivity.isActive {
                 Text(workingText)
             }
             Text("最新更新：\(latestUpdateText)")
@@ -64,10 +64,14 @@ struct MenuBarContent: View {
     }
 
     private var workingText: String {
-        if model.synchronizationTotalCount > 0 {
+        if model.workActivity.kind == .updatingModules, model.synchronizationTotalCount > 0 {
             return "正在更新 \(model.synchronizationCompletedCount) / \(model.synchronizationTotalCount)…"
         }
-        return model.statusMessage
+        let status = model.statusMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !status.isEmpty, status != "准备就绪", status != model.workActivity.title else {
+            return model.workActivity.title
+        }
+        return "\(model.workActivity.title)：\(status)"
     }
 
     private func activateMainWindow() {

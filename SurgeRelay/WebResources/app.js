@@ -358,7 +358,12 @@ function renderActivity() {
   const autoPublishText = activity.automaticPublishRunsAt ? ` · 自动发布 ${formatTime(activity.automaticPublishRunsAt)}` : '';
   const canStartUpdate = activity.canStartUpdate !== false;
   const updateBlockedReason = activity.updateBlockedReason || '当前无法开始更新';
-  ui.status.textContent = `${activity.status || '准备就绪'}${autoPublishText}`;
+  const title = activity.title || '';
+  const status = activity.status || (title ? `${title}任务进行中` : '准备就绪');
+  const activityText = title && activity.kind !== 'idle' && status !== title
+    ? `${title} · ${status}`
+    : status;
+  ui.status.textContent = `${activityText}${autoPublishText}`;
   ui.refresh.disabled = !canStartUpdate;
   ui.refresh.title = canStartUpdate ? '更新全部' : updateBlockedReason;
   ui.refresh.setAttribute('aria-label', canStartUpdate ? '更新全部' : `无法更新：${updateBlockedReason}`);

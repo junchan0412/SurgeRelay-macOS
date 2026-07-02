@@ -81,6 +81,26 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertEqual(failed.failureMessage, "端口已被占用")
     }
 
+    func testWorkActivityDescribesActiveAndNonBlockingWork() {
+        let startedAt = Date(timeIntervalSince1970: 1_800)
+        let publishing = WorkActivity(kind: .publishing, startedAt: startedAt)
+
+        XCTAssertTrue(publishing.isActive)
+        XCTAssertEqual(publishing.title, "GitHub 发布")
+        XCTAssertEqual(publishing.startedAt, startedAt)
+        XCTAssertTrue(publishing.blocksUpdates)
+        XCTAssertEqual(
+            publishing.updateBlockedReason(statusMessage: "正在生成 GitHub 发布预览…"),
+            "Surge Relay 正在执行“GitHub 发布”任务：正在生成 GitHub 发布预览…"
+        )
+
+        let keychain = WorkActivity(kind: .checkingKeychain)
+        XCTAssertTrue(keychain.isActive)
+        XCTAssertFalse(keychain.blocksUpdates)
+        XCTAssertNil(keychain.updateBlockedReason(statusMessage: "正在写入、读取并清理临时诊断项。"))
+        XCTAssertFalse(WorkActivity.idle.isActive)
+    }
+
     func testUpdateAdmissionExplainsBlockedAndAcceptedStates() {
         let busy = UpdateAdmission.allModules(
             isWorking: true,
@@ -127,6 +147,26 @@ final class SurgeRelayTests: XCTestCase {
         )
         XCTAssertTrue(accepted.isAccepted)
         XCTAssertNil(accepted.blockedReason)
+    }
+
+    func testUpdateAdmissionUsesStructuredWorkActivity() {
+        let busy = UpdateAdmission.allModules(
+            activity: WorkActivity(kind: .previewingPublish),
+            enabledModuleCount: 2,
+            statusMessage: "正在生成 GitHub 发布预览…"
+        )
+        XCTAssertFalse(busy.isAccepted)
+        XCTAssertEqual(
+            busy.blockedReason,
+            "Surge Relay 正在执行“发布预览”任务：正在生成 GitHub 发布预览…"
+        )
+
+        let checkingKeychain = UpdateAdmission.allModules(
+            activity: WorkActivity(kind: .checkingKeychain),
+            enabledModuleCount: 1,
+            statusMessage: "正在写入、读取并清理临时诊断项。"
+        )
+        XCTAssertTrue(checkingKeychain.isAccepted)
     }
 
     func testWebManagementDisplayURLOmitsAccessToken() throws {

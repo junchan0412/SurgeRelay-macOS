@@ -214,9 +214,13 @@ enum WebManagementAPI {
             },
             activity: WebActivityPayload(
                 isWorking: model.isWorking,
+                kind: model.workActivity.kind.rawValue,
+                title: model.workActivity.isActive ? model.workActivity.title : nil,
                 status: model.statusMessage,
                 progress: progress,
                 currentModuleID: model.synchronizingModuleID?.uuidString.lowercased(),
+                startedAt: model.workActivity.startedAt,
+                blocksUpdates: model.workActivity.blocksUpdates,
                 canStartUpdate: updateAdmission.isAccepted,
                 updateBlockedReason: updateAdmission.blockedReason,
                 enabledModuleCount: enabledCount,
@@ -335,9 +339,13 @@ private struct WebModulePayload: Encodable {
 
 private struct WebActivityPayload: Encodable {
     let isWorking: Bool
+    let kind: String
+    let title: String?
     let status: String
     let progress: Double?
     let currentModuleID: String?
+    let startedAt: Date?
+    let blocksUpdates: Bool
     let canStartUpdate: Bool
     let updateBlockedReason: String?
     let enabledModuleCount: Int
