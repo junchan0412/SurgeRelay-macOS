@@ -356,8 +356,12 @@ function renderActivity() {
   if (!state) return;
   const activity = state.activity;
   const autoPublishText = activity.automaticPublishRunsAt ? ` · 自动发布 ${formatTime(activity.automaticPublishRunsAt)}` : '';
+  const canStartUpdate = activity.canStartUpdate !== false;
+  const updateBlockedReason = activity.updateBlockedReason || '当前无法开始更新';
   ui.status.textContent = `${activity.status || '准备就绪'}${autoPublishText}`;
-  ui.refresh.disabled = activity.isWorking;
+  ui.refresh.disabled = !canStartUpdate;
+  ui.refresh.title = canStartUpdate ? '更新全部' : updateBlockedReason;
+  ui.refresh.setAttribute('aria-label', canStartUpdate ? '更新全部' : `无法更新：${updateBlockedReason}`);
   if (activity.isWorking && activity.progress !== null) {
     const percent = Math.round(activity.progress * 100);
     ui.percent.textContent = `${percent}%`;

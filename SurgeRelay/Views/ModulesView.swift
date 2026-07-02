@@ -230,7 +230,8 @@ struct ModulesView: View {
                         } label: {
                             Label("更新全部", systemImage: "arrow.clockwise")
                         }
-                        .disabled(model.modules.isEmpty || model.isWorking)
+                        .disabled(!model.updateAdmission.isAccepted)
+                        .help(model.updateAdmission.isAccepted ? "更新全部模块" : model.updateAdmission.message)
                         Button {
                             scanLocalModulesForPreview()
                         } label: {

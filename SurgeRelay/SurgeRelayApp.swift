@@ -34,7 +34,7 @@ struct SurgeRelayApp: App {
                     Task { await model.updateAll() }
                 }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
-                .disabled(model.isWorking)
+                .disabled(!model.updateAdmission.isAccepted)
             }
         }
 

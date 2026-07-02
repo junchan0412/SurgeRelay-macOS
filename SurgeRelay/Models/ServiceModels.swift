@@ -206,6 +206,63 @@ struct GitHubPublishSnapshot: Codable, Equatable, Sendable {
     }
 }
 
+struct UpdateAdmission: Equatable, Sendable {
+    var isAccepted: Bool
+    var message: String
+
+    var blockedReason: String? {
+        isAccepted ? nil : message
+    }
+
+    static func allModules(
+        isWorking: Bool,
+        enabledModuleCount: Int,
+        statusMessage: String
+    ) -> UpdateAdmission {
+        if isWorking {
+            return .rejected(busyMessage(statusMessage: statusMessage))
+        }
+        guard enabledModuleCount > 0 else {
+            return .rejected("没有启用的模块可更新。")
+        }
+        return .accepted("已开始更新全部模块。")
+    }
+
+    static func module(
+        _ module: RelayModule,
+        isWorking: Bool,
+        enabledModuleCount: Int,
+        statusMessage: String
+    ) -> UpdateAdmission {
+        if isWorking {
+            return .rejected(busyMessage(statusMessage: statusMessage))
+        }
+        guard module.isEnabled else {
+            return .rejected("“\(module.name)”已停用，请先启用后再更新。")
+        }
+        guard enabledModuleCount > 0 else {
+            return .rejected("没有启用的模块可更新。")
+        }
+        return .accepted("已开始更新 \(module.name)。")
+    }
+
+    private static func accepted(_ message: String) -> UpdateAdmission {
+        UpdateAdmission(isAccepted: true, message: message)
+    }
+
+    private static func rejected(_ message: String) -> UpdateAdmission {
+        UpdateAdmission(isAccepted: false, message: message)
+    }
+
+    private static func busyMessage(statusMessage: String) -> String {
+        let status = statusMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !status.isEmpty, status != "准备就绪" else {
+            return "Surge Relay 正在执行其他任务。"
+        }
+        return "Surge Relay 正在执行其他任务：\(status)"
+    }
+}
+
 struct DiagnosticModuleSnapshot: Codable, Sendable {
     var id: UUID
     var name: String

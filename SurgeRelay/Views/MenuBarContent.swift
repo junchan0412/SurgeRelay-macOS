@@ -21,7 +21,7 @@ struct MenuBarContent: View {
         Button("更新全部模块") {
             Task { await model.updateAll() }
         }
-        .disabled(model.modules.isEmpty || model.isWorking)
+        .disabled(!model.updateAdmission.isAccepted)
 
         if let url = model.combinedRawURL {
             Button("拷贝总订阅地址") {

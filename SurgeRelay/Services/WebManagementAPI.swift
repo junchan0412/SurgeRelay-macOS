@@ -29,8 +29,16 @@ enum WebManagementAPI {
                 await model.refreshModuleOutputFolders()
                 return .json(statePayload(model: model))
             case ("POST", "/api/update-all"):
+                let admission = model.updateAdmission
+                guard admission.isAccepted else {
+                    return .json(
+                        ActionPayload(ok: false, message: admission.message),
+                        status: 409,
+                        reason: "Conflict"
+                    )
+                }
                 Task { await model.updateAll() }
-                return .json(ActionPayload(ok: true, message: "已开始更新全部模块。"), status: 202, reason: "Accepted")
+                return .json(ActionPayload(ok: true, message: admission.message), status: 202, reason: "Accepted")
             case ("POST", "/api/modules"):
                 let mutation = try request.decodeBody(WebModuleMutation.self)
                 try model.addModule(from: mutation.draft())
@@ -95,8 +103,16 @@ enum WebManagementAPI {
             model.setModuleEnabled(id: id, enabled: payload.enabled)
             return .json(ActionPayload(ok: true, message: model.statusMessage))
         case ("POST", "update"):
+            let admission = model.updateAdmission(for: module)
+            guard admission.isAccepted else {
+                return .json(
+                    ActionPayload(ok: false, message: admission.message),
+                    status: 409,
+                    reason: "Conflict"
+                )
+            }
             Task { await model.update(moduleID: id) }
-            return .json(ActionPayload(ok: true, message: "已开始更新 \(module.name)。"), status: 202, reason: "Accepted")
+            return .json(ActionPayload(ok: true, message: admission.message), status: 202, reason: "Accepted")
         case ("GET", "preview"):
             return .text(try await model.previewContent(for: module))
         case ("PUT", "preview"):
@@ -146,6 +162,8 @@ enum WebManagementAPI {
 
     private static func statePayload(model: AppModel) -> WebStatePayload {
         let newestUpdate = model.modules.compactMap(\.lastUpdatedAt).max()
+        let enabledCount = model.modules.filter(\.isEnabled).count
+        let updateAdmission = model.updateAdmission
         let progress: Double? = if model.synchronizationTotalCount > 0 {
             min(
                 max(Double(model.synchronizationCompletedCount) / Double(model.synchronizationTotalCount), 0),
@@ -159,7 +177,7 @@ enum WebManagementAPI {
                 name: "Surge Relay 汇总",
                 fileName: FilenameSanitizer.sgmoduleName(from: model.settings.combinedModuleFileName),
                 sourceCount: model.modules.count,
-                enabledCount: model.modules.filter(\.isEnabled).count,
+                enabledCount: enabledCount,
                 lastUpdatedAt: newestUpdate,
                 subscriptionURL: model.combinedRawURL?.absoluteString ?? model.combinedLocalFileURL?.absoluteString
             ),
@@ -199,6 +217,9 @@ enum WebManagementAPI {
                 status: model.statusMessage,
                 progress: progress,
                 currentModuleID: model.synchronizingModuleID?.uuidString.lowercased(),
+                canStartUpdate: updateAdmission.isAccepted,
+                updateBlockedReason: updateAdmission.blockedReason,
+                enabledModuleCount: enabledCount,
                 automaticPublishScheduledAt: model.automaticPublishScheduledAt,
                 automaticPublishRunsAt: model.automaticPublishRunsAt,
                 latestGitHubPublish: model.latestGitHubPublish,
@@ -317,6 +338,9 @@ private struct WebActivityPayload: Encodable {
     let status: String
     let progress: Double?
     let currentModuleID: String?
+    let canStartUpdate: Bool
+    let updateBlockedReason: String?
+    let enabledModuleCount: Int
     let automaticPublishScheduledAt: Date?
     let automaticPublishRunsAt: Date?
     let latestGitHubPublish: GitHubPublishSnapshot?

@@ -237,6 +237,23 @@ final class AppModel {
         PersistenceStore.saveSettings(settings)
     }
 
+    var updateAdmission: UpdateAdmission {
+        UpdateAdmission.allModules(
+            isWorking: isWorking,
+            enabledModuleCount: modules.filter(\.isEnabled).count,
+            statusMessage: statusMessage
+        )
+    }
+
+    func updateAdmission(for module: RelayModule) -> UpdateAdmission {
+        UpdateAdmission.module(
+            module,
+            isWorking: isWorking,
+            enabledModuleCount: modules.filter(\.isEnabled).count,
+            statusMessage: statusMessage
+        )
+    }
+
     func saveGitHubToken() {
         githubToken = githubToken.trimmingCharacters(in: .whitespacesAndNewlines)
         do {
@@ -717,8 +734,12 @@ final class AppModel {
     }
 
     func updateAll() async {
+        let admission = updateAdmission
+        guard admission.isAccepted else {
+            statusMessage = admission.message
+            return
+        }
         let enabledModules = modules.filter(\.isEnabled)
-        guard !isWorking, !enabledModules.isEmpty else { return }
         automaticPublishTask?.cancel()
         let updateGeneration = localChangeGeneration
         isWorking = true
@@ -961,8 +982,14 @@ final class AppModel {
         }
     }
 
-    func update(moduleID _: UUID) async {
+    func update(moduleID: UUID) async {
         // 单个来源改变也会影响同一份输出，因此始终安全地重建全部启用来源。
+        guard let module = modules.first(where: { $0.id == moduleID }) else { return }
+        let admission = updateAdmission(for: module)
+        guard admission.isAccepted else {
+            statusMessage = admission.message
+            return
+        }
         await updateAll()
     }
 

@@ -81,6 +81,54 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertEqual(failed.failureMessage, "端口已被占用")
     }
 
+    func testUpdateAdmissionExplainsBlockedAndAcceptedStates() {
+        let busy = UpdateAdmission.allModules(
+            isWorking: true,
+            enabledModuleCount: 2,
+            statusMessage: "正在检查 Demo…"
+        )
+        XCTAssertFalse(busy.isAccepted)
+        XCTAssertEqual(busy.blockedReason, "Surge Relay 正在执行其他任务：正在检查 Demo…")
+
+        let empty = UpdateAdmission.allModules(
+            isWorking: false,
+            enabledModuleCount: 0,
+            statusMessage: "准备就绪"
+        )
+        XCTAssertFalse(empty.isAccepted)
+        XCTAssertEqual(empty.message, "没有启用的模块可更新。")
+
+        let disabled = RelayModule(
+            name: "Demo",
+            sourceURL: "https://example.com/demo.sgmodule",
+            outputFileName: "Demo",
+            isEnabled: false
+        )
+        let disabledAdmission = UpdateAdmission.module(
+            disabled,
+            isWorking: false,
+            enabledModuleCount: 0,
+            statusMessage: "准备就绪"
+        )
+        XCTAssertFalse(disabledAdmission.isAccepted)
+        XCTAssertEqual(disabledAdmission.message, "“Demo”已停用，请先启用后再更新。")
+
+        let enabled = RelayModule(
+            name: "Demo",
+            sourceURL: "https://example.com/demo.sgmodule",
+            outputFileName: "Demo",
+            isEnabled: true
+        )
+        let accepted = UpdateAdmission.module(
+            enabled,
+            isWorking: false,
+            enabledModuleCount: 1,
+            statusMessage: "准备就绪"
+        )
+        XCTAssertTrue(accepted.isAccepted)
+        XCTAssertNil(accepted.blockedReason)
+    }
+
     func testWebManagementDisplayURLOmitsAccessToken() throws {
         let accessURL = try XCTUnwrap(WebManagementURLFactory.url(
             host: "relay.local",
