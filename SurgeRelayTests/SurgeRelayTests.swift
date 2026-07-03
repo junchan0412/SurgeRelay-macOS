@@ -338,6 +338,119 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertFalse(value.contains("icon="))
     }
 
+    func testScriptHubUpstreamRejectsFloatingRevision() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GitHubMockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        GitHubMockURLProtocol.reset()
+        defer { GitHubMockURLProtocol.reset() }
+
+        do {
+            _ = try await ScriptHubUpstreamService(session: session).fetchManagedModule(
+                from: "https://raw.githubusercontent.com/Script-Hub-Org/Script-Hub/main/modules/script-hub.surge.sgmodule",
+                previousRevision: nil
+            )
+            XCTFail("floating Script-Hub revisions must be rejected")
+        } catch let error as RelayError {
+            XCTAssertTrue(error.localizedDescription.contains("固定 tag 或 commit"))
+        }
+    }
+
+    func testScriptHubUpstreamPinsReferencedScriptsAndRecordsHashes() async throws {
+        let revision = "6b4fb62240629d2fc66b08bc271f8c1f83a5dcd1"
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GitHubMockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        GitHubMockURLProtocol.reset()
+        defer { GitHubMockURLProtocol.reset() }
+        GitHubMockURLProtocol.handler = { request in
+            switch request.url?.path {
+            case "/Script-Hub-Org/Script-Hub/\(revision)/modules/script-hub.surge.sgmodule":
+                return (200, Data("""
+                #!name=Script Hub
+                # script.hub
+                [Script]
+                Script Hub: 重写转换 = type=http-request, pattern=^https?:\\/\\/script\\.hub\\/file\\/_start_\\/, script-path=https://raw.githubusercontent.com/Script-Hub-Org/Script-Hub/main/Rewrite-Parser.js, timeout=300
+                """.utf8))
+            case "/Script-Hub-Org/Script-Hub/\(revision)/Rewrite-Parser.js":
+                return (200, Data("function rewriteParser() { return true; }".utf8))
+            default:
+                return (404, Data())
+            }
+        }
+
+        let result = try await ScriptHubUpstreamService(session: session).fetchManagedModule(
+            from: "https://raw.githubusercontent.com/Script-Hub-Org/Script-Hub/\(revision)/modules/script-hub.surge.sgmodule",
+            previousRevision: nil
+        )
+
+        XCTAssertEqual(result.sourceDescription, "Script-Hub-Org/Script-Hub@\(revision)")
+        XCTAssertEqual(result.upstreamRevision, revision)
+        XCTAssertEqual(result.scriptHashes.keys.sorted(), ["Rewrite-Parser.js"])
+        XCTAssertTrue(GitHubMockURLProtocol.requestedPaths.contains(
+            "GET /Script-Hub-Org/Script-Hub/\(revision)/Rewrite-Parser.js"
+        ))
+    }
+
+    func testScriptHubUpstreamRejectsChangedHashForSamePinnedRevision() async throws {
+        let revision = "6b4fb62240629d2fc66b08bc271f8c1f83a5dcd1"
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GitHubMockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        GitHubMockURLProtocol.reset()
+        defer { GitHubMockURLProtocol.reset() }
+        var scriptBody = "first"
+        GitHubMockURLProtocol.handler = { request in
+            switch request.url?.path {
+            case "/Script-Hub-Org/Script-Hub/\(revision)/modules/script-hub.surge.sgmodule":
+                return (200, Data("""
+                #!name=Script Hub
+                # script.hub
+                [Script]
+                Script Hub: 重写转换 = type=http-request, pattern=^https?:\\/\\/script\\.hub\\/file\\/_start_\\/, script-path=https://raw.githubusercontent.com/Script-Hub-Org/Script-Hub/main/Rewrite-Parser.js, timeout=300
+                """.utf8))
+            case "/Script-Hub-Org/Script-Hub/\(revision)/Rewrite-Parser.js":
+                return (200, Data(scriptBody.utf8))
+            default:
+                return (404, Data())
+            }
+        }
+        let service = ScriptHubUpstreamService(session: session)
+        let first = try await service.fetchManagedModule(
+            from: "https://raw.githubusercontent.com/Script-Hub-Org/Script-Hub/\(revision)/modules/script-hub.surge.sgmodule",
+            previousRevision: nil
+        )
+        scriptBody = "second"
+
+        do {
+            _ = try await service.fetchManagedModule(
+                from: "https://raw.githubusercontent.com/Script-Hub-Org/Script-Hub/\(revision)/modules/script-hub.surge.sgmodule",
+                previousRevision: first.revision,
+                previousUpstreamRevision: first.upstreamRevision,
+                previousScriptHashes: first.scriptHashes
+            )
+            XCTFail("changed script hashes for the same pinned revision must be rejected")
+        } catch let error as RelayError {
+            XCTAssertTrue(error.localizedDescription.contains("脚本 hash 已变化"))
+        }
+    }
+
+    func testEmbeddedScriptHubEngineBlocksPrivateHTTPBridgeHosts() async throws {
+        let script = """
+        $httpClient.get("http://127.0.0.1/private", function(error, response, body) {
+          $done({body: String(error || "allowed")});
+        });
+        """
+
+        let output = try await EmbeddedScriptHubEngine().convert(
+            script: script,
+            requestURL: try XCTUnwrap(URL(string: "https://example.com/demo.conf"))
+        )
+
+        XCTAssertTrue(output.contains("127.0.0.1"))
+        XCTAssertFalse(output.contains("allowed"))
+    }
+
     func testGitHubRawURL() throws {
         var settings = GitHubSettings()
         settings.owner = "someone"
@@ -352,6 +465,25 @@ final class SurgeRelayTests: XCTestCase {
             try XCTUnwrap(settings.rawURL(for: "Ads/YouTube.sgmodule")).absoluteString,
             "https://raw.githubusercontent.com/someone/relay/main/modules/Ads/YouTube.sgmodule"
         )
+    }
+
+    func testGitHubSettingsValidatesOwnerRepositoryAndBranch() {
+        var settings = GitHubSettings()
+        settings.owner = "-bad"
+        XCTAssertFalse(settings.isConfigured)
+        XCTAssertNotNil(settings.validationMessage)
+
+        settings.owner = "someone"
+        settings.repository = "bad/repo"
+        XCTAssertFalse(settings.isConfigured)
+
+        settings.repository = "relay"
+        settings.branch = "feature//bad"
+        XCTAssertFalse(settings.isConfigured)
+
+        settings.branch = "feature/security-hardening"
+        XCTAssertTrue(settings.isConfigured)
+        XCTAssertNil(settings.validationMessage)
     }
 
     func testGitHubClientListsNestedModuleDirectoriesFromTree() async throws {
@@ -1724,6 +1856,32 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertTrue(parsed.isLoopback)
     }
 
+    func testWebRequestParserRejectsInvalidContentLength() {
+        let negative = "POST /api/update-all HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: -1\r\n\r\n"
+        let huge = "POST /api/update-all HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 999999999\r\n\r\n"
+
+        guard case .invalid = WebManagementServer.parseRequestResult(Data(negative.utf8), isLoopback: true) else {
+            return XCTFail("negative Content-Length must be invalid")
+        }
+        guard case .invalid = WebManagementServer.parseRequestResult(Data(huge.utf8), isLoopback: true) else {
+            return XCTFail("oversized Content-Length must be invalid")
+        }
+    }
+
+    func testWebRequestParserDistinguishesIncompleteBodyFromInvalidLength() {
+        let request = """
+        POST /api/update-all HTTP/1.1\r
+        Host: 127.0.0.1\r
+        Content-Length: 12\r
+        \r
+        short
+        """
+
+        guard case .incomplete = WebManagementServer.parseRequestResult(Data(request.utf8), isLoopback: true) else {
+            return XCTFail("valid Content-Length with partial body should remain incomplete")
+        }
+    }
+
     func testWebRequestSecurityAllowsSessionBootstrapWithValidToken() {
         let configuration = WebServerConfiguration(port: 8787, allowRemoteAccess: false, accessToken: "secret")
         let request = WebHTTPRequest(
@@ -1771,12 +1929,26 @@ final class SurgeRelayTests: XCTestCase {
             method: "GET",
             path: "/api/state",
             query: ["token": "secret"],
-            headers: ["authorization": "Bearer secret"],
+            headers: [:],
             body: Data(),
             isLoopback: true
         )
 
         XCTAssertEqual(WebRequestSecurity.rejection(for: request, configuration: configuration)?.status, 401)
+    }
+
+    func testWebRequestSecurityAllowsBearerTokenForNonBrowserAPI() {
+        let configuration = WebServerConfiguration(port: 8787, allowRemoteAccess: true, accessToken: "secret")
+        let request = WebHTTPRequest(
+            method: "POST",
+            path: "/api/update-all",
+            query: [:],
+            headers: ["authorization": "Bearer secret"],
+            body: Data(),
+            isLoopback: false
+        )
+
+        XCTAssertNil(WebRequestSecurity.rejection(for: request, configuration: configuration))
     }
 
     func testWebRequestSecurityAllowsSessionCookieWithoutQueryToken() {
@@ -1912,6 +2084,43 @@ final class SurgeRelayTests: XCTestCase {
         )
 
         XCTAssertNil(WebRequestSecurity.rejection(for: request, configuration: configuration))
+    }
+
+    func testWebRequestSecurityAllowsSameOriginRefererWhenOriginIsMissing() {
+        let configuration = WebServerConfiguration(port: 8787, allowRemoteAccess: true, accessToken: "secret")
+        let session = WebRequestSecurity.sessionCookieValue(for: "secret")
+        let request = WebHTTPRequest(
+            method: "POST",
+            path: "/api/update-all",
+            query: [:],
+            headers: [
+                "cookie": "\(WebRequestSecurity.sessionCookieName)=\(session)",
+                "host": "127.0.0.1:8787",
+                "referer": "http://127.0.0.1:8787/"
+            ],
+            body: Data(),
+            isLoopback: true
+        )
+
+        XCTAssertNil(WebRequestSecurity.rejection(for: request, configuration: configuration))
+    }
+
+    func testWebRequestSecurityRejectsUnsafeSessionCookieWithoutOriginRefererOrBearer() {
+        let configuration = WebServerConfiguration(port: 8787, allowRemoteAccess: true, accessToken: "secret")
+        let session = WebRequestSecurity.sessionCookieValue(for: "secret")
+        let request = WebHTTPRequest(
+            method: "POST",
+            path: "/api/update-all",
+            query: [:],
+            headers: [
+                "cookie": "\(WebRequestSecurity.sessionCookieName)=\(session)",
+                "host": "127.0.0.1:8787"
+            ],
+            body: Data(),
+            isLoopback: true
+        )
+
+        XCTAssertEqual(WebRequestSecurity.rejection(for: request, configuration: configuration)?.status, 403)
     }
 
     func testWebAuthenticationThrottleLimitsRepeatedFailuresAndClearsOnSuccess() {

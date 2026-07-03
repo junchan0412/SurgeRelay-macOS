@@ -341,8 +341,6 @@ struct ModulesView: View {
                 SettingsView()
                     .environment(model)
 
-                Divider()
-
                 HStack {
                     Spacer()
                     Button("完成") { model.presentsSettings = false }
@@ -350,7 +348,7 @@ struct ModulesView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 14)
-                .background(.bar)
+                .background(.ultraThinMaterial)
             }
             .frame(width: 620, height: 560)
         }

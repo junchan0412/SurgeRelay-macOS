@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.3.0
+
+- 加固 Web 管理 HTTP 解析器，拒绝非法、负数或超限 `Content-Length`，并补充回归测试。
+- Web 写操作收紧为同源 `Origin` / `Referer` 或显式 Bearer token；前端不再把原始访问令牌保存到 `sessionStorage`。
+- Script-Hub 上游默认固定到明确 commit，更新时强制脚本引用使用同一 revision，并记录脚本 SHA-256 hash。
+- JavaScriptCore HTTP bridge 限制为 `http` / `https`，拦截本机、内网、链路本地和保留地址，并限制响应体大小。
+- GitHub owner、repository 和 branch 增加结构化校验，避免拼接 API URL 时接受异常仓库标识。
+- 抽离配置迁移、Web 管理 URL、发布 key 和更新周期等纯业务协调逻辑，降低 `AppModel` 后续维护压力。
+- 设置页顶部分类切换改用系统分段控件与完整玻璃 header，修复选中态文字偏移和突兀横向分隔线。
+- 新增 `SECURITY.md`，并在 README 说明 ATS、沙盒、Web 管理和 Script-Hub 供应链边界。
+
 ## 1.2.46
 
 - 设置页顶部不再使用系统 `TabView` 标签栏，改为自绘液态玻璃样式切换器，文字在选中胶囊中保持垂直居中。

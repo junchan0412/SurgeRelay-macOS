@@ -59,9 +59,7 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            settingsTabSelector
-                .padding(.top, 12)
-                .padding(.bottom, 8)
+            settingsHeader
 
             selectedSettingsContent
         }
@@ -97,37 +95,32 @@ struct SettingsView: View {
         }
     }
 
+    private var settingsHeader: some View {
+        ZStack {
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .ignoresSafeArea(edges: .top)
+
+            settingsTabSelector
+        }
+        .frame(height: 56)
+        .frame(maxWidth: .infinity)
+    }
+
     private var settingsTabSelector: some View {
-        HStack(spacing: 3) {
+        Picker("设置分类", selection: $selectedTab) {
             ForEach(SettingsTab.allCases) { tab in
-                Button {
-                    selectedTab = tab
-                } label: {
-                    Text(tab.title)
-                        .font(.system(size: 15, weight: .semibold))
-                        .lineLimit(1)
-                        .frame(width: tab.width, height: 30, alignment: .center)
-                        .padding(.horizontal, 4)
-                        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(selectedTab == tab ? Color.primary : Color.secondary)
-                .background {
-                    if selectedTab == tab {
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(.regularMaterial)
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .strokeBorder(.primary.opacity(0.14), lineWidth: 0.5)
-                            }
-                    }
-                }
-                .accessibilityAddTraits(selectedTab == tab ? .isSelected : [])
+                Text(tab.title)
+                    .tag(tab)
             }
         }
-        .padding(3)
-        .frame(height: 36)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .controlSize(.large)
+        .frame(width: 450)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     @ViewBuilder
@@ -199,6 +192,21 @@ struct SettingsView: View {
                 LabeledContent("版本") {
                     Text(model.upstreamState.revision.map { String($0.prefix(7)) } ?? "—")
                         .monospaced()
+                }
+                LabeledContent("固定来源") {
+                    Text(model.upstreamState.sourceDescription ?? "尚未验证")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+                LabeledContent("上游 revision") {
+                    Text(model.upstreamState.upstreamRevision.map { String($0.prefix(12)) } ?? "—")
+                        .monospaced()
+                        .foregroundStyle(.secondary)
+                }
+                LabeledContent("脚本 hash") {
+                    Text(model.upstreamState.scriptHashes.isEmpty ? "尚未记录" : "\(model.upstreamState.scriptHashes.count) 个脚本已记录")
+                        .foregroundStyle(.secondary)
                 }
                 LabeledContent("上次检查") {
                     Text(model.upstreamState.lastCheckedAt?.formatted(date: .abbreviated, time: .shortened) ?? "尚未检查")

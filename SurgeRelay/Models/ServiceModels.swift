@@ -860,6 +860,89 @@ struct UpstreamUpdateResult: Sendable {
     var revision: String
     var changed: Bool
     var scripts: [String: Data]
+    var sourceDescription: String
+    var upstreamRevision: String
+    var scriptHashes: [String: String]
+}
+
+enum UpdateCoordinator {
+    static func shouldRefreshScriptHub(
+        missingEngine: Bool,
+        settings: AppSettings,
+        upstreamState: ScriptHubUpstreamState
+    ) -> Bool {
+        missingEngine || (
+            settings.automaticallyUpdateScriptHub &&
+                RefreshPolicy.isDue(
+                    lastUpdatedAt: upstreamState.lastCheckedAt,
+                    intervalMinutes: settings.refreshIntervalMinutes
+                )
+        )
+    }
+
+    static func refreshIntervalSeconds(settings: AppSettings) -> Int? {
+        guard settings.refreshIntervalMinutes > 0 else { return nil }
+        return settings.refreshIntervalMinutes * 60
+    }
+}
+
+enum PublishCoordinator {
+    static func repositoryKey(_ settings: GitHubSettings) -> String {
+        [
+            settings.owner,
+            settings.repository,
+            settings.branch,
+            settings.directory.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        ]
+        .joined(separator: "/")
+    }
+
+    static func retryPrefix(_ report: PublishReport) -> String {
+        report.retriedAfterConflict ? "远端分支已更新并重新同步；" : ""
+    }
+}
+
+enum WebManagementController {
+    static func accessModeTitle(settings: AppSettings) -> String {
+        settings.webServerAllowRemoteAccess ? "局域网" : "仅本机"
+    }
+
+    static func host(settings: AppSettings, processInfo: ProcessInfo = .processInfo) -> String {
+        guard settings.webServerAllowRemoteAccess else { return "127.0.0.1" }
+        var host = processInfo.hostName.trimmingCharacters(in: CharacterSet(charactersIn: "."))
+        if !host.contains(".") { host += ".local" }
+        return host
+    }
+
+    static func url(settings: AppSettings, accessToken: String, includingToken: Bool) -> URL? {
+        guard settings.webServerEnabled else { return nil }
+        return WebManagementURLFactory.url(
+            host: host(settings: settings),
+            port: settings.webServerPort,
+            accessToken: accessToken,
+            includingToken: includingToken
+        )
+    }
+}
+
+enum ConfigurationManager {
+    static var configurationDirectoryPath: String {
+        PersistenceStore.configurationDirectoryURL.path
+    }
+
+    static func migrateConfiguration(
+        to path: String,
+        modules: [RelayModule],
+        settings: AppSettings,
+        upstreamState: ScriptHubUpstreamState,
+        updateHistory: [UpdateHistoryEntry]
+    ) throws {
+        try PersistenceStore.useConfigurationDirectory(path)
+        try PersistenceStore.saveModules(modules)
+        PersistenceStore.saveSettings(settings)
+        PersistenceStore.saveUpstreamState(upstreamState)
+        PersistenceStore.saveUpdateHistory(updateHistory)
+    }
 }
 
 enum RelayError: LocalizedError, Sendable {

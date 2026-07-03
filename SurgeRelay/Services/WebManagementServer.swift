@@ -184,8 +184,12 @@ enum WebRequestSecurity {
     static func isAuthorized(_ request: WebHTTPRequest, configuration: WebServerConfiguration) -> Bool {
         let expected = configuration.accessToken.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !expected.isEmpty else { return false }
+        if let provided = bearerAccessToken(in: request),
+           timingSafeEqual(provided, expected) {
+            return true
+        }
         if allowsAccessTokenBootstrap(request),
-           let provided = accessToken(in: request),
+           let provided = bootstrapAccessToken(in: request),
            timingSafeEqual(provided, expected) {
             return true
         }
@@ -216,20 +220,52 @@ enum WebRequestSecurity {
     }
 
     private static func isTrustedOrigin(_ request: WebHTTPRequest) -> Bool {
-        guard let origin = request.headers["origin"]?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !origin.isEmpty else {
-            return true
+        if let origin = request.headers["origin"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !origin.isEmpty {
+            return isSameOrigin(origin, host: request.headers["host"])
         }
-        guard origin.lowercased() != "null",
-              let originComponents = URLComponents(string: origin),
-              originComponents.scheme?.lowercased() == "http",
-              let originHost = originComponents.host?.lowercased(),
-              let expected = normalizedHostPort(from: request.headers["host"]) else {
+        if let referer = request.headers["referer"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !referer.isEmpty {
+            return isSameOrigin(referer, host: request.headers["host"])
+        }
+        return bearerAccessToken(in: request) != nil
+    }
+
+    private static func isSameOrigin(_ value: String, host: String?) -> Bool {
+        guard value.lowercased() != "null",
+              let components = URLComponents(string: value),
+              components.scheme?.lowercased() == "http",
+              let sourceHost = components.host?.lowercased(),
+              let expected = normalizedHostPort(from: host) else {
             return false
         }
-        let originPort = originComponents.port ?? 80
+        let sourcePort = components.port ?? 80
         let expectedPort = expected.port ?? 80
-        return originHost == expected.host && originPort == expectedPort
+        return sourceHost == expected.host && sourcePort == expectedPort
+    }
+
+    private static func bearerAccessToken(in request: WebHTTPRequest) -> String? {
+        guard let authorization = request.headers["authorization"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+              authorization.lowercased().hasPrefix("bearer ") else {
+            return nil
+        }
+        let token = String(authorization.dropFirst("Bearer ".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+        return token.isEmpty ? nil : token
+    }
+
+    private static func bootstrapAccessToken(in request: WebHTTPRequest) -> String? {
+        if let token = bearerAccessToken(in: request) {
+            return token
+        }
+        if let value = request.query["token"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !value.isEmpty {
+            return value
+        }
+        if let value = request.headers["x-surge-relay-token"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !value.isEmpty {
+            return value
+        }
+        return nil
     }
 
     private static func normalizedHostPort(from value: String?) -> (host: String, port: Int?)? {
@@ -240,23 +276,6 @@ enum WebRequestSecurity {
             return nil
         }
         return (host, components.port)
-    }
-
-    private static func accessToken(in request: WebHTTPRequest) -> String? {
-        if let value = request.query["token"]?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !value.isEmpty {
-            return value
-        }
-        if let value = request.headers["x-surge-relay-token"]?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !value.isEmpty {
-            return value
-        }
-        guard let authorization = request.headers["authorization"]?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !authorization.isEmpty else { return nil }
-        if authorization.lowercased().hasPrefix("bearer ") {
-            return String(authorization.dropFirst("Bearer ".count)).trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-        return authorization
     }
 
     private static func sessionCookie(in request: WebHTTPRequest) -> String? {
@@ -283,6 +302,12 @@ enum WebRequestSecurity {
         }
         return difference == 0
     }
+}
+
+enum WebRequestParseResult {
+    case request(WebHTTPRequest)
+    case incomplete
+    case invalid(String)
 }
 
 final class WebAuthenticationThrottle {
@@ -318,7 +343,7 @@ final class WebAuthenticationThrottle {
     func recordSuccess(for request: WebHTTPRequest) {
         guard request.path.hasPrefix("/api/") else { return }
         lock.withLock {
-            failuresByClient.removeValue(forKey: request.clientIdentifier)
+            _ = failuresByClient.removeValue(forKey: request.clientIdentifier)
         }
     }
 
@@ -485,21 +510,24 @@ final class WebManagementServer: @unchecked Sendable {
                 send(.error(status: 400, message: "请求内容过大。"), over: connection)
                 return
             }
-            if let request = Self.parseRequest(
+            switch Self.parseRequestResult(
                 buffer,
                 isLoopback: isLoopback,
                 clientIdentifier: clientIdentifier
             ) {
+            case let .request(request):
                 dispatch(request, over: connection)
-            } else if complete || error != nil {
+            case .incomplete where complete || error != nil:
                 send(.error(status: 400, message: "无效的 HTTP 请求。"), over: connection)
-            } else {
+            case .incomplete:
                 receive(
                     on: connection,
                     accumulated: buffer,
                     isLoopback: isLoopback,
                     clientIdentifier: clientIdentifier
                 )
+            case let .invalid(message):
+                send(.error(status: 400, message: message), over: connection)
             }
         }
     }
@@ -617,13 +645,31 @@ final class WebManagementServer: @unchecked Sendable {
         isLoopback: Bool,
         clientIdentifier: String = "loopback"
     ) -> WebHTTPRequest? {
+        guard case let .request(request) = parseRequestResult(
+            data,
+            isLoopback: isLoopback,
+            clientIdentifier: clientIdentifier
+        ) else {
+            return nil
+        }
+        return request
+    }
+
+    static func parseRequestResult(
+        _ data: Data,
+        isLoopback: Bool,
+        clientIdentifier: String = "loopback",
+        maximumRequestSize: Int = 4 * 1024 * 1024
+    ) -> WebRequestParseResult {
         let separator = Data("\r\n\r\n".utf8)
         guard let headerRange = data.range(of: separator),
-              let headerText = String(data: data[..<headerRange.lowerBound], encoding: .utf8) else { return nil }
+              let headerText = String(data: data[..<headerRange.lowerBound], encoding: .utf8) else {
+            return .incomplete
+        }
         let lines = headerText.components(separatedBy: "\r\n")
-        guard let requestLine = lines.first else { return nil }
+        guard let requestLine = lines.first else { return .invalid("无效的 HTTP 请求。") }
         let requestParts = requestLine.split(separator: " ", omittingEmptySubsequences: true)
-        guard requestParts.count == 3 else { return nil }
+        guard requestParts.count == 3 else { return .invalid("无效的 HTTP 请求。") }
 
         var headers: [String: String] = [:]
         for line in lines.dropFirst() {
@@ -632,9 +678,18 @@ final class WebManagementServer: @unchecked Sendable {
             let value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
             headers[name] = value
         }
-        let contentLength = Int(headers["content-length", default: "0"]) ?? 0
+        let contentLengthHeader = headers["content-length", default: "0"]
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let contentLength = Int(contentLengthHeader),
+              (0...maximumRequestSize).contains(contentLength) else {
+            return .invalid("Content-Length 无效或超过限制。")
+        }
         let bodyStart = headerRange.upperBound
-        guard data.count >= bodyStart + contentLength else { return nil }
+        guard bodyStart <= maximumRequestSize,
+              contentLength <= maximumRequestSize - bodyStart else {
+            return .invalid("请求内容过大。")
+        }
+        guard data.count >= bodyStart + contentLength else { return .incomplete }
         let body = data.subdata(in: bodyStart..<(bodyStart + contentLength))
 
         let target = String(requestParts[1])
@@ -644,7 +699,7 @@ final class WebManagementServer: @unchecked Sendable {
             (components?.queryItems ?? []).compactMap { item in item.value.map { (item.name, $0) } },
             uniquingKeysWith: { _, latest in latest }
         )
-        return WebHTTPRequest(
+        return .request(WebHTTPRequest(
             method: String(requestParts[0]).uppercased(),
             path: path.isEmpty ? "/" : path,
             query: query,
@@ -652,7 +707,7 @@ final class WebManagementServer: @unchecked Sendable {
             body: body,
             isLoopback: isLoopback,
             clientIdentifier: clientIdentifier
-        )
+        ))
     }
 
     private static func clientIdentifier(endpoint: NWEndpoint) -> String {

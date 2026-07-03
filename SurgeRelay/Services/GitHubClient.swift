@@ -424,7 +424,7 @@ actor GitHubClient {
     }
 
     private func apiURL(settings: GitHubSettings, fileName: String?) throws -> URL {
-        var path = "https://api.github.com/repos/\(settings.owner)/\(settings.repository)"
+        var path = "https://api.github.com/repos/\(try GitHubRepositoryValidator.validatedRepositoryPath(owner: settings.owner, repository: settings.repository))"
         if let fileName {
             path += "/contents/\(encodedRepositoryPath(for: fileName, settings: settings))"
         }
@@ -433,7 +433,8 @@ actor GitHubClient {
     }
 
     private func apiURL(settings: GitHubSettings, suffix: String) throws -> URL {
-        guard let url = URL(string: "https://api.github.com/repos/\(settings.owner)/\(settings.repository)/\(suffix)") else {
+        let repositoryPath = try GitHubRepositoryValidator.validatedRepositoryPath(owner: settings.owner, repository: settings.repository)
+        guard let url = URL(string: "https://api.github.com/repos/\(repositoryPath)/\(suffix)") else {
             throw RelayError.githubNotConfigured
         }
         return url

@@ -29,7 +29,11 @@ struct GitHubSettings: Codable, Equatable, Sendable {
     }
 
     var isConfigured: Bool {
-        !owner.isEmpty && !repository.isEmpty && !branch.isEmpty
+        validationMessage == nil
+    }
+
+    var validationMessage: String? {
+        GitHubRepositoryValidator.validationMessage(owner: owner, repository: repository, branch: branch)
     }
 
     func rawURL(for fileName: String) -> URL? {
@@ -53,10 +57,71 @@ struct GitHubSettings: Codable, Equatable, Sendable {
     }
 }
 
+enum GitHubRepositoryValidator {
+    static func validationMessage(owner: String, repository: String, branch: String) -> String? {
+        let owner = owner.trimmingCharacters(in: .whitespacesAndNewlines)
+        let repository = repository.trimmingCharacters(in: .whitespacesAndNewlines)
+        let branch = branch.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard isValidOwner(owner) else {
+            return "GitHub owner 只能包含字母、数字和连字符，且不能以连字符开头或结尾。"
+        }
+        guard isValidRepository(repository) else {
+            return "GitHub 仓库名只能包含字母、数字、点、下划线和连字符。"
+        }
+        guard isValidBranch(branch) else {
+            return "GitHub branch 不能包含空白、控制字符、连续斜杠、..、@{、反斜杠，且不能以斜杠开头或结尾。"
+        }
+        return nil
+    }
+
+    static func validatedRepositoryPath(owner: String, repository: String) throws -> String {
+        guard validationMessage(owner: owner, repository: repository, branch: "main") == nil else {
+            throw RelayError.githubNotConfigured
+        }
+        return "\(encodedPathComponent(owner.trimmingCharacters(in: .whitespacesAndNewlines)))/\(encodedPathComponent(repository.trimmingCharacters(in: .whitespacesAndNewlines)))"
+    }
+
+    private static func isValidOwner(_ value: String) -> Bool {
+        value.range(of: #"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$"#, options: .regularExpression) != nil
+    }
+
+    private static func isValidRepository(_ value: String) -> Bool {
+        value.range(of: #"^[A-Za-z0-9._-]{1,100}$"#, options: .regularExpression) != nil
+    }
+
+    private static func isValidBranch(_ value: String) -> Bool {
+        guard !value.isEmpty,
+              value.count <= 255,
+              !value.hasPrefix("/"),
+              !value.hasSuffix("/"),
+              !value.contains("//"),
+              !value.contains(".."),
+              !value.contains("@{"),
+              !value.contains("\\"),
+              !value.hasSuffix(".lock") else {
+            return false
+        }
+        for scalar in value.unicodeScalars {
+            if CharacterSet.whitespacesAndNewlines.contains(scalar) || scalar.value < 0x20 || scalar.value == 0x7f {
+                return false
+            }
+        }
+        return value.split(separator: "/").allSatisfy { component in
+            !component.isEmpty && !component.hasPrefix(".") && !component.hasSuffix(".lock")
+        }
+    }
+
+    private static func encodedPathComponent(_ value: String) -> String {
+        var allowed = CharacterSet.urlPathAllowed
+        allowed.remove(charactersIn: "/")
+        return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
+    }
+}
+
 struct AppSettings: Codable, Equatable, Sendable {
     // Kept only to find and remove files created by early development builds.
     var outputDirectory: String = AppSettings.defaultOutputDirectory
-    var scriptHubModuleURL = "https://raw.githubusercontent.com/Script-Hub-Org/Script-Hub/main/modules/script-hub.surge.sgmodule"
+    var scriptHubModuleURL = AppSettings.defaultScriptHubModuleURL
     var combinedModuleEnabled = false
     var combinedModuleFileName = "Surge-Relay.sgmodule"
     // Retained so existing settings decode cleanly during migration.
@@ -85,7 +150,7 @@ struct AppSettings: Codable, Equatable, Sendable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         outputDirectory = try container.decodeIfPresent(String.self, forKey: .outputDirectory) ?? Self.defaultOutputDirectory
         scriptHubModuleURL = try container.decodeIfPresent(String.self, forKey: .scriptHubModuleURL)
-            ?? "https://raw.githubusercontent.com/Script-Hub-Org/Script-Hub/main/modules/script-hub.surge.sgmodule"
+            ?? Self.defaultScriptHubModuleURL
         combinedModuleEnabled = try container.decodeIfPresent(Bool.self, forKey: .combinedModuleEnabled) ?? false
         combinedModuleFileName = try container.decodeIfPresent(String.self, forKey: .combinedModuleFileName) ?? "Surge-Relay.sgmodule"
         scriptHubBaseURL = try container.decodeIfPresent(String.self, forKey: .scriptHubBaseURL) ?? "http://script.hub"
@@ -124,6 +189,8 @@ struct AppSettings: Codable, Equatable, Sendable {
             .path
     }
 
+    static let defaultScriptHubModuleURL = "https://raw.githubusercontent.com/Script-Hub-Org/Script-Hub/6b4fb62240629d2fc66b08bc271f8c1f83a5dcd1/modules/script-hub.surge.sgmodule"
+
     func publishedURL(for fileName: String) -> URL? {
         guard storageMode == .gitHub else { return nil }
         return github.publicURL(for: fileName)
@@ -145,9 +212,25 @@ enum StorageMode: String, Codable, Sendable {
 
 struct ScriptHubUpstreamState: Codable, Equatable, Sendable {
     var revision: String?
+    var sourceDescription: String?
+    var upstreamRevision: String?
+    var scriptHashes: [String: String] = [:]
     var lastCheckedAt: Date?
     var lastUpdatedAt: Date?
     var lastError: String?
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        revision = try container.decodeIfPresent(String.self, forKey: .revision)
+        sourceDescription = try container.decodeIfPresent(String.self, forKey: .sourceDescription)
+        upstreamRevision = try container.decodeIfPresent(String.self, forKey: .upstreamRevision)
+        scriptHashes = try container.decodeIfPresent([String: String].self, forKey: .scriptHashes) ?? [:]
+        lastCheckedAt = try container.decodeIfPresent(Date.self, forKey: .lastCheckedAt)
+        lastUpdatedAt = try container.decodeIfPresent(Date.self, forKey: .lastUpdatedAt)
+        lastError = try container.decodeIfPresent(String.self, forKey: .lastError)
+    }
 }
 
 enum SidebarDestination: String, CaseIterable, Hashable, Identifiable {

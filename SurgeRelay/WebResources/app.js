@@ -121,7 +121,6 @@ let autoFilledName = '';
 let manualNameEdited = false;
 let webAccessToken = '';
 let stateEvents = null;
-const webAccessTokenStorageKey = 'surgeRelay.webAccessToken';
 const mobileLayout = window.matchMedia('(max-width: 700px)');
 
 initializeAccessToken();
@@ -291,25 +290,15 @@ async function establishSession() {
 function initializeAccessToken() {
   const url = new URL(location.href);
   const token = url.searchParams.get('token') || '';
-  webAccessToken = token || readStoredAccessToken();
+  webAccessToken = token.trim();
   if (token) {
-    storeAccessToken(token);
     url.searchParams.delete('token');
     history.replaceState(history.state, '', url);
   }
 }
 
-function readStoredAccessToken() {
-  try { return sessionStorage.getItem(webAccessTokenStorageKey) || ''; }
-  catch (_) { return ''; }
-}
-
 function storeAccessToken(token) {
   webAccessToken = token.trim();
-  try {
-    if (webAccessToken) sessionStorage.setItem(webAccessTokenStorageKey, webAccessToken);
-    else sessionStorage.removeItem(webAccessTokenStorageKey);
-  } catch (_) {}
 }
 
 async function promptForAccessToken() {

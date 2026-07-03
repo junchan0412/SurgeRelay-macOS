@@ -261,12 +261,10 @@ final class AppModel {
             let missingEngine = !(await engineStore.hasScript(named: "Rewrite-Parser.js"))
             if await shouldUpdateModulesOnLaunch() {
                 await updateAll()
-            } else if missingEngine || (
-                settings.automaticallyUpdateScriptHub
-                    && RefreshPolicy.isDue(
-                        lastUpdatedAt: upstreamState.lastCheckedAt,
-                        intervalMinutes: settings.refreshIntervalMinutes
-                    )
+            } else if UpdateCoordinator.shouldRefreshScriptHub(
+                missingEngine: missingEngine,
+                settings: settings,
+                upstreamState: upstreamState
             ) {
                 await refreshScriptHub(showProgress: false)
             } else if modules.contains(where: shouldUpdateModule) {
@@ -451,16 +449,18 @@ final class AppModel {
 
 
     var configurationDirectoryPath: String {
-        PersistenceStore.configurationDirectoryURL.path
+        ConfigurationManager.configurationDirectoryPath
     }
 
     func useConfigurationDirectory(_ path: String) {
         do {
-            try PersistenceStore.useConfigurationDirectory(path)
-            try PersistenceStore.saveModules(modules)
-            PersistenceStore.saveSettings(settings)
-            PersistenceStore.saveUpstreamState(upstreamState)
-            PersistenceStore.saveUpdateHistory(updateHistory)
+            try ConfigurationManager.migrateConfiguration(
+                to: path,
+                modules: modules,
+                settings: settings,
+                upstreamState: upstreamState,
+                updateHistory: updateHistory
+            )
             statusMessage = "配置和手动编辑内容已迁移到新的同步目录"
         } catch {
             presentedError = "无法更改配置目录：\(error.localizedDescription)"
@@ -717,8 +717,7 @@ final class AppModel {
 
     func restartScheduler() {
         schedulerTask?.cancel()
-        guard settings.refreshIntervalMinutes > 0 else { return }
-        let seconds = settings.refreshIntervalMinutes * 60
+        guard let seconds = UpdateCoordinator.refreshIntervalSeconds(settings: settings) else { return }
         schedulerTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(seconds))
@@ -1232,7 +1231,9 @@ final class AppModel {
         do {
             let result = try await upstreamService.fetchManagedModule(
                 from: settings.scriptHubModuleURL,
-                previousRevision: upstreamState.revision
+                previousRevision: upstreamState.revision,
+                previousUpstreamRevision: upstreamState.upstreamRevision,
+                previousScriptHashes: upstreamState.scriptHashes
             )
             let missing = !(await engineStore.hasScript(named: "Rewrite-Parser.js"))
             if result.changed || missing {
@@ -1240,6 +1241,9 @@ final class AppModel {
                 upstreamState.lastUpdatedAt = .now
             }
             upstreamState.revision = result.revision
+            upstreamState.sourceDescription = result.sourceDescription
+            upstreamState.upstreamRevision = result.upstreamRevision
+            upstreamState.scriptHashes = result.scriptHashes
             upstreamState.lastCheckedAt = .now
             upstreamState.lastError = nil
             PersistenceStore.saveUpstreamState(upstreamState)
@@ -1650,34 +1654,19 @@ final class AppModel {
     }
 
     var webManagementURL: URL? {
-        guard settings.webServerEnabled else { return nil }
-        return WebManagementURLFactory.url(
-            host: webManagementHost,
-            port: settings.webServerPort,
-            accessToken: webAccessToken,
-            includingToken: true
-        )
+        WebManagementController.url(settings: settings, accessToken: webAccessToken, includingToken: true)
     }
 
     var webManagementDisplayURL: URL? {
-        guard settings.webServerEnabled else { return nil }
-        return WebManagementURLFactory.url(
-            host: webManagementHost,
-            port: settings.webServerPort,
-            accessToken: webAccessToken,
-            includingToken: false
-        )
+        WebManagementController.url(settings: settings, accessToken: webAccessToken, includingToken: false)
     }
 
     var webManagementAccessModeTitle: String {
-        settings.webServerAllowRemoteAccess ? "局域网" : "仅本机"
+        WebManagementController.accessModeTitle(settings: settings)
     }
 
     private var webManagementHost: String {
-        guard settings.webServerAllowRemoteAccess else { return "127.0.0.1" }
-        var host = ProcessInfo.processInfo.hostName.trimmingCharacters(in: CharacterSet(charactersIn: "."))
-        if !host.contains(".") { host += ".local" }
-        return host
+        WebManagementController.host(settings: settings)
     }
 
     func rawURL(for module: RelayModule) -> URL? {
@@ -2050,17 +2039,11 @@ final class AppModel {
     }
 
     private func githubPublishRepositoryKey(_ settings: GitHubSettings) -> String {
-        [
-            settings.owner,
-            settings.repository,
-            settings.branch,
-            settings.directory.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        ]
-        .joined(separator: "/")
+        PublishCoordinator.repositoryKey(settings)
     }
 
     private func githubPublishRetryPrefix(_ report: PublishReport) -> String {
-        report.retriedAfterConflict ? "远端分支已更新并重新同步；" : ""
+        PublishCoordinator.retryPrefix(report)
     }
 
     private func recordGitHubPublish(_ report: PublishReport) {
