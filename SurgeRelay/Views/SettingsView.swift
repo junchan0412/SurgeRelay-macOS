@@ -4,6 +4,9 @@ import CoreImage.CIFilterBuiltins
 import SwiftUI
 
 struct SettingsView: View {
+    private let settingsContentMaxWidth: CGFloat = 680
+    private let settingsHorizontalPadding: CGFloat = 22
+
     @Environment(AppModel.self) private var model
     @State private var isCheckingUpdate = false
     @State private var isTesting = false
@@ -43,8 +46,7 @@ struct SettingsView: View {
             diagnosticsSettings
                 .tabItem { Label("诊断", systemImage: "stethoscope") }
         }
-        .frame(minWidth: 760, minHeight: 620)
-        .padding(18)
+        .frame(minWidth: 640, idealWidth: 780, minHeight: 580, idealHeight: 640)
         .navigationTitle("设置")
         .task {
             refreshInstallationDiagnostics()
@@ -79,7 +81,7 @@ struct SettingsView: View {
 
     private var generalSettings: some View {
         settingsForm {
-            Section("通用") {
+            settingsSection("通用") {
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("配置储存目录")
@@ -101,7 +103,7 @@ struct SettingsView: View {
                 }
             }
 
-            Section("自动化") {
+            settingsSection("自动化") {
                 Picker("刷新间隔", selection: Binding(
                     get: { model.settings.refreshIntervalMinutes },
                     set: {
@@ -126,7 +128,7 @@ struct SettingsView: View {
                 ))
             }
 
-            Section("Script-Hub") {
+            settingsSection("Script-Hub") {
                 LabeledContent("版本") {
                     Text(model.upstreamState.revision.map { String($0.prefix(7)) } ?? "—")
                         .monospaced()
@@ -167,7 +169,7 @@ struct SettingsView: View {
 
     private var publishingSettings: some View {
         settingsForm {
-            Section("存储位置") {
+            settingsSection("存储位置") {
                 Picker("模块发布到", selection: storageModeBinding) {
                     Text("本地").tag(StorageMode.local)
                     Text("GitHub").tag(StorageMode.gitHub)
@@ -217,7 +219,7 @@ struct SettingsView: View {
             }
 
             if model.settings.storageMode == .gitHub, model.settings.github.repositoryIsPrivate == true {
-                Section("Cloudflare Worker") {
+                settingsSection("Cloudflare Worker") {
                     TextField("公共地址", text: githubBinding(\.publicBaseURL))
                 }
             }
@@ -226,7 +228,7 @@ struct SettingsView: View {
 
     private var credentialsSettings: some View {
         settingsForm {
-            Section("GitHub Token") {
+            settingsSection("GitHub Token") {
                 SecureField("Token", text: Binding(
                     get: { model.githubToken },
                     set: { model.githubToken = $0 }
@@ -265,7 +267,7 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Web 管理令牌") {
+            settingsSection("Web 管理令牌") {
                 SecureField("令牌", text: Binding(
                     get: { model.webAccessToken },
                     set: { model.webAccessToken = $0 }
@@ -289,7 +291,7 @@ struct SettingsView: View {
                 }
             }
 
-            Section("钥匙串状态") {
+            settingsSection("钥匙串状态") {
                 keychainDiagnosticsContent
             }
         }
@@ -301,7 +303,7 @@ struct SettingsView: View {
 
     private var webManagementSettings: some View {
         settingsForm {
-            Section("服务") {
+            settingsSection("服务") {
                 LabeledContent("服务状态") {
                     Label(model.webServerState.title, systemImage: model.webServerState.systemImage)
                         .foregroundStyle(webServerStateColor)
@@ -348,7 +350,7 @@ struct SettingsView: View {
                 }
             }
 
-            Section("访问") {
+            settingsSection("访问") {
                 if let displayURL = model.webManagementDisplayURL, let url = model.webManagementURL {
                     LabeledContent(model.settings.webServerAllowRemoteAccess ? "局域网地址" : "本机地址") {
                         Text(displayURL.absoluteString)
@@ -378,10 +380,10 @@ struct SettingsView: View {
 
     private var diagnosticsSettings: some View {
         settingsForm {
-            Section("安装与权限") {
+            settingsSection("安装与权限") {
                 installationDiagnosticsContent
             }
-            Section("诊断") {
+            settingsSection("诊断") {
                 DisclosureGroup("最近更新") {
                     if model.updateHistory.isEmpty {
                         Text("暂无记录").foregroundStyle(.secondary)
@@ -435,10 +437,39 @@ struct SettingsView: View {
         }
     }
 
-    private func settingsForm<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        Form { content() }
-            .formStyle(.grouped)
-            .padding(.top, 10)
+    private func settingsForm<Content: View>(@ViewBuilder content: @escaping () -> Content) -> some View {
+        GeometryReader { geometry in
+            let contentWidth = max(
+                360,
+                min(settingsContentMaxWidth, geometry.size.width - settingsHorizontalPadding * 2)
+            )
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    content()
+                }
+                .frame(width: contentWidth, alignment: .topLeading)
+                .padding(.horizontal, settingsHorizontalPadding)
+                .padding(.vertical, 20)
+                .frame(width: geometry.size.width, alignment: .top)
+            }
+            .scrollIndicators(.visible)
+            .background(Color(nsColor: .windowBackgroundColor))
+        }
+    }
+
+    private func settingsSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.headline)
+            VStack(alignment: .leading, spacing: 10) {
+                content()
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var installationDiagnosticsContent: some View {

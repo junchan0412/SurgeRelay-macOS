@@ -3,6 +3,22 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.2.45</title>
+            <pubDate>Fri, 03 Jul 2026 19:21:58 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.2.45</link>
+            <sparkle:version>47</sparkle:version>
+            <sparkle:shortVersionString>1.2.45</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.2.45
+
+
+- 修复设置窗口在旧窗口尺寸或长路径、长 URL 场景下被横向撑爆，导致左侧标签和右侧按钮被裁切的问题。
+- 设置页不再使用会被输入内容撑宽的系统 `Form` 两列布局，改为固定最大宽度、随窗口收缩的滚动设置面板。
+- 设置分组改为独立区块显示，通用、发布、凭据、Web 管理和诊断页共享同一套宽度约束，避免 Token 输入框、路径和 URL 再次越界。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.2.45/Surge-Relay-1.2.45.app.zip" length="8358457" type="application/zip" sparkle:edSignature="oIlmNXaImb4uiCsyx8cA7gv34mU9scrM+0FzRH+JUWCPUOO19sBnTl7AYvjr7QT8cvvtU7pcAjs6tHNL+1kAAA=="/>
+        </item>
+        <item>
             <title>1.2.44</title>
             <pubDate>Fri, 03 Jul 2026 19:03:27 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.2.44</link>
