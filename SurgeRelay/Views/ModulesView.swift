@@ -337,14 +337,20 @@ struct ModulesView: View {
             .environment(model)
         }
         .sheet(isPresented: $model.presentsSettings) {
-            NavigationStack {
+            VStack(spacing: 0) {
                 SettingsView()
                     .environment(model)
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("完成") { model.presentsSettings = false }
-                        }
-                    }
+
+                Divider()
+
+                HStack {
+                    Spacer()
+                    Button("完成") { model.presentsSettings = false }
+                        .keyboardShortcut(.defaultAction)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 14)
+                .background(.bar)
             }
             .frame(width: 620, height: 560)
         }

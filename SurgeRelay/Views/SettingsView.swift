@@ -14,6 +14,7 @@ struct SettingsView: View {
     @State private var showsWebQRCode = false
     @State private var installationDiagnostics: InstallationDiagnosticSnapshot?
     @State private var localRootDiagnostics: LocalModuleRootDiagnosticSnapshot?
+    @State private var selectedTab: SettingsTab = .general
 
     private enum ConnectionResult {
         case success(String)
@@ -29,25 +30,42 @@ struct SettingsView: View {
         }
     }
 
-    var body: some View {
-        TabView {
-            generalSettings
-                .tabItem { Label("通用", systemImage: "gearshape") }
+    private enum SettingsTab: String, CaseIterable, Identifiable {
+        case general
+        case publishing
+        case credentials
+        case webManagement
+        case diagnostics
 
-            publishingSettings
-                .tabItem { Label("发布", systemImage: "shippingbox") }
+        var id: Self { self }
 
-            credentialsSettings
-                .tabItem { Label("凭据", systemImage: "key.fill") }
-
-            webManagementSettings
-                .tabItem { Label("Web 管理", systemImage: "network") }
-
-            diagnosticsSettings
-                .tabItem { Label("诊断", systemImage: "stethoscope") }
+        var title: String {
+            switch self {
+            case .general: "通用"
+            case .publishing: "发布"
+            case .credentials: "凭据"
+            case .webManagement: "Web 管理"
+            case .diagnostics: "诊断"
+            }
         }
-        .frame(minWidth: 640, idealWidth: 780, minHeight: 580, idealHeight: 640)
-        .navigationTitle("设置")
+
+        var width: CGFloat {
+            switch self {
+            case .webManagement: 92
+            default: 64
+            }
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            settingsTabSelector
+                .padding(.top, 12)
+                .padding(.bottom, 8)
+
+            selectedSettingsContent
+        }
+        .frame(minWidth: 560, idealWidth: 620, minHeight: 440, idealHeight: 500)
         .task {
             refreshInstallationDiagnostics()
             refreshLocalRootDiagnostics()
@@ -76,6 +94,55 @@ struct SettingsView: View {
                 .padding(28)
                 .frame(minWidth: 330)
             }
+        }
+    }
+
+    private var settingsTabSelector: some View {
+        HStack(spacing: 3) {
+            ForEach(SettingsTab.allCases) { tab in
+                Button {
+                    selectedTab = tab
+                } label: {
+                    Text(tab.title)
+                        .font(.system(size: 15, weight: .semibold))
+                        .lineLimit(1)
+                        .frame(width: tab.width, height: 30, alignment: .center)
+                        .padding(.horizontal, 4)
+                        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(selectedTab == tab ? Color.primary : Color.secondary)
+                .background {
+                    if selectedTab == tab {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(.regularMaterial)
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .strokeBorder(.primary.opacity(0.14), lineWidth: 0.5)
+                            }
+                    }
+                }
+                .accessibilityAddTraits(selectedTab == tab ? .isSelected : [])
+            }
+        }
+        .padding(3)
+        .frame(height: 36)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    @ViewBuilder
+    private var selectedSettingsContent: some View {
+        switch selectedTab {
+        case .general:
+            generalSettings
+        case .publishing:
+            publishingSettings
+        case .credentials:
+            credentialsSettings
+        case .webManagement:
+            webManagementSettings
+        case .diagnostics:
+            diagnosticsSettings
         }
     }
 
