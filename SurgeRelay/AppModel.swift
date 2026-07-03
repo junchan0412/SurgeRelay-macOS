@@ -211,6 +211,30 @@ final class AppModel {
         return tokenLoad.token.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    @discardableResult
+    func ensureWebAccessTokenForEditing(showStatusMessage: Bool = false) -> String {
+        ensureWebAccessTokenLoaded(showStatusMessage: showStatusMessage)
+    }
+
+    func saveWebAccessToken() {
+        webAccessToken = webAccessToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !webAccessToken.isEmpty else {
+            presentedError = "Web 管理令牌不能为空。可以点击“生成新令牌”后保存。"
+            statusMessage = "Web 管理令牌未保存"
+            return
+        }
+        do {
+            try KeychainStore.saveWebAccessToken(webAccessToken)
+            webAccessTokenStorageStatus = .keychain
+            statusMessage = "Web 管理访问令牌已保存到系统钥匙串"
+        } catch {
+            webAccessTokenStorageStatus = .memoryOnly
+            presentedError = "无法保存 Web 管理访问令牌：\(error.localizedDescription)"
+            statusMessage = "Web 管理访问令牌仅在本次运行中有效"
+        }
+        applyWebServerSettings()
+    }
+
     func resetWebAccessToken() {
         let token = Self.generateWebAccessToken()
         webAccessToken = token
@@ -1662,7 +1686,7 @@ final class AppModel {
     }
 
     func previewContent(for module: RelayModule) async throws -> String {
-        let content = try await fileStore.readComponent(id: module.id)
+        let content = try await componentContent(for: module)
         let materialized = await processingWorker.materialize(content, overrides: module.argumentOverrides)
         return await processingWorker.applyingModuleMetadata(
             name: module.name,
@@ -1672,7 +1696,7 @@ final class AppModel {
     }
 
     func moduleArgumentInfo(for module: RelayModule) async -> ModuleArgumentInfo {
-        guard let content = try? await fileStore.readConvertedComponent(id: module.id) else {
+        guard let content = try? await convertedComponentContent(for: module) else {
             return ModuleArgumentInfo()
         }
         return await processingWorker.argumentInfo(in: content)
@@ -1723,7 +1747,7 @@ final class AppModel {
             category: module.category,
             to: content
         )
-        if let current = try? await fileStore.readComponent(id: module.id), current == namedContent {
+        if let current = try? await componentContent(for: module), current == namedContent {
             statusMessage = "内容没有变化"
             return
         }
@@ -1732,7 +1756,7 @@ final class AppModel {
         registerLocalChange()
         try await fileStore.writeComponentOverride(namedContent, id: module.id)
         if let index = modules.firstIndex(where: { $0.id == module.id }),
-           let converted = try? await fileStore.readConvertedComponent(id: module.id) {
+           let converted = try? await convertedComponentContent(for: module) {
             modules[index].overrideBaseHash = Data(converted.utf8).sha256String
             modules[index].hasOverrideConflict = false
         }
@@ -1746,7 +1770,8 @@ final class AppModel {
         beginWork(.restoringPreview)
         defer { endWork(.restoringPreview) }
         registerLocalChange()
-        let content = try await fileStore.restoreComponent(id: module.id)
+        try await fileStore.removeComponentOverride(id: module.id)
+        let content = try await convertedComponentContent(for: module)
         if let index = modules.firstIndex(where: { $0.id == module.id }) {
             modules[index].overrideBaseHash = nil
             modules[index].hasOverrideConflict = false
@@ -1766,7 +1791,7 @@ final class AppModel {
 
     func acceptOverrideConflict(moduleID: UUID) async {
         guard let index = modules.firstIndex(where: { $0.id == moduleID }),
-              let converted = try? await fileStore.readConvertedComponent(id: moduleID) else { return }
+              let converted = try? await convertedComponentContent(for: modules[index]) else { return }
         modules[index].overrideBaseHash = Data(converted.utf8).sha256String
         modules[index].hasOverrideConflict = false
         try? persistModules()
@@ -1774,8 +1799,45 @@ final class AppModel {
     }
 
     func convertedPreviewContent(for module: RelayModule) async throws -> String {
-        let content = try await fileStore.readConvertedComponent(id: module.id)
+        let content = try await convertedComponentContent(for: module)
         return await processingWorker.materialize(content, overrides: module.argumentOverrides)
+    }
+
+    private func componentContent(for module: RelayModule) async throws -> String {
+        if await fileStore.hasComponent(id: module.id) {
+            return try await fileStore.readComponent(id: module.id)
+        }
+        return try await recoverLocalSourceContent(for: module)
+    }
+
+    private func convertedComponentContent(for module: RelayModule) async throws -> String {
+        do {
+            return try await fileStore.readConvertedComponent(id: module.id)
+        } catch {
+            return try await recoverLocalSourceContent(for: module)
+        }
+    }
+
+    private func recoverLocalSourceContent(for module: RelayModule) async throws -> String {
+        guard let sourceURL = URL(string: module.sourceURL), sourceURL.isFileURL else {
+            throw RelayError.invalidOutput("模块尚无转换缓存，请先更新该模块。")
+        }
+        guard module.sourceFormat.isNativeSurgeModule(for: sourceURL) else {
+            throw RelayError.invalidOutput("本地来源尚无转换缓存，请先更新该模块。")
+        }
+        do {
+            let data = try Data(contentsOf: sourceURL.standardizedFileURL)
+            guard let content = String(data: data, encoding: .utf8) else {
+                throw RelayError.invalidOutput("原始本地模块不是有效的 UTF-8 文本。")
+            }
+            let sanitized = SurgeModuleSanitizer.sanitize(content)
+            try? await fileStore.writeComponent(sanitized, id: module.id)
+            return sanitized
+        } catch let error as RelayError {
+            throw error
+        } catch {
+            throw RelayError.invalidOutput("模块缓存缺失，且无法读取原始本地文件：\(error.localizedDescription)")
+        }
     }
 
     func installationDiagnostics() -> InstallationDiagnosticSnapshot {

@@ -79,9 +79,13 @@ actor ModuleFileStore {
     }
 
     func restoreComponent(id: UUID) throws -> String {
+        try removeComponentOverride(id: id)
+        return try readConvertedComponent(id: id)
+    }
+
+    func removeComponentOverride(id: UUID) throws {
         let url = componentOverrideURL(for: id)
         if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
-        return try readConvertedComponent(id: id)
     }
 
     func removeComponent(id: UUID) throws {

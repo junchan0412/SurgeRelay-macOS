@@ -27,8 +27,58 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        @Bindable var model = model
-        Form {
+        TabView {
+            generalSettings
+                .tabItem { Label("通用", systemImage: "gearshape") }
+
+            publishingSettings
+                .tabItem { Label("发布", systemImage: "shippingbox") }
+
+            credentialsSettings
+                .tabItem { Label("凭据", systemImage: "key.fill") }
+
+            webManagementSettings
+                .tabItem { Label("Web 管理", systemImage: "network") }
+
+            diagnosticsSettings
+                .tabItem { Label("诊断", systemImage: "stethoscope") }
+        }
+        .frame(minWidth: 760, minHeight: 620)
+        .padding(18)
+        .navigationTitle("设置")
+        .task {
+            refreshInstallationDiagnostics()
+            refreshLocalRootDiagnostics()
+            model.ensureGitHubTokenLoaded()
+            model.ensureWebAccessTokenForEditing()
+        }
+        .onChange(of: model.settings.localModuleDirectory) { _, _ in
+            refreshLocalRootDiagnostics()
+        }
+        .sheet(isPresented: $showsWebQRCode) {
+            if let url = model.webManagementURL, let displayURL = model.webManagementDisplayURL {
+                VStack(spacing: 18) {
+                    Text("Web 管理").font(.title2.bold())
+                    if let image = qrCodeImage(for: url.absoluteString) {
+                        Image(nsImage: image)
+                            .interpolation(.none)
+                            .resizable()
+                            .frame(width: 240, height: 240)
+                    }
+                    Text(displayURL.absoluteString)
+                        .font(.system(.callout, design: .monospaced))
+                        .textSelection(.enabled)
+                    Button("完成") { showsWebQRCode = false }
+                        .keyboardShortcut(.defaultAction)
+                }
+                .padding(28)
+                .frame(minWidth: 330)
+            }
+        }
+    }
+
+    private var generalSettings: some View {
+        settingsForm {
             Section("通用") {
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 3) {
@@ -76,134 +126,182 @@ struct SettingsView: View {
                 ))
             }
 
-            Section("安装与权限") {
-                if let diagnostics = installationDiagnostics {
-                    LabeledContent("版本") {
-                        Text("\(diagnostics.appVersion) (\(diagnostics.buildNumber))")
-                            .foregroundStyle(.secondary)
-                    }
-                    LabeledContent("App 位置") {
-                        Text(diagnostics.appPath)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .textSelection(.enabled)
-                            .lineLimit(2)
-                    }
-                    diagnosticLabel("签名", value: diagnostics.signatureStatus, systemImage: "signature")
-                    diagnosticLabel("Gatekeeper", value: diagnostics.gatekeeperStatus, systemImage: "lock.shield")
-                    diagnosticLabel("隔离属性", value: diagnostics.quarantineStatus, systemImage: "shield.lefthalf.filled")
-                    diagnosticLabel("崩溃报告", value: diagnostics.recentCrashReportStatus, systemImage: "waveform.path.ecg")
-                    if !diagnostics.recentCrashReports.isEmpty {
-                        DisclosureGroup("最近崩溃报告") {
-                            ForEach(diagnostics.recentCrashReports) { report in
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(report.fileName)
-                                        .font(.caption.weight(.medium))
-                                        .textSelection(.enabled)
-                                    if let modifiedAt = report.modifiedAt {
-                                        Text(modifiedAt.formatted(date: .abbreviated, time: .shortened))
-                                            .font(.caption2)
-                                            .foregroundStyle(.tertiary)
-                                    }
-                                    Text(report.path)
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                        .textSelection(.enabled)
-                                        .lineLimit(2)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.vertical, 2)
-                            }
+            Section("Script-Hub") {
+                LabeledContent("版本") {
+                    Text(model.upstreamState.revision.map { String($0.prefix(7)) } ?? "—")
+                        .monospaced()
+                }
+                LabeledContent("上次检查") {
+                    Text(model.upstreamState.lastCheckedAt?.formatted(date: .abbreviated, time: .shortened) ?? "尚未检查")
+                        .foregroundStyle(.secondary)
+                }
+                TextField("上游模块", text: stringBinding(\.scriptHubModuleURL))
+                Toggle("自动更新", isOn: Binding(
+                    get: { model.settings.automaticallyUpdateScriptHub },
+                    set: { model.settings.automaticallyUpdateScriptHub = $0; model.saveSettings() }
+                ))
+                HStack(spacing: 8) {
+                    Button("检查更新", systemImage: "arrow.clockwise") {
+                        Task {
+                            isCheckingUpdate = true
+                            await model.refreshScriptHub(showProgress: false)
+                            isCheckingUpdate = false
                         }
                     }
-                    LabeledContent("自动检查更新") {
-                        Label(
-                            diagnostics.sparkleAutomaticChecksEnabled ? "开启" : "关闭",
-                            systemImage: diagnostics.sparkleAutomaticChecksEnabled ? "checkmark.circle.fill" : "pause.circle"
-                        )
-                        .foregroundStyle(diagnostics.sparkleAutomaticChecksEnabled ? .green : .secondary)
+                    .disabled(isCheckingUpdate)
+                    if isCheckingUpdate {
+                        ProgressView().controlSize(.small)
+                        Text("正在检查…")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                    if let feedURL = diagnostics.sparkleFeedURL {
-                        LabeledContent("更新源") {
-                            Text(feedURL)
+                }
+                if let error = model.upstreamState.lastError {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .textSelection(.enabled)
+                }
+            }
+        }
+    }
+
+    private var publishingSettings: some View {
+        settingsForm {
+            Section("存储位置") {
+                Picker("模块发布到", selection: storageModeBinding) {
+                    Text("本地").tag(StorageMode.local)
+                    Text("GitHub").tag(StorageMode.gitHub)
+                }
+                .pickerStyle(.segmented)
+
+                if model.settings.storageMode == .local {
+                    HStack(alignment: .firstTextBaseline) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("本地模块根目录")
+                            Text(model.settings.localModuleDirectory)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .textSelection(.enabled)
                                 .lineLimit(2)
-                        }
-                    }
-                    Label(diagnostics.updateRecommendation, systemImage: "shippingbox")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Button("重新检查", systemImage: "arrow.clockwise") {
-                        refreshInstallationDiagnostics()
-                    }
-                } else {
-                    HStack(spacing: 8) {
-                        ProgressView().controlSize(.small)
-                        Text("正在读取安装状态…")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-
-            Section("钥匙串") {
-                let credentials = model.credentialDiagnostics()
-                LabeledContent("服务") {
-                    Text(credentials.keychainService)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                }
-                LabeledContent("访问检查") {
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Label(credentials.keychainAccessStatus, systemImage: credentials.keychainAccessState.systemImage)
-                            .foregroundStyle(keychainAccessProbeColor(credentials.keychainAccessState))
-                        if let checkedAt = credentials.keychainAccessCheckedAt {
-                            Text(checkedAt.formatted(date: .abbreviated, time: .shortened))
+                            Text(model.settings.combinedModuleEnabled ? "总模块保存在根目录；独立模块可选择根目录下的文件夹" : "独立模块可选择根目录下的文件夹")
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        Button("选择…") { chooseLocalModuleDirectory() }
+                    }
+                    if let diagnostics = localRootDiagnostics {
+                        localRootDiagnosticContent(diagnostics)
+                    } else {
+                        HStack(spacing: 8) {
+                            ProgressView().controlSize(.small)
+                            Text("正在检查本地模块根目录…")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
-                Text(credentials.keychainAccessMessage)
+
+                if model.settings.storageMode == .gitHub {
+                    TextField("所有者", text: githubBinding(\.owner))
+                    TextField("仓库", text: githubBinding(\.repository))
+                    TextField("分支", text: githubBinding(\.branch))
+                    TextField("模块根目录", text: githubBinding(\.directory))
+                    LabeledContent("仓库类型") {
+                        switch model.settings.github.repositoryIsPrivate {
+                        case .some(true): Label("私有", systemImage: "lock.fill")
+                        case .some(false): Label("公开", systemImage: "globe")
+                        case nil: Text("未检测").foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+
+            if model.settings.storageMode == .gitHub, model.settings.github.repositoryIsPrivate == true {
+                Section("Cloudflare Worker") {
+                    TextField("公共地址", text: githubBinding(\.publicBaseURL))
+                }
+            }
+        }
+    }
+
+    private var credentialsSettings: some View {
+        settingsForm {
+            Section("GitHub Token") {
+                SecureField("Token", text: Binding(
+                    get: { model.githubToken },
+                    set: { model.githubToken = $0 }
+                ))
+                LabeledContent("保存状态") {
+                    Label(model.githubTokenStorageStatus.title, systemImage: githubTokenStorageImage)
+                        .foregroundStyle(githubTokenStorageColor)
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    Label("Fine-grained token：Repository permissions 只需要 Contents 读写、Metadata 只读。", systemImage: "checkmark.shield")
+                    Label("Classic token：公开仓库可用 public_repo；私有仓库需要 repo。", systemImage: "lock")
+                    Label("不需要 admin、delete_repo、workflow 或组织管理权限。", systemImage: "exclamationmark.triangle")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+                HStack(spacing: 8) {
+                    Link("创建 Token", destination: URL(string: "https://github.com/settings/personal-access-tokens/new")!)
+                    Button("保存到钥匙串", systemImage: "key.fill") { model.saveGitHubToken() }
+                    Button("测试连接", systemImage: "network") { testGitHubConnection() }
+                        .disabled(model.githubToken.isEmpty || !model.settings.github.isConfigured || isTesting)
+                    if isTesting {
+                        ProgressView().controlSize(.small)
+                    }
+                }
+                if !model.settings.github.isConfigured {
+                    Label("测试连接前请先在“发布”中填写 GitHub 仓库信息。", systemImage: "info.circle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if let result = connectionResult {
+                    Label(result.message, systemImage: result.isError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(result.isError ? .red : .green)
+                        .textSelection(.enabled)
+                }
+            }
+
+            Section("Web 管理令牌") {
+                SecureField("令牌", text: Binding(
+                    get: { model.webAccessToken },
+                    set: { model.webAccessToken = $0 }
+                ))
+                LabeledContent("保存状态") {
+                    Label(model.webAccessTokenStorageStatus.title, systemImage: webAccessTokenStorageImage)
+                        .foregroundStyle(webAccessTokenStorageColor)
+                }
+                Label("访问 Web 管理页面时使用；可自己填写，也可生成随机令牌。", systemImage: "network.badge.shield.half.filled")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
-                if let statusCode = credentials.keychainAccessStatusCode {
-                    LabeledContent("错误码") {
-                        Text("OSStatus \(statusCode)")
-                            .font(.caption.monospaced())
-                            .foregroundStyle(.secondary)
-                            .textSelection(.enabled)
+                HStack(spacing: 8) {
+                    Button("保存到钥匙串", systemImage: "key.fill") { model.saveWebAccessToken() }
+                    Button("生成新令牌", systemImage: "arrow.triangle.2.circlepath") { model.resetWebAccessToken() }
+                    Button("拷贝令牌", systemImage: "doc.on.doc") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(model.webAccessToken, forType: .string)
                     }
+                    .disabled(model.webAccessToken.isEmpty)
                 }
-                if !credentials.keychainAccessRecoverySuggestion.isEmpty {
-                    Label(credentials.keychainAccessRecoverySuggestion, systemImage: "wrench.and.screwdriver")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                }
-                credentialLabel(
-                    "GitHub Token",
-                    account: credentials.githubTokenAccount,
-                    status: credentials.githubTokenStatus
-                )
-                credentialLabel(
-                    "Web 管理令牌",
-                    account: credentials.webAccessTokenAccount,
-                    status: credentials.webAccessTokenStatus
-                )
-                Label(credentials.note, systemImage: "key.fill")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Button("重新检查", systemImage: "arrow.clockwise") {
-                    model.refreshKeychainAccessProbe()
-                }
-                .disabled(credentials.keychainAccessState == .checking)
             }
 
-            Section("Web 管理") {
+            Section("钥匙串状态") {
+                keychainDiagnosticsContent
+            }
+        }
+        .onAppear {
+            model.ensureGitHubTokenLoaded()
+            model.ensureWebAccessTokenForEditing()
+        }
+    }
+
+    private var webManagementSettings: some View {
+        settingsForm {
+            Section("服务") {
                 LabeledContent("服务状态") {
                     Label(model.webServerState.title, systemImage: model.webServerState.systemImage)
                         .foregroundStyle(webServerStateColor)
@@ -241,11 +339,6 @@ struct SettingsView: View {
                         )
                         .foregroundStyle(model.settings.webServerAllowRemoteAccess ? .orange : .secondary)
                     }
-                    LabeledContent("令牌存储") {
-                        Label(model.webAccessTokenStorageStatus.title, systemImage: webAccessTokenStorageImage)
-                            .foregroundStyle(webAccessTokenStorageColor)
-                            .textSelection(.enabled)
-                    }
                 }
                 if let failure = model.webServerState.failureMessage {
                     Label(failure, systemImage: "exclamationmark.triangle.fill")
@@ -253,6 +346,9 @@ struct SettingsView: View {
                         .foregroundStyle(.red)
                         .textSelection(.enabled)
                 }
+            }
+
+            Section("访问") {
                 if let displayURL = model.webManagementDisplayURL, let url = model.webManagementURL {
                     LabeledContent(model.settings.webServerAllowRemoteAccess ? "局域网地址" : "本机地址") {
                         Text(displayURL.absoluteString)
@@ -266,148 +362,25 @@ struct SettingsView: View {
                             NSPasteboard.general.setString(url.absoluteString, forType: .string)
                         }
                         Button("二维码", systemImage: "qrcode") { showsWebQRCode = true }
-                        Button("重置令牌", systemImage: "arrow.triangle.2.circlepath") {
-                            model.resetWebAccessToken()
-                        }
                     }
                     if model.settings.webServerAllowRemoteAccess {
                         Label("局域网访问会暴露模块管理入口，请只在可信网络中启用。", systemImage: "lock.open.fill")
                             .font(.caption)
                             .foregroundStyle(.orange)
                     }
-                }
-            }
-
-            Section("Script-Hub") {
-                LabeledContent("版本") {
-                    Text(model.upstreamState.revision.map { String($0.prefix(7)) } ?? "—")
-                        .monospaced()
-                }
-                LabeledContent("上次检查") {
-                    Text(model.upstreamState.lastCheckedAt?.formatted(date: .abbreviated, time: .shortened) ?? "尚未检查")
+                } else {
+                    Text("启用 Web 管理后会显示访问地址。")
                         .foregroundStyle(.secondary)
                 }
-                TextField("上游模块", text: stringBinding(\.scriptHubModuleURL))
-                Toggle("自动更新", isOn: Binding(
-                    get: { model.settings.automaticallyUpdateScriptHub },
-                    set: { model.settings.automaticallyUpdateScriptHub = $0; model.saveSettings() }
-                ))
-                HStack(spacing: 8) {
-                    Button("检查更新", systemImage: "arrow.clockwise") {
-                        Task {
-                            isCheckingUpdate = true
-                            await model.refreshScriptHub(showProgress: false)
-                            isCheckingUpdate = false
-                        }
-                    }
-                    .disabled(isCheckingUpdate)
-                    if isCheckingUpdate {
-                        ProgressView().controlSize(.small)
-                        Text("正在检查…")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                if let error = model.upstreamState.lastError {
-                    Label(error, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
-                        .textSelection(.enabled)
-                }
             }
+        }
+    }
 
-            Section("存储位置") {
-                Picker("模块发布到", selection: storageModeBinding) {
-                    Text("本地").tag(StorageMode.local)
-                    Text("GitHub").tag(StorageMode.gitHub)
-                }
-                .pickerStyle(.segmented)
-
-                if model.settings.storageMode == .local {
-                    HStack(alignment: .firstTextBaseline) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("本地模块根目录")
-                            Text(model.settings.localModuleDirectory)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .textSelection(.enabled)
-                                .lineLimit(2)
-                            Text(model.settings.combinedModuleEnabled ? "总模块保存在根目录；独立模块可选择根目录下的文件夹" : "独立模块可选择根目录下的文件夹")
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        Button("选择…") { chooseLocalModuleDirectory() }
-                    }
-                    if let diagnostics = localRootDiagnostics {
-                        localRootDiagnosticContent(diagnostics)
-                    } else {
-                        HStack(spacing: 8) {
-                            ProgressView().controlSize(.small)
-                            Text("正在检查本地模块根目录…")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
+    private var diagnosticsSettings: some View {
+        settingsForm {
+            Section("安装与权限") {
+                installationDiagnosticsContent
             }
-
-            if model.settings.storageMode == .gitHub {
-            Section("GitHub") {
-                TextField("所有者", text: githubBinding(\.owner))
-                TextField("仓库", text: githubBinding(\.repository))
-                TextField("分支", text: githubBinding(\.branch))
-                TextField("模块根目录", text: githubBinding(\.directory))
-                LabeledContent("仓库类型") {
-                    switch model.settings.github.repositoryIsPrivate {
-                    case .some(true): Label("私有", systemImage: "lock.fill")
-                    case .some(false): Label("公开", systemImage: "globe")
-                    case nil: Text("未检测").foregroundStyle(.secondary)
-                    }
-                }
-            }
-
-            Section("访问凭据") {
-                SecureField("GitHub Token", text: $model.githubToken)
-                HStack(spacing: 8) {
-                    Button("保存") { model.saveGitHubToken() }
-                        .help("GitHub Token 会保存在系统钥匙串")
-                    Button("测试连接") {
-                        Task {
-                            isTesting = true
-                            connectionResult = nil
-                            model.presentedError = nil
-                            await model.testGitHub(showProgress: false)
-                            isTesting = false
-                            if let error = model.presentedError {
-                                connectionResult = .failure(error)
-                                model.presentedError = nil
-                            } else {
-                                connectionResult = .success(model.statusMessage)
-                            }
-                        }
-                    }
-                    .disabled(model.githubToken.isEmpty || !model.settings.github.isConfigured || isTesting)
-                    if isTesting {
-                        ProgressView().controlSize(.small)
-                    }
-                }
-                if let result = connectionResult {
-                    Label(result.message, systemImage: result.isError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
-                        .font(.caption)
-                        .foregroundStyle(result.isError ? .red : .green)
-                        .textSelection(.enabled)
-                }
-            }
-            .onAppear {
-                model.ensureGitHubTokenLoaded()
-            }
-
-            if model.settings.github.repositoryIsPrivate == true {
-                Section("Cloudflare Worker") {
-                    TextField("公共地址", text: githubBinding(\.publicBaseURL))
-                }
-            }
-            }
-
             Section("诊断") {
                 DisclosureGroup("最近更新") {
                     if model.updateHistory.isEmpty {
@@ -459,35 +432,174 @@ struct SettingsView: View {
                         .disabled(model.updateHistory.isEmpty)
                 }
             }
+        }
+    }
 
-        }
-        .formStyle(.grouped)
-        .navigationTitle("设置")
-        .task {
-            refreshInstallationDiagnostics()
-            refreshLocalRootDiagnostics()
-        }
-        .onChange(of: model.settings.localModuleDirectory) { _, _ in
-            refreshLocalRootDiagnostics()
-        }
-        .sheet(isPresented: $showsWebQRCode) {
-            if let url = model.webManagementURL, let displayURL = model.webManagementDisplayURL {
-                VStack(spacing: 18) {
-                    Text("Web 管理").font(.title2.bold())
-                    if let image = qrCodeImage(for: url.absoluteString) {
-                        Image(nsImage: image)
-                            .interpolation(.none)
-                            .resizable()
-                            .frame(width: 240, height: 240)
-                    }
-                    Text(displayURL.absoluteString)
-                        .font(.system(.callout, design: .monospaced))
-                        .textSelection(.enabled)
-                    Button("完成") { showsWebQRCode = false }
-                        .keyboardShortcut(.defaultAction)
+    private func settingsForm<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        Form { content() }
+            .formStyle(.grouped)
+            .padding(.top, 10)
+    }
+
+    private var installationDiagnosticsContent: some View {
+        Group {
+            if let diagnostics = installationDiagnostics {
+                LabeledContent("版本") {
+                    Text("\(diagnostics.appVersion) (\(diagnostics.buildNumber))")
+                        .foregroundStyle(.secondary)
                 }
-                .padding(28)
-                .frame(minWidth: 330)
+                LabeledContent("App 位置") {
+                    Text(diagnostics.appPath)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .lineLimit(2)
+                }
+                diagnosticLabel("签名", value: diagnostics.signatureStatus, systemImage: "signature")
+                diagnosticLabel("Gatekeeper", value: diagnostics.gatekeeperStatus, systemImage: "lock.shield")
+                diagnosticLabel("隔离属性", value: diagnostics.quarantineStatus, systemImage: "shield.lefthalf.filled")
+                diagnosticLabel("崩溃报告", value: diagnostics.recentCrashReportStatus, systemImage: "waveform.path.ecg")
+                if !diagnostics.recentCrashReports.isEmpty {
+                    DisclosureGroup("最近崩溃报告") {
+                        ForEach(diagnostics.recentCrashReports) { report in
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(report.fileName)
+                                    .font(.caption.weight(.medium))
+                                    .textSelection(.enabled)
+                                if let modifiedAt = report.modifiedAt {
+                                    Text(modifiedAt.formatted(date: .abbreviated, time: .shortened))
+                                        .font(.caption2)
+                                        .foregroundStyle(.tertiary)
+                                }
+                                Text(report.path)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .textSelection(.enabled)
+                                    .lineLimit(2)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 2)
+                        }
+                    }
+                }
+                LabeledContent("自动检查更新") {
+                    Label(
+                        diagnostics.sparkleAutomaticChecksEnabled ? "开启" : "关闭",
+                        systemImage: diagnostics.sparkleAutomaticChecksEnabled ? "checkmark.circle.fill" : "pause.circle"
+                    )
+                    .foregroundStyle(diagnostics.sparkleAutomaticChecksEnabled ? .green : .secondary)
+                }
+                if let feedURL = diagnostics.sparkleFeedURL {
+                    LabeledContent("更新源") {
+                        Text(feedURL)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .lineLimit(2)
+                    }
+                }
+                Label(diagnostics.updateRecommendation, systemImage: "shippingbox")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button("重新检查", systemImage: "arrow.clockwise") {
+                    refreshInstallationDiagnostics()
+                }
+            } else {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("正在读取安装状态…")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private var keychainDiagnosticsContent: some View {
+        let credentials = model.credentialDiagnostics()
+        return Group {
+            LabeledContent("服务") {
+                Text(credentials.keychainService)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+            LabeledContent("访问检查") {
+                VStack(alignment: .trailing, spacing: 2) {
+                    Label(credentials.keychainAccessStatus, systemImage: credentials.keychainAccessState.systemImage)
+                        .foregroundStyle(keychainAccessProbeColor(credentials.keychainAccessState))
+                    if let checkedAt = credentials.keychainAccessCheckedAt {
+                        Text(checkedAt.formatted(date: .abbreviated, time: .shortened))
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+            Text(credentials.keychainAccessMessage)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+            if let statusCode = credentials.keychainAccessStatusCode {
+                LabeledContent("错误码") {
+                    Text("OSStatus \(statusCode)")
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+            }
+            if !credentials.keychainAccessRecoverySuggestion.isEmpty {
+                Label(credentials.keychainAccessRecoverySuggestion, systemImage: "wrench.and.screwdriver")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+            credentialLabel(
+                "GitHub Token",
+                account: credentials.githubTokenAccount,
+                status: credentials.githubTokenStatus
+            )
+            credentialLabel(
+                "Web 管理令牌",
+                account: credentials.webAccessTokenAccount,
+                status: credentials.webAccessTokenStatus
+            )
+            Label(credentials.note, systemImage: "key.fill")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Button("重新检查", systemImage: "arrow.clockwise") {
+                model.refreshKeychainAccessProbe()
+            }
+            .disabled(credentials.keychainAccessState == .checking)
+        }
+    }
+
+    private var githubTokenStorageImage: String {
+        switch model.githubTokenStorageStatus {
+        case .keychain: "checkmark.circle.fill"
+        case .notChecked, .notConfigured: "questionmark.circle"
+        case .legacyConfigurationFallback, .memoryOnly, .unavailable: "exclamationmark.triangle.fill"
+        }
+    }
+
+    private var githubTokenStorageColor: Color {
+        switch model.githubTokenStorageStatus {
+        case .keychain: .green
+        case .notChecked, .notConfigured: .secondary
+        case .legacyConfigurationFallback, .memoryOnly, .unavailable: .orange
+        }
+    }
+
+    private func testGitHubConnection() {
+        Task {
+            isTesting = true
+            connectionResult = nil
+            model.presentedError = nil
+            await model.testGitHub(showProgress: false)
+            isTesting = false
+            if let error = model.presentedError {
+                connectionResult = .failure(error)
+                model.presentedError = nil
+            } else {
+                connectionResult = .success(model.statusMessage)
             }
         }
     }

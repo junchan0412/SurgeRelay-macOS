@@ -3,6 +3,24 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.2.44</title>
+            <pubDate>Fri, 03 Jul 2026 19:03:27 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.2.44</link>
+            <sparkle:version>46</sparkle:version>
+            <sparkle:shortVersionString>1.2.44</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.2.44
+
+
+- 设置窗口重新整理为“通用、发布、凭据、Web 管理、诊断”五个页签，让存储位置、Token、Web 服务和诊断信息各自归位。
+- 凭据页新增可编辑的 GitHub Token 与 Web 管理令牌输入框，支持保存到钥匙串、测试 GitHub 连接、生成和拷贝 Web 管理令牌。
+- GitHub Token 设置处补充权限说明：Fine-grained token 只需要 Contents 读写和 Metadata 只读；Classic token 公开仓库使用 `public_repo`，私有仓库使用 `repo`，不需要仓库管理或删除权限。
+- 本地 `file://` Surge 模块在转换缓存缺失时，会从原始文件安全恢复预览缓存；远程模块缺少缓存时会提示先更新模块，避免显示临时 `.cache` 文件不存在的底层错误。
+- 恢复手动覆盖时会先移除覆盖文件，再通过同一套缓存恢复逻辑读取转换结果，减少历史缓存缺失导致的恢复失败。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.2.44/Surge-Relay-1.2.44.app.zip" length="8261500" type="application/zip" sparkle:edSignature="YfFVnIVr7pVo/Zj+szSp27O5QThIlq3VtpLpSKvPZMpkqi3ZsXCTATzLevnxeqoAXBBrYrTYaTWrfuAbJRQPAQ=="/>
+        </item>
+        <item>
             <title>1.2.43</title>
             <pubDate>Fri, 03 Jul 2026 04:44:23 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.2.43</link>
