@@ -24,6 +24,7 @@
 - 将更新失败后的原始链接补查判定和总模块缺缓存详情格式化抽出到 `UpdateFailurePlanner`。
 - 将 GitHub 发布旧路径候选、所选模块路径合并、发布成功文案和历史记录构建抽出到 `GitHubPublishPlanner`。
 - 将发布规划、自动发布文案和发布文件组装测试拆到 `PublishPlannerTests.swift`，继续降低 `ModelAndCoordinatorTests.swift` 的维护压力。
+- 将 Script-Hub 转换 URL、上游固定版本、内置引擎安全、参数物化和 sanitizer 测试拆到 `ScriptHubTests.swift`。
 - 将维护文档和 Release 构建脚本的默认 Xcode 路径更新为 macOS 27 beta 使用的 `Xcode-beta.app`，脚本仍保留旧路径作为 fallback。
 - 404 更新失败说明补充仓库公开性和访问权限检查建议；Web 管理端失败详情新增“复制错误”按钮。
 - Web 管理端新增失败模块筛选按钮，可在存在更新失败时一键只看失败模块。
