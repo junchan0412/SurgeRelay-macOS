@@ -20,6 +20,7 @@
 		27AF5D3F446A25299DC890B3 /* JavaScriptCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 13871D2C902AAF75BBD033C6 /* JavaScriptCore.framework */; };
 		25A25A25A25A25A25A25A25 /* AutomaticPublishPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = C25C25C25C25C25C25C25C25 /* AutomaticPublishPlanner.swift */; };
 		B7B7B7B7B7B7B7B7B7B7B7B7 /* UpdateCompletionStatusPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7C7C7C7C7C7C7C7C7C7C7C7 /* UpdateCompletionStatusPlanner.swift */; };
+		B8B8B8B8B8B8B8B8B8B8B8B8 /* WebManagementHTTP.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8C8C8C8C8C8C8C8C8C8C8C8 /* WebManagementHTTP.swift */; };
 		280C7E38DAD9F18ED8090287 /* ModuleEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E43B99091BF5C4100CE1DA0E /* ModuleEditorView.swift */; };
 		285A582F1C5CC5AF92DF0E7B /* doc.text.svg in Resources */ = {isa = PBXBuildFile; fileRef = 891546F1DD330D7407BFA7E0 /* doc.text.svg */; };
 		2AD845464760705F3E0982BE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3AE70978C59AAF84436C3194 /* Assets.xcassets */; };
@@ -194,6 +195,7 @@
 		BB83E467F68776A168C3BBA3 /* ellipsis.svg */ = {isa = PBXFileReference; path = ellipsis.svg; sourceTree = "<group>"; };
 		C25C25C25C25C25C25C25C25 /* AutomaticPublishPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomaticPublishPlanner.swift; sourceTree = "<group>"; };
 		C7C7C7C7C7C7C7C7C7C7C7C7 /* UpdateCompletionStatusPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateCompletionStatusPlanner.swift; sourceTree = "<group>"; };
+		C8C8C8C8C8C8C8C8C8C8C8C8 /* WebManagementHTTP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebManagementHTTP.swift; sourceTree = "<group>"; };
 		BDD7A6C8082510469A2FA843 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		C9B8AF8AB1ACDCB66A0C8FC1 /* checkmark.svg */ = {isa = PBXFileReference; path = checkmark.svg; sourceTree = "<group>"; };
 		D0DDEE5D89E10E2659D8FC1F /* network.svg */ = {isa = PBXFileReference; path = network.svg; sourceTree = "<group>"; };
@@ -286,6 +288,7 @@
 				254A83429BCA625706A87254 /* ScriptHubClient.swift */,
 				098EA18AE40BB22B02102431 /* ScriptHubUpstreamService.swift */,
 				C7C7C7C7C7C7C7C7C7C7C7C7 /* UpdateCompletionStatusPlanner.swift */,
+				C8C8C8C8C8C8C8C8C8C8C8C8 /* WebManagementHTTP.swift */,
 				51D9670C12C677CBC8D96FA4 /* WebManagementAPI.swift */,
 				33932BCF1BFE460CA55DF088 /* WebManagementServer.swift */,
 			);
@@ -580,6 +583,7 @@
 				9457731342986CF96B53EA0F /* CheckForUpdatesView.swift in Sources */,
 				A11A11A11A11A11A11A11A11 /* CombinedModuleViews.swift in Sources */,
 				E52CE366B20E07E670D9E6E8 /* Components.swift in Sources */,
+				B8B8B8B8B8B8B8B8B8B8B8B8 /* WebManagementHTTP.swift in Sources */,
 				C577752A7FA64D5E4749D52B /* DataHash.swift in Sources */,
 				A22A22A22A22A22A22A22A22 /* DetailInfoViews.swift in Sources */,
 				8375967E58B7560C4A7FE4B4 /* EmbeddedScriptHubEngine.swift in Sources */,

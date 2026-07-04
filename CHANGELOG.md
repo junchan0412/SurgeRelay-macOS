@@ -9,6 +9,7 @@
 - 将本地模块扫描和本地模块文件夹枚举从 `AppModel.swift` 抽出到 `LocalModuleScanner.swift`，让 AppModel 继续收敛为状态协调器。
 - 将旧发布输出清理的目录和文件名规划抽出到 `LegacyOutputCleanupPlanner`，减少 AppModel 中的历史兼容路径计算。
 - 将 Web 管理端模块搜索字段抽出到 `web-logic.js`，让列表搜索与列表刷新签名共享可测试的字段维护入口。
+- 将 Web 管理 HTTP 请求/响应模型、解析器、认证节流和安全响应头抽出到 `WebManagementHTTP.swift`，让 `WebManagementServer` 更专注于 Network 连接生命周期。
 - 将桌面端模块搜索索引抽出到 `ModuleSearchIndex` 服务文件，避免主模块视图继续承载纯搜索字段拼装逻辑。
 - 404 更新失败说明补充仓库公开性和访问权限检查建议；Web 管理端失败详情新增“复制错误”按钮。
 - Web 管理端新增失败模块筛选按钮，可在存在更新失败时一键只看失败模块。
