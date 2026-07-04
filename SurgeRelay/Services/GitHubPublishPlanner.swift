@@ -12,6 +12,33 @@ struct GitHubPublishedPathUpdate: Equatable, Sendable {
 }
 
 enum GitHubPublishPlanner {
+    static func targetDescription(settings: GitHubSettings) -> String {
+        let repository = "\(settings.owner)/\(settings.repository)@\(settings.branch)"
+        let directory = settings.directory.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        return directory.isEmpty ? repository : "\(repository)/\(directory)"
+    }
+
+    static func preview(
+        settings: GitHubSettings,
+        pathPlan: GitHubPublishedPathPlan,
+        report: PublishReport
+    ) -> PublishPreview {
+        PublishPreview(
+            destination: .gitHub,
+            targetDescription: targetDescription(settings: settings),
+            activeFiles: pathPlan.currentPaths,
+            changedFiles: report.publishedFiles,
+            deletedFiles: report.deletedFiles
+        )
+    }
+
+    static func shouldPersistPathPlan(
+        _ pathPlan: GitHubPublishedPathPlan,
+        allowDeleting: Bool
+    ) -> Bool {
+        pathPlan.stalePaths.isEmpty || allowDeleting
+    }
+
     static func pathPlan(
         currentPaths: [String],
         settings: GitHubSettings,

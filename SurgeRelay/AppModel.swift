@@ -1404,12 +1404,10 @@ final class AppModel {
             settings: settings.github,
             token: token
         )
-        return PublishPreview(
-            destination: .gitHub,
-            targetDescription: "\(settings.github.owner)/\(settings.github.repository)@\(settings.github.branch)/\(settings.github.directory)",
-            activeFiles: pathPlan.currentPaths,
-            changedFiles: report.publishedFiles,
-            deletedFiles: report.deletedFiles
+        return GitHubPublishPlanner.preview(
+            settings: settings.github,
+            pathPlan: pathPlan,
+            report: report
         )
     }
 
@@ -1447,7 +1445,7 @@ final class AppModel {
             settings: settings.github,
             token: token
         )
-        if pathPlan.stalePaths.isEmpty || allowDeleting {
+        if GitHubPublishPlanner.shouldPersistPathPlan(pathPlan, allowDeleting: allowDeleting) {
             settings.githubPublishedRepositoryKey = pathPlan.repositoryKey
             settings.githubPublishedFilePaths = pathPlan.currentPaths
             saveSettings()

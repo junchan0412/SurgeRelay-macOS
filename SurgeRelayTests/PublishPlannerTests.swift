@@ -140,6 +140,58 @@ final class PublishPlannerTests: XCTestCase {
         XCTAssertTrue(movedRepositoryPlan.stalePaths.isEmpty)
     }
 
+    func testGitHubPublishPlannerBuildsPreviewAndTargetDescription() {
+        var settings = GitHubSettings()
+        settings.owner = "someone"
+        settings.repository = "relay"
+        settings.branch = "main"
+        settings.directory = "/surge/modules/"
+        let pathPlan = GitHubPublishedPathPlan(
+            repositoryKey: "someone/relay/main/surge/modules",
+            currentPaths: ["A.sgmodule", "Folder/C.sgmodule"],
+            stalePaths: ["Old.sgmodule"]
+        )
+        let report = PublishReport(
+            publishedFiles: ["A.sgmodule"],
+            deletedFiles: ["Old.sgmodule"]
+        )
+
+        let preview = GitHubPublishPlanner.preview(
+            settings: settings,
+            pathPlan: pathPlan,
+            report: report
+        )
+
+        XCTAssertEqual(GitHubPublishPlanner.targetDescription(settings: settings), "someone/relay@main/surge/modules")
+        XCTAssertEqual(preview.destination, .gitHub)
+        XCTAssertEqual(preview.targetDescription, "someone/relay@main/surge/modules")
+        XCTAssertEqual(preview.activeFiles, ["A.sgmodule", "Folder/C.sgmodule"])
+        XCTAssertEqual(preview.changedFiles, ["A.sgmodule"])
+        XCTAssertEqual(preview.deletedFiles, ["Old.sgmodule"])
+        XCTAssertTrue(preview.requiresDeletionConfirmation)
+
+        settings.directory = ""
+        XCTAssertEqual(GitHubPublishPlanner.targetDescription(settings: settings), "someone/relay@main")
+    }
+
+    func testGitHubPublishPlannerOnlyPersistsPathPlanWhenDeletionIsAllowedOrUnneeded() {
+        let cleanPlan = GitHubPublishedPathPlan(
+            repositoryKey: "someone/relay/main/modules",
+            currentPaths: ["A.sgmodule"],
+            stalePaths: []
+        )
+        let deletionPlan = GitHubPublishedPathPlan(
+            repositoryKey: "someone/relay/main/modules",
+            currentPaths: ["A.sgmodule"],
+            stalePaths: ["Old.sgmodule"]
+        )
+
+        XCTAssertTrue(GitHubPublishPlanner.shouldPersistPathPlan(cleanPlan, allowDeleting: false))
+        XCTAssertTrue(GitHubPublishPlanner.shouldPersistPathPlan(cleanPlan, allowDeleting: true))
+        XCTAssertFalse(GitHubPublishPlanner.shouldPersistPathPlan(deletionPlan, allowDeleting: false))
+        XCTAssertTrue(GitHubPublishPlanner.shouldPersistPathPlan(deletionPlan, allowDeleting: true))
+    }
+
     func testGitHubPublishPlannerMergesSelectedPublishPathsOnlyForSameRepository() {
         var settings = GitHubSettings()
         settings.owner = "someone"
