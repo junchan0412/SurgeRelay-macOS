@@ -81,6 +81,7 @@
 		91C91C91C91C91C91C91C91C /* LegacyOutputCleanupPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B91B91B91B91B91B91B91B91 /* LegacyOutputCleanupPlanner.swift */; };
 		92C92C92C92C92C92C92C92C /* LocalModuleScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B92B92B92B92B92B92B92B92 /* LocalModuleScanner.swift */; };
 		92D92D92D92D92D92D92D92D /* LocalModuleImportPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B93B93B93B93B93B93B93B93 /* LocalModuleImportPlanner.swift */; };
+		92E92E92E92E92E92E92E92E /* LocalPublishedFilesPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B95B95B95B95B95B95B95B95 /* LocalPublishedFilesPlanner.swift */; };
 		94D94D94D94D94D94D94D94D /* ModuleSearchIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = B94B94B94B94B94B94B94B94 /* ModuleSearchIndex.swift */; };
 		920AB497FDE7DA286892FFB9 /* arrow.clockwise.svg in Resources */ = {isa = PBXBuildFile; fileRef = 1205EFC09D3CF22EAF9A2F9B /* arrow.clockwise.svg */; };
 		93D45771DAD23A3F8AD5473F /* MenuBarContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B79782FA982FB6C66E5D50BA /* MenuBarContent.swift */; };
@@ -213,6 +214,7 @@
 		B92B92B92B92B92B92B92B92 /* LocalModuleScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModuleScanner.swift; sourceTree = "<group>"; };
 		B93B93B93B93B93B93B93B93 /* LocalModuleImportPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModuleImportPlanner.swift; sourceTree = "<group>"; };
 		B94B94B94B94B94B94B94B94 /* ModuleSearchIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleSearchIndex.swift; sourceTree = "<group>"; };
+		B95B95B95B95B95B95B95B95 /* LocalPublishedFilesPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalPublishedFilesPlanner.swift; sourceTree = "<group>"; };
 		B7DAE6646C847419124DE9BB /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		B9CF6B25A0E233718DB970EF /* arrow.up.arrow.down.svg */ = {isa = PBXFileReference; path = arrow.up.arrow.down.svg; sourceTree = "<group>"; };
 		BB83E467F68776A168C3BBA3 /* ellipsis.svg */ = {isa = PBXFileReference; path = ellipsis.svg; sourceTree = "<group>"; };
@@ -318,6 +320,7 @@
 				B91B91B91B91B91B91B91B91 /* LegacyOutputCleanupPlanner.swift */,
 				B92B92B92B92B92B92B92B92 /* LocalModuleScanner.swift */,
 				B93B93B93B93B93B93B93B93 /* LocalModuleImportPlanner.swift */,
+				B95B95B95B95B95B95B95B95 /* LocalPublishedFilesPlanner.swift */,
 				E1070DB686AADF6D51CF6CDB /* ModuleFileStore.swift */,
 				0C15061B43CE01B2548616E5 /* ModuleIconStore.swift */,
 				E60E60E60E60E60E60E60E60 /* ModuleDraftPlanner.swift */,
@@ -654,6 +657,7 @@
 				91C91C91C91C91C91C91C91C /* LegacyOutputCleanupPlanner.swift in Sources */,
 				92C92C92C92C92C92C92C92C /* LocalModuleScanner.swift in Sources */,
 				92D92D92D92D92D92D92D92D /* LocalModuleImportPlanner.swift in Sources */,
+				92E92E92E92E92E92E92E92E /* LocalPublishedFilesPlanner.swift in Sources */,
 				A44A44A44A44A44A44A44A44 /* LocalModuleImportPreviewView.swift in Sources */,
 				93D45771DAD23A3F8AD5473F /* MenuBarContent.swift in Sources */,
 				A55A55A55A55A55A55A55A55 /* ModuleDetailView.swift in Sources */,

@@ -1367,9 +1367,11 @@ final class AppModel {
                     [],
                     toRootDirectory: preview.targetDescription,
                     removingObsoleteRelativePaths: preview.deletedFiles,
-                    knownManagedRelativePaths: settings.localPublishedRootDirectory == preview.targetDescription
-                        ? settings.localPublishedFilePaths
-                        : []
+                    knownManagedRelativePaths: LocalPublishedFilesPlanner.knownManagedPathsForConfirmedCleanup(
+                        preview: preview,
+                        previousRootDirectory: settings.localPublishedRootDirectory,
+                        previousPublishedPaths: settings.localPublishedFilePaths
+                    )
                 )
                 settings.localPublishedRootDirectory = preview.targetDescription
                 settings.localPublishedFilePaths = preview.activeFiles
@@ -1659,35 +1661,28 @@ final class AppModel {
                 includeAssets: includeAssets,
                 destination: .local
             )
-            let currentPaths = files.map(\.name)
-            let knownManagedPaths = settings.localPublishedRootDirectory == settings.localModuleDirectory
-                ? settings.localPublishedFilePaths
-                : []
-            let stalePaths = settings.localPublishedRootDirectory == settings.localModuleDirectory
-                ? settings.localPublishedFilePaths.filter { !currentPaths.contains($0) }
-                : []
+            let localPublishPlan = LocalPublishedFilesPlanner.plan(
+                files: files,
+                targetDirectory: settings.localModuleDirectory,
+                previousRootDirectory: settings.localPublishedRootDirectory,
+                previousPublishedPaths: settings.localPublishedFilePaths
+            )
             _ = try await fileStore.exportPublishedFiles(
                 files,
-                toRootDirectory: settings.localModuleDirectory,
+                toRootDirectory: localPublishPlan.targetDirectory,
                 removingObsoleteRelativePaths: [],
-                knownManagedRelativePaths: knownManagedPaths
+                knownManagedRelativePaths: localPublishPlan.knownManagedPaths
             )
-            if stalePaths.isEmpty {
-                settings.localPublishedRootDirectory = settings.localModuleDirectory
-                settings.localPublishedFilePaths = currentPaths
+            if !localPublishPlan.requiresCleanupConfirmation {
+                settings.localPublishedRootDirectory = localPublishPlan.targetDirectory
+                settings.localPublishedFilePaths = localPublishPlan.currentPaths
                 if pendingPublishPreview?.destination == .local {
                     pendingPublishPreview = nil
                 }
                 saveSettings()
             } else {
-                pendingPublishPreview = PublishPreview(
-                    destination: .local,
-                    targetDescription: settings.localModuleDirectory,
-                    activeFiles: currentPaths,
-                    changedFiles: [],
-                    deletedFiles: stalePaths
-                )
-                statusMessage = "已写入本地模块，等待确认清理 \(stalePaths.count) 个旧文件"
+                pendingPublishPreview = localPublishPlan.cleanupPreview()
+                statusMessage = localPublishPlan.cleanupStatusMessage
             }
         }
     }
