@@ -3,11 +3,20 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 const logicSource = readFileSync(new URL('../SurgeRelay/WebResources/web-logic.js', import.meta.url), 'utf8');
+const optionsSource = readFileSync(new URL('../SurgeRelay/WebResources/web-options.js', import.meta.url), 'utf8');
 const context = vm.createContext({ console, URL });
 vm.runInContext(logicSource, context, { filename: 'web-logic.js' });
+vm.runInContext(optionsSource, context, { filename: 'web-options.js' });
 
 const logic = context.SurgeRelayWebLogic;
 assert.ok(logic, 'web logic should install a global testable API');
+const options = context.SurgeRelayWebOptions;
+assert.ok(options, 'web options should install a global testable API');
+assert.equal(options.scriptHubDefaults.removeCommentedRewrites, true);
+assert.ok(
+  options.advancedGroups.some(group => group.id === 'script-conversion'),
+  'advanced option groups should include script conversion controls'
+);
 
 assert.equal(
   logic.publishedRelativePathForDraft({
@@ -150,9 +159,11 @@ assert.equal(
 
 const indexHTML = readFileSync(new URL('../SurgeRelay/WebResources/index.html', import.meta.url), 'utf8');
 const logicScriptIndex = indexHTML.indexOf('/web-logic.js');
+const optionsScriptIndex = indexHTML.indexOf('/web-options.js');
 const appScriptIndex = indexHTML.indexOf('/app.js');
 assert.ok(logicScriptIndex >= 0, 'index should load web-logic.js');
-assert.ok(appScriptIndex > logicScriptIndex, 'web-logic.js must load before app.js');
+assert.ok(optionsScriptIndex > logicScriptIndex, 'web-options.js must load after web-logic.js');
+assert.ok(appScriptIndex > optionsScriptIndex, 'web-options.js must load before app.js');
 assert.match(indexHTML, /name="storageLocation"/);
 assert.match(indexHTML, /name="outputFolder"/);
 assert.match(indexHTML, /id="output-path-preview"/);

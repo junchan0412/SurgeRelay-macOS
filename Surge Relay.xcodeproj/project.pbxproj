@@ -74,6 +74,7 @@
 		97E70C46C2E39CD56EDEBEB7 /* app-icon.png in Resources */ = {isa = PBXBuildFile; fileRef = 73AE036D60EE5A513D1BE243 /* app-icon.png */; };
 		A0543C2BA470C33854288294 /* app.js in Resources */ = {isa = PBXBuildFile; fileRef = FC3EC697C414F11A0F8E2D11 /* app.js */; };
 		A0643C2BA470C33854288294 /* web-logic.js in Resources */ = {isa = PBXBuildFile; fileRef = FC4EC697C414F11A0F8E2D11 /* web-logic.js */; };
+		A0743C2BA470C33854288294 /* web-options.js in Resources */ = {isa = PBXBuildFile; fileRef = FC5EC697C414F11A0F8E2D11 /* web-options.js */; };
 		A11A11A11A11A11A11A11A11 /* CombinedModuleViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B11B11B11B11B11B11B11B11 /* CombinedModuleViews.swift */; };
 		A22A22A22A22A22A22A22A22 /* DetailInfoViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22B22B22B22B22B22B22B22 /* DetailInfoViews.swift */; };
 		A33A33A33A33A33A33A33A33 /* PublishFileAssembler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B33B33B33B33B33B33B33 /* PublishFileAssembler.swift */; };
@@ -222,6 +223,7 @@
 		FB702CBBD9181A2CF6940B32 /* Surge Relay.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Surge Relay.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		FC3EC697C414F11A0F8E2D11 /* app.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = app.js; sourceTree = "<group>"; };
 		FC4EC697C414F11A0F8E2D11 /* web-logic.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "web-logic.js"; sourceTree = "<group>"; };
+		FC5EC697C414F11A0F8E2D11 /* web-options.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "web-options.js"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -312,6 +314,7 @@
 				D9B853F6EB21124C4483BD3B /* index.html */,
 				3549A3C7816CDA81F931C49F /* manifest.webmanifest */,
 				FC4EC697C414F11A0F8E2D11 /* web-logic.js */,
+				FC5EC697C414F11A0F8E2D11 /* web-options.js */,
 			);
 			path = WebResources;
 			sourceTree = "<group>";
@@ -557,6 +560,7 @@
 				62E8C1BFFB984922B7271C2C /* tag.svg in Resources */,
 				BD7735DF69FE59DECD229AF2 /* trash.svg in Resources */,
 				A0643C2BA470C33854288294 /* web-logic.js in Resources */,
+				A0743C2BA470C33854288294 /* web-options.js in Resources */,
 				B7752C3B9A95AA5DCEF3FBE3 /* xmark.svg in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

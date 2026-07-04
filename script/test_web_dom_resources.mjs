@@ -5,6 +5,7 @@ import vm from 'node:vm';
 const root = new URL('../', import.meta.url);
 const indexHTML = readFileSync(new URL('SurgeRelay/WebResources/index.html', root), 'utf8');
 const logicSource = readFileSync(new URL('SurgeRelay/WebResources/web-logic.js', root), 'utf8');
+const optionsSource = readFileSync(new URL('SurgeRelay/WebResources/web-options.js', root), 'utf8');
 const appSource = readFileSync(new URL('SurgeRelay/WebResources/app.js', root), 'utf8');
 
 const requiredIDs = [
@@ -426,6 +427,7 @@ context.window.prompt = () => '';
 context.globalThis = context;
 
 vm.runInContext(logicSource, context, { filename: 'web-logic.js' });
+vm.runInContext(optionsSource, context, { filename: 'web-options.js' });
 vm.runInContext(appSource, context, { filename: 'app.js' });
 
 await flushAsync();

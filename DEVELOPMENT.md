@@ -84,6 +84,8 @@ Treat this as data, not disposable commentary. `ModuleMetadataParser.scriptHubSu
 
 The local scanner must prefer this original URL over the local generated file path. `ModuleArgumentProcessor.materialize` must preserve ordinary comments so `#SUBSCRIBED` and user explanations survive standalone publish output.
 
+Web management Script-Hub advanced option defaults and group schema live in `WebResources/web-options.js`. Keep option keys, default values, and editor groups there; `app.js` should consume the exported schema instead of defining static option metadata inline.
+
 ## Build And Test
 
 `ModelAndCoordinatorTests.swift` owns pure model/coordinator coverage, including source metadata restoration, update failure formatting, summary counts, and publish-plan decisions. `LocalFileStoreTests.swift` owns local configuration migration, local module scanning, local publish safety, legacy cleanup, root diagnostics, and generated asset file coverage. `WebManagementTests.swift` owns Web management request parsing, API payload, session cookie, same-origin, throttling, response hardening, and icon content-type coverage. `GitHubReleaseTests.swift` owns GitHub settings, remote directory discovery, release asset parsing, checksum validation, and install guidance coverage. `GitHubPublishTests.swift` owns GitHub publish diffing, preview, duplicate path rejection, commit snapshots, and reference-move retry coverage; GitHub network fakes belong in `GitHubTestSupport.swift`. Keep shrinking the larger `SurgeRelayTests.swift` by moving similarly cohesive tests into focused files instead of adding more unrelated cases there.
@@ -92,6 +94,7 @@ Use the local Xcode beta explicitly:
 
 ```bash
 node --check SurgeRelay/WebResources/web-logic.js
+node --check SurgeRelay/WebResources/web-options.js
 node --check SurgeRelay/WebResources/app.js
 node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs
