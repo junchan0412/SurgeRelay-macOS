@@ -44,6 +44,10 @@ const webOptions = window.SurgeRelayWebOptions;
 if (!webOptions) throw new Error('web-options.js must load before app.js');
 const { scriptHubDefaults, advancedGroups } = webOptions;
 
+const webFormat = window.SurgeRelayWebFormat;
+if (!webFormat) throw new Error('web-format.js must load before app.js');
+const { formatDate, formatTime, escapeHTML, escapeAttribute, highlightCode } = webFormat;
+
 let state = null;
 let selectedID = null;
 let detailTab = 'info';
@@ -1105,20 +1109,4 @@ function showCopySuccess(button) {
   button.dataset.copyTimer = String(timer);
 }
 
-function highlightCode(text) {
-  return text.split('\n').map(line => {
-    const trimmed = line.trim(); let value = escapeHTML(line);
-    if (/^\[[^\]]+\]$/.test(trimmed)) return `<span class="code-line code-section">${value}</span>`;
-    if (/^(#|\/\/|;)/.test(trimmed)) return `<span class="code-line code-comment">${value}</span>`;
-    value = value.replace(/(https?:\/\/[^\s,&lt;&gt;]+)/g, '<span class="code-url">$1</span>');
-    value = value.replace(/^([A-Za-z][A-Za-z0-9_-]*)(\s*=)/, '<span class="code-key">$1</span>$2');
-    value = value.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="code-number">$1</span>');
-    return `<span class="code-line">${value || ' '}</span>`;
-  }).join('');
-}
-
 function showToast(message, isError = false) { clearTimeout(toastTimer); ui.toast.textContent = message; ui.toast.classList.toggle('error', isError); ui.toast.classList.add('visible'); toastTimer = setTimeout(() => ui.toast.classList.remove('visible'), 2600); }
-function formatDate(value, fallback = '—') { if (!value) return fallback; const date = new Date(value); if (Number.isNaN(date.valueOf())) return fallback; return new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'medium' }).format(date); }
-function formatTime(value, fallback = '—') { if (!value) return fallback; const date = new Date(value); if (Number.isNaN(date.valueOf())) return fallback; return new Intl.DateTimeFormat('zh-CN', { timeStyle: 'medium' }).format(date); }
-function escapeHTML(value) { return String(value ?? '').replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]); }
-function escapeAttribute(value) { return escapeHTML(value); }

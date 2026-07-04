@@ -113,6 +113,8 @@ The local scanner must prefer this original URL over the local generated file pa
 
 Web management Script-Hub advanced option defaults and group schema live in `WebResources/web-options.js`. Keep option keys, default values, and editor groups there; `app.js` should consume the exported schema instead of defining static option metadata inline.
 
+Web management formatting helpers live in `WebResources/web-format.js`. Keep HTML escaping, attribute escaping, date/time formatting, and module preview syntax highlighting there so `app.js` stays focused on API calls, state changes, event handling, and DOM composition.
+
 ## Build And Test
 
 `ModelAndCoordinatorTests.swift` owns pure model/coordinator coverage, including source metadata restoration, update failure formatting, summary counts, diagnostics, preview content, and credential coordination. `ModulePlanningTests.swift` owns module naming, draft validation and planning, local import planning, output path inspection, output-folder catalogs, and local self-export protection. `AppSettingsTests.swift` owns settings decoding, migration defaults, and combined-module setting defaults. `SecurityDiagnosticsTests.swift` owns keychain round trips, credential diagnostics, keychain probe snapshots, and installation diagnostics. `ScriptHubTests.swift` owns Script-Hub conversion URLs, upstream pinning and script hashes, embedded-engine bridge safety, native Surge conversion, argument materialization, advanced option summaries, and sanitizer behavior. `PublishPlannerTests.swift` owns publish-plan selection, GitHub publish result planning, automatic publish status text, update-completion status text, publish-file assembly, and local published-file manifest planning. `LocalFileStoreTests.swift` owns local configuration migration, local module scanning, local publish safety, legacy cleanup, root diagnostics, and generated asset file coverage. `WebManagementTests.swift` owns Web management request parsing, API payload, session cookie, same-origin, throttling, response hardening, and icon content-type coverage. `GitHubReleaseTests.swift` owns GitHub settings, remote directory discovery, release asset parsing, checksum validation, and install guidance coverage. `GitHubPublishTests.swift` owns GitHub publish diffing, preview, duplicate path rejection, commit snapshots, and reference-move retry coverage; GitHub network fakes belong in `GitHubTestSupport.swift`. Keep shrinking the larger test files by moving similarly cohesive tests into focused files instead of adding more unrelated cases there.
@@ -122,6 +124,7 @@ Use the local Xcode beta explicitly:
 ```bash
 node --check SurgeRelay/WebResources/web-logic.js
 node --check SurgeRelay/WebResources/web-options.js
+node --check SurgeRelay/WebResources/web-format.js
 node --check SurgeRelay/WebResources/app.js
 node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs

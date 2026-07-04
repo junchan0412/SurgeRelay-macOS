@@ -4,14 +4,18 @@ import vm from 'node:vm';
 
 const logicSource = readFileSync(new URL('../SurgeRelay/WebResources/web-logic.js', import.meta.url), 'utf8');
 const optionsSource = readFileSync(new URL('../SurgeRelay/WebResources/web-options.js', import.meta.url), 'utf8');
+const formatSource = readFileSync(new URL('../SurgeRelay/WebResources/web-format.js', import.meta.url), 'utf8');
 const context = vm.createContext({ console, URL });
 vm.runInContext(logicSource, context, { filename: 'web-logic.js' });
 vm.runInContext(optionsSource, context, { filename: 'web-options.js' });
+vm.runInContext(formatSource, context, { filename: 'web-format.js' });
 
 const logic = context.SurgeRelayWebLogic;
 assert.ok(logic, 'web logic should install a global testable API');
 const options = context.SurgeRelayWebOptions;
 assert.ok(options, 'web options should install a global testable API');
+const format = context.SurgeRelayWebFormat;
+assert.ok(format, 'web format should install a global testable API');
 assert.equal(options.scriptHubDefaults.removeCommentedRewrites, true);
 assert.ok(
   options.advancedGroups.some(group => group.id === 'script-conversion'),
@@ -157,13 +161,20 @@ assert.equal(
   '更新失败：原始链接返回 404'
 );
 
+assert.equal(format.escapeHTML('<tag attr="1">Tom & Jerry</tag>'), '&lt;tag attr=&quot;1&quot;&gt;Tom &amp; Jerry&lt;/tag&gt;');
+assert.equal(format.formatDate('not-a-date', 'fallback'), 'fallback');
+assert.match(format.highlightCode('[General]\nkey = https://example.com/1'), /code-section/);
+assert.match(format.highlightCode('[General]\nkey = https://example.com/1'), /code-url/);
+
 const indexHTML = readFileSync(new URL('../SurgeRelay/WebResources/index.html', import.meta.url), 'utf8');
 const logicScriptIndex = indexHTML.indexOf('/web-logic.js');
 const optionsScriptIndex = indexHTML.indexOf('/web-options.js');
+const formatScriptIndex = indexHTML.indexOf('/web-format.js');
 const appScriptIndex = indexHTML.indexOf('/app.js');
 assert.ok(logicScriptIndex >= 0, 'index should load web-logic.js');
 assert.ok(optionsScriptIndex > logicScriptIndex, 'web-options.js must load after web-logic.js');
-assert.ok(appScriptIndex > optionsScriptIndex, 'web-options.js must load before app.js');
+assert.ok(formatScriptIndex > optionsScriptIndex, 'web-format.js must load after web-options.js');
+assert.ok(appScriptIndex > formatScriptIndex, 'web-format.js must load before app.js');
 assert.match(indexHTML, /name="storageLocation"/);
 assert.match(indexHTML, /name="outputFolder"/);
 assert.match(indexHTML, /id="output-path-preview"/);

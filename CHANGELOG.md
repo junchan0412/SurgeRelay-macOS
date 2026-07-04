@@ -15,6 +15,7 @@
 - 将旧发布输出清理的目录和文件名规划抽出到 `LegacyOutputCleanupPlanner`，减少 AppModel 中的历史兼容路径计算。
 - 将 Web 管理端模块搜索字段抽出到 `web-logic.js`，让列表搜索与列表刷新签名共享可测试的字段维护入口。
 - 将 Web 管理端 Script-Hub 高级选项 schema 抽出到 `web-options.js`，让编辑器选项配置独立于主前端状态与渲染逻辑。
+- 将 Web 管理端 HTML 转义、日期格式化和预览高亮抽出到 `web-format.js`，继续缩小 `app.js` 的渲染辅助职责。
 - 将 Web 管理 HTTP 请求/响应模型、解析器、认证节流和安全响应头抽出到 `WebManagementHTTP.swift`，让 `WebManagementServer` 更专注于 Network 连接生命周期。
 - 将桌面端模块搜索索引抽出到 `ModuleSearchIndex` 服务文件，避免主模块视图继续承载纯搜索字段拼装逻辑。
 - 将设置页通用表单、分区、行组件和窗口 chrome 配置抽出到 `SettingsComponents.swift`，为后续继续拆分凭据与诊断页面降低耦合。
