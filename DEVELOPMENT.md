@@ -62,6 +62,8 @@ Update failures should surface actionable causes through `UpdateFailureFormatter
 
 Update failure source-check decisions belong in `UpdateFailurePlanner`. Keep "should probe the original source after a generic conversion failure", latest-module source selection for error text, and missing-cache detail formatting there. `AppModel` should perform only the actual `SourceRevisionService` check and then apply the returned message.
 
+Update completion status and automatic-publish scheduling decisions belong in `UpdateCompletionStatusPlanner`. Keep the choice between queueing GitHub automatic publish, clearing an impossible automatic-publish schedule, showing local cleanup confirmation, and reporting a plain refreshed output there. `AppModel` should only execute the returned schedule action and assign the returned status message.
+
 Diagnostic report assembly belongs in `DiagnosticReportBuilder`. AppModel should pass the current settings, module list, runtime state, and diagnostics snapshots into the builder; URL redaction and report DTO mapping should stay there so exported diagnostics never include source query strings, fragments, or embedded credentials.
 
 Preview content reads belong in `ModulePreviewContentProvider`. Keep cache lookup, local Surge source fallback, argument materialization, and metadata application there; AppModel should only coordinate edit/save/restore state around those reads.

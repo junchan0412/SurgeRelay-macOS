@@ -1058,39 +1058,31 @@ final class AppModel {
             guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
             await cleanupLegacyOutputFiles()
             guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
-            if settings.publishToGitHub, settings.automaticallyPublish, settings.github.isConfigured,
-               !ensureGitHubTokenLoaded(showStatusMessage: false).isEmpty {
-                let automaticPublishPlan = githubPublishPlan
-                if AutomaticPublishPlanner.shouldRunScheduledPublish(plan: automaticPublishPlan) {
-                    if AutomaticPublishPlanner.shouldQueueAfterModuleUpdate(
-                        plan: automaticPublishPlan,
-                        contentChanged: contentChanged
-                    ) {
-                        scheduleAutomaticPublish()
-                    }
-                    statusMessage = UpdateCompletionStatusPlanner.automaticPublishQueuedStatus(
-                        contentChanged: contentChanged,
-                        failures: failures
-                    )
-                } else {
-                    clearAutomaticPublishSchedule()
-                    statusMessage = AutomaticPublishPlanner.skippedAfterModuleUpdateStatus(
-                        contentChanged: contentChanged,
-                        failures: failures
-                    )
-                }
-            } else if pendingPublishPreview?.destination == .local {
-                statusMessage = UpdateCompletionStatusPlanner.localCleanupPendingStatus(
-                    failures: failures,
-                    staleFileCount: pendingPublishPreview?.deletedFiles.count ?? 0
-                )
-            } else {
-                statusMessage = UpdateCompletionStatusPlanner.refreshedOutputStatus(
-                    combinedModuleEnabled: settings.combinedModuleEnabled,
-                    combinedSourceCount: components.count,
-                    failures: failures
-                )
+            let canUseAutomaticGitHubPublish = settings.publishToGitHub &&
+                settings.automaticallyPublish &&
+                settings.github.isConfigured &&
+                !ensureGitHubTokenLoaded(showStatusMessage: false).isEmpty
+            let pendingLocalCleanupFileCount = pendingPublishPreview?.destination == .local
+                ? pendingPublishPreview?.deletedFiles.count
+                : nil
+            let completionDecision = UpdateCompletionStatusPlanner.decision(
+                canUseAutomaticGitHubPublish: canUseAutomaticGitHubPublish,
+                publishPlan: githubPublishPlan,
+                contentChanged: contentChanged,
+                failures: failures,
+                pendingLocalCleanupFileCount: pendingLocalCleanupFileCount,
+                combinedModuleEnabled: settings.combinedModuleEnabled,
+                combinedSourceCount: components.count
+            )
+            switch completionDecision.scheduleAction {
+            case .none:
+                break
+            case .scheduleAutomaticPublish:
+                scheduleAutomaticPublish()
+            case .clearAutomaticPublishSchedule:
+                clearAutomaticPublishSchedule()
             }
+            statusMessage = completionDecision.statusMessage
         } catch {
             if isCurrentWorkCancellation(error) { return }
             presentedError = settings.combinedModuleEnabled
