@@ -17,8 +17,9 @@ This document records the project conventions needed to maintain this fork.
 
 ## View Boundaries
 
-Keep `ModulesView.swift` focused on the split-view shell, sidebar filtering, selection, editor presentation, and per-module detail composition.
+Keep `ModulesView.swift` focused on the split-view shell, search/index coordination, detail selection, toolbar actions, editor presentation, and sheet routing.
 
+- `ModuleSidebarView.swift` owns the sidebar list, module rows, batch-selection checkboxes, context menu entry points, empty/sidebar states, and the bottom status card.
 - `CombinedModuleViews.swift` owns the combined-module sidebar row, combined-module detail page, and publish-preview summary UI.
 - `DetailInfoViews.swift` owns reusable detail rows and section chrome used by module and combined-module detail pages.
 - Shared preview/editor components that are not specific to the module list stay in `Components.swift`.

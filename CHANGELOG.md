@@ -3,6 +3,7 @@
 ## Unreleased
 
 - 新增无需证书和 GitHub secret 的发布配置预检，并接入 GitHub Actions 证书导入之前，提前检查版本号、Sparkle、appcast、entitlement、发布脚本和 workflow 配置一致性。
+- 将主窗口侧边栏、模块行、批量选择勾选和底部状态卡拆出到 `ModuleSidebarView.swift`，让 `ModulesView.swift` 更专注于 split-view 编排、搜索、详情和 sheet 状态。
 - 将本地模块导入预览 sheet 拆出 `ModulesView.swift`，让主模块视图继续收敛到侧边栏、选择和详情编排。
 - 将单模块详情页拆出 `ModulesView.swift`，让主模块视图进一步专注于导航、筛选和工具栏状态。
 - 更新失败时在模块列表、详情首屏和 Web 管理端顶部直接显示原始链接错误原因；GitHub 自动发布现在必须至少有一个模块开启独立发布，否则不会排队或执行。
