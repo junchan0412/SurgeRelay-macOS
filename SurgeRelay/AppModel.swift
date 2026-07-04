@@ -1028,7 +1028,7 @@ final class AppModel {
             return
         }
         let updateModules = modules.filter(shouldUpdateModule)
-        automaticPublishTask?.cancel()
+        cancelAutomaticPublishSchedule()
         let updateGeneration = localChangeGeneration
         beginWork(.updatingModules)
         synchronizationCompletedCount = 0
@@ -1271,14 +1271,11 @@ final class AppModel {
                 if hasGitHubAutomaticPublishableModuleSelection {
                     if contentChanged {
                         scheduleAutomaticPublish()
-                        statusMessage = failures == 0
-                            ? "模块输出已更新，等待发布"
-                            : "模块输出已更新；\(failures) 个来源沿用上次版本，等待发布"
-                    } else {
-                        statusMessage = failures == 0
-                            ? "所有模块内容均未变化，无需发布"
-                            : "模块内容未变化；\(failures) 个来源沿用上次版本，无需发布"
                     }
+                    statusMessage = UpdateCompletionStatusPlanner.automaticPublishQueuedStatus(
+                        contentChanged: contentChanged,
+                        failures: failures
+                    )
                 } else {
                     clearAutomaticPublishSchedule()
                     statusMessage = AutomaticPublishPlanner.skippedAfterModuleUpdateStatus(
@@ -1287,16 +1284,16 @@ final class AppModel {
                     )
                 }
             } else if pendingPublishPreview?.destination == .local {
-                let count = pendingPublishPreview?.deletedFiles.count ?? 0
-                statusMessage = failures == 0
-                    ? "模块输出已更新，等待确认清理 \(count) 个本地旧文件"
-                    : "模块输出已更新；\(failures) 个来源沿用上次版本，等待确认清理 \(count) 个本地旧文件"
+                statusMessage = UpdateCompletionStatusPlanner.localCleanupPendingStatus(
+                    failures: failures,
+                    staleFileCount: pendingPublishPreview?.deletedFiles.count ?? 0
+                )
             } else {
-                statusMessage = if settings.combinedModuleEnabled {
-                    failures == 0 ? "总模块已由 \(components.count) 个来源合并完成" : "总模块已更新；\(failures) 个来源沿用上次成功版本"
-                } else {
-                    failures == 0 ? "模块输出已刷新" : "模块输出已刷新；\(failures) 个来源沿用上次成功版本"
-                }
+                statusMessage = UpdateCompletionStatusPlanner.refreshedOutputStatus(
+                    combinedModuleEnabled: settings.combinedModuleEnabled,
+                    combinedSourceCount: components.count,
+                    failures: failures
+                )
             }
         } catch {
             if isCurrentWorkCancellation(error) { return }
