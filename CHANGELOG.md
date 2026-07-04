@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.3
+
+- 继续完善 Script-Hub 上游迁移：旧配置从 `main` / `master` / `HEAD` 自动迁移到固定 commit 后，会同步清除设置页里残留的旧错误提示。
+
 ## 1.3.2
 
 - 修复升级后旧配置仍保留 Script-Hub `main` / `master` / `HEAD` 上游地址的问题；官方浮动分支地址会自动迁移到固定 commit 默认值。

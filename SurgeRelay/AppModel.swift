@@ -102,7 +102,12 @@ final class AppModel {
         let legacyGitHubToken = loadedSettings.githubToken.trimmingCharacters(in: .whitespacesAndNewlines)
         modules = loadedModules
         settings = loadedSettings
-        upstreamState = PersistenceStore.loadUpstreamState()
+        var loadedUpstreamState = PersistenceStore.loadUpstreamState()
+        let clearedStaleScriptHubError = Self.clearStaleScriptHubFloatingRevisionError(
+            settings: loadedSettings,
+            upstreamState: &loadedUpstreamState
+        )
+        upstreamState = loadedUpstreamState
         updateHistory = PersistenceStore.loadUpdateHistory()
         githubToken = legacyGitHubToken
         webAccessToken = ""
@@ -115,7 +120,23 @@ final class AppModel {
         if !AppRuntimeOptions.isUIQAMode {
             PersistenceStore.saveSettings(loadedSettings)
             try? PersistenceStore.saveModules(loadedModules)
+            if clearedStaleScriptHubError {
+                PersistenceStore.saveUpstreamState(loadedUpstreamState)
+            }
         }
+    }
+
+    private static func clearStaleScriptHubFloatingRevisionError(
+        settings: AppSettings,
+        upstreamState: inout ScriptHubUpstreamState
+    ) -> Bool {
+        guard settings.scriptHubModuleURL == AppSettings.defaultScriptHubModuleURL,
+              let lastError = upstreamState.lastError,
+              lastError.contains("固定 tag 或 commit") else {
+            return false
+        }
+        upstreamState.lastError = nil
+        return true
     }
 
     private static func loadGitHubToken(migratingLegacyToken legacyToken: String) -> GitHubTokenLoadResult {
