@@ -1008,6 +1008,49 @@ enum PublishCoordinator {
             combinedModuleEnabled: combinedModuleEnabled
         ).hasPublishableModuleSelection
     }
+
+    static func shouldSkipStandaloneLocalExport(
+        _ module: RelayModule,
+        isLocalExport: Bool,
+        localModuleDirectory: String
+    ) -> Bool {
+        guard isLocalExport,
+              let sourceRelativePath = LocalSourcePathResolver.storageRelativePath(
+                for: module,
+                rootDirectoryPath: localModuleDirectory
+              ) else {
+            return false
+        }
+        return sourceRelativePath.lowercased() == module.publishedRelativePath.lowercased()
+    }
+}
+
+enum LocalSourcePathResolver {
+    static func storageRelativePath(
+        for module: RelayModule,
+        rootDirectoryPath: String
+    ) -> String? {
+        if module.storageLocation == .local, let relativePath = module.localStorageRelativePath {
+            return ModuleOutputFolder.normalized(relativePath)
+        }
+        return relativePath(forSourceURL: module.sourceURL, rootDirectoryPath: rootDirectoryPath)
+    }
+
+    static func fileName(forSourceURL sourceURL: String, rootDirectoryPath: String) -> String? {
+        guard let relativePath = relativePath(forSourceURL: sourceURL, rootDirectoryPath: rootDirectoryPath) else {
+            return nil
+        }
+        return relativePath.split(separator: "/").last.map(String.init)
+    }
+
+    static func relativePath(forSourceURL sourceURL: String, rootDirectoryPath: String) -> String? {
+        guard let url = URL(string: sourceURL), url.isFileURL else { return nil }
+        let root = URL(filePath: rootDirectoryPath, directoryHint: .isDirectory).standardizedFileURL
+        let source = url.standardizedFileURL
+        let rootPath = root.path.hasSuffix("/") ? root.path : root.path + "/"
+        guard source.path.hasPrefix(rootPath) else { return nil }
+        return ModuleOutputFolder.normalized(String(source.path.dropFirst(rootPath.count)))
+    }
 }
 
 enum UpdateFailureFormatter {

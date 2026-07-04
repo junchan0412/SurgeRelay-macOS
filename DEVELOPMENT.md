@@ -47,6 +47,8 @@ All publishable module selection should flow through `PublishPlan` / `PublishCoo
 
 Keep the selected publish path conservative: it should merge new paths into the known GitHub publish list but must not prune paths that belong to unselected modules.
 
+Local publish self-overwrite checks also belong in `PublishCoordinator` with paths resolved by `LocalSourcePathResolver`. If a local source file and the standalone output resolve to the same relative path, skip that export instead of writing over the user's original module.
+
 Shared module counts should flow through `ModuleCollectionSummary`. Main window status, menu bar text, Web management state, and diagnostics should not independently reimplement enabled, standalone, failed, latest-update, or updateable counts unless they need the actual module objects.
 
 Update failures should surface actionable causes through `UpdateFailureFormatter`. If an original source returns 404/401/403/429, times out, fails DNS, or fails TLS validation, store that reason on the module and in update history; aggregate alerts that block combined-module replacement should include the same reason rather than only the module name.

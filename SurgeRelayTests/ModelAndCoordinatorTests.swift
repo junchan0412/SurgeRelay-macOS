@@ -279,12 +279,12 @@ final class ModelAndCoordinatorTests: XCTestCase {
         )
 
         XCTAssertTrue(module.publishesStandalone)
-        XCTAssertTrue(AppModel.shouldSkipStandaloneLocalExport(
+        XCTAssertTrue(PublishCoordinator.shouldSkipStandaloneLocalExport(
             module,
             isLocalExport: true,
             localModuleDirectory: root.path
         ))
-        XCTAssertFalse(AppModel.shouldSkipStandaloneLocalExport(
+        XCTAssertFalse(PublishCoordinator.shouldSkipStandaloneLocalExport(
             module,
             isLocalExport: false,
             localModuleDirectory: root.path
@@ -298,7 +298,7 @@ final class ModelAndCoordinatorTests: XCTestCase {
             outputFolder: "Ads",
             publishesStandalone: true
         )
-        XCTAssertFalse(AppModel.shouldSkipStandaloneLocalExport(
+        XCTAssertFalse(PublishCoordinator.shouldSkipStandaloneLocalExport(
             copiedModule,
             isLocalExport: true,
             localModuleDirectory: root.path
@@ -321,12 +321,12 @@ final class ModelAndCoordinatorTests: XCTestCase {
         XCTAssertEqual(module.storageLocation, .local)
         XCTAssertEqual(module.sourceOrigin, .remote(.quantumultX))
         XCTAssertEqual(module.publishedRelativePath, "Converted/Remote Backed.sgmodule")
-        XCTAssertTrue(AppModel.shouldSkipStandaloneLocalExport(
+        XCTAssertTrue(PublishCoordinator.shouldSkipStandaloneLocalExport(
             module,
             isLocalExport: true,
             localModuleDirectory: "/Users/example/Surge"
         ))
-        XCTAssertFalse(AppModel.shouldSkipStandaloneLocalExport(
+        XCTAssertFalse(PublishCoordinator.shouldSkipStandaloneLocalExport(
             module,
             isLocalExport: false,
             localModuleDirectory: "/Users/example/Surge"

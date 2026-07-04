@@ -1789,7 +1789,7 @@ final class AppModel {
         for module in plan.standaloneModules {
             try checkCurrentWorkCancellation()
             try Task.checkCancellation()
-            if Self.shouldSkipStandaloneLocalExport(
+            if PublishCoordinator.shouldSkipStandaloneLocalExport(
                 module,
                 isLocalExport: destination == .local,
                 localModuleDirectory: settings.localModuleDirectory
@@ -2448,7 +2448,7 @@ final class AppModel {
         guard !rootPath.isEmpty else {
             throw RelayError.invalidOutput("请先设置本地模块根目录，或将模块存放位置改为 GitHub。")
         }
-        if let relativePath = Self.localSourceRelativePath(for: source, rootDirectoryPath: rootPath) {
+        if let relativePath = LocalSourcePathResolver.relativePath(forSourceURL: source, rootDirectoryPath: rootPath) {
             return relativePath
         }
         return ModuleOutputFolder.relativePath(
@@ -2535,15 +2535,15 @@ final class AppModel {
             module.outputFolder = ModuleOutputFolder.normalized(module.outputFolder)
             if module.storageLocation == .local {
                 if module.localStorageRelativePath == nil {
-                    module.localStorageRelativePath = Self.localSourceRelativePath(
-                        for: module.sourceURL,
+                    module.localStorageRelativePath = LocalSourcePathResolver.relativePath(
+                        forSourceURL: module.sourceURL,
                         rootDirectoryPath: localModuleDirectory
                     ) ?? module.publishedRelativePath
                 }
                 module.preservesOutputFileName = true
             }
-            let localSourceFileName = Self.localSourceFileName(
-                for: module.sourceURL,
+            let localSourceFileName = LocalSourcePathResolver.fileName(
+                forSourceURL: module.sourceURL,
                 rootDirectoryPath: localModuleDirectory
             )
             let preservesExistingFileName = module.preservesOutputFileName ||
@@ -2576,47 +2576,6 @@ final class AppModel {
             module.outputFileName = candidate
             return module
         }
-    }
-
-    nonisolated static func shouldSkipStandaloneLocalExport(
-        _ module: RelayModule,
-        isLocalExport: Bool,
-        localModuleDirectory: String
-    ) -> Bool {
-        guard isLocalExport,
-              let sourceRelativePath = localStorageRelativePath(
-                for: module,
-                rootDirectoryPath: localModuleDirectory
-              ) else {
-            return false
-        }
-        return sourceRelativePath.lowercased() == module.publishedRelativePath.lowercased()
-    }
-
-    nonisolated private static func localStorageRelativePath(
-        for module: RelayModule,
-        rootDirectoryPath: String
-    ) -> String? {
-        if module.storageLocation == .local, let relativePath = module.localStorageRelativePath {
-            return ModuleOutputFolder.normalized(relativePath)
-        }
-        return localSourceRelativePath(for: module.sourceURL, rootDirectoryPath: rootDirectoryPath)
-    }
-
-    private static func localSourceFileName(for sourceURL: String, rootDirectoryPath: String) -> String? {
-        guard let relativePath = localSourceRelativePath(for: sourceURL, rootDirectoryPath: rootDirectoryPath) else {
-            return nil
-        }
-        return relativePath.split(separator: "/").last.map(String.init)
-    }
-
-    nonisolated private static func localSourceRelativePath(for sourceURL: String, rootDirectoryPath: String) -> String? {
-        guard let url = URL(string: sourceURL), url.isFileURL else { return nil }
-        let root = URL(filePath: rootDirectoryPath, directoryHint: .isDirectory).standardizedFileURL
-        let source = url.standardizedFileURL
-        let rootPath = root.path.hasSuffix("/") ? root.path : root.path + "/"
-        guard source.path.hasPrefix(rootPath) else { return nil }
-        return ModuleOutputFolder.normalized(String(source.path.dropFirst(rootPath.count)))
     }
 
 }
