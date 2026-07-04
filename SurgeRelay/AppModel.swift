@@ -1028,9 +1028,10 @@ final class AppModel {
                     module: module,
                     existingFailure: sourceCheckFailure
                 )
-                let failureMessage = updateFailureMessage(
+                let failureMessage = UpdateFailurePlanner.detailedMessage(
                     for: error,
                     module: module,
+                    latestModule: modules.first(where: { $0.id == module.id }),
                     sourceCheckFailure: sourceFailure
                 )
                 setState(id: module.id, state: .failed, error: failureMessage)
@@ -1054,7 +1055,7 @@ final class AppModel {
                 } else {
                     if shouldContributeToCombined(module) {
                         missingCache.append(module.name)
-                        missingCacheDetails.append(missingCacheFailureDetail(
+                        missingCacheDetails.append(UpdateFailurePlanner.missingCacheFailureDetail(
                             moduleName: module.name,
                             failureMessage: failureMessage
                         ))
@@ -2062,27 +2063,17 @@ final class AppModel {
         PersistenceStore.saveUpdateHistory(updateHistory)
     }
 
-    private func updateFailureMessage(
-        for error: any Error,
-        module: RelayModule,
-        sourceCheckFailure: (any Error)? = nil
-    ) -> String {
-        let current = modules.first(where: { $0.id == module.id }) ?? module
-        return UpdateFailureFormatter.detailedMessage(
-            for: error,
-            sourceURL: current.effectiveOriginalSourceURL,
-            sourceCheckError: sourceCheckFailure
-        )
-    }
-
     private func sourceCheckFailureAfterConversionFailure(
         _ error: any Error,
         module: RelayModule,
         existingFailure: (any Error)?
     ) async -> (any Error)? {
         if let existingFailure { return existingFailure }
-        guard !UpdateFailureFormatter.isActionableNetworkFailure(error),
-              module.hasRemoteOriginalSource else {
+        guard UpdateFailurePlanner.shouldCheckOriginalSourceAfterConversionFailure(
+            error,
+            module: module,
+            existingSourceCheckFailure: existingFailure
+        ) else {
             return nil
         }
 
@@ -2092,11 +2083,6 @@ final class AppModel {
         } catch {
             return error
         }
-    }
-
-    private func missingCacheFailureDetail(moduleName: String, failureMessage: String) -> String {
-        let indentedMessage = failureMessage.replacingOccurrences(of: "\n", with: "\n  ")
-        return "- \(moduleName)：\(indentedMessage)"
     }
 
     private var hasGitHubPublishableModuleSelection: Bool {

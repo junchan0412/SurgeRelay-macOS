@@ -902,6 +902,80 @@ final class ModelAndCoordinatorTests: XCTestCase {
         XCTAssertFalse(message.contains("token=secret"))
     }
 
+    func testUpdateFailurePlannerDecidesWhenToProbeOriginalSource() {
+        let remote = RelayModule(
+            name: "Remote",
+            sourceURL: "https://example.com/source.conf",
+            sourceFormat: .quantumultX,
+            outputFileName: "Remote"
+        )
+        let local = RelayModule(
+            name: "Local",
+            sourceURL: URL(filePath: "/tmp/Local.sgmodule").absoluteString,
+            sourceFormat: .surge,
+            outputFileName: "Local"
+        )
+
+        XCTAssertTrue(UpdateFailurePlanner.shouldCheckOriginalSourceAfterConversionFailure(
+            RelayError.invalidOutput("Script-Hub 转换失败"),
+            module: remote,
+            existingSourceCheckFailure: nil
+        ))
+        XCTAssertFalse(UpdateFailurePlanner.shouldCheckOriginalSourceAfterConversionFailure(
+            RelayError.httpFailure(status: 404, message: "Not Found"),
+            module: remote,
+            existingSourceCheckFailure: nil
+        ))
+        XCTAssertFalse(UpdateFailurePlanner.shouldCheckOriginalSourceAfterConversionFailure(
+            RelayError.invalidOutput("Script-Hub 转换失败"),
+            module: local,
+            existingSourceCheckFailure: nil
+        ))
+        XCTAssertFalse(UpdateFailurePlanner.shouldCheckOriginalSourceAfterConversionFailure(
+            RelayError.invalidOutput("Script-Hub 转换失败"),
+            module: remote,
+            existingSourceCheckFailure: URLError(.timedOut)
+        ))
+    }
+
+    func testUpdateFailurePlannerUsesLatestModuleSourceForFailureMessage() {
+        let moduleID = UUID()
+        let original = RelayModule(
+            id: moduleID,
+            name: "Module",
+            sourceURL: "https://example.com/old.conf?token=secret",
+            sourceFormat: .quantumultX,
+            outputFileName: "Module"
+        )
+        let latest = RelayModule(
+            id: moduleID,
+            name: "Module",
+            sourceURL: "https://example.com/new.conf?token=secret",
+            sourceFormat: .quantumultX,
+            outputFileName: "Module"
+        )
+
+        let message = UpdateFailurePlanner.detailedMessage(
+            for: RelayError.httpFailure(status: 404, message: ""),
+            module: original,
+            latestModule: latest
+        )
+
+        XCTAssertTrue(message.contains("https://example.com/new.conf"))
+        XCTAssertFalse(message.contains("https://example.com/old.conf"))
+        XCTAssertFalse(message.contains("token=secret"))
+    }
+
+    func testUpdateFailurePlannerFormatsMissingCacheDetails() {
+        XCTAssertEqual(
+            UpdateFailurePlanner.missingCacheFailureDetail(
+                moduleName: "Demo",
+                failureMessage: "第一行\n第二行"
+            ),
+            "- Demo：第一行\n  第二行"
+        )
+    }
+
     func testModuleCollectionSummaryCountsDerivedStateInOnePlace() {
         let olderDate = Date(timeIntervalSince1970: 1_000)
         let newerDate = Date(timeIntervalSince1970: 2_000)

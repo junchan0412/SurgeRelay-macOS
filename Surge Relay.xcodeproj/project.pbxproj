@@ -29,6 +29,7 @@
 		D50D50D50D50D50D50D50D50 /* CredentialTokenCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E50E50E50E50E50E50E50E50 /* CredentialTokenCoordinator.swift */; };
 		D60D60D60D60D60D60D60D60 /* ModuleDraftPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E60E60E60E60E60E60E60E60 /* ModuleDraftPlanner.swift */; };
 		D70D70D70D70D70D70D70D70 /* ModuleOutputFolderCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70E70E70E70E70E70E70E70 /* ModuleOutputFolderCatalog.swift */; };
+		D80D80D80D80D80D80D80D80 /* UpdateFailurePlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80E80E80E80E80E80E80E80 /* UpdateFailurePlanner.swift */; };
 		280C7E38DAD9F18ED8090287 /* ModuleEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E43B99091BF5C4100CE1DA0E /* ModuleEditorView.swift */; };
 		285A582F1C5CC5AF92DF0E7B /* doc.text.svg in Resources */ = {isa = PBXBuildFile; fileRef = 891546F1DD330D7407BFA7E0 /* doc.text.svg */; };
 		2AD845464760705F3E0982BE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3AE70978C59AAF84436C3194 /* Assets.xcassets */; };
@@ -213,6 +214,7 @@
 		E50E50E50E50E50E50E50E50 /* CredentialTokenCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialTokenCoordinator.swift; sourceTree = "<group>"; };
 		E60E60E60E60E60E60E60E60 /* ModuleDraftPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleDraftPlanner.swift; sourceTree = "<group>"; };
 		E70E70E70E70E70E70E70E70 /* ModuleOutputFolderCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleOutputFolderCatalog.swift; sourceTree = "<group>"; };
+		E80E80E80E80E80E80E80E80 /* UpdateFailurePlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateFailurePlanner.swift; sourceTree = "<group>"; };
 		BDD7A6C8082510469A2FA843 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		C9B8AF8AB1ACDCB66A0C8FC1 /* checkmark.svg */ = {isa = PBXFileReference; path = checkmark.svg; sourceTree = "<group>"; };
 		D0DDEE5D89E10E2659D8FC1F /* network.svg */ = {isa = PBXFileReference; path = network.svg; sourceTree = "<group>"; };
@@ -314,6 +316,7 @@
 				254A83429BCA625706A87254 /* ScriptHubClient.swift */,
 				098EA18AE40BB22B02102431 /* ScriptHubUpstreamService.swift */,
 				C7C7C7C7C7C7C7C7C7C7C7C7 /* UpdateCompletionStatusPlanner.swift */,
+				E80E80E80E80E80E80E80E80 /* UpdateFailurePlanner.swift */,
 				C8C8C8C8C8C8C8C8C8C8C8C8 /* WebManagementHTTP.swift */,
 				51D9670C12C677CBC8D96FA4 /* WebManagementAPI.swift */,
 				33932BCF1BFE460CA55DF088 /* WebManagementServer.swift */,
@@ -652,6 +655,7 @@
 				6C8F8E71624D2151BFA675ED /* ServiceModels.swift in Sources */,
 				1AECEBD32D966A1910B3A007 /* SettingsView.swift in Sources */,
 				D596D087CB06F13BD28D7510 /* SurgeRelayApp.swift in Sources */,
+				D80D80D80D80D80D80D80D80 /* UpdateFailurePlanner.swift in Sources */,
 				4B5E934EB9AC34C451301F50 /* WebManagementAPI.swift in Sources */,
 				540136DA3B34EAD959E5B5F7 /* WebManagementServer.swift in Sources */,
 			);

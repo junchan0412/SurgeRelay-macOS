@@ -21,6 +21,7 @@
 - 将模块存放文件夹菜单合并、创建文件夹后的设置变更和 GitHub 目录刷新缓存策略抽出到 `ModuleOutputFolderCatalog`。
 - 将总模块 GitHub 地址、本地总模块文件地址和独立模块订阅地址解析抽出到 `PublishedAddressResolver`，让设置模型只保留配置数据。
 - 将 GitHub Token 旧配置迁移、钥匙串加载失败回退和 Web 管理访问令牌生成抽出到 `CredentialTokenCoordinator`，并补齐无真实钥匙串依赖的异常分支测试。
+- 将更新失败后的原始链接补查判定和总模块缺缓存详情格式化抽出到 `UpdateFailurePlanner`。
 - 将维护文档和 Release 构建脚本的默认 Xcode 路径更新为 macOS 27 beta 使用的 `Xcode-beta.app`，脚本仍保留旧路径作为 fallback。
 - 404 更新失败说明补充仓库公开性和访问权限检查建议；Web 管理端失败详情新增“复制错误”按钮。
 - Web 管理端新增失败模块筛选按钮，可在存在更新失败时一键只看失败模块。
