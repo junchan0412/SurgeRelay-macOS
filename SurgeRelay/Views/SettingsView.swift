@@ -4,9 +4,6 @@ import CoreImage.CIFilterBuiltins
 import SwiftUI
 
 struct SettingsView: View {
-    private let settingsContentMaxWidth: CGFloat = 680
-    private let settingsHorizontalPadding: CGFloat = 22
-
     @Environment(AppModel.self) private var model
     @State private var isCheckingUpdate = false
     @State private var isTesting = false
@@ -176,8 +173,8 @@ struct SettingsView: View {
     }
 
     private var generalSettings: some View {
-        settingsForm {
-            settingsSection("通用") {
+        SettingsForm {
+            SettingsSection("通用") {
                 SettingsControlRow("配置储存目录", icon: "folder") {
                     pathSelectionControl(
                         path: model.configurationDirectoryPath,
@@ -198,7 +195,7 @@ struct SettingsView: View {
                 }
             }
 
-            settingsSection("自动化") {
+            SettingsSection("自动化") {
                 SettingsControlRow("刷新间隔", icon: "clock.arrow.circlepath") {
                     Picker("刷新间隔", selection: Binding(
                         get: { model.settings.refreshIntervalMinutes },
@@ -227,7 +224,7 @@ struct SettingsView: View {
                 ))
             }
 
-            settingsSection("Script-Hub") {
+            SettingsSection("Script-Hub") {
                 settingsInfoRow(
                     "版本",
                     value: model.upstreamState.revision.map { String($0.prefix(7)) } ?? "—",
@@ -292,8 +289,8 @@ struct SettingsView: View {
     }
 
     private var publishingSettings: some View {
-        settingsForm {
-            settingsSection("存储位置") {
+        SettingsForm {
+            SettingsSection("存储位置") {
                 settingsToggleRow("发布到本地", icon: "folder", isOn: Binding(
                     get: { model.settings.publishToLocal },
                     set: { model.setPublishToLocal($0) }
@@ -343,7 +340,7 @@ struct SettingsView: View {
             }
 
             if model.settings.publishToGitHub, model.settings.github.repositoryIsPrivate == true {
-                settingsSection("Cloudflare Worker") {
+                SettingsSection("Cloudflare Worker") {
                     settingsTextFieldRow("公共地址", icon: "network", text: githubBinding(\.publicBaseURL), prompt: "https://example.workers.dev")
                 }
             }
@@ -351,8 +348,8 @@ struct SettingsView: View {
     }
 
     private var credentialsSettings: some View {
-        settingsForm {
-            settingsSection("GitHub Token") {
+        SettingsForm {
+            SettingsSection("GitHub Token") {
                 settingsSecureFieldRow("Token", icon: "key.fill", text: Binding(
                     get: { model.githubToken },
                     set: { model.githubToken = $0 }
@@ -395,7 +392,7 @@ struct SettingsView: View {
                 }
             }
 
-            settingsSection("Web 管理令牌") {
+            SettingsSection("Web 管理令牌") {
                 settingsSecureFieldRow("令牌", icon: "network.badge.shield.half.filled", text: Binding(
                     get: { model.webAccessToken },
                     set: { model.webAccessToken = $0 }
@@ -423,7 +420,7 @@ struct SettingsView: View {
                 }
             }
 
-            settingsSection("钥匙串状态") {
+            SettingsSection("钥匙串状态") {
                 keychainDiagnosticsContent
             }
         }
@@ -436,8 +433,8 @@ struct SettingsView: View {
     }
 
     private var webManagementSettings: some View {
-        settingsForm {
-            settingsSection("服务") {
+        SettingsForm {
+            SettingsSection("服务") {
                 SettingsInfoRow("服务状态", icon: model.webServerState.systemImage) {
                     Label(model.webServerState.title, systemImage: model.webServerState.systemImage)
                         .foregroundStyle(webServerStateColor)
@@ -489,7 +486,7 @@ struct SettingsView: View {
                 }
             }
 
-            settingsSection("访问") {
+            SettingsSection("访问") {
                 if let displayURL = model.webManagementDisplayURL, let url = model.webManagementURL {
                     settingsInfoRow(
                         model.settings.webServerAllowRemoteAccess ? "局域网地址" : "本机地址",
@@ -522,11 +519,11 @@ struct SettingsView: View {
     }
 
     private var diagnosticsSettings: some View {
-        settingsForm {
-            settingsSection("安装与权限") {
+        SettingsForm {
+            SettingsSection("安装与权限") {
                 installationDiagnosticsContent
             }
-            settingsSection("诊断") {
+            SettingsSection("诊断") {
                 DisclosureGroup("最近更新") {
                     if model.updateHistory.isEmpty {
                         Text("暂无记录").foregroundStyle(.secondary)
@@ -578,48 +575,6 @@ struct SettingsView: View {
                 }
             }
         }
-    }
-
-    private func settingsForm<Content: View>(@ViewBuilder content: @escaping () -> Content) -> some View {
-        GeometryReader { geometry in
-            let contentWidth = max(
-                360,
-                min(settingsContentMaxWidth, geometry.size.width - settingsHorizontalPadding * 2)
-            )
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    content()
-                }
-                .frame(width: contentWidth, alignment: .topLeading)
-                .padding(.horizontal, settingsHorizontalPadding)
-                .padding(.top, 18)
-                .padding(.bottom, 24)
-                .frame(width: geometry.size.width, alignment: .top)
-            }
-            .scrollIndicators(.visible)
-            .background(Color(nsColor: .windowBackgroundColor))
-        }
-    }
-
-    private func settingsSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
-                .padding(.leading, 2)
-            VStack(alignment: .leading, spacing: 11) {
-                content()
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 13)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(Color(nsColor: .separatorColor).opacity(0.18), lineWidth: 0.5)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func settingsInfoRow(
@@ -1111,84 +1066,5 @@ struct SettingsView: View {
         guard let output = filter.outputImage?.transformed(by: CGAffineTransform(scaleX: 10, y: 10)),
               let image = CIContext().createCGImage(output, from: output.extent) else { return nil }
         return NSImage(cgImage: image, size: NSSize(width: output.extent.width, height: output.extent.height))
-    }
-}
-
-private struct SettingsWindowChromeConfigurator: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        configureWhenReady(view)
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        configureWhenReady(nsView)
-    }
-
-    private func configureWhenReady(_ view: NSView) {
-        DispatchQueue.main.async {
-            guard let window = view.window else { return }
-            window.titleVisibility = .hidden
-            window.titlebarSeparatorStyle = .none
-        }
-    }
-}
-
-private enum SettingsTabMetrics {
-    static let selectorWidth: CGFloat = 406
-    static let selectorHeight: CGFloat = 40
-    static let itemHeight: CGFloat = 30
-}
-
-private struct SettingsInfoRow<Content: View>: View {
-    let title: String
-    let icon: String
-    private let content: () -> Content
-
-    init(_ title: String, icon: String, @ViewBuilder content: @escaping () -> Content) {
-        self.title = title
-        self.icon = icon
-        self.content = content
-    }
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: icon)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .frame(width: 20, alignment: .center)
-            Text(title)
-                .font(.callout.weight(.medium))
-                .foregroundStyle(.primary)
-                .frame(width: 108, alignment: .leading)
-            content()
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(.vertical, 5)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(Color(nsColor: .separatorColor).opacity(0.14))
-                .frame(height: 0.5)
-                .padding(.leading, 30)
-        }
-    }
-}
-
-private struct SettingsControlRow<Content: View>: View {
-    let title: String
-    let icon: String
-    private let content: () -> Content
-
-    init(_ title: String, icon: String, @ViewBuilder content: @escaping () -> Content) {
-        self.title = title
-        self.icon = icon
-        self.content = content
-    }
-
-    var body: some View {
-        SettingsInfoRow(title, icon: icon) {
-            content()
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
     }
 }

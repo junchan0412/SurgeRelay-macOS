@@ -4,6 +4,14 @@ enum AutomaticPublishPlanner {
     static let noStandaloneModulesStatus = "没有开启独立发布的模块，已跳过 GitHub 自动发布"
     static let noStandaloneFilesStatus = "没有可自动发布的独立模块文件，已跳过 GitHub 自动发布"
 
+    static func shouldQueueAfterModuleUpdate(plan: PublishPlan, contentChanged: Bool) -> Bool {
+        contentChanged && shouldRunScheduledPublish(plan: plan)
+    }
+
+    static func shouldRunScheduledPublish(plan: PublishPlan) -> Bool {
+        plan.hasStandaloneModuleSelection
+    }
+
     static func skippedAfterModuleUpdateStatus(contentChanged: Bool, failures: Int) -> String {
         let failureSuffix = failures > 0 ? "；\(failures) 个来源沿用上次成功版本" : ""
         if contentChanged {

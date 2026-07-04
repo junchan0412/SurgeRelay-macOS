@@ -1268,8 +1268,12 @@ final class AppModel {
             guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
             if settings.publishToGitHub, settings.automaticallyPublish, settings.github.isConfigured,
                !ensureGitHubTokenLoaded(showStatusMessage: false).isEmpty {
-                if hasGitHubAutomaticPublishableModuleSelection {
-                    if contentChanged {
+                let automaticPublishPlan = githubPublishPlan
+                if AutomaticPublishPlanner.shouldRunScheduledPublish(plan: automaticPublishPlan) {
+                    if AutomaticPublishPlanner.shouldQueueAfterModuleUpdate(
+                        plan: automaticPublishPlan,
+                        contentChanged: contentChanged
+                    ) {
                         scheduleAutomaticPublish()
                     }
                     statusMessage = UpdateCompletionStatusPlanner.automaticPublishQueuedStatus(
@@ -1330,7 +1334,7 @@ final class AppModel {
     private func scheduleAutomaticPublish() {
         guard settings.publishToGitHub, settings.automaticallyPublish, settings.github.isConfigured else { return }
         guard !ensureGitHubTokenLoaded(showStatusMessage: false).isEmpty else { return }
-        guard hasGitHubAutomaticPublishableModuleSelection else {
+        guard AutomaticPublishPlanner.shouldRunScheduledPublish(plan: githubPublishPlan) else {
             clearAutomaticPublishSchedule()
             return
         }
@@ -1355,7 +1359,7 @@ final class AppModel {
                 self.clearAutomaticPublishSchedule()
                 return
             }
-            guard self.hasGitHubAutomaticPublishableModuleSelection else {
+            guard AutomaticPublishPlanner.shouldRunScheduledPublish(plan: self.githubPublishPlan) else {
                 self.clearAutomaticPublishSchedule()
                 self.statusMessage = AutomaticPublishPlanner.noStandaloneModulesStatus
                 return
@@ -2364,10 +2368,6 @@ final class AppModel {
 
     private var hasGitHubPublishableModuleSelection: Bool {
         githubPublishPlan.hasPublishableModuleSelection
-    }
-
-    private var hasGitHubAutomaticPublishableModuleSelection: Bool {
-        githubPublishPlan.hasStandaloneModuleSelection
     }
 
     private var githubPublishPlan: PublishPlan {

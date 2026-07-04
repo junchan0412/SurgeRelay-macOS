@@ -416,6 +416,17 @@ final class ModelAndCoordinatorTests: XCTestCase {
         XCTAssertTrue(message.contains("转换阶段同时失败"))
     }
 
+    func testUpdateFailureFormatterExplainsOriginalURLError() {
+        let message = UpdateFailureFormatter.detailedMessage(
+            for: URLError(.timedOut),
+            sourceURL: "https://example.com/slow.sgmodule?token=secret"
+        )
+
+        XCTAssertTrue(message.contains("连接原始链接超时"))
+        XCTAssertTrue(message.contains("https://example.com/slow.sgmodule"))
+        XCTAssertFalse(message.contains("token=secret"))
+    }
+
     func testModuleCollectionSummaryCountsDerivedStateInOnePlace() {
         let olderDate = Date(timeIntervalSince1970: 1_000)
         let newerDate = Date(timeIntervalSince1970: 2_000)
@@ -586,6 +597,40 @@ final class ModelAndCoordinatorTests: XCTestCase {
             AutomaticPublishPlanner.skippedAfterModuleUpdateStatus(contentChanged: false, failures: 0),
             "模块内容未变化；没有开启独立发布的模块，无需 GitHub 自动发布"
         )
+    }
+
+    func testAutomaticPublishPlannerOnlyQueuesStandaloneModulePublishing() {
+        let standalone = RelayModule(
+            id: UUID(),
+            name: "Standalone",
+            sourceURL: "https://example.com/standalone.sgmodule",
+            outputFileName: "Standalone",
+            publishesStandalone: true
+        )
+        let combinedID = UUID()
+        let standalonePlan = PublishPlan(
+            standaloneModules: [standalone],
+            combinedModuleIDs: [combinedID]
+        )
+        let combinedOnlyPlan = PublishPlan(
+            standaloneModules: [],
+            combinedModuleIDs: [combinedID]
+        )
+
+        XCTAssertTrue(AutomaticPublishPlanner.shouldRunScheduledPublish(plan: standalonePlan))
+        XCTAssertTrue(AutomaticPublishPlanner.shouldQueueAfterModuleUpdate(
+            plan: standalonePlan,
+            contentChanged: true
+        ))
+        XCTAssertFalse(AutomaticPublishPlanner.shouldQueueAfterModuleUpdate(
+            plan: standalonePlan,
+            contentChanged: false
+        ))
+        XCTAssertFalse(AutomaticPublishPlanner.shouldRunScheduledPublish(plan: combinedOnlyPlan))
+        XCTAssertFalse(AutomaticPublishPlanner.shouldQueueAfterModuleUpdate(
+            plan: combinedOnlyPlan,
+            contentChanged: true
+        ))
     }
 
     func testAutomaticPublishPlannerChecksStandaloneCachedOutput() async {

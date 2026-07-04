@@ -6,11 +6,13 @@
 - 将本地模块导入预览 sheet 拆出 `ModulesView.swift`，让主模块视图继续收敛到侧边栏、选择和详情编排。
 - 将单模块详情页拆出 `ModulesView.swift`，让主模块视图进一步专注于导航、筛选和工具栏状态。
 - 更新失败时在模块列表、详情首屏和 Web 管理端顶部直接显示原始链接错误原因；GitHub 自动发布现在必须至少有一个模块开启独立发布，否则不会排队或执行。
+- GitHub 自动发布的排队和执行入口统一使用 `AutomaticPublishPlanner` 判定；仅启用总模块但没有任何独立发布模块时会明确跳过。
 - 将本地模块扫描和本地模块文件夹枚举从 `AppModel.swift` 抽出到 `LocalModuleScanner.swift`，让 AppModel 继续收敛为状态协调器。
 - 将旧发布输出清理的目录和文件名规划抽出到 `LegacyOutputCleanupPlanner`，减少 AppModel 中的历史兼容路径计算。
 - 将 Web 管理端模块搜索字段抽出到 `web-logic.js`，让列表搜索与列表刷新签名共享可测试的字段维护入口。
 - 将 Web 管理 HTTP 请求/响应模型、解析器、认证节流和安全响应头抽出到 `WebManagementHTTP.swift`，让 `WebManagementServer` 更专注于 Network 连接生命周期。
 - 将桌面端模块搜索索引抽出到 `ModuleSearchIndex` 服务文件，避免主模块视图继续承载纯搜索字段拼装逻辑。
+- 将设置页通用表单、分区、行组件和窗口 chrome 配置抽出到 `SettingsComponents.swift`，为后续继续拆分凭据与诊断页面降低耦合。
 - 404 更新失败说明补充仓库公开性和访问权限检查建议；Web 管理端失败详情新增“复制错误”按钮。
 - Web 管理端新增失败模块筛选按钮，可在存在更新失败时一键只看失败模块。
 - 将 GitHub 自动发布跳过文案和独立模块缓存判断抽出到 `AutomaticPublishPlanner`，继续减少 AppModel 中的发布策略分支。
