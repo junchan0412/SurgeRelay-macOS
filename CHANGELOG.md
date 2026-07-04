@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 新增无需证书和 GitHub secret 的发布配置预检，并接入 GitHub Actions 证书导入之前，提前检查版本号、Sparkle、appcast、entitlement、发布脚本和 workflow 配置一致性。
 - 发布候选统一通过 `PublishPlan` 计算，桌面发布、发布预览、生成资产和空发布判断共享同一套可测试逻辑，降低总模块/独立模块关系再次分叉的风险。
 - 桌面主窗口、菜单栏和 Web 管理端共用 `ModuleCollectionSummary` 计算模块总数、总模块来源数、独立发布数、失败数、最近更新时间和可更新数量。
 - 将总模块侧边栏、总模块详情、发布预览摘要和通用详情行拆出 `ModulesView.swift`，降低主模块视图单文件维护压力。

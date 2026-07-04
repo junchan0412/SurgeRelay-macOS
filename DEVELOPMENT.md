@@ -92,6 +92,7 @@ node --check SurgeRelay/WebResources/web-logic.js
 node --check SurgeRelay/WebResources/app.js
 node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs
+./script/check_release_configuration.sh
 ```
 
 ```bash
@@ -119,6 +120,14 @@ Release builds require:
 - Sparkle EdDSA private key in the keychain
 - stable self-signed signing identity: `Surge Relay Self-Signed Code Signing`
 - unchanged bundle identifier: `com.allenmiao.SurgeRelay`
+
+Before importing signing certificates or calling GitHub, run the local release preflight:
+
+```bash
+VERSION=1.3.8 ./script/check_release_configuration.sh
+```
+
+The preflight checks version/build consistency, Sparkle feed and public key metadata, the latest appcast entry, the release entitlement, shell syntax for release scripts, and the GitHub Actions release entrypoint.
 
 Build release assets with:
 

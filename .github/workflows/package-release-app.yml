@@ -32,6 +32,13 @@ jobs:
           xcodebuild -version
           xcodebuild -showsdks
 
+      - name: Check release configuration
+        run: |
+          set -euo pipefail
+          VERSION="${{ inputs.tag }}"
+          VERSION="${VERSION#v}"
+          VERSION="$VERSION" ./script/check_release_configuration.sh
+
       - name: Import self-signed signing certificate
         env:
           CODESIGN_CERTIFICATE_P12_BASE64: ${{ secrets.CODESIGN_CERTIFICATE_P12_BASE64 }}

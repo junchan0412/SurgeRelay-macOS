@@ -138,6 +138,7 @@ node --check SurgeRelay/WebResources/web-logic.js
 node --check SurgeRelay/WebResources/app.js
 node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs
+./script/check_release_configuration.sh
 
 DEVELOPER_DIR="/Volumes/TR 5000/Applications/Xcode.app/Contents/Developer" \
 xcodebuild build-for-testing \
@@ -151,6 +152,12 @@ xcodebuild build-for-testing \
 ## 发布
 
 正式发布需要 Sparkle EdDSA 私钥和固定自签名 Code Signing 证书。构建脚本会生成 `.app.zip`、`.pkg`、sha256 文件和 Sparkle 签名元数据，并可更新 `appcast.xml`。
+
+发布前可先运行无需证书和 GitHub secret 的配置预检，确认版本号、Sparkle 配置、appcast、entitlement、发布脚本和 GitHub Actions 入口保持一致：
+
+```bash
+VERSION=1.3.8 ./script/check_release_configuration.sh
+```
 
 ```bash
 REQUIRE_SPARKLE_SIGNATURES=1 \
