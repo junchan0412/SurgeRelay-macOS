@@ -99,6 +99,7 @@ struct StatusPill: View {
             .padding(.horizontal, 9)
             .padding(.vertical, 5)
             .background(color.opacity(0.12), in: Capsule())
+            .help(title)
     }
 
     private var title: String {

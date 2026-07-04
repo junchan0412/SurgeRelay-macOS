@@ -947,6 +947,10 @@ struct PublishPlan: Equatable, Sendable {
         !standaloneModules.isEmpty || includesCombined
     }
 
+    var hasStandaloneModuleSelection: Bool {
+        !standaloneModules.isEmpty
+    }
+
     var scopeTitle: String {
         if includesCombined {
             return standaloneModules.isEmpty ? "总模块" : "总模块与独立模块"

@@ -499,7 +499,15 @@ final class ModelAndCoordinatorTests: XCTestCase {
         XCTAssertEqual(combinedPlan.standaloneModules.map(\.id), [standalone.id])
         XCTAssertEqual(combinedPlan.combinedModuleIDs, Set([combinedOnly.id]))
         XCTAssertEqual(combinedPlan.assetModuleIDs, Set([standalone.id, combinedOnly.id]))
+        XCTAssertTrue(combinedPlan.hasStandaloneModuleSelection)
         XCTAssertEqual(combinedPlan.scopeTitle, "总模块与独立模块")
+
+        let combinedOnlyPlan = PublishCoordinator.plan(
+            modules: [combinedOnly, ignored],
+            combinedModuleEnabled: true
+        )
+        XCTAssertTrue(combinedOnlyPlan.hasPublishableModuleSelection)
+        XCTAssertFalse(combinedOnlyPlan.hasStandaloneModuleSelection)
 
         XCTAssertEqual(
             PublishCoordinator.publishableModuleIDs(

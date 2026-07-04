@@ -587,6 +587,7 @@ function renderModuleDetail(module, animate = true) {
     ? detailRow('folder', '本地相对路径', module.localStorageRelativePath, false, module.localStorageRelativePath)
     : '';
   setDetailHTML(`${detailToolbar(module)}
+    ${error}
     <section class="form-section-view"><h3 class="section-heading">管理关系</h3><div class="group-box">
       ${detailRow(module.storageLocationIcon || 'folder', '模块存放', module.storageLocationTitle || 'GitHub 模块')}
       ${detailRow(module.sourceOriginIcon || 'link', '转换前来源', module.sourceOriginTitle || module.sourceFormatTitle)}
@@ -611,7 +612,7 @@ function renderModuleDetail(module, animate = true) {
       ${sourceLastModifiedRow}
       ${detailRow('gearshape', '转换引擎', module.conversionEngineRevision ? module.conversionEngineRevision.slice(0, 12) : '原生 Surge 模块', false, module.conversionEngineRevision || null)}
     </div></section>
-    ${advanced}<div id="arguments-section"></div>${conflict}${published}${error}`, animate);
+    ${advanced}<div id="arguments-section"></div>${conflict}${published}`, animate);
   loadArguments(module);
 }
 

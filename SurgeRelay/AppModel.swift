@@ -1268,7 +1268,7 @@ final class AppModel {
             guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
             if settings.publishToGitHub, settings.automaticallyPublish, settings.github.isConfigured,
                !ensureGitHubTokenLoaded(showStatusMessage: false).isEmpty {
-                if hasGitHubPublishableModuleSelection {
+                if hasGitHubAutomaticPublishableModuleSelection {
                     if contentChanged {
                         scheduleAutomaticPublish()
                         statusMessage = failures == 0
@@ -1333,7 +1333,7 @@ final class AppModel {
     private func scheduleAutomaticPublish() {
         guard settings.publishToGitHub, settings.automaticallyPublish, settings.github.isConfigured else { return }
         guard !ensureGitHubTokenLoaded(showStatusMessage: false).isEmpty else { return }
-        guard hasGitHubPublishableModuleSelection else {
+        guard hasGitHubAutomaticPublishableModuleSelection else {
             clearAutomaticPublishSchedule()
             return
         }
@@ -1358,9 +1358,14 @@ final class AppModel {
                 self.clearAutomaticPublishSchedule()
                 return
             }
-            guard await self.hasGitHubPublishableFiles() else {
+            guard self.hasGitHubAutomaticPublishableModuleSelection else {
                 self.clearAutomaticPublishSchedule()
-                self.statusMessage = "没有可发布的模块文件，已跳过 GitHub 自动发布"
+                self.statusMessage = "没有开启独立发布的模块，已跳过 GitHub 自动发布"
+                return
+            }
+            guard await self.hasGitHubAutomaticPublishableFiles() else {
+                self.clearAutomaticPublishSchedule()
+                self.statusMessage = "没有可自动发布的独立模块文件，已跳过 GitHub 自动发布"
                 return
             }
             self.clearAutomaticPublishSchedule()
@@ -1387,7 +1392,7 @@ final class AppModel {
             } catch {
                 guard !self.isCurrentWorkCancellation(error) else { return }
                 if self.isNoFilesToPublish(error) {
-                    self.statusMessage = "没有可发布的模块文件，已跳过 GitHub 自动发布"
+                    self.statusMessage = "没有可自动发布的独立模块文件，已跳过 GitHub 自动发布"
                     return
                 }
                 self.presentedError = "GitHub 自动发布失败：\(error.localizedDescription)"
@@ -2384,6 +2389,10 @@ final class AppModel {
         githubPublishPlan.hasPublishableModuleSelection
     }
 
+    private var hasGitHubAutomaticPublishableModuleSelection: Bool {
+        githubPublishPlan.hasStandaloneModuleSelection
+    }
+
     private var githubPublishPlan: PublishPlan {
         PublishCoordinator.plan(
             modules: modules,
@@ -2394,9 +2403,9 @@ final class AppModel {
     private func automaticPublishSkippedStatus(contentChanged: Bool, failures: Int) -> String {
         let failureSuffix = failures > 0 ? "；\(failures) 个来源沿用上次成功版本" : ""
         if contentChanged {
-            return "模块输出已更新\(failureSuffix)；没有开启发布的模块，已跳过 GitHub 自动发布"
+            return "模块输出已更新\(failureSuffix)；没有开启独立发布的模块，已跳过 GitHub 自动发布"
         }
-        return "模块内容未变化\(failureSuffix)；没有开启发布的模块，无需 GitHub 自动发布"
+        return "模块内容未变化\(failureSuffix)；没有开启独立发布的模块，无需 GitHub 自动发布"
     }
 
     private func isNoFilesToPublish(_ error: any Error) -> Bool {
@@ -2407,14 +2416,8 @@ final class AppModel {
         return true
     }
 
-    private func hasGitHubPublishableFiles() async -> Bool {
-        let plan = githubPublishPlan
-        if plan.includesCombined,
-           (try? await fileStore.readCombined()) != nil {
-            return true
-        }
-
-        for module in plan.standaloneModules {
+    private func hasGitHubAutomaticPublishableFiles() async -> Bool {
+        for module in githubPublishPlan.standaloneModules {
             if await fileStore.hasComponent(id: module.id) {
                 return true
             }

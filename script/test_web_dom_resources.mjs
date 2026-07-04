@@ -400,6 +400,11 @@ const refresh = document.querySelector('#refresh-button');
 assert.match(list.innerHTML, /Block HTTPDNS/, 'app.js should render module rows from /api/state');
 assert.match(list.innerHTML, /更新失败：原始链接返回 404/, 'sidebar should show failure summary');
 assert.match(detail.innerHTML, /管理关系/, 'module detail should render management relationship section');
+assert.ok(
+  detail.innerHTML.indexOf('最近一次更新失败') >= 0 &&
+    detail.innerHTML.indexOf('最近一次更新失败') < detail.innerHTML.indexOf('管理关系'),
+  'module detail should expose failure reason before management details'
+);
 assert.match(detail.innerHTML, /原始地址/, 'module detail should expose original source address');
 assert.equal(refresh.disabled, false, 'refresh button should stay enabled when update admission allows it');
 
