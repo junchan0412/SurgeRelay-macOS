@@ -736,48 +736,17 @@ final class AppModel {
     }
 
     func addModule(from draft: ModuleDraft) throws {
-        if let message = draft.validationMessage { throw RelayError.invalidOutput(message) }
-        let source = draft.sourceURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        let category = draft.category.trimmingCharacters(in: .whitespacesAndNewlines)
-        let outputFolder = ModuleOutputFolder.normalized(draft.outputFolder)
-        let customIconURL = draft.normalizedCustomIconURL
-        guard !modules.contains(where: { ModuleSourceIdentity.matches($0.effectiveOriginalSourceURL, source) }) else {
-            throw RelayError.duplicateSourceURL
-        }
-        let outputFileName = ModuleNamingPlanner.uniqueOutputFileName(
-            for: draft,
-            source: source,
+        let plan = try ModuleDraftPlanner.addPlan(
+            from: draft,
             modules: modules,
-            combinedModuleFileName: settings.combinedModuleFileName
-        )
-        let localStorageRelativePath = try ModuleNamingPlanner.localStorageRelativePath(
-            storageLocation: draft.storageLocation,
-            source: source,
-            outputFileName: outputFileName,
-            outputFolder: outputFolder,
+            combinedModuleFileName: settings.combinedModuleFileName,
             localModuleDirectory: settings.localModuleDirectory
         )
-        let module = RelayModule(
-            name: draft.name.trimmingCharacters(in: .whitespacesAndNewlines),
-            sourceURL: source,
-            sourceFormat: draft.sourceFormat,
-            outputFileName: outputFileName,
-            category: category,
-            outputFolder: outputFolder,
-            storageLocation: draft.storageLocation,
-            localStorageRelativePath: localStorageRelativePath,
-            preservesOutputFileName: draft.storageLocation == .local,
-            publishesStandalone: draft.publishesStandalone,
-            isEnabled: draft.isEnabled,
-            scriptHubOptions: draft.scriptHubOptions,
-            iconURL: customIconURL,
-            customIconURL: customIconURL,
-            detectedSourceFormat: ModuleNamingPlanner.detectedFormat(for: draft.sourceFormat, source: source)
-        )
+        let module = plan.module
         registerLocalChange()
         modules.append(module)
         selectedModuleID = module.id
-        if let customIconURL, let url = URL(string: customIconURL) {
+        if let customIconURL = plan.customIconURL, let url = URL(string: customIconURL) {
             Task { try? await iconStore.cacheIcon(from: url, for: module.id, force: true) }
         }
         try persistModules()
@@ -786,100 +755,39 @@ final class AppModel {
     }
 
     func updateModule(id: UUID, from draft: ModuleDraft) throws {
-        if let message = draft.validationMessage { throw RelayError.invalidOutput(message) }
         guard let index = modules.firstIndex(where: { $0.id == id }) else { return }
-        let name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let source = draft.sourceURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        let category = draft.category.trimmingCharacters(in: .whitespacesAndNewlines)
-        let outputFolder = ModuleOutputFolder.normalized(draft.outputFolder)
-        let customIconURL = draft.normalizedCustomIconURL
-        guard !modules.contains(where: {
-            $0.id != id && ModuleSourceIdentity.matches($0.effectiveOriginalSourceURL, source)
-        }) else {
-            throw RelayError.duplicateSourceURL
-        }
-        let outputFileName = ModuleNamingPlanner.uniqueOutputFileName(
-            for: draft,
-            source: source,
+        guard let plan = try ModuleDraftPlanner.updatePlan(
+            id: id,
+            from: draft,
             modules: modules,
             combinedModuleFileName: settings.combinedModuleFileName,
-            excluding: id
-        )
-        let detectedSourceFormat = ModuleNamingPlanner.detectedFormat(for: draft.sourceFormat, source: source)
-        let localStorageRelativePath = try ModuleNamingPlanner.localStorageRelativePath(
-            storageLocation: draft.storageLocation,
-            source: source,
-            outputFileName: outputFileName,
-            outputFolder: outputFolder,
             localModuleDirectory: settings.localModuleDirectory
-        )
-        let current = modules[index]
-        guard current.name != name ||
-                current.sourceURL != source ||
-                current.sourceFormat != draft.sourceFormat ||
-                current.outputFileName != outputFileName ||
-                current.category != category ||
-                current.outputFolder != outputFolder ||
-                current.storageLocation != draft.storageLocation ||
-                current.localStorageRelativePath != localStorageRelativePath ||
-                current.preservesOutputFileName != (draft.storageLocation == .local) ||
-                current.publishesStandalone != draft.publishesStandalone ||
-                current.isEnabled != draft.isEnabled ||
-                current.scriptHubOptions != draft.scriptHubOptions ||
-                current.customIconURL != customIconURL else {
+        ) else {
+            return
+        }
+        guard plan.hasChanges else {
             statusMessage = "没有需要保存的更改"
             return
         }
         registerLocalChange()
-        let sourceChanged = modules[index].sourceURL != source ||
-            modules[index].sourceFormat != draft.sourceFormat ||
-            modules[index].scriptHubOptions != draft.scriptHubOptions
-        let customIconChanged = modules[index].customIconURL != customIconURL
-        let previousOutputFileName = modules[index].outputFileName
-        modules[index].name = name
-        modules[index].sourceURL = source
-        modules[index].sourceFormat = draft.sourceFormat
-        modules[index].outputFileName = outputFileName
-        modules[index].category = category
-        modules[index].outputFolder = outputFolder
-        modules[index].storageLocation = draft.storageLocation
-        modules[index].localStorageRelativePath = localStorageRelativePath
-        modules[index].preservesOutputFileName = draft.storageLocation == .local
-        modules[index].publishesStandalone = draft.publishesStandalone
-        modules[index].isEnabled = draft.isEnabled
-        modules[index].scriptHubOptions = draft.scriptHubOptions
-        modules[index].customIconURL = customIconURL
-        modules[index].detectedSourceFormat = detectedSourceFormat
-        if sourceChanged {
-            modules[index].state = .never
-            modules[index].lastError = nil
-            modules[index].sourceETag = nil
-            modules[index].sourceLastModified = nil
-            modules[index].sourceContentHash = nil
-            modules[index].sourceCheckedAt = nil
-            modules[index].conversionEngineRevision = nil
-            modules[index].scriptHubSubscription = nil
-        }
-        if sourceChanged || customIconChanged {
-            if let customIconURL, let url = URL(string: customIconURL) {
-                modules[index].iconURL = customIconURL
+        modules[index] = plan.module
+        if plan.sourceChanged || plan.customIconChanged {
+            if let customIconURL = plan.customIconURL, let url = URL(string: customIconURL) {
                 Task { try? await iconStore.cacheIcon(from: url, for: id, force: true) }
             } else {
-                modules[index].iconURL = nil
                 Task { try? await iconStore.removeIcon(for: id) }
             }
         }
-        _ = previousOutputFileName
         try persistModules()
-        statusMessage = sourceChanged
+        statusMessage = plan.sourceChanged
             ? "已保存 \(modules[index].name)，即将自动更新"
             : "已保存 \(modules[index].name)，正在刷新输出"
-        if sourceChanged, shouldUpdateModule(modules[index]) {
+        if plan.sourceChanged, shouldUpdateModule(modules[index]) {
             scheduleAutomaticUpdate()
         } else {
             Task { await rebuildCombinedFromCache() }
         }
-        if customIconChanged, customIconURL == nil, !sourceChanged {
+        if plan.customIconChanged, plan.customIconURL == nil, !plan.sourceChanged {
             Task { await refreshModuleMetadataFromCache() }
         }
     }

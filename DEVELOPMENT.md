@@ -62,6 +62,8 @@ Preview content reads belong in `ModulePreviewContentProvider`. Keep cache looku
 
 Module output naming belongs in `ModuleNamingPlanner`. Keep output-file uniqueness checks, combined-module filename collision avoidance, detected source-format inference, local storage relative-path derivation, and loaded-module naming normalization there. AppModel should pass the current modules and settings into the planner instead of reimplementing path rules inline.
 
+Add/edit draft planning belongs in `ModuleDraftPlanner`. Keep draft validation, duplicate effective-source checks, add-module construction, edit change detection, source revision state clearing, custom-icon planning, and local storage relative-path decisions there. `AppModel` should apply the returned add/update plan, then handle persistence, icon cache side effects, and update scheduling.
+
 User-visible publish addresses belong in `PublishedAddressResolver`. Keep GitHub publication gating, standalone module URL eligibility, combined-module GitHub URL generation, and local combined-module file URL generation there. `AppSettings` should remain configuration data, while AppModel, views, Web management, and diagnostics consume resolved addresses through AppModel forwarding properties.
 
 Credential loading and token migration belong in `CredentialTokenCoordinator`. Keep GitHub Token legacy-settings migration, keychain-unavailable fallback, Web management access-token generation, and memory-only degradation there. `AppModel` should apply the returned token, storage status, status message, and persistence side effects rather than duplicating keychain decision branches inline.

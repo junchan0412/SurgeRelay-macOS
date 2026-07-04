@@ -500,6 +500,144 @@ final class ModelAndCoordinatorTests: XCTestCase {
         XCTAssertEqual(normalized[1].outputFileName, "Surge-Relay-2.sgmodule")
     }
 
+    func testModuleDraftPlannerBuildsLocalAddPlanWithoutLosingOriginalPath() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let source = root.appending(path: "Ads/My Module.sgmodule").absoluteString
+        var draft = ModuleDraft()
+        draft.name = "  My Local Module  "
+        draft.sourceURL = source
+        draft.sourceFormat = .automatic
+        draft.outputFileName = "Converted Copy.sgmodule"
+        draft.outputFolder = " Converted "
+        draft.category = " #工具 "
+        draft.storageLocation = .local
+        draft.publishesStandalone = true
+        draft.iconURL = " https://example.com/icon.png "
+
+        let plan = try ModuleDraftPlanner.addPlan(
+            from: draft,
+            modules: [],
+            combinedModuleFileName: "Surge Relay",
+            localModuleDirectory: root.path
+        )
+
+        XCTAssertEqual(plan.module.name, "My Local Module")
+        XCTAssertEqual(plan.module.sourceURL, source)
+        XCTAssertEqual(plan.module.category, "#工具")
+        XCTAssertEqual(plan.module.outputFolder, "Converted")
+        XCTAssertEqual(plan.module.outputFileName, "Converted Copy.sgmodule")
+        XCTAssertEqual(plan.module.localStorageRelativePath, "Ads/My Module.sgmodule")
+        XCTAssertTrue(plan.module.preservesOutputFileName)
+        XCTAssertEqual(plan.module.storageLocation, .local)
+        XCTAssertEqual(plan.module.detectedSourceFormat, .surge)
+        XCTAssertEqual(plan.customIconURL, "https://example.com/icon.png")
+        XCTAssertEqual(plan.module.iconURL, "https://example.com/icon.png")
+    }
+
+    func testModuleDraftPlannerRejectsDuplicateEffectiveSource() throws {
+        let existing = RelayModule(
+            name: "Existing",
+            sourceURL: "HTTPS://Example.com:443/modules/demo.sgmodule#fragment",
+            outputFileName: "Existing"
+        )
+        var draft = ModuleDraft()
+        draft.name = "Duplicate"
+        draft.sourceURL = "https://example.com/modules/demo.sgmodule"
+
+        XCTAssertThrowsError(try ModuleDraftPlanner.addPlan(
+            from: draft,
+            modules: [existing],
+            combinedModuleFileName: "Surge Relay",
+            localModuleDirectory: ""
+        )) { error in
+            XCTAssertEqual(error.localizedDescription, RelayError.duplicateSourceURL.localizedDescription)
+        }
+    }
+
+    func testModuleDraftPlannerReturnsNoChangeUpdatePlan() throws {
+        let module = RelayModule(
+            name: "Stable",
+            sourceURL: "https://example.com/stable.sgmodule",
+            sourceFormat: .surge,
+            outputFileName: "Stable",
+            category: "#工具",
+            outputFolder: "Tools",
+            publishesStandalone: true,
+            isEnabled: false,
+            customIconURL: "https://example.com/icon.png"
+        )
+        let plan = try XCTUnwrap(ModuleDraftPlanner.updatePlan(
+            id: module.id,
+            from: ModuleDraft(module: module),
+            modules: [module],
+            combinedModuleFileName: "Surge Relay",
+            localModuleDirectory: ""
+        ))
+
+        XCTAssertFalse(plan.hasChanges)
+        XCTAssertFalse(plan.sourceChanged)
+        XCTAssertFalse(plan.customIconChanged)
+        XCTAssertEqual(plan.module, module)
+    }
+
+    func testModuleDraftPlannerClearsSourceStateWhenSourceChanges() throws {
+        let module = RelayModule(
+            name: "Wrapped",
+            sourceURL: "https://example.com/old.conf",
+            sourceFormat: .quantumultX,
+            outputFileName: "Wrapped",
+            iconURL: "https://example.com/detected.png",
+            customIconURL: "https://example.com/custom.png",
+            scriptHubSubscription: ScriptHubSubscriptionInfo(
+                subscriptionURL: "http://script.hub/file/_start_/https://example.com/old.conf/_end_/Wrapped.sgmodule",
+                originalURL: "https://example.com/old.conf",
+                outputName: "Wrapped.sgmodule",
+                sourceType: "qx-rewrite",
+                target: "surge-module",
+                category: nil,
+                options: ScriptHubOptions()
+            ),
+            lastUpdatedAt: Date(timeIntervalSince1970: 1_000),
+            contentHash: "converted-hash",
+            sourceETag: "etag",
+            sourceLastModified: "date",
+            sourceContentHash: "source-hash",
+            sourceCheckedAt: Date(timeIntervalSince1970: 1_100),
+            conversionEngineRevision: "revision",
+            state: .current,
+            lastError: "old error"
+        )
+        var draft = ModuleDraft(module: module)
+        draft.sourceURL = "https://example.com/new.conf"
+        draft.iconURL = ""
+
+        let plan = try XCTUnwrap(ModuleDraftPlanner.updatePlan(
+            id: module.id,
+            from: draft,
+            modules: [module],
+            combinedModuleFileName: "Surge Relay",
+            localModuleDirectory: ""
+        ))
+
+        XCTAssertTrue(plan.hasChanges)
+        XCTAssertTrue(plan.sourceChanged)
+        XCTAssertTrue(plan.customIconChanged)
+        XCTAssertEqual(plan.module.sourceURL, "https://example.com/new.conf")
+        XCTAssertNil(plan.module.iconURL)
+        XCTAssertNil(plan.module.customIconURL)
+        XCTAssertEqual(plan.module.state, .never)
+        XCTAssertNil(plan.module.lastError)
+        XCTAssertNil(plan.module.sourceETag)
+        XCTAssertNil(plan.module.sourceLastModified)
+        XCTAssertNil(plan.module.sourceContentHash)
+        XCTAssertNil(plan.module.sourceCheckedAt)
+        XCTAssertNil(plan.module.conversionEngineRevision)
+        XCTAssertNil(plan.module.scriptHubSubscription)
+        XCTAssertEqual(plan.module.lastUpdatedAt, module.lastUpdatedAt)
+        XCTAssertEqual(plan.module.contentHash, module.contentHash)
+    }
+
     func testPublishedAddressResolverBuildsOnlyAvailableAddresses() throws {
         var settings = AppSettings()
         settings.github.owner = "someone"
