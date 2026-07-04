@@ -16,6 +16,7 @@
 - 将 Web 管理 HTTP 请求/响应模型、解析器、认证节流和安全响应头抽出到 `WebManagementHTTP.swift`，让 `WebManagementServer` 更专注于 Network 连接生命周期。
 - 将桌面端模块搜索索引抽出到 `ModuleSearchIndex` 服务文件，避免主模块视图继续承载纯搜索字段拼装逻辑。
 - 将设置页通用表单、分区、行组件和窗口 chrome 配置抽出到 `SettingsComponents.swift`，为后续继续拆分凭据与诊断页面降低耦合。
+- 将凭据和 Web 管理设置页拆出到独立视图，并复用共享设置行组件，让 `SettingsView.swift` 继续收敛为页签和通用/发布/诊断编排。
 - 将诊断报告构建和模块来源 URL 脱敏抽出到 `DiagnosticReportBuilder`，让 AppModel 只负责提供当前状态快照。
 - 将模块预览内容读取、本地 Surge 源文件缓存恢复、参数物化和元数据应用抽出到 `ModulePreviewContentProvider`，让 AppModel 继续收敛为状态协调器。
 - 将模块输出文件命名、本地存储相对路径推导、格式探测和启动时命名归一化抽出到 `ModuleNamingPlanner`，并补充本地原模块路径保护与重名规避测试。

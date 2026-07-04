@@ -95,6 +95,8 @@
 		A33A33A33A33A33A33A33A33 /* PublishFileAssembler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B33B33B33B33B33B33B33 /* PublishFileAssembler.swift */; };
 		A44A44A44A44A44A44A44A44 /* LocalModuleImportPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B44B44B44B44B44B44B44B44 /* LocalModuleImportPreviewView.swift */; };
 		A55A55A55A55A55A55A55A55 /* ModuleDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B55B55B55B55B55B55B55B55 /* ModuleDetailView.swift */; };
+		A66A66A66A66A66A66A66A66 /* SettingsCredentialsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B96B96B96B96B96B96B96B96 /* SettingsCredentialsView.swift */; };
+		A77A77A77A77A77A77A77A77 /* SettingsWebManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B97B97B97B97B97B97B97B97 /* SettingsWebManagementView.swift */; };
 		A539280CA083F785A10720E4 /* exclamationmark.triangle.svg in Resources */ = {isa = PBXBuildFile; fileRef = 36BAB6179FD0D6477CCD7527 /* exclamationmark.triangle.svg */; };
 		A8F3D6A87774ABA071E95490 /* eye.svg in Resources */ = {isa = PBXBuildFile; fileRef = 882056C6C077004DCDC917F2 /* eye.svg */; };
 		AA8F7B5F28379ACDB4DDEDB9 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDD7A6C8082510469A2FA843 /* RootView.swift */; };
@@ -215,6 +217,8 @@
 		B93B93B93B93B93B93B93B93 /* LocalModuleImportPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModuleImportPlanner.swift; sourceTree = "<group>"; };
 		B94B94B94B94B94B94B94B94 /* ModuleSearchIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleSearchIndex.swift; sourceTree = "<group>"; };
 		B95B95B95B95B95B95B95B95 /* LocalPublishedFilesPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalPublishedFilesPlanner.swift; sourceTree = "<group>"; };
+		B96B96B96B96B96B96B96B96 /* SettingsCredentialsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsCredentialsView.swift; sourceTree = "<group>"; };
+		B97B97B97B97B97B97B97B97 /* SettingsWebManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWebManagementView.swift; sourceTree = "<group>"; };
 		B7DAE6646C847419124DE9BB /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		B9CF6B25A0E233718DB970EF /* arrow.up.arrow.down.svg */ = {isa = PBXFileReference; path = arrow.up.arrow.down.svg; sourceTree = "<group>"; };
 		BB83E467F68776A168C3BBA3 /* ellipsis.svg */ = {isa = PBXFileReference; path = ellipsis.svg; sourceTree = "<group>"; };
@@ -300,6 +304,8 @@
 				BDD7A6C8082510469A2FA843 /* RootView.swift */,
 				41447934F9FEEEA0E8C36B5C /* ScriptHubAdvancedOptionsView.swift */,
 				C9C9C9C9C9C9C9C9C9C9C9C9 /* SettingsComponents.swift */,
+				B96B96B96B96B96B96B96B96 /* SettingsCredentialsView.swift */,
+				B97B97B97B97B97B97B97B97 /* SettingsWebManagementView.swift */,
 				F53C80368CE81330FB2D723A /* SettingsView.swift */,
 			);
 			path = Views;
@@ -681,6 +687,8 @@
 				089528920AE30C1DC82F1C30 /* ScriptHubAdvancedOptionsView.swift in Sources */,
 				3EE4F5BD7D273B859D69002E /* ScriptHubClient.swift in Sources */,
 				B9B9B9B9B9B9B9B9B9B9B9B9 /* SettingsComponents.swift in Sources */,
+				A66A66A66A66A66A66A66A66 /* SettingsCredentialsView.swift in Sources */,
+				A77A77A77A77A77A77A77A77 /* SettingsWebManagementView.swift in Sources */,
 				B8555D3D9FEACB351D53EBC9 /* ScriptHubOptions.swift in Sources */,
 				8DA26E8693FBA37A8D155709 /* ScriptHubUpstreamService.swift in Sources */,
 				6C8F8E71624D2151BFA675ED /* ServiceModels.swift in Sources */,
