@@ -27,6 +27,7 @@
 - 将诊断报告构建和模块来源 URL 脱敏抽出到 `DiagnosticReportBuilder`，让 AppModel 只负责提供当前状态快照。
 - 将模块预览内容读取、本地 Surge 源文件缓存恢复、参数物化和元数据应用抽出到 `ModulePreviewContentProvider`，让 AppModel 继续收敛为状态协调器。
 - 将模块输出文件命名、本地存储相对路径推导、格式探测和启动时命名归一化抽出到 `ModuleNamingPlanner`，并补充本地原模块路径保护与重名规避测试。
+- 将模块刷新资格、总模块贡献判断和启动时更新判定抽出到 `ModuleRefreshPlanner`，避免 AppModel、列表统计和启动刷新继续分散维护同一套规则。
 - 将添加/编辑模块时的草稿校验、重复来源判断、输出命名、存放路径推导和来源变化状态清理抽出到 `ModuleDraftPlanner`。
 - 将模块存放文件夹菜单合并、创建文件夹后的设置变更和 GitHub 目录刷新缓存策略抽出到 `ModuleOutputFolderCatalog`。
 - 将总模块 GitHub 地址、本地总模块文件地址和独立模块订阅地址解析抽出到 `PublishedAddressResolver`，让设置模型只保留配置数据。

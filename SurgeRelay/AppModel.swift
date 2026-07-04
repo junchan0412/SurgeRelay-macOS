@@ -215,7 +215,14 @@ final class AppModel {
             await cleanupLegacyOutputFiles()
             await refreshModuleMetadataFromCache()
             let missingEngine = !(await engineStore.hasScript(named: "Rewrite-Parser.js"))
-            if await shouldUpdateModulesOnLaunch() {
+            if await ModuleRefreshPlanner.shouldUpdateOnLaunch(
+                modules: modules,
+                combinedModuleEnabled: settings.combinedModuleEnabled,
+                refreshIntervalMinutes: settings.refreshIntervalMinutes,
+                componentExists: { [fileStore] id in
+                    await fileStore.hasComponent(id: id)
+                }
+            ) {
                 await updateAll()
             } else if UpdateCoordinator.shouldRefreshScriptHub(
                 missingEngine: missingEngine,
@@ -229,22 +236,6 @@ final class AppModel {
         }
     }
 
-    private func shouldUpdateModulesOnLaunch() async -> Bool {
-        let updateModules = modules.filter(shouldUpdateModule)
-        guard !updateModules.isEmpty else { return false }
-
-        for module in updateModules {
-            if module.lastUpdatedAt == nil { return true }
-            if !(await fileStore.hasComponent(id: module.id)) { return true }
-        }
-
-        let oldestUpdate = updateModules.compactMap(\.lastUpdatedAt).min()
-        return RefreshPolicy.isDue(
-            lastUpdatedAt: oldestUpdate,
-            intervalMinutes: settings.refreshIntervalMinutes
-        )
-    }
-
     func saveSettings() {
         settings.storageMode = settings.publishToGitHub ? .gitHub : .local
         if !settings.publishToGitHub || !settings.automaticallyPublish {
@@ -254,11 +245,17 @@ final class AppModel {
     }
 
     private func shouldContributeToCombined(_ module: RelayModule) -> Bool {
-        settings.combinedModuleEnabled && module.isEnabled
+        ModuleRefreshPlanner.contributesToCombined(
+            module,
+            combinedModuleEnabled: settings.combinedModuleEnabled
+        )
     }
 
     private func shouldUpdateModule(_ module: RelayModule) -> Bool {
-        module.hasRemoteOriginalSource || shouldContributeToCombined(module) || module.publishesStandalone
+        ModuleRefreshPlanner.isUpdateable(
+            module,
+            combinedModuleEnabled: settings.combinedModuleEnabled
+        )
     }
 
     func setCombinedModuleEnabled(_ enabled: Bool) {

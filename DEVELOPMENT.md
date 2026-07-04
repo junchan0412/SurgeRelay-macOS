@@ -73,6 +73,8 @@ Preview content reads belong in `ModulePreviewContentProvider`. Keep cache looku
 
 Module output naming belongs in `ModuleNamingPlanner`. Keep output-file uniqueness checks, combined-module filename collision avoidance, detected source-format inference, local storage relative-path derivation, and loaded-module naming normalization there. AppModel should pass the current modules and settings into the planner instead of reimplementing path rules inline.
 
+Module refresh eligibility belongs in `ModuleRefreshPlanner`. Keep "contributes to combined module", "is updateable", updateable module filtering, and launch-time refresh decisions there so AppModel, summary counts, and startup refresh behavior stay aligned.
+
 Add/edit draft planning belongs in `ModuleDraftPlanner`. Keep draft validation, duplicate effective-source checks, add-module construction, edit change detection, source revision state clearing, custom-icon planning, and local storage relative-path decisions there. `AppModel` should apply the returned add/update plan, then handle persistence, icon cache side effects, and update scheduling.
 
 Module output-folder catalogs belong in `ModuleOutputFolderCatalog`. Keep the merged folder menu, create-folder setting changes, local destination path planning, and GitHub directory refresh cache decisions there. `AppModel` should do the actual local directory creation and GitHub directory fetch, then apply the returned state.
