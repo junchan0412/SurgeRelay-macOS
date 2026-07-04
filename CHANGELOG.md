@@ -10,6 +10,7 @@
 - 自动发布在延迟执行前会复用 `PublishPlan` 判定是否存在实际可发布文件；没有独立发布模块、也没有总模块输出时，会跳过 GitHub 自动发布。
 - 将模型和协调器相关单元测试拆分到 `ModelAndCoordinatorTests.swift`，让更新失败说明、发布计划和模块元数据规则有独立测试归属。
 - 将 Web 管理 HTTP 解析、同源校验、会话 cookie、安全响应头和图标内容类型测试拆分到 `WebManagementTests.swift`，继续缩小主测试文件。
+- 将 GitHub 配置、远端目录读取、Release 资产解析、校验和与安装建议测试拆分到 `GitHubReleaseTests.swift`，并抽出共用 GitHub URLProtocol 测试支持。
 
 ## 1.3.8
 

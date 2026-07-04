@@ -79,7 +79,7 @@ The local scanner must prefer this original URL over the local generated file pa
 
 ## Build And Test
 
-`ModelAndCoordinatorTests.swift` owns pure model/coordinator coverage, including source metadata restoration, update failure formatting, summary counts, and publish-plan decisions. `WebManagementTests.swift` owns Web management request parsing, API payload, session cookie, same-origin, throttling, response hardening, and icon content-type coverage. Keep shrinking the larger `SurgeRelayTests.swift` by moving similarly cohesive tests into focused files instead of adding more unrelated cases there.
+`ModelAndCoordinatorTests.swift` owns pure model/coordinator coverage, including source metadata restoration, update failure formatting, summary counts, and publish-plan decisions. `WebManagementTests.swift` owns Web management request parsing, API payload, session cookie, same-origin, throttling, response hardening, and icon content-type coverage. `GitHubReleaseTests.swift` owns GitHub settings, remote directory discovery, release asset parsing, checksum validation, and install guidance coverage; GitHub network fakes belong in `GitHubTestSupport.swift`. Keep shrinking the larger `SurgeRelayTests.swift` by moving similarly cohesive tests into focused files instead of adding more unrelated cases there.
 
 Use the local Xcode beta explicitly:
 
