@@ -2145,69 +2145,29 @@ final class AppModel {
         LocalModuleRootDiagnosticSnapshot.current(path: settings.localModuleDirectory)
     }
 
-    private var storageModeDescription: String {
-        switch (settings.publishToLocal, settings.publishToGitHub) {
-        case (true, true): "Local + GitHub"
-        case (true, false): "Local"
-        case (false, true): "GitHub"
-        case (false, false): "None"
-        }
-    }
-
     func diagnosticsData() throws -> Data {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
-        let report = DiagnosticReport(
-            generatedAt: .now,
+        return try DiagnosticReportBuilder.data(for: DiagnosticReportBuildRequest(
             appVersion: version,
             operatingSystem: ProcessInfo.processInfo.operatingSystemVersionString,
+            settings: settings,
+            modules: modules,
+            upstreamState: upstreamState,
             installation: installationDiagnostics(),
             credentials: credentialDiagnostics(),
-            engineRevision: upstreamState.revision,
-            storageMode: storageModeDescription,
             localModuleRoot: localModuleRootDiagnostics(),
-            githubRepository: "\(settings.github.owner)/\(settings.github.repository)",
-            webServerEnabled: settings.webServerEnabled,
-            webServerState: webServerState.diagnosticValue,
-            webServerPort: settings.webServerPort,
-            webServerAllowRemoteAccess: settings.webServerAllowRemoteAccess,
-            webServerAccessMode: webManagementAccessModeTitle,
-            webManagementURL: webManagementDisplayURL?.absoluteString,
-            webAccessTokenStorageStatus: webAccessTokenStorageStatus.title,
+            webServerState: webServerState,
+            webManagementURL: webManagementDisplayURL,
+            webManagementAccessModeTitle: webManagementAccessModeTitle,
+            webAccessTokenStorageStatus: webAccessTokenStorageStatus,
             automaticPublishScheduledAt: automaticPublishScheduledAt,
             automaticPublishRunsAt: automaticPublishRunsAt,
             latestGitHubPublish: latestGitHubPublish,
-            activeWorkKind: workActivity.kind.rawValue,
-            activeWorkTitle: workActivity.isActive ? workActivity.title : nil,
-            activeWorkStatus: workActivity.isActive ? statusMessage : nil,
-            activeWorkStartedAt: workActivity.startedAt,
-            activeWorkBlocksUpdates: workActivity.blocksUpdates,
-            activeWorkCanCancel: workActivity.canCancel,
-            activeWorkCancellationRequested: workCancellationRequested,
-            modules: modules.map {
-                DiagnosticModuleSnapshot(
-                    id: $0.id,
-                    name: $0.name,
-                    sourceURL: redactedSourceURL($0.sourceURL),
-                    effectiveOriginalSourceURL: redactedSourceURL($0.effectiveOriginalSourceURL),
-                    storageLocation: $0.storageLocation.rawValue,
-                    storageLocationTitle: $0.storageLocation.title,
-                    sourceOriginTitle: $0.sourceOrigin.title,
-                    relationshipSummary: $0.relationshipSummary,
-                    localStorageRelativePath: $0.localStorageRelativePath,
-                    enabled: $0.isEnabled,
-                    state: $0.state.rawValue,
-                    lastUpdatedAt: $0.lastUpdatedAt,
-                    sourceCheckedAt: $0.sourceCheckedAt,
-                    lastError: $0.lastError,
-                    hasOverrideConflict: $0.hasOverrideConflict
-                )
-            },
+            workActivity: workActivity,
+            statusMessage: statusMessage,
+            workCancellationRequested: workCancellationRequested,
             history: updateHistory
-        )
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-        encoder.dateEncodingStrategy = .iso8601
-        return try encoder.encode(report)
+        ))
     }
 
     func clearUpdateHistory() {
@@ -2423,15 +2383,6 @@ final class AppModel {
         let suffix = report.retriedAfterConflict ? "（已处理远端更新）" : ""
         let commitText = commit.map { "原子提交 \($0.prefix(8))" } ?? "GitHub 内容已发布"
         return "\(commitText)：上传/更新 \(report.publishedFiles.count) 个，删除 \(report.deletedFiles.count) 个\(suffix)"
-    }
-
-    private func redactedSourceURL(_ value: String) -> String {
-        guard var components = URLComponents(string: value) else { return value }
-        components.user = nil
-        components.password = nil
-        components.query = nil
-        components.fragment = nil
-        return components.string ?? value
     }
 
     private func localStorageRelativePath(

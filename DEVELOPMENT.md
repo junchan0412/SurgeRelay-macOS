@@ -12,6 +12,7 @@ This document records the project conventions needed to maintain this fork.
 - Module model: `SurgeRelay/Models/RelayModule.swift`
 - Conversion path: `SurgeRelay/Services/ScriptHubClient.swift`
 - Local/GitHub publishing: `SurgeRelay/AppModel.swift`, `SurgeRelay/Services/ModuleFileStore.swift`, `SurgeRelay/Services/GitHubClient.swift`
+- Diagnostics export: `SurgeRelay/Services/DiagnosticReportBuilder.swift`
 - Module metadata parsing: `SurgeRelay/Utilities/ModuleMetadataParser.swift`
 
 ## View Boundaries
@@ -54,6 +55,8 @@ Published file assembly belongs in `PublishFileAssembler`: it owns adding the co
 Shared module counts should flow through `ModuleCollectionSummary`. Main window status, menu bar text, Web management state, and diagnostics should not independently reimplement enabled, standalone, failed, latest-update, or updateable counts unless they need the actual module objects.
 
 Update failures should surface actionable causes through `UpdateFailureFormatter`. If an original source returns 404/401/403/429, times out, fails DNS, or fails TLS validation, store that reason on the module and in update history; aggregate alerts that block combined-module replacement should include the same reason rather than only the module name.
+
+Diagnostic report assembly belongs in `DiagnosticReportBuilder`. AppModel should pass the current settings, module list, runtime state, and diagnostics snapshots into the builder; URL redaction and report DTO mapping should stay there so exported diagnostics never include source query strings, fragments, or embedded credentials.
 
 ## Existing Module Safety
 

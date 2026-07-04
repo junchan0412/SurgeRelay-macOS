@@ -22,6 +22,7 @@
 		B7B7B7B7B7B7B7B7B7B7B7B7 /* UpdateCompletionStatusPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7C7C7C7C7C7C7C7C7C7C7C7 /* UpdateCompletionStatusPlanner.swift */; };
 		B8B8B8B8B8B8B8B8B8B8B8B8 /* WebManagementHTTP.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8C8C8C8C8C8C8C8C8C8C8C8 /* WebManagementHTTP.swift */; };
 		B9B9B9B9B9B9B9B9B9B9B9B9 /* SettingsComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9C9C9C9C9C9C9C9C9C9C9C9 /* SettingsComponents.swift */; };
+		D10D10D10D10D10D10D10D10 /* DiagnosticReportBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10E10E10E10E10E10E10E10 /* DiagnosticReportBuilder.swift */; };
 		280C7E38DAD9F18ED8090287 /* ModuleEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E43B99091BF5C4100CE1DA0E /* ModuleEditorView.swift */; };
 		285A582F1C5CC5AF92DF0E7B /* doc.text.svg in Resources */ = {isa = PBXBuildFile; fileRef = 891546F1DD330D7407BFA7E0 /* doc.text.svg */; };
 		2AD845464760705F3E0982BE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3AE70978C59AAF84436C3194 /* Assets.xcassets */; };
@@ -198,6 +199,7 @@
 		C7C7C7C7C7C7C7C7C7C7C7C7 /* UpdateCompletionStatusPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateCompletionStatusPlanner.swift; sourceTree = "<group>"; };
 		C8C8C8C8C8C8C8C8C8C8C8C8 /* WebManagementHTTP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebManagementHTTP.swift; sourceTree = "<group>"; };
 		C9C9C9C9C9C9C9C9C9C9C9C9 /* SettingsComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsComponents.swift; sourceTree = "<group>"; };
+		E10E10E10E10E10E10E10E10 /* DiagnosticReportBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticReportBuilder.swift; sourceTree = "<group>"; };
 		BDD7A6C8082510469A2FA843 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		C9B8AF8AB1ACDCB66A0C8FC1 /* checkmark.svg */ = {isa = PBXFileReference; path = checkmark.svg; sourceTree = "<group>"; };
 		D0DDEE5D89E10E2659D8FC1F /* network.svg */ = {isa = PBXFileReference; path = network.svg; sourceTree = "<group>"; };
@@ -275,6 +277,7 @@
 			isa = PBXGroup;
 			children = (
 				C25C25C25C25C25C25C25C25 /* AutomaticPublishPlanner.swift */,
+				E10E10E10E10E10E10E10E10 /* DiagnosticReportBuilder.swift */,
 				AE767EF4FAD14A21E2B2FDCC /* EmbeddedScriptHubEngine.swift */,
 				354B1BF761ABD7AADD982A17 /* EngineStore.swift */,
 				6D546CD4ADCE23EA73DE271A /* GitHubClient.swift */,
@@ -589,6 +592,7 @@
 				B8B8B8B8B8B8B8B8B8B8B8B8 /* WebManagementHTTP.swift in Sources */,
 				C577752A7FA64D5E4749D52B /* DataHash.swift in Sources */,
 				A22A22A22A22A22A22A22A22 /* DetailInfoViews.swift in Sources */,
+				D10D10D10D10D10D10D10D10 /* DiagnosticReportBuilder.swift in Sources */,
 				8375967E58B7560C4A7FE4B4 /* EmbeddedScriptHubEngine.swift in Sources */,
 				FC75AF5CF098DE5C35C3572B /* EngineStore.swift in Sources */,
 				407E672ECAD57CD270BB44B7 /* FilenameSanitizer.swift in Sources */,
