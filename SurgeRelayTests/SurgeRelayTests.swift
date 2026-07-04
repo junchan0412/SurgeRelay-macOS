@@ -918,6 +918,33 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertTrue(settings.customModuleOutputFolders.isEmpty)
     }
 
+    func testSettingsMigratesFloatingScriptHubUpstreamURL() throws {
+        for revision in ["main", "master", "HEAD"] {
+            let data = Data("""
+            {
+              "scriptHubModuleURL": "https://raw.githubusercontent.com/Script-Hub-Org/Script-Hub/\(revision)/modules/script-hub.surge.sgmodule"
+            }
+            """.utf8)
+            let settings = try JSONDecoder().decode(AppSettings.self, from: data)
+
+            XCTAssertEqual(settings.scriptHubModuleURL, AppSettings.defaultScriptHubModuleURL)
+        }
+    }
+
+    func testSettingsKeepsPinnedOrCustomScriptHubUpstreamURL() throws {
+        let tagURL = "https://raw.githubusercontent.com/Script-Hub-Org/Script-Hub/v1.0.0/modules/script-hub.surge.sgmodule"
+        let customURL = "https://example.com/script-hub.surge.sgmodule"
+
+        XCTAssertEqual(
+            try JSONDecoder().decode(AppSettings.self, from: Data(#"{"scriptHubModuleURL":"\#(tagURL)"}"#.utf8)).scriptHubModuleURL,
+            tagURL
+        )
+        XCTAssertEqual(
+            try JSONDecoder().decode(AppSettings.self, from: Data(#"{"scriptHubModuleURL":"\#(customURL)"}"#.utf8)).scriptHubModuleURL,
+            customURL
+        )
+    }
+
     func testSettingsDecodesCustomModuleOutputFolders() throws {
         let data = Data(#"{"customModuleOutputFolders":["Ads","Tools/Nested"]}"#.utf8)
         let settings = try JSONDecoder().decode(AppSettings.self, from: data)

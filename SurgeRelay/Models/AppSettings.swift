@@ -149,8 +149,9 @@ struct AppSettings: Codable, Equatable, Sendable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         outputDirectory = try container.decodeIfPresent(String.self, forKey: .outputDirectory) ?? Self.defaultOutputDirectory
-        scriptHubModuleURL = try container.decodeIfPresent(String.self, forKey: .scriptHubModuleURL)
-            ?? Self.defaultScriptHubModuleURL
+        scriptHubModuleURL = Self.normalizedScriptHubModuleURL(
+            try container.decodeIfPresent(String.self, forKey: .scriptHubModuleURL)
+        )
         combinedModuleEnabled = try container.decodeIfPresent(Bool.self, forKey: .combinedModuleEnabled) ?? false
         combinedModuleFileName = try container.decodeIfPresent(String.self, forKey: .combinedModuleFileName) ?? "Surge-Relay.sgmodule"
         scriptHubBaseURL = try container.decodeIfPresent(String.self, forKey: .scriptHubBaseURL) ?? "http://script.hub"
@@ -190,6 +191,31 @@ struct AppSettings: Codable, Equatable, Sendable {
     }
 
     static let defaultScriptHubModuleURL = "https://raw.githubusercontent.com/Script-Hub-Org/Script-Hub/6b4fb62240629d2fc66b08bc271f8c1f83a5dcd1/modules/script-hub.surge.sgmodule"
+
+    static func normalizedScriptHubModuleURL(_ value: String?) -> String {
+        guard let value else { return defaultScriptHubModuleURL }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return defaultScriptHubModuleURL }
+        guard let url = URL(string: trimmed),
+              url.scheme?.lowercased() == "https",
+              url.host?.lowercased() == "raw.githubusercontent.com" else {
+            return trimmed
+        }
+        let components = url.path.split(separator: "/").map(String.init)
+        guard components.count >= 4 else { return trimmed }
+        let owner = components[0].lowercased()
+        let repository = components[1].lowercased()
+        let revision = components[2].lowercased()
+        let modulePath = components.dropFirst(3).joined(separator: "/")
+        let floatingRevisions = ["main", "master", "head"]
+        guard owner == "script-hub-org",
+              repository == "script-hub",
+              modulePath == "modules/script-hub.surge.sgmodule",
+              floatingRevisions.contains(revision) else {
+            return trimmed
+        }
+        return defaultScriptHubModuleURL
+    }
 
     func publishedURL(for fileName: String) -> URL? {
         guard storageMode == .gitHub else { return nil }
