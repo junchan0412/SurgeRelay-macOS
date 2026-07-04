@@ -85,6 +85,8 @@ final class AppModel {
                 .appending(path: "SurgeRelayUIQA/Modules", directoryHint: .isDirectory)
             try? FileManager.default.createDirectory(at: uiQAModuleDirectory, withIntermediateDirectories: true)
             loadedSettings.storageMode = .local
+            loadedSettings.publishToLocal = true
+            loadedSettings.publishToGitHub = false
             loadedSettings.localModuleDirectory = uiQAModuleDirectory.path
         }
         if loadedSettings.github.owner.isEmpty { loadedSettings.github.owner = "EEliberto" }
@@ -332,7 +334,8 @@ final class AppModel {
     }
 
     func saveSettings() {
-        if settings.storageMode != .gitHub || !settings.automaticallyPublish {
+        settings.storageMode = settings.publishToGitHub ? .gitHub : .local
+        if !settings.publishToGitHub || !settings.automaticallyPublish {
             cancelAutomaticPublishSchedule()
         }
         PersistenceStore.saveSettings(settings)
@@ -510,8 +513,12 @@ final class AppModel {
     }
 
     func setStorageMode(_ mode: StorageMode) {
-        guard settings.storageMode != mode else { return }
+        let nextLocal = mode == .local
+        let nextGitHub = mode == .gitHub
+        guard settings.publishToLocal != nextLocal || settings.publishToGitHub != nextGitHub else { return }
         settings.storageMode = mode
+        settings.publishToLocal = nextLocal
+        settings.publishToGitHub = nextGitHub
         saveSettings()
         if mode == .local {
             Task { await rebuildCombinedFromCache() }
@@ -523,7 +530,34 @@ final class AppModel {
     func setLocalModuleDirectory(_ path: String) {
         settings.localModuleDirectory = path
         saveSettings()
-        if settings.storageMode == .local { Task { await rebuildCombinedFromCache() } }
+        if settings.publishToLocal { Task { await rebuildCombinedFromCache() } }
+    }
+
+    func setPublishToLocal(_ enabled: Bool) {
+        guard settings.publishToLocal != enabled else { return }
+        if !enabled && !settings.publishToGitHub {
+            statusMessage = "至少需要保留一个发布目标"
+            return
+        }
+        settings.publishToLocal = enabled
+        saveSettings()
+        statusMessage = enabled ? "已开启本地发布" : "已关闭本地发布"
+        Task { await rebuildCombinedFromCache() }
+    }
+
+    func setPublishToGitHub(_ enabled: Bool) {
+        guard settings.publishToGitHub != enabled else { return }
+        if !enabled && !settings.publishToLocal {
+            statusMessage = "至少需要保留一个发布目标"
+            return
+        }
+        settings.publishToGitHub = enabled
+        saveSettings()
+        statusMessage = enabled ? "已开启 GitHub 发布" : "已关闭 GitHub 发布"
+        if enabled {
+            Task { await refreshModuleOutputFolders(force: true) }
+            scheduleAutomaticPublish()
+        }
     }
 
     func scanExistingLocalModules() async throws -> LocalModuleScanReport {
@@ -613,12 +647,14 @@ final class AppModel {
             var module = RelayModule(
                 name: name,
                 sourceURL: candidate.sourceURL,
-                sourceFormat: .surge,
+                sourceFormat: candidate.sourceFormat,
                 outputFileName: outputFileName,
                 category: candidate.category,
                 outputFolder: outputFolder,
                 isEnabled: false,
-                detectedSourceFormat: .surge,
+                scriptHubOptions: candidate.scriptHubOptions,
+                scriptHubSubscription: candidate.scriptHubSubscription,
+                detectedSourceFormat: candidate.sourceFormat == .automatic ? nil : candidate.sourceFormat,
                 sourceContentHash: candidate.sourceContentHash,
                 sourceCheckedAt: .now
             )
@@ -627,6 +663,9 @@ final class AppModel {
                     module: module,
                     github: settings.github.isConfigured ? settings.github : nil
                 )
+                if let subscription = ModuleMetadataParser.scriptHubSubscription(in: result.content) {
+                    module.scriptHubSubscription = subscription
+                }
                 try await fileStore.writeComponent(result.content, id: module.id)
                 let fingerprint = await processingWorker.contentFingerprint(
                     of: result.content,
@@ -669,9 +708,13 @@ final class AppModel {
     }
 
     func moduleOutputFolderOptions(preserving selected: String? = nil) -> [String] {
-        let configuredFolders = settings.storageMode == .local
-            ? localModuleOutputFolders()
-            : githubModuleOutputFolders
+        var configuredFolders: [String] = []
+        if settings.publishToLocal {
+            configuredFolders.append(contentsOf: localModuleOutputFolders())
+        }
+        if settings.publishToGitHub {
+            configuredFolders.append(contentsOf: githubModuleOutputFolders)
+        }
         return ModuleOutputFolder.options(
             from: configuredFolders + settings.customModuleOutputFolders + modules.map(\.outputFolder),
             preserving: selected
@@ -685,7 +728,7 @@ final class AppModel {
             throw RelayError.invalidOutput("请输入文件夹名称。")
         }
 
-        if settings.storageMode == .local {
+        if settings.publishToLocal {
             let rootPath = settings.localModuleDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !rootPath.isEmpty else {
                 throw RelayError.invalidOutput("请先设置本地模块根目录。")
@@ -707,14 +750,14 @@ final class AppModel {
             githubModuleOutputFolders = ModuleOutputFolder.options(from: githubModuleOutputFolders + [folder])
         }
         saveSettings()
-        statusMessage = settings.storageMode == .local
-            ? "已创建文件夹 \(folder)"
+        statusMessage = settings.publishToLocal
+            ? "已创建/记录文件夹 \(folder)"
             : "已添加 GitHub 文件夹 \(folder)，发布模块时会自动创建路径"
         return folder
     }
 
     func refreshModuleOutputFolders(force: Bool = false) async {
-        guard settings.storageMode == .gitHub, settings.github.isConfigured else {
+        guard settings.publishToGitHub, settings.github.isConfigured else {
             githubModuleOutputFolders = [ModuleOutputFolder.root]
             githubModuleOutputFoldersLastRefreshedAt = nil
             githubModuleOutputFoldersConfiguration = nil
@@ -857,6 +900,7 @@ final class AppModel {
             modules[index].sourceContentHash = nil
             modules[index].sourceCheckedAt = nil
             modules[index].conversionEngineRevision = nil
+            modules[index].scriptHubSubscription = nil
         }
         if sourceChanged || customIconChanged {
             if let customIconURL, let url = URL(string: customIconURL) {
@@ -1076,6 +1120,9 @@ final class AppModel {
                     in: effectiveContent,
                     relativeTo: module.sourceURL
                 )
+                if let subscription = ModuleMetadataParser.scriptHubSubscription(in: effectiveContent) {
+                    module.scriptHubSubscription = subscription
+                }
                 let preferredIcon = module.customIconURL.flatMap(URL.init(string:)) ?? detectedIcon
                 module.iconURL = preferredIcon?.absoluteString
                 module.detectedSourceFormat = detectedFormat(for: module.sourceFormat, source: module.sourceURL)
@@ -1168,7 +1215,7 @@ final class AppModel {
             guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
             await cleanupLegacyOutputFiles()
             guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
-            if settings.storageMode == .gitHub, settings.automaticallyPublish, settings.github.isConfigured,
+            if settings.publishToGitHub, settings.automaticallyPublish, settings.github.isConfigured,
                !ensureGitHubTokenLoaded(showStatusMessage: false).isEmpty {
                 if contentChanged {
                     scheduleAutomaticPublish()
@@ -1225,7 +1272,7 @@ final class AppModel {
     }
 
     private func scheduleAutomaticPublish() {
-        guard settings.storageMode == .gitHub, settings.automaticallyPublish, settings.github.isConfigured else { return }
+        guard settings.publishToGitHub, settings.automaticallyPublish, settings.github.isConfigured else { return }
         guard !ensureGitHubTokenLoaded(showStatusMessage: false).isEmpty else { return }
         automaticPublishTask?.cancel()
         let scheduledAt = Date.now
@@ -1238,7 +1285,7 @@ final class AppModel {
                 try? await Task.sleep(for: .milliseconds(250))
             }
             guard !Task.isCancelled,
-                  self.settings.storageMode == .gitHub,
+                  self.settings.publishToGitHub,
                   self.settings.automaticallyPublish,
                   self.settings.github.isConfigured else {
                 self.clearAutomaticPublishSchedule()
@@ -1368,8 +1415,8 @@ final class AppModel {
 
     func previewPublish() async {
         guard !isWorking else { return }
-        guard settings.storageMode == .gitHub else {
-            statusMessage = "本地模式会在合并时自动生成清理预览"
+        guard settings.publishToGitHub else {
+            statusMessage = "GitHub 发布未开启；本地发布会在合并时自动生成清理预览"
             return
         }
         cancelAutomaticPublishSchedule()
@@ -1445,7 +1492,7 @@ final class AppModel {
         }
         let data = settings.combinedModuleEnabled ? try await fileStore.readCombined() : nil
         try checkCurrentWorkCancellation()
-        let files = try await currentPublishedFiles(combinedData: data, includeAssets: true)
+        let files = try await currentPublishedFiles(combinedData: data, includeAssets: true, destination: .gitHub)
         try checkCurrentWorkCancellation()
         let currentPaths = files.map(\.name)
         let repositoryKey = githubPublishRepositoryKey(settings.github)
@@ -1481,7 +1528,7 @@ final class AppModel {
         }
         let data = settings.combinedModuleEnabled ? try await fileStore.readCombined() : nil
         try checkCurrentWorkCancellation()
-        let files = try await currentPublishedFiles(combinedData: data, includeAssets: true)
+        let files = try await currentPublishedFiles(combinedData: data, includeAssets: true, destination: .gitHub)
         try checkCurrentWorkCancellation()
         let currentPaths = files.map(\.name)
         let repositoryKey = githubPublishRepositoryKey(settings.github)
@@ -1546,6 +1593,39 @@ final class AppModel {
                 module.overrideBaseHash = Data(converted.utf8).sha256String
                 changed = true
             }
+            if let subscription = ModuleMetadataParser.scriptHubSubscription(in: content) {
+                let sourceWasFile = URL(string: module.sourceURL)?.isFileURL == true
+                if module.scriptHubSubscription != subscription {
+                    module.scriptHubSubscription = subscription
+                    changed = true
+                }
+                if sourceWasFile || module.sourceURL.hasPrefix("http://script.hub/") || module.sourceURL.hasPrefix("https://script.hub/") {
+                    module.sourceURL = subscription.originalURL
+                    module.sourceETag = nil
+                    module.sourceLastModified = nil
+                    module.sourceContentHash = nil
+                    module.sourceCheckedAt = nil
+                    module.conversionEngineRevision = nil
+                    changed = true
+                }
+                if let sourceFormat = subscription.sourceFormat,
+                   sourceWasFile || module.sourceFormat == .automatic || module.sourceFormat == .surge {
+                    if module.sourceFormat != sourceFormat {
+                        module.sourceFormat = sourceFormat
+                        changed = true
+                    }
+                }
+                if sourceWasFile || module.scriptHubOptions == ScriptHubOptions() {
+                    if module.scriptHubOptions != subscription.options {
+                        module.scriptHubOptions = subscription.options
+                        changed = true
+                    }
+                }
+                if module.category.isEmpty, let category = subscription.category, !category.isEmpty {
+                    module.category = category
+                    changed = true
+                }
+            }
             let detectedIcon = await processingWorker.iconURL(in: content, relativeTo: module.sourceURL)
             let preferredIcon = module.customIconURL.flatMap(URL.init(string:)) ?? detectedIcon
             let value = preferredIcon?.absoluteString
@@ -1569,7 +1649,11 @@ final class AppModel {
         if changed { try? persistModules() }
     }
 
-    private func currentPublishedFiles(combinedData: Data?, includeAssets: Bool) async throws -> [PublishFile] {
+    private func currentPublishedFiles(
+        combinedData: Data?,
+        includeAssets: Bool,
+        destination: PublishDestination
+    ) async throws -> [PublishFile] {
         var files: [PublishFile] = []
         if settings.combinedModuleEnabled, let combinedData {
             files.append(PublishFile(
@@ -1582,7 +1666,7 @@ final class AppModel {
             try Task.checkCancellation()
             if Self.shouldSkipStandaloneLocalExport(
                 module,
-                storageMode: settings.storageMode,
+                isLocalExport: destination == .local,
                 localModuleDirectory: settings.localModuleDirectory
             ) {
                 continue
@@ -1618,8 +1702,12 @@ final class AppModel {
     }
 
     private func publishCurrentFiles(combinedData: Data?, includeAssets: Bool) async throws {
-        if settings.storageMode == .local {
-            let files = try await currentPublishedFiles(combinedData: combinedData, includeAssets: includeAssets)
+        if settings.publishToLocal {
+            let files = try await currentPublishedFiles(
+                combinedData: combinedData,
+                includeAssets: includeAssets,
+                destination: .local
+            )
             let currentPaths = files.map(\.name)
             let knownManagedPaths = settings.localPublishedRootDirectory == settings.localModuleDirectory
                 ? settings.localPublishedFilePaths
@@ -1929,6 +2017,15 @@ final class AppModel {
         LocalModuleRootDiagnosticSnapshot.current(path: settings.localModuleDirectory)
     }
 
+    private var storageModeDescription: String {
+        switch (settings.publishToLocal, settings.publishToGitHub) {
+        case (true, true): "Local + GitHub"
+        case (true, false): "Local"
+        case (false, true): "GitHub"
+        case (false, false): "None"
+        }
+    }
+
     func diagnosticsData() throws -> Data {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
         let report = DiagnosticReport(
@@ -1938,7 +2035,7 @@ final class AppModel {
             installation: installationDiagnostics(),
             credentials: credentialDiagnostics(),
             engineRevision: upstreamState.revision,
-            storageMode: settings.storageMode == .gitHub ? "GitHub" : "Local",
+            storageMode: storageModeDescription,
             localModuleRoot: localModuleRootDiagnostics(),
             githubRepository: "\(settings.github.owner)/\(settings.github.repository)",
             webServerEnabled: settings.webServerEnabled,
@@ -2251,10 +2348,10 @@ final class AppModel {
 
     nonisolated static func shouldSkipStandaloneLocalExport(
         _ module: RelayModule,
-        storageMode: StorageMode,
+        isLocalExport: Bool,
         localModuleDirectory: String
     ) -> Bool {
-        guard storageMode == .local,
+        guard isLocalExport,
               let sourceRelativePath = localSourceRelativePath(
                 for: module.sourceURL,
                 rootDirectoryPath: localModuleDirectory
@@ -2320,11 +2417,14 @@ enum LocalModuleFolderScanner {
 struct LocalModuleScanCandidate: Identifiable, Hashable, Sendable {
     var relativePath: String
     var sourceURL: String
+    var sourceFormat: ModuleSourceFormat
     var name: String
     var outputFileName: String
     var category: String
     var outputFolder: String
-    var sourceContentHash: String
+    var scriptHubOptions: ScriptHubOptions
+    var scriptHubSubscription: ScriptHubSubscriptionInfo?
+    var sourceContentHash: String?
 
     var id: String { relativePath }
 }
@@ -2430,16 +2530,6 @@ enum LocalModuleScanner {
                 continue
             }
 
-            let sourceURL = standardizedURL.absoluteString
-            let sourceKey = ModuleSourceIdentity.canonicalValue(for: sourceURL)
-            guard existingSources.insert(sourceKey).inserted else {
-                skipped.append(LocalModuleScanSkippedFile(
-                    relativePath: normalizedRelativePath,
-                    reason: "来源文件已纳入管理"
-                ))
-                continue
-            }
-
             let data: Data
             do {
                 data = try Data(contentsOf: standardizedURL)
@@ -2471,19 +2561,34 @@ enum LocalModuleScanner {
                 ))
                 continue
             }
+            let subscription = ModuleMetadataParser.scriptHubSubscription(in: content)
+            let sourceURL = subscription?.originalURL ?? standardizedURL.absoluteString
+            let sourceKey = ModuleSourceIdentity.canonicalValue(for: sourceURL)
+            guard existingSources.insert(sourceKey).inserted else {
+                skipped.append(LocalModuleScanSkippedFile(
+                    relativePath: normalizedRelativePath,
+                    reason: "来源文件已纳入管理"
+                ))
+                continue
+            }
             let components = normalizedRelativePath.split(separator: "/").map(String.init)
             let outputFileName = components.last ?? standardizedURL.lastPathComponent
             let outputFolder = components.dropLast().joined(separator: "/")
             let fallbackName = FilenameSanitizer.baseName(from: outputFileName)
                 .replacingOccurrences(of: "-", with: " ")
+            let sourceFormat = subscription?.sourceFormat ?? .surge
+            let sourceContentHash = subscription == nil ? data.sha256String : nil
             values.append(LocalModuleScanCandidate(
                 relativePath: normalizedRelativePath,
                 sourceURL: sourceURL,
+                sourceFormat: sourceFormat,
                 name: ModuleMetadataParser.displayName(in: content) ?? fallbackName,
                 outputFileName: FilenameSanitizer.existingSgmoduleName(from: outputFileName),
-                category: ModuleMetadataParser.category(in: content) ?? "",
+                category: ModuleMetadataParser.category(in: content) ?? subscription?.category ?? "",
                 outputFolder: ModuleOutputFolder.normalized(outputFolder),
-                sourceContentHash: data.sha256String
+                scriptHubOptions: subscription?.options ?? ScriptHubOptions(),
+                scriptHubSubscription: subscription,
+                sourceContentHash: sourceContentHash
             ))
         }
 

@@ -166,6 +166,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     var argumentOverrides: [String: String]
     var iconURL: String?
     var customIconURL: String?
+    var scriptHubSubscription: ScriptHubSubscriptionInfo?
     var detectedSourceFormat: ModuleSourceFormat?
     var createdAt: Date
     var lastUpdatedAt: Date?
@@ -194,6 +195,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         argumentOverrides: [String: String] = [:],
         iconURL: String? = nil,
         customIconURL: String? = nil,
+        scriptHubSubscription: ScriptHubSubscriptionInfo? = nil,
         detectedSourceFormat: ModuleSourceFormat? = nil,
         createdAt: Date = .now,
         lastUpdatedAt: Date? = nil,
@@ -221,6 +223,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         self.argumentOverrides = argumentOverrides
         self.iconURL = iconURL
         self.customIconURL = customIconURL
+        self.scriptHubSubscription = scriptHubSubscription
         self.detectedSourceFormat = detectedSourceFormat
         self.createdAt = createdAt
         self.lastUpdatedAt = lastUpdatedAt
@@ -237,7 +240,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, sourceURL, sourceFormat, outputFileName, category, outputFolder, publishesStandalone, isEnabled, scriptHubOptions, argumentOverrides, iconURL, customIconURL, detectedSourceFormat
+        case id, name, sourceURL, sourceFormat, outputFileName, category, outputFolder, publishesStandalone, isEnabled, scriptHubOptions, argumentOverrides, iconURL, customIconURL, scriptHubSubscription, detectedSourceFormat
         case createdAt, lastUpdatedAt, contentHash, sourceETag, sourceLastModified, sourceContentHash, sourceCheckedAt
         case conversionEngineRevision, overrideBaseHash, hasOverrideConflict, state, lastError
     }
@@ -264,6 +267,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         customIconURL = try container.decodeIfPresent(String.self, forKey: .customIconURL)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         if customIconURL?.isEmpty == true { customIconURL = nil }
+        scriptHubSubscription = try container.decodeIfPresent(ScriptHubSubscriptionInfo.self, forKey: .scriptHubSubscription)
         detectedSourceFormat = try container.decodeIfPresent(ModuleSourceFormat.self, forKey: .detectedSourceFormat)
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? .now
         lastUpdatedAt = try container.decodeIfPresent(Date.self, forKey: .lastUpdatedAt)

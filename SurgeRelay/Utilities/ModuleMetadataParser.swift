@@ -1,6 +1,41 @@
 import Foundation
 
+struct ScriptHubSubscriptionInfo: Codable, Hashable, Sendable {
+    var subscriptionURL: String
+    var originalURL: String
+    var outputName: String?
+    var sourceType: String?
+    var target: String?
+    var category: String?
+    var options: ScriptHubOptions
+
+    var sourceFormat: ModuleSourceFormat? {
+        switch sourceType?.lowercased() {
+        case "qx-rewrite": .quantumultX
+        case "loon-plugin": .loon
+        case "surge-module": .surge
+        default: nil
+        }
+    }
+
+    var displaySummary: String {
+        let type = sourceFormat?.shortTitle ?? sourceType ?? "未知格式"
+        let targetText = target.map { " -> \($0)" } ?? ""
+        return "Script-Hub \(type)\(targetText)"
+    }
+}
+
 enum ModuleMetadataParser {
+    static func scriptHubSubscription(in content: String) -> ScriptHubSubscriptionInfo? {
+        let pattern = #"(?im)^\s*#\s*SUBSCRIBED\s+(.+?)\s*$"#
+        guard let expression = try? NSRegularExpression(pattern: pattern) else { return nil }
+        let range = NSRange(content.startIndex..., in: content)
+        guard let match = expression.firstMatch(in: content, range: range),
+              let urlRange = Range(match.range(at: 1), in: content) else { return nil }
+        let value = String(content[urlRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+        return parseScriptHubSubscriptionURL(value)
+    }
+
     static func iconURL(in content: String, relativeTo source: String? = nil) -> URL? {
         let pattern = #"(?im)^\s*#!icon\s*=\s*(.+?)\s*$"#
         guard let expression = try? NSRegularExpression(pattern: pattern),
@@ -107,6 +142,75 @@ enum ModuleMetadataParser {
         }
         return expression.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) != nil
     }
+
+    private static func parseScriptHubSubscriptionURL(_ value: String) -> ScriptHubSubscriptionInfo? {
+        let startMarker = "/_start_/"
+        let endMarker = "/_end_/"
+        guard let start = value.range(of: startMarker),
+              let end = value.range(of: endMarker, range: start.upperBound..<value.endIndex) else {
+            return nil
+        }
+
+        let originalPart = String(value[start.upperBound..<end.lowerBound])
+        let tail = String(value[end.upperBound...])
+        let pieces = tail.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
+        let outputName = pieces.first.map(String.init)
+            .map { $0.removingPercentEncoding ?? $0 }?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let query = pieces.count > 1 ? String(pieces[1]) : ""
+        let queryItems = decodedQueryItems(from: query)
+        guard let originalURL = normalizedOriginalURL(originalPart) else { return nil }
+        let sourceType = queryItems["type"]?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return ScriptHubSubscriptionInfo(
+            subscriptionURL: value,
+            originalURL: originalURL,
+            outputName: outputName?.isEmpty == false ? outputName : nil,
+            sourceType: sourceType?.isEmpty == false ? sourceType : nil,
+            target: queryItems["target"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+            category: queryItems["category"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+            options: ScriptHubOptions(query: queryItems)
+        )
+    }
+
+    private static func decodedQueryItems(from query: String) -> [String: String] {
+        guard !query.isEmpty else { return [:] }
+        var components = URLComponents()
+        components.percentEncodedQuery = query
+        if let items = components.queryItems {
+            var values: [String: String] = [:]
+            for item in items {
+                guard let value = item.value else { continue }
+                values[item.name] = value
+            }
+            return values
+        }
+
+        var values: [String: String] = [:]
+        for pair in query.split(separator: "&") {
+            let pieces = pair.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+            guard pieces.count == 2 else { continue }
+            let name = String(pieces[0]).removingPercentEncoding ?? String(pieces[0])
+            let value = String(pieces[1]).removingPercentEncoding ?? String(pieces[1])
+            values[name] = value
+        }
+        return values
+    }
+
+    private static func normalizedOriginalURL(_ value: String) -> String? {
+        let decoded = (value.removingPercentEncoding ?? value)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !decoded.isEmpty else { return nil }
+        if let url = URL(string: decoded),
+           ["http", "https"].contains(url.scheme?.lowercased()) {
+            return url.absoluteString
+        }
+        let encoded = decoded.addingPercentEncoding(withAllowedCharacters: .urlFragmentAllowed) ?? decoded
+        if let url = URL(string: encoded),
+           ["http", "https"].contains(url.scheme?.lowercased()) {
+            return url.absoluteString
+        }
+        return decoded
+    }
 }
 
 struct ModuleArgumentDefinition: Identifiable, Hashable, Sendable {
@@ -145,7 +249,6 @@ enum ModuleArgumentProcessor {
         for line in resolved.components(separatedBy: "\n") {
             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
             if isArgumentMetadata(trimmed) { continue }
-            if isCommentOnly(trimmed) { continue }
             if trimmed.isEmpty {
                 guard !previousWasEmpty, !output.isEmpty else { continue }
                 previousWasEmpty = true
@@ -206,8 +309,4 @@ enum ModuleArgumentProcessor {
         return expression.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) != nil
     }
 
-    private static func isCommentOnly(_ line: String) -> Bool {
-        guard !line.isEmpty, !line.hasPrefix("#!") else { return false }
-        return line.hasPrefix("#") || line.hasPrefix("//") || line.hasPrefix(";")
-    }
 }

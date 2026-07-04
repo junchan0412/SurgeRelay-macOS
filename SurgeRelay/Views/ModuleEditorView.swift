@@ -105,7 +105,7 @@ struct ModuleEditorView: View {
             Button("创建") { createFolder() }
             Button("取消", role: .cancel) {}
         } message: {
-            Text(model.settings.storageMode == .local
+            Text(model.settings.publishToLocal
                 ? "将在本地模块根目录下创建文件夹。"
                 : "GitHub 不支持空文件夹；该路径会先保存为选项，发布模块时自动创建。")
         }

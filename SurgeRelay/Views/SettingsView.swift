@@ -191,6 +191,11 @@ struct SettingsView: View {
                 if model.settings.combinedModuleEnabled {
                     settingsTextFieldRow("总模块文件名", icon: "doc", text: combinedFileNameBinding, prompt: "Surge-Relay")
                 }
+                SettingsControlRow("软件更新", icon: "arrow.down.circle") {
+                    Button("检查更新", systemImage: "arrow.clockwise") {
+                        model.presentsUpdateChecker = true
+                    }
+                }
             }
 
             settingsSection("自动化") {
@@ -289,17 +294,16 @@ struct SettingsView: View {
     private var publishingSettings: some View {
         settingsForm {
             settingsSection("存储位置") {
-                SettingsControlRow("模块发布到", icon: "shippingbox") {
-                    Picker("模块发布到", selection: storageModeBinding) {
-                        Text("本地").tag(StorageMode.local)
-                        Text("GitHub").tag(StorageMode.gitHub)
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .frame(maxWidth: 220)
-                }
+                settingsToggleRow("发布到本地", icon: "folder", isOn: Binding(
+                    get: { model.settings.publishToLocal },
+                    set: { model.setPublishToLocal($0) }
+                ))
+                settingsToggleRow("发布到 GitHub", icon: "cloud", isOn: Binding(
+                    get: { model.settings.publishToGitHub },
+                    set: { model.setPublishToGitHub($0) }
+                ))
 
-                if model.settings.storageMode == .local {
+                if model.settings.publishToLocal {
                     SettingsControlRow("本地根目录", icon: "folder") {
                         pathSelectionControl(
                             path: model.settings.localModuleDirectory,
@@ -323,11 +327,11 @@ struct SettingsView: View {
                     }
                 }
 
-                if model.settings.storageMode == .gitHub {
+                if model.settings.publishToGitHub {
                     settingsTextFieldRow("所有者", icon: "person", text: githubBinding(\.owner), prompt: "GitHub 用户或组织")
                     settingsTextFieldRow("仓库", icon: "tray.full", text: githubBinding(\.repository), prompt: "Repository")
                     settingsTextFieldRow("分支", icon: "arrow.triangle.branch", text: githubBinding(\.branch), prompt: "main")
-                    settingsTextFieldRow("模块根目录", icon: "folder", text: githubBinding(\.directory), prompt: "modules")
+                    settingsTextFieldRow("模块根目录", icon: "folder", text: githubBinding(\.directory), prompt: "modules 或 surge/modules")
                     SettingsInfoRow("仓库类型", icon: repositoryTypeIcon) {
                         switch model.settings.github.repositoryIsPrivate {
                         case .some(true): Label("私有", systemImage: "lock.fill")
@@ -338,7 +342,7 @@ struct SettingsView: View {
                 }
             }
 
-            if model.settings.storageMode == .gitHub, model.settings.github.repositoryIsPrivate == true {
+            if model.settings.publishToGitHub, model.settings.github.repositoryIsPrivate == true {
                 settingsSection("Cloudflare Worker") {
                     settingsTextFieldRow("公共地址", icon: "network", text: githubBinding(\.publicBaseURL), prompt: "https://example.workers.dev")
                 }
@@ -894,13 +898,6 @@ struct SettingsView: View {
                 connectionResult = .success(model.statusMessage)
             }
         }
-    }
-
-    private var storageModeBinding: Binding<StorageMode> {
-        Binding(
-            get: { model.settings.storageMode },
-            set: { model.setStorageMode($0) }
-        )
     }
 
     private var webServerStateColor: Color {

@@ -17,6 +17,15 @@ enum ModuleSearchIndex {
         ]
         if let iconURL = module.iconURL { parts.append(iconURL) }
         if let customIconURL = module.customIconURL { parts.append(customIconURL) }
+        if let subscription = module.scriptHubSubscription {
+            parts.append(subscription.subscriptionURL)
+            parts.append(subscription.originalURL)
+            parts.append(subscription.displaySummary)
+            if let outputName = subscription.outputName { parts.append(outputName) }
+            if let sourceType = subscription.sourceType { parts.append(sourceType) }
+            if let target = subscription.target { parts.append(target) }
+            if let category = subscription.category { parts.append(category) }
+        }
         parts.append(contentsOf: module.argumentOverrides.flatMap { [$0.key, $0.value] })
         if let data = try? JSONEncoder().encode(module.scriptHubOptions),
            let text = String(data: data, encoding: .utf8) {
@@ -50,6 +59,13 @@ struct ModulesView: View {
         case module(RelayModule)
     }
 
+    private struct SidebarModuleSection: Identifiable {
+        let id: String
+        let title: String
+        let systemImage: String
+        let modules: [RelayModule]
+    }
+
     private var selectionKind: SelectionKind? {
         if model.settings.combinedModuleEnabled,
            model.selectedModuleID == AppModel.combinedModuleSelectionID {
@@ -66,6 +82,51 @@ struct ModulesView: View {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !query.isEmpty else { return model.modules }
         return model.modules.filter { searchableText(for: $0).contains(query) }
+    }
+
+    private var sidebarSections: [SidebarModuleSection] {
+        let values = filteredModules
+        return [
+            SidebarModuleSection(
+                id: "attention",
+                title: "需要处理",
+                systemImage: "exclamationmark.triangle",
+                modules: values.filter { $0.state == .failed || $0.hasOverrideConflict }
+            ),
+            SidebarModuleSection(
+                id: "remote",
+                title: "可更新",
+                systemImage: "arrow.triangle.2.circlepath",
+                modules: values.filter { module in
+                    module.state != .failed && !module.hasOverrideConflict && hasRemoteSource(module)
+                }
+            ),
+            SidebarModuleSection(
+                id: "local",
+                title: "本地来源",
+                systemImage: "folder",
+                modules: values.filter { module in
+                    module.state != .failed && !module.hasOverrideConflict && hasLocalSource(module)
+                }
+            ),
+            SidebarModuleSection(
+                id: "missing",
+                title: "缺少有效来源",
+                systemImage: "link.badge.plus",
+                modules: values.filter { module in
+                    module.state != .failed && !module.hasOverrideConflict && !hasRemoteSource(module) && !hasLocalSource(module)
+                }
+            )
+        ].filter { !$0.modules.isEmpty }
+    }
+
+    private func hasRemoteSource(_ module: RelayModule) -> Bool {
+        guard let url = URL(string: module.sourceURL) else { return false }
+        return ["http", "https"].contains(url.scheme?.lowercased())
+    }
+
+    private func hasLocalSource(_ module: RelayModule) -> Bool {
+        URL(string: module.sourceURL)?.isFileURL == true
     }
 
     private func searchableText(for module: RelayModule) -> String {
@@ -237,19 +298,15 @@ struct ModulesView: View {
                     }
                 }
 
-                Section {
-                if searchText.isEmpty {
-                    ForEach(model.modules) { module in
-                        moduleRow(module)
+                ForEach(sidebarSections) { section in
+                    Section {
+                        ForEach(section.modules) { module in
+                            moduleRow(module)
+                        }
+                    } header: {
+                        Label("\(section.title) \(section.modules.count)", systemImage: section.systemImage)
+                            .font(.caption.weight(.medium))
                     }
-                    .onMove { offsets, destination in
-                        model.moveModules(fromOffsets: offsets, toOffset: destination)
-                    }
-                } else {
-                    ForEach(filteredModules) { module in
-                        moduleRow(module)
-                    }
-                }
                 }
             }
             .overlay {
@@ -282,6 +339,13 @@ struct ModulesView: View {
                         }
                         .disabled(!model.updateAdmission.isAccepted)
                         .help(model.updateAdmission.isAccepted ? "更新全部模块" : model.updateAdmission.message)
+                        Button {
+                            Task { await model.publishAll() }
+                        } label: {
+                            Label("发布全部", systemImage: "square.and.arrow.up")
+                        }
+                        .disabled(model.isWorking || !model.settings.publishToGitHub || !model.settings.github.isConfigured)
+                        .help(model.settings.publishToGitHub ? "发布当前所有输出到 GitHub" : "未开启 GitHub 发布")
                         Button {
                             scanLocalModulesForPreview()
                         } label: {
@@ -672,7 +736,12 @@ private struct CombinedModuleDetailView: View {
     @ViewBuilder
     private var summaryPills: some View {
         metadataPill("\(includedModules.count) 个来源", systemImage: "shippingbox")
-        metadataPill(model.settings.storageMode == .local ? "本地发布" : "GitHub 发布", systemImage: model.settings.storageMode == .local ? "folder" : "cloud")
+        if model.settings.publishToLocal {
+            metadataPill("本地发布", systemImage: "folder")
+        }
+        if model.settings.publishToGitHub {
+            metadataPill("GitHub 发布", systemImage: "cloud")
+        }
         if !failedModules.isEmpty {
             metadataPill("\(failedModules.count) 个失败", systemImage: "exclamationmark.triangle", isWarning: true)
         }
@@ -693,26 +762,29 @@ private struct CombinedModuleDetailView: View {
     }
 
     private var outputSection: some View {
-        detailSection(model.settings.storageMode == .local ? "总模块文件" : "总模块订阅") {
-            if model.settings.storageMode == .local {
+        detailSection("总模块输出") {
+            if model.settings.publishToLocal {
                 if let localURL = model.combinedLocalFileURL {
                     detailRow("文件位置", value: localURL.path, icon: "doc", monospaced: true, copyValue: localURL.path)
                 } else {
                     Label("等待本地模块根目录配置。", systemImage: "info.circle")
                         .foregroundStyle(.secondary)
                 }
-            } else if let rawURL = model.combinedRawURL {
-                detailRow("订阅地址", value: rawURL.absoluteString, icon: "link", monospaced: true, copyValue: rawURL.absoluteString)
-            } else {
-                Label("完成发布配置后，这里会显示稳定订阅地址。", systemImage: "info.circle")
-                    .foregroundStyle(.secondary)
+            }
+            if model.settings.publishToGitHub {
+                if let rawURL = model.combinedRawURL {
+                    detailRow("GitHub 订阅", value: rawURL.absoluteString, icon: "link", monospaced: true, copyValue: rawURL.absoluteString)
+                } else {
+                    Label("完成 GitHub 发布配置后，这里会显示稳定订阅地址。", systemImage: "info.circle")
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }
 
     @ViewBuilder
     private var latestPublishSection: some View {
-        if model.settings.storageMode == .gitHub, let publish = model.latestGitHubPublish {
+        if model.settings.publishToGitHub, let publish = model.latestGitHubPublish {
             detailSection("最近 GitHub 发布") {
                 detailRow("提交", value: publish.commitDisplay, icon: "arrow.triangle.branch")
                 detailRow("时间", value: publish.date.formatted(date: .long, time: .standard), icon: "clock")
@@ -735,9 +807,9 @@ private struct CombinedModuleDetailView: View {
     @ViewBuilder
     private var publishPreviewSection: some View {
         let preview = relevantPublishPreview
-        if model.settings.storageMode == .gitHub || preview != nil {
-            detailSection(model.settings.storageMode == .gitHub ? "GitHub 发布" : "本地清理") {
-                if model.settings.storageMode == .gitHub {
+        if model.settings.publishToGitHub || preview != nil {
+            detailSection("发布与清理") {
+                if model.settings.publishToGitHub {
                     Button("预览发布…", systemImage: "square.and.arrow.up") {
                         Task { await model.previewPublish() }
                     }
@@ -758,7 +830,7 @@ private struct CombinedModuleDetailView: View {
                         }
                         .disabled(model.isWorking)
                     }
-                } else if model.settings.storageMode == .gitHub {
+                } else if model.settings.publishToGitHub {
                     Label("发布前可预览新增、更新和删除的文件；包含删除项时会要求确认。", systemImage: "info.circle")
                         .foregroundStyle(.secondary)
                 }
@@ -768,12 +840,9 @@ private struct CombinedModuleDetailView: View {
 
     private var relevantPublishPreview: PublishPreview? {
         guard let preview = model.pendingPublishPreview else { return nil }
-        switch (model.settings.storageMode, preview.destination) {
-        case (.gitHub, .gitHub), (.local, .local):
-            return preview
-        default:
-            return nil
-        }
+        if preview.destination == .gitHub { return model.settings.publishToGitHub ? preview : nil }
+        if preview.destination == .local { return model.settings.publishToLocal ? preview : nil }
+        return nil
     }
 
     private func metadataPill(_ title: String, systemImage: String, isWarning: Bool = false) -> some View {
@@ -1311,6 +1380,12 @@ private struct ModuleDetailView: View {
         detailSection("来源与输出") {
             detailRow("原始地址", value: sourceAddressDisplay, icon: "link", monospaced: true, copyValue: sourceAddressCopyValue)
             detailRow("来源格式", value: module.sourceFormatDisplayTitle, icon: "doc.text")
+            if let subscription = module.scriptHubSubscription {
+                detailRow("来源记录", value: subscription.displaySummary, icon: "point.3.connected.trianglepath.dotted")
+                if let outputName = subscription.outputName {
+                    detailRow("原输出名", value: outputName, icon: "doc.text", monospaced: true)
+                }
+            }
             detailRow("模块标签", value: module.category.isEmpty ? "未设置" : module.category, icon: "tag")
             detailRow("存放文件夹", value: ModuleOutputFolder.displayTitle(for: module.outputFolder), icon: "folder")
             detailRow(
@@ -1359,11 +1434,11 @@ private struct ModuleDetailView: View {
             if model.settings.combinedModuleEnabled {
                 detailRow("总模块", value: module.isEnabled ? "包含" : "不包含", icon: "square.stack.3d.up")
                 detailRow(
-                    model.settings.storageMode == .local ? "汇总文件" : "汇总订阅",
+                    "汇总输出",
                     value: combinedOutputLocation,
                     icon: "square.stack.3d.up",
                     monospaced: true,
-                    copyValue: combinedOutputLocation == "等待 GitHub 发布配置" ? nil : combinedOutputLocation
+                    copyValue: combinedOutputCopyValue
                 )
             }
         }
@@ -1417,7 +1492,7 @@ private struct ModuleDetailView: View {
 
     @ViewBuilder
     private var publishingSection: some View {
-        if model.settings.storageMode == .gitHub {
+        if model.settings.publishToGitHub {
             detailSection(model.settings.github.repositoryIsPrivate == true ? "Cloudflare" : "GitHub") {
                 if !module.publishesStandalone {
                     Label("该模块未开启独立发布。", systemImage: "pause.circle")
@@ -1429,7 +1504,8 @@ private struct ModuleDetailView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-        } else if module.publishesStandalone {
+        }
+        if model.settings.publishToLocal, module.publishesStandalone {
             detailSection("本地文件") {
                 detailRow("文件位置", value: localPublishedPath, icon: "doc", monospaced: true, copyValue: localPublishedPath)
             }
@@ -1460,8 +1536,18 @@ private struct ModuleDetailView: View {
     }
 
     private var combinedOutputLocation: String {
-        if let localURL = model.combinedLocalFileURL { return localURL.path }
-        return model.combinedRawURL?.absoluteString ?? "等待 GitHub 发布配置"
+        var values: [String] = []
+        if let localURL = model.combinedLocalFileURL {
+            values.append(localURL.path)
+        }
+        if let rawURL = model.combinedRawURL {
+            values.append(rawURL.absoluteString)
+        }
+        return values.isEmpty ? "等待发布配置" : values.joined(separator: "\n")
+    }
+
+    private var combinedOutputCopyValue: String? {
+        combinedOutputLocation == "等待发布配置" ? nil : combinedOutputLocation
     }
 
     private var localPublishedPath: String {
@@ -1519,6 +1605,9 @@ private struct ModuleDetailView: View {
         ]
         if !module.category.isEmpty {
             pills.append(ModuleDetailMetadataPill(title: module.category, systemImage: "tag"))
+        }
+        if module.scriptHubSubscription != nil {
+            pills.append(ModuleDetailMetadataPill(title: "Script-Hub", systemImage: "link"))
         }
         let folder = ModuleOutputFolder.normalized(module.outputFolder)
         if folder != ModuleOutputFolder.root {

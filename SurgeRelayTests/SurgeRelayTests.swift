@@ -39,6 +39,51 @@ final class SurgeRelayTests: XCTestCase {
         ))
     }
 
+    func testScriptHubSubscriptionMetadataRestoresOriginalSource() throws {
+        let content = """
+        #!name=Converted
+        #!category=#工具
+
+        # 🔗 模块链接
+        #SUBSCRIBED http://script.hub/file/_start_/https://raw.githubusercontent.com/example/repo/main/Loon/demo.plugin/_end_/Demo.sgmodule?type=loon-plugin&target=surge-module&category=%23%E5%B7%A5%E5%85%B7&del=false&jqEnabled=true
+
+        [Script]
+        Demo = type=http-request, pattern=^https://example.com, script-path=https://example.com/demo.js
+        """
+
+        let info = try XCTUnwrap(ModuleMetadataParser.scriptHubSubscription(in: content))
+
+        XCTAssertEqual(info.originalURL, "https://raw.githubusercontent.com/example/repo/main/Loon/demo.plugin")
+        XCTAssertEqual(info.outputName, "Demo.sgmodule")
+        XCTAssertEqual(info.sourceType, "loon-plugin")
+        XCTAssertEqual(info.sourceFormat, .loon)
+        XCTAssertEqual(info.target, "surge-module")
+        XCTAssertEqual(info.category, "#工具")
+        XCTAssertFalse(info.options.removeCommentedRewrites)
+        XCTAssertTrue(info.options.enableJQ)
+    }
+
+    func testModuleArgumentMaterializePreservesSemanticComments() {
+        let content = """
+        #!arguments=Notify:开启通知
+        #SUBSCRIBED http://script.hub/file/_start_/https://example.com/demo.plugin/_end_/Demo.sgmodule?type=loon-plugin&target=surge-module
+        # 普通说明应该保留
+
+        [General]
+        force-http-engine-hosts = %APPEND% script.hub
+
+        [Script]
+        Demo = type=http-request, argument={{{Notify}}}
+        """
+
+        let output = ModuleArgumentProcessor.materialize(content, overrides: ["Notify": "关闭通知"])
+
+        XCTAssertFalse(output.contains("#!arguments="))
+        XCTAssertTrue(output.contains("#SUBSCRIBED http://script.hub/file/_start_/https://example.com/demo.plugin/_end_/Demo.sgmodule"))
+        XCTAssertTrue(output.contains("# 普通说明应该保留"))
+        XCTAssertTrue(output.contains("argument=关闭通知"))
+    }
+
     func testLocalFileSourceIsAcceptedForSurgeModules() {
         var draft = ModuleDraft()
         draft.name = "Local"
@@ -202,12 +247,12 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertTrue(module.publishesStandalone)
         XCTAssertTrue(AppModel.shouldSkipStandaloneLocalExport(
             module,
-            storageMode: .local,
+            isLocalExport: true,
             localModuleDirectory: root.path
         ))
         XCTAssertFalse(AppModel.shouldSkipStandaloneLocalExport(
             module,
-            storageMode: .gitHub,
+            isLocalExport: false,
             localModuleDirectory: root.path
         ))
 
@@ -221,9 +266,40 @@ final class SurgeRelayTests: XCTestCase {
         )
         XCTAssertFalse(AppModel.shouldSkipStandaloneLocalExport(
             copiedModule,
-            storageMode: .local,
+            isLocalExport: true,
             localModuleDirectory: root.path
         ))
+    }
+
+    func testLocalModuleScannerRestoresScriptHubOriginalSource() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: root.appending(path: "Converted", directoryHint: .isDirectory), withIntermediateDirectories: true)
+        let file = root.appending(path: "Converted/Demo.sgmodule")
+        try Data("""
+        #!name=Demo
+        #!category=#工具
+        #SUBSCRIBED http://script.hub/file/_start_/https://raw.githubusercontent.com/example/repo/main/QuantumultX/demo.conf/_end_/Demo.sgmodule?type=qx-rewrite&target=surge-module&del=false
+
+        [URL Rewrite]
+        ^https://example.com reject
+        """.utf8).write(to: file)
+
+        let report = try LocalModuleScanner.report(
+            in: root.path,
+            combinedFileName: "Surge Relay",
+            existingModules: [],
+            publishedFilePaths: []
+        )
+        let candidate = try XCTUnwrap(report.candidates.first)
+
+        XCTAssertEqual(candidate.sourceURL, "https://raw.githubusercontent.com/example/repo/main/QuantumultX/demo.conf")
+        XCTAssertEqual(candidate.sourceFormat, .quantumultX)
+        XCTAssertEqual(candidate.category, "#工具")
+        XCTAssertEqual(candidate.outputFolder, "Converted")
+        XCTAssertNil(candidate.sourceContentHash)
+        XCTAssertEqual(candidate.scriptHubSubscription?.sourceType, "qx-rewrite")
+        XCTAssertFalse(candidate.scriptHubOptions.removeCommentedRewrites)
     }
 
     func testModuleOutputFolderBuildsRelativePaths() {
@@ -1115,15 +1191,19 @@ final class SurgeRelayTests: XCTestCase {
         settings.localModuleDirectory = "/tmp/Surge Relay"
         settings.github.repositoryIsPrivate = false
 
-        settings.storageMode = .local
+        settings.publishToLocal = true
+        settings.publishToGitHub = false
         XCTAssertNil(settings.publishedURL(for: "My-Relay.sgmodule"))
         XCTAssertEqual(
             try XCTUnwrap(settings.localCombinedModuleURL).path,
             "/tmp/Surge Relay/My-Relay.sgmodule"
         )
 
-        settings.storageMode = .gitHub
-        XCTAssertNil(settings.localCombinedModuleURL)
+        settings.publishToGitHub = true
+        XCTAssertEqual(
+            try XCTUnwrap(settings.localCombinedModuleURL).path,
+            "/tmp/Surge Relay/My-Relay.sgmodule"
+        )
         XCTAssertEqual(
             try XCTUnwrap(settings.publishedURL(for: "My-Relay.sgmodule")).host,
             "raw.githubusercontent.com"

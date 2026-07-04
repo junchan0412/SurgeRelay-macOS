@@ -134,6 +134,8 @@ struct AppSettings: Codable, Equatable, Sendable {
     var github = GitHubSettings()
     var githubToken = ""
     var storageMode: StorageMode = .gitHub
+    var publishToLocal = false
+    var publishToGitHub = true
     var localModuleDirectory: String = AppSettings.defaultLocalModuleRootDirectory
     var localPublishedRootDirectory: String?
     var localPublishedFilePaths: [String] = []
@@ -163,6 +165,12 @@ struct AppSettings: Codable, Equatable, Sendable {
         github = try container.decodeIfPresent(GitHubSettings.self, forKey: .github) ?? GitHubSettings()
         githubToken = try container.decodeIfPresent(String.self, forKey: .githubToken) ?? ""
         storageMode = try container.decodeIfPresent(StorageMode.self, forKey: .storageMode) ?? .gitHub
+        publishToLocal = try container.decodeIfPresent(Bool.self, forKey: .publishToLocal) ?? (storageMode == .local)
+        publishToGitHub = try container.decodeIfPresent(Bool.self, forKey: .publishToGitHub) ?? (storageMode == .gitHub)
+        if !publishToLocal && !publishToGitHub {
+            publishToGitHub = true
+            storageMode = .gitHub
+        }
         localModuleDirectory = try container.decodeIfPresent(String.self, forKey: .localModuleDirectory) ?? Self.defaultLocalModuleRootDirectory
         localPublishedRootDirectory = try container.decodeIfPresent(String.self, forKey: .localPublishedRootDirectory)
         localPublishedFilePaths = try container.decodeIfPresent([String].self, forKey: .localPublishedFilePaths) ?? []
@@ -218,12 +226,12 @@ struct AppSettings: Codable, Equatable, Sendable {
     }
 
     func publishedURL(for fileName: String) -> URL? {
-        guard storageMode == .gitHub else { return nil }
+        guard publishToGitHub else { return nil }
         return github.publicURL(for: fileName)
     }
 
     var localCombinedModuleURL: URL? {
-        guard combinedModuleEnabled, storageMode == .local else { return nil }
+        guard combinedModuleEnabled, publishToLocal else { return nil }
         let directory = localModuleDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !directory.isEmpty else { return nil }
         return URL(filePath: directory, directoryHint: .isDirectory)
