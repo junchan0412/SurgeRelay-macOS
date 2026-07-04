@@ -569,6 +569,66 @@ final class ModelAndCoordinatorTests: XCTestCase {
         XCTAssertTrue(emptyPlan.assetModuleIDs.isEmpty)
     }
 
+    func testAutomaticPublishPlannerBuildsSkipMessages() {
+        XCTAssertEqual(
+            AutomaticPublishPlanner.noStandaloneModulesStatus,
+            "没有开启独立发布的模块，已跳过 GitHub 自动发布"
+        )
+        XCTAssertEqual(
+            AutomaticPublishPlanner.noStandaloneFilesStatus,
+            "没有可自动发布的独立模块文件，已跳过 GitHub 自动发布"
+        )
+        XCTAssertEqual(
+            AutomaticPublishPlanner.skippedAfterModuleUpdateStatus(contentChanged: true, failures: 2),
+            "模块输出已更新；2 个来源沿用上次成功版本；没有开启独立发布的模块，已跳过 GitHub 自动发布"
+        )
+        XCTAssertEqual(
+            AutomaticPublishPlanner.skippedAfterModuleUpdateStatus(contentChanged: false, failures: 0),
+            "模块内容未变化；没有开启独立发布的模块，无需 GitHub 自动发布"
+        )
+    }
+
+    func testAutomaticPublishPlannerChecksStandaloneCachedOutput() async {
+        let standaloneID = UUID()
+        let standalone = RelayModule(
+            id: standaloneID,
+            name: "Standalone",
+            sourceURL: "https://example.com/standalone.sgmodule",
+            outputFileName: "Standalone",
+            publishesStandalone: true
+        )
+        let combinedOnlyID = UUID()
+        let plan = PublishPlan(
+            standaloneModules: [standalone],
+            combinedModuleIDs: [combinedOnlyID]
+        )
+
+        let hasStandaloneOutput = await AutomaticPublishPlanner.hasCachedStandaloneOutput(
+            plan: plan
+        ) { id in
+            id == standaloneID
+        }
+        XCTAssertTrue(hasStandaloneOutput)
+
+        let onlyCombinedPlan = PublishPlan(
+            standaloneModules: [],
+            combinedModuleIDs: [combinedOnlyID]
+        )
+        let combinedOutputDoesNotCount = await AutomaticPublishPlanner.hasCachedStandaloneOutput(
+            plan: onlyCombinedPlan
+        ) { _ in
+            true
+        }
+        XCTAssertFalse(combinedOutputDoesNotCount)
+
+        let missingStandaloneOutput = await AutomaticPublishPlanner.hasCachedStandaloneOutput(
+            plan: plan
+        ) { _ in
+            false
+        }
+        XCTAssertFalse(missingStandaloneOutput)
+    }
+
     func testPublishFileAssemblerBuildsCombinedStandaloneAndAssets() async throws {
         let standaloneID = UUID()
         let combinedID = UUID()
