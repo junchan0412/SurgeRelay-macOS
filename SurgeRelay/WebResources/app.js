@@ -5,6 +5,8 @@ const ui = {
   summarySubtitle: document.querySelector('#summary-subtitle'),
   detail: document.querySelector('#detail-content'),
   search: document.querySelector('#search-input'),
+  filterRow: document.querySelector('#filter-row'),
+  failureFilter: document.querySelector('#failure-filter'),
   add: document.querySelector('#add-button'),
   refresh: document.querySelector('#refresh-button'),
   back: document.querySelector('#mobile-back'),
@@ -117,6 +119,7 @@ let state = null;
 let selectedID = null;
 let detailTab = 'info';
 let editingID = null;
+let showFailuresOnly = false;
 let previewText = '';
 let previewSavedText = '';
 let toastTimer = null;
@@ -135,6 +138,10 @@ initializeHistoryState();
 ui.advancedOptions.innerHTML = `<p class="advanced-intro">这些选项由 App 内置的 Script‑Hub 引擎执行，并随当前模块保存。留空即采用上游默认行为。</p>${advancedGroups.map(advancedGroupMarkup).join('')}`;
 
 ui.search.addEventListener('input', renderSidebar);
+ui.failureFilter.addEventListener('click', () => {
+  showFailuresOnly = !showFailuresOnly;
+  renderSidebar();
+});
 ui.add.addEventListener('click', () => openEditor());
 ui.refresh.addEventListener('click', updateAll);
 ui.cancelActivity.addEventListener('click', cancelCurrentWork);
@@ -407,11 +414,22 @@ function patchSidebarLive() {
 function renderSidebar() {
   if (!state) return;
   const query = ui.search.value.trim();
-  const modules = state.modules.filter(module => webLogic.moduleMatchesSearch(module, query));
+  const failedCount = state.modules.filter(module => module.state === 'failed').length;
+  if (failedCount === 0) showFailuresOnly = false;
+  ui.filterRow.hidden = failedCount === 0;
+  ui.failureFilter.hidden = failedCount === 0;
+  ui.failureFilter.setAttribute('aria-pressed', showFailuresOnly ? 'true' : 'false');
+  const failureFilterLabel = ui.failureFilter.querySelector('span:last-child');
+  if (failureFilterLabel) failureFilterLabel.textContent = `失败 ${failedCount}`;
+  const modules = state.modules.filter(module =>
+    (!showFailuresOnly || module.state === 'failed') &&
+    webLogic.moduleMatchesSearch(module, query)
+  );
   ui.summaryRow.hidden = !state.combined.isEnabled;
   if (state.combined.isEnabled) ui.summarySubtitle.textContent = `${state.combined.enabledCount} 个来源 · 总模块订阅`;
   ui.summaryRow.classList.toggle('selected', state.combined.isEnabled && selectedID === 'combined');
-  ui.list.innerHTML = modules.length ? modules.map(moduleRow).join('') : `<div class="empty-state"><div><span class="symbol" data-symbol="magnifyingglass"></span><div>${query ? '没有搜索结果' : '还没有模块'}</div></div></div>`;
+  const emptyText = query ? '没有搜索结果' : (showFailuresOnly ? '没有更新失败的模块' : '还没有模块');
+  ui.list.innerHTML = modules.length ? modules.map(moduleRow).join('') : `<div class="empty-state"><div><span class="symbol" data-symbol="magnifyingglass"></span><div>${emptyText}</div></div></div>`;
 }
 
 function moduleRow(module) {

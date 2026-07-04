@@ -12,9 +12,9 @@
   <link rel="manifest" href="/manifest.webmanifest?v=1">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Surge Relay">
-  <link rel="stylesheet" href="/app.css?v=27">
+  <link rel="stylesheet" href="/app.css?v=28">
   <script src="/web-logic.js?v=1" defer></script>
-  <script src="/app.js?v=30" defer></script>
+  <script src="/app.js?v=31" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -29,6 +29,9 @@
           </div>
         </div>
         <label class="search-field"><span class="symbol" data-symbol="magnifyingglass"></span><input id="search-input" type="search" placeholder="搜索" autocomplete="off"></label>
+        <div class="filter-row" id="filter-row" hidden>
+          <button class="filter-chip" id="failure-filter" type="button" hidden aria-pressed="false"><span class="symbol" data-symbol="exclamationmark.triangle"></span><span>失败</span></button>
+        </div>
       </div>
 
       <nav class="module-navigation">

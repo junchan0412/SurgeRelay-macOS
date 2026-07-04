@@ -9,7 +9,7 @@ const appSource = readFileSync(new URL('SurgeRelay/WebResources/app.js', root), 
 
 const requiredIDs = [
   'module-list', 'summary-row', 'summary-subtitle', 'detail-content', 'search-input',
-  'add-button', 'refresh-button', 'mobile-back', 'mobile-title', 'activity-status',
+  'filter-row', 'failure-filter', 'add-button', 'refresh-button', 'mobile-back', 'mobile-title', 'activity-status',
   'activity-percent', 'progress-track', 'progress-fill', 'activity-cancel', 'latest-update',
   'module-dialog', 'module-dialog-message', 'module-form', 'icon-url-preview',
   'output-path-preview', 'output-path-note', 'dialog-title', 'save-module-button',
@@ -268,7 +268,7 @@ function fakeState() {
       name: 'Surge Relay',
       fileName: 'Surge Relay',
       enabledCount: 0,
-      sourceCount: 1,
+      sourceCount: 2,
       lastUpdatedAt: null,
       subscriptionURL: null
     },
@@ -287,41 +287,78 @@ function fakeState() {
       latestGitHubPublish: null
     },
     moduleOutputFolders: ['', 'Ads/Video'],
-    modules: [{
-      id: 'module-1',
-      name: 'Block HTTPDNS',
-      sourceURL: 'https://raw.githubusercontent.com/example/repo/main/block.conf',
-      effectiveOriginalSourceURL: 'https://raw.githubusercontent.com/example/repo/main/block.conf',
-      sourceFormat: 'quantumultX',
-      sourceFormatTitle: 'Quantumult X 重写',
-      sourceOriginTitle: '远程 Quantumult X',
-      sourceOriginIcon: 'link',
-      storageLocation: 'gitHub',
-      storageLocationTitle: 'GitHub 模块',
-      storageLocationIcon: 'cloud',
-      relationshipSummary: 'GitHub 模块 · 远程 Quantumult X',
-      localStorageRelativePath: null,
-      outputFileName: 'Block-HTTPDNS.sgmodule',
-      publishedRelativePath: 'Ads/Video/Block-HTTPDNS.sgmodule',
-      category: '#2 警条模块',
-      outputFolder: 'Ads/Video',
-      iconURL: '',
-      customIconURL: '',
-      isEnabled: false,
-      publishesStandalone: true,
-      state: 'failed',
-      stateTitle: '更新失败',
-      lastError: '原始链接返回 404：https://raw.githubusercontent.com/example/repo/main/block.conf',
-      lastUpdatedAt: null,
-      sourceCheckedAt: null,
-      contentHash: null,
-      sourceContentHash: null,
-      sourceETag: null,
-      sourceLastModified: null,
-      conversionEngineRevision: null,
-      advancedSummary: '',
-      scriptHubOptions: {}
-    }]
+    modules: [
+      {
+        id: 'module-1',
+        name: 'Block HTTPDNS',
+        sourceURL: 'https://raw.githubusercontent.com/example/repo/main/block.conf',
+        effectiveOriginalSourceURL: 'https://raw.githubusercontent.com/example/repo/main/block.conf',
+        sourceFormat: 'quantumultX',
+        sourceFormatTitle: 'Quantumult X 重写',
+        sourceOriginTitle: '远程 Quantumult X',
+        sourceOriginIcon: 'link',
+        storageLocation: 'gitHub',
+        storageLocationTitle: 'GitHub 模块',
+        storageLocationIcon: 'cloud',
+        relationshipSummary: 'GitHub 模块 · 远程 Quantumult X',
+        localStorageRelativePath: null,
+        outputFileName: 'Block-HTTPDNS.sgmodule',
+        publishedRelativePath: 'Ads/Video/Block-HTTPDNS.sgmodule',
+        category: '#2 警条模块',
+        outputFolder: 'Ads/Video',
+        iconURL: '',
+        customIconURL: '',
+        isEnabled: false,
+        publishesStandalone: true,
+        state: 'failed',
+        stateTitle: '更新失败',
+        lastError: '原始链接返回 404：https://raw.githubusercontent.com/example/repo/main/block.conf',
+        lastUpdatedAt: null,
+        sourceCheckedAt: null,
+        contentHash: null,
+        sourceContentHash: null,
+        sourceETag: null,
+        sourceLastModified: null,
+        conversionEngineRevision: null,
+        advancedSummary: '',
+        scriptHubOptions: {}
+      },
+      {
+        id: 'module-2',
+        name: 'Clean Module',
+        sourceURL: 'https://example.com/clean.sgmodule',
+        effectiveOriginalSourceURL: 'https://example.com/clean.sgmodule',
+        sourceFormat: 'surge',
+        sourceFormatTitle: 'Surge 模块',
+        sourceOriginTitle: '远程 Surge 模块',
+        sourceOriginIcon: 'link',
+        storageLocation: 'gitHub',
+        storageLocationTitle: 'GitHub 模块',
+        storageLocationIcon: 'cloud',
+        relationshipSummary: 'GitHub 模块 · 远程 Surge 模块',
+        localStorageRelativePath: null,
+        outputFileName: 'Clean-Module.sgmodule',
+        publishedRelativePath: 'Clean-Module.sgmodule',
+        category: '',
+        outputFolder: '',
+        iconURL: '',
+        customIconURL: '',
+        isEnabled: false,
+        publishesStandalone: true,
+        state: 'current',
+        stateTitle: '已是最新',
+        lastError: '',
+        lastUpdatedAt: null,
+        sourceCheckedAt: null,
+        contentHash: null,
+        sourceContentHash: null,
+        sourceETag: null,
+        sourceLastModified: null,
+        conversionEngineRevision: null,
+        advancedSummary: '',
+        scriptHubOptions: {}
+      }
+    ]
   };
 }
 
@@ -397,8 +434,18 @@ await flushAsync();
 const list = document.querySelector('#module-list');
 const detail = document.querySelector('#detail-content');
 const refresh = document.querySelector('#refresh-button');
+const filterRow = document.querySelector('#filter-row');
+const failureFilter = document.querySelector('#failure-filter');
 assert.match(list.innerHTML, /Block HTTPDNS/, 'app.js should render module rows from /api/state');
+assert.match(list.innerHTML, /Clean Module/, 'app.js should render non-failed module rows before filtering');
 assert.match(list.innerHTML, /更新失败：原始链接返回 404/, 'sidebar should show failure summary');
+assert.equal(filterRow.hidden, false, 'failure filter row should appear when failed modules exist');
+assert.equal(failureFilter.hidden, false, 'failure filter should appear when failed modules exist');
+assert.equal(failureFilter.getAttribute('aria-pressed'), 'false', 'failure filter should start inactive');
+failureFilter.dispatch('click');
+assert.equal(failureFilter.getAttribute('aria-pressed'), 'true', 'failure filter should toggle on');
+assert.match(list.innerHTML, /Block HTTPDNS/, 'failure filter should keep failed modules visible');
+assert.doesNotMatch(list.innerHTML, /Clean Module/, 'failure filter should hide non-failed modules');
 assert.match(detail.innerHTML, /管理关系/, 'module detail should render management relationship section');
 assert.ok(
   detail.innerHTML.indexOf('最近一次更新失败') >= 0 &&
