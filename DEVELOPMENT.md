@@ -60,6 +60,8 @@ Diagnostic report assembly belongs in `DiagnosticReportBuilder`. AppModel should
 
 Preview content reads belong in `ModulePreviewContentProvider`. Keep cache lookup, local Surge source fallback, argument materialization, and metadata application there; AppModel should only coordinate edit/save/restore state around those reads.
 
+Module output naming belongs in `ModuleNamingPlanner`. Keep output-file uniqueness checks, combined-module filename collision avoidance, detected source-format inference, local storage relative-path derivation, and loaded-module naming normalization there. AppModel should pass the current modules and settings into the planner instead of reimplementing path rules inline.
+
 ## Existing Module Safety
 
 Do not overwrite or delete user-owned modules unless the file is known to be managed by Surge Relay.
@@ -104,7 +106,7 @@ node script/test_web_dom_resources.mjs
 ```
 
 ```bash
-DEVELOPER_DIR="/Volumes/TR 5000/Applications/Xcode.app/Contents/Developer" \
+DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
 xcodebuild test \
   -project "Surge Relay.xcodeproj" \
   -scheme "Surge Relay" \
@@ -144,7 +146,7 @@ REQUIRE_SPARKLE_SIGNATURES=1 \
 REQUIRE_STABLE_CODESIGN=1 \
 VERIFY_APPCAST=1 \
 UPDATE_APPCAST=1 \
-DEVELOPER_DIR="/Volumes/TR 5000/Applications/Xcode.app/Contents/Developer" \
+DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
 ./script/build_release_assets.sh
 ```
 

@@ -185,7 +185,9 @@ grep -Fq "MARKETING_VERSION = $PROJECT_VERSION;" "$ROOT_DIR/Surge Relay.xcodepro
 grep -Fq "CURRENT_PROJECT_VERSION = $PROJECT_BUILD;" "$ROOT_DIR/Surge Relay.xcodeproj/project.pbxproj" \
   || fail "Xcode project CURRENT_PROJECT_VERSION is not synced with project.yml ($PROJECT_BUILD)"
 
-if [[ -d "/Volumes/TR 5000/Applications/Xcode.app/Contents/Developer" ]]; then
+if [[ -d "/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" ]]; then
+  export DEVELOPER_DIR="${DEVELOPER_DIR:-/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer}"
+elif [[ -d "/Volumes/TR 5000/Applications/Xcode.app/Contents/Developer" ]]; then
   export DEVELOPER_DIR="${DEVELOPER_DIR:-/Volumes/TR 5000/Applications/Xcode.app/Contents/Developer}"
 fi
 

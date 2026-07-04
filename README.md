@@ -123,7 +123,7 @@ Surge Relay 只在需要时访问钥匙串：
 本项目是 Xcode macOS App。推荐使用命令行构建，当前维护环境使用：
 
 ```bash
-DEVELOPER_DIR="/Volumes/TR 5000/Applications/Xcode.app/Contents/Developer" \
+DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
 xcodebuild build \
   -project "Surge Relay.xcodeproj" \
   -scheme "Surge Relay" \
@@ -140,7 +140,7 @@ node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs
 ./script/check_release_configuration.sh
 
-DEVELOPER_DIR="/Volumes/TR 5000/Applications/Xcode.app/Contents/Developer" \
+DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
 xcodebuild build-for-testing \
   -project "Surge Relay.xcodeproj" \
   -scheme "Surge Relay" \
@@ -164,7 +164,7 @@ REQUIRE_SPARKLE_SIGNATURES=1 \
 REQUIRE_STABLE_CODESIGN=1 \
 VERIFY_APPCAST=1 \
 UPDATE_APPCAST=1 \
-DEVELOPER_DIR="/Volumes/TR 5000/Applications/Xcode.app/Contents/Developer" \
+DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
 ./script/build_release_assets.sh
 ```
 

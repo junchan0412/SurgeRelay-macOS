@@ -5,7 +5,7 @@
 本报告基于当前工作区源码、脚本、文档与构建命令输出。当前工程是 Xcode macOS App，主 scheme 为 `Surge Relay`，目标平台 macOS 26.0。调研开始时版本元数据为 `1.3.7 (56)`，本轮优化发布目标为 `1.3.8 (57)`。维护环境需要显式使用：
 
 ```bash
-DEVELOPER_DIR="/Volumes/TR 5000/Applications/Xcode.app/Contents/Developer"
+DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer"
 ```
 
 不设置该变量时，系统会使用 `/Library/Developer/CommandLineTools`，`xcodebuild` 会直接失败。即使设置正确，当前 macOS/Xcode beta 组合会输出 CoreSimulator 版本警告，但 macOS 构建和测试可继续执行。

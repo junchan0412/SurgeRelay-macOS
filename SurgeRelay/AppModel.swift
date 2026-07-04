@@ -96,7 +96,7 @@ final class AppModel {
         loadedSettings.customModuleOutputFolders = ModuleOutputFolder.options(
             from: loadedSettings.customModuleOutputFolders
         ).filter { !$0.isEmpty }
-        let loadedModules = Self.normalizedModuleNaming(
+        let loadedModules = ModuleNamingPlanner.normalizedModuleNaming(
             PersistenceStore.loadModules(),
             combinedFileName: loadedSettings.combinedModuleFileName,
             localModuleDirectory: loadedSettings.localModuleDirectory
@@ -639,7 +639,7 @@ final class AppModel {
                 continue
             }
             let outputFolder = ModuleOutputFolder.normalized(candidate.outputFolder)
-            let outputFileName = uniqueOutputFileName(
+            let outputFileName = ModuleNamingPlanner.uniqueOutputFileName(
                 preferredFileName: candidate.outputFileName,
                 folder: outputFolder,
                 unavailable: unavailablePaths,
@@ -832,12 +832,18 @@ final class AppModel {
         guard !modules.contains(where: { ModuleSourceIdentity.matches($0.effectiveOriginalSourceURL, source) }) else {
             throw RelayError.duplicateSourceURL
         }
-        let outputFileName = uniqueOutputFileName(for: draft, source: source)
-        let localStorageRelativePath = try localStorageRelativePath(
+        let outputFileName = ModuleNamingPlanner.uniqueOutputFileName(
+            for: draft,
+            source: source,
+            modules: modules,
+            combinedModuleFileName: settings.combinedModuleFileName
+        )
+        let localStorageRelativePath = try ModuleNamingPlanner.localStorageRelativePath(
             storageLocation: draft.storageLocation,
             source: source,
             outputFileName: outputFileName,
-            outputFolder: outputFolder
+            outputFolder: outputFolder,
+            localModuleDirectory: settings.localModuleDirectory
         )
         let module = RelayModule(
             name: draft.name.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -854,7 +860,7 @@ final class AppModel {
             scriptHubOptions: draft.scriptHubOptions,
             iconURL: customIconURL,
             customIconURL: customIconURL,
-            detectedSourceFormat: detectedFormat(for: draft.sourceFormat, source: source)
+            detectedSourceFormat: ModuleNamingPlanner.detectedFormat(for: draft.sourceFormat, source: source)
         )
         registerLocalChange()
         modules.append(module)
@@ -880,13 +886,20 @@ final class AppModel {
         }) else {
             throw RelayError.duplicateSourceURL
         }
-        let outputFileName = uniqueOutputFileName(for: draft, source: source, excluding: id)
-        let detectedSourceFormat = detectedFormat(for: draft.sourceFormat, source: source)
-        let localStorageRelativePath = try localStorageRelativePath(
+        let outputFileName = ModuleNamingPlanner.uniqueOutputFileName(
+            for: draft,
+            source: source,
+            modules: modules,
+            combinedModuleFileName: settings.combinedModuleFileName,
+            excluding: id
+        )
+        let detectedSourceFormat = ModuleNamingPlanner.detectedFormat(for: draft.sourceFormat, source: source)
+        let localStorageRelativePath = try ModuleNamingPlanner.localStorageRelativePath(
             storageLocation: draft.storageLocation,
             source: source,
             outputFileName: outputFileName,
-            outputFolder: outputFolder
+            outputFolder: outputFolder,
+            localModuleDirectory: settings.localModuleDirectory
         )
         let current = modules[index]
         guard current.name != name ||
@@ -1161,7 +1174,10 @@ final class AppModel {
                 }
                 let preferredIcon = module.customIconURL.flatMap(URL.init(string:)) ?? detectedIcon
                 module.iconURL = preferredIcon?.absoluteString
-                module.detectedSourceFormat = detectedFormat(for: module.sourceFormat, source: module.sourceURL)
+                module.detectedSourceFormat = ModuleNamingPlanner.detectedFormat(
+                    for: module.sourceFormat,
+                    source: module.sourceURL
+                )
                 if let preferredIcon {
                     try? await iconStore.cacheIcon(from: preferredIcon, for: module.id, force: true)
                 } else {
@@ -1767,7 +1783,10 @@ final class AppModel {
             if iconChanged {
                 module.iconURL = value
             }
-            let resolvedFormat = detectedFormat(for: module.sourceFormat, source: module.sourceURL)
+            let resolvedFormat = ModuleNamingPlanner.detectedFormat(
+                for: module.sourceFormat,
+                source: module.sourceURL
+            )
             let formatChanged = module.detectedSourceFormat != resolvedFormat
             if formatChanged { module.detectedSourceFormat = resolvedFormat }
             moduleChanged = moduleChanged || iconChanged || formatChanged
@@ -2365,147 +2384,6 @@ final class AppModel {
         let suffix = report.retriedAfterConflict ? "（已处理远端更新）" : ""
         let commitText = commit.map { "原子提交 \($0.prefix(8))" } ?? "GitHub 内容已发布"
         return "\(commitText)：上传/更新 \(report.publishedFiles.count) 个，删除 \(report.deletedFiles.count) 个\(suffix)"
-    }
-
-    private func localStorageRelativePath(
-        storageLocation: ModuleStorageLocation,
-        source: String,
-        outputFileName: String,
-        outputFolder: String
-    ) throws -> String? {
-        guard storageLocation == .local else { return nil }
-        let rootPath = settings.localModuleDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !rootPath.isEmpty else {
-            throw RelayError.invalidOutput("请先设置本地模块根目录，或将模块存放位置改为 GitHub。")
-        }
-        if let relativePath = LocalSourcePathResolver.relativePath(forSourceURL: source, rootDirectoryPath: rootPath) {
-            return relativePath
-        }
-        return ModuleOutputFolder.relativePath(
-            fileName: outputFileName,
-            folder: outputFolder,
-            preservesExistingFileName: true
-        )
-    }
-
-    private func detectedFormat(for format: ModuleSourceFormat, source: String) -> ModuleSourceFormat? {
-        guard format == .automatic, let url = URL(string: source) else { return nil }
-        return format.resolvedFormat(for: url)
-    }
-
-    private func uniqueOutputFileName(for draft: ModuleDraft, source: String, excluding excludedID: UUID? = nil) -> String {
-        let preservesExistingFileName = URL(string: source)?.isFileURL == true
-        let normalized = draft.normalizedOutputFileName(for: source)
-        let folder = ModuleOutputFolder.normalized(draft.outputFolder)
-        let combined = ModuleOutputFolder.relativePath(
-            fileName: settings.combinedModuleFileName,
-            folder: ModuleOutputFolder.root
-        ).lowercased()
-        let unavailable = Set(modules.compactMap { module -> String? in
-            module.id == excludedID ? nil : module.publishedRelativePath.lowercased()
-        } + [combined])
-        let relativePath = ModuleOutputFolder.relativePath(
-            fileName: normalized,
-            folder: folder,
-            preservesExistingFileName: draft.storageLocation == .local || preservesExistingFileName
-        )
-        guard unavailable.contains(relativePath.lowercased()) else { return normalized }
-
-        return uniqueOutputFileName(
-            preferredFileName: normalized,
-            folder: folder,
-            unavailable: unavailable,
-            preservesExistingFileName: draft.storageLocation == .local || preservesExistingFileName
-        )
-    }
-
-    private func uniqueOutputFileName(
-        preferredFileName: String,
-        folder: String,
-        unavailable: Set<String>,
-        preservesExistingFileName: Bool = false
-    ) -> String {
-        let normalized = preservesExistingFileName
-            ? FilenameSanitizer.existingSgmoduleName(from: preferredFileName)
-            : FilenameSanitizer.sgmoduleName(from: preferredFileName)
-        var relativePath = ModuleOutputFolder.relativePath(
-            fileName: normalized,
-            folder: folder,
-            preservesExistingFileName: preservesExistingFileName
-        )
-        guard unavailable.contains(relativePath.lowercased()) else { return normalized }
-
-        let base = preservesExistingFileName
-            ? FilenameSanitizer.existingFileBaseName(from: normalized)
-            : FilenameSanitizer.baseName(from: normalized)
-        var suffix = 2
-        repeat {
-            relativePath = ModuleOutputFolder.relativePath(
-                fileName: "\(base)-\(suffix).sgmodule",
-                folder: folder,
-                preservesExistingFileName: preservesExistingFileName
-            )
-            if unavailable.contains(relativePath.lowercased()) { suffix += 1 } else { break }
-        } while true
-        return "\(base)-\(suffix).sgmodule"
-    }
-
-    private static func normalizedModuleNaming(
-        _ modules: [RelayModule],
-        combinedFileName: String,
-        localModuleDirectory: String
-    ) -> [RelayModule] {
-        var used = Set<String>()
-        let combined = ModuleOutputFolder.relativePath(
-            fileName: combinedFileName,
-            folder: ModuleOutputFolder.root
-        ).lowercased()
-        return modules.map { value in
-            var module = value
-            module.outputFolder = ModuleOutputFolder.normalized(module.outputFolder)
-            if module.storageLocation == .local {
-                if module.localStorageRelativePath == nil {
-                    module.localStorageRelativePath = LocalSourcePathResolver.relativePath(
-                        forSourceURL: module.sourceURL,
-                        rootDirectoryPath: localModuleDirectory
-                    ) ?? module.publishedRelativePath
-                }
-                module.preservesOutputFileName = true
-            }
-            let localSourceFileName = LocalSourcePathResolver.fileName(
-                forSourceURL: module.sourceURL,
-                rootDirectoryPath: localModuleDirectory
-            )
-            let preservesExistingFileName = module.preservesOutputFileName ||
-                URL(string: module.sourceURL)?.isFileURL == true
-            let preferredValue = localSourceFileName
-                ?? (module.outputFileName.isEmpty ? module.name : module.outputFileName)
-            let preferred = preservesExistingFileName
-                ? FilenameSanitizer.existingSgmoduleName(from: preferredValue)
-                : FilenameSanitizer.sgmoduleName(from: preferredValue)
-            let base = preservesExistingFileName
-                ? FilenameSanitizer.existingFileBaseName(from: preferred)
-                : FilenameSanitizer.baseName(from: preferred)
-            var candidate = preferred
-            var suffix = 2
-            var relative = ModuleOutputFolder.relativePath(
-                fileName: candidate,
-                folder: module.outputFolder,
-                preservesExistingFileName: preservesExistingFileName
-            )
-            while used.contains(relative.lowercased()) || relative.lowercased() == combined {
-                candidate = "\(base)-\(suffix).sgmodule"
-                relative = ModuleOutputFolder.relativePath(
-                    fileName: candidate,
-                    folder: module.outputFolder,
-                    preservesExistingFileName: preservesExistingFileName
-                )
-                suffix += 1
-            }
-            used.insert(relative.lowercased())
-            module.outputFileName = candidate
-            return module
-        }
     }
 
 }

@@ -16,6 +16,8 @@
 - 将设置页通用表单、分区、行组件和窗口 chrome 配置抽出到 `SettingsComponents.swift`，为后续继续拆分凭据与诊断页面降低耦合。
 - 将诊断报告构建和模块来源 URL 脱敏抽出到 `DiagnosticReportBuilder`，让 AppModel 只负责提供当前状态快照。
 - 将模块预览内容读取、本地 Surge 源文件缓存恢复、参数物化和元数据应用抽出到 `ModulePreviewContentProvider`，让 AppModel 继续收敛为状态协调器。
+- 将模块输出文件命名、本地存储相对路径推导、格式探测和启动时命名归一化抽出到 `ModuleNamingPlanner`，并补充本地原模块路径保护与重名规避测试。
+- 将维护文档和 Release 构建脚本的默认 Xcode 路径更新为 macOS 27 beta 使用的 `Xcode-beta.app`，脚本仍保留旧路径作为 fallback。
 - 404 更新失败说明补充仓库公开性和访问权限检查建议；Web 管理端失败详情新增“复制错误”按钮。
 - Web 管理端新增失败模块筛选按钮，可在存在更新失败时一键只看失败模块。
 - 将 GitHub 自动发布跳过文案和独立模块缓存判断抽出到 `AutomaticPublishPlanner`，继续减少 AppModel 中的发布策略分支。

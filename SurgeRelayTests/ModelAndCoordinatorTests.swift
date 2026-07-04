@@ -387,6 +387,115 @@ final class ModelAndCoordinatorTests: XCTestCase {
         )
     }
 
+    func testModuleNamingPlannerBuildsLocalStorageRelativePath() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let source = root.appending(path: "Ads/My Module.sgmodule").absoluteString
+
+        XCTAssertEqual(
+            try ModuleNamingPlanner.localStorageRelativePath(
+                storageLocation: .local,
+                source: source,
+                outputFileName: "Different.sgmodule",
+                outputFolder: "Converted",
+                localModuleDirectory: root.path
+            ),
+            "Ads/My Module.sgmodule"
+        )
+        XCTAssertNil(try ModuleNamingPlanner.localStorageRelativePath(
+            storageLocation: .gitHub,
+            source: source,
+            outputFileName: "Different.sgmodule",
+            outputFolder: "Converted",
+            localModuleDirectory: ""
+        ))
+        XCTAssertThrowsError(try ModuleNamingPlanner.localStorageRelativePath(
+            storageLocation: .local,
+            source: "https://example.com/source.conf",
+            outputFileName: "Different.sgmodule",
+            outputFolder: "Converted",
+            localModuleDirectory: "   "
+        ))
+    }
+
+    func testModuleNamingPlannerAvoidsCombinedAndExistingOutputPaths() {
+        let existing = RelayModule(
+            name: "Existing",
+            sourceURL: "https://example.com/existing.sgmodule",
+            outputFileName: "Existing",
+            outputFolder: "Folder"
+        )
+        var draft = ModuleDraft()
+        draft.name = "Existing"
+        draft.sourceURL = "https://example.com/new.sgmodule"
+        draft.outputFolder = "Folder"
+
+        XCTAssertEqual(
+            ModuleNamingPlanner.uniqueOutputFileName(
+                for: draft,
+                source: draft.sourceURL,
+                modules: [existing],
+                combinedModuleFileName: "Surge Relay"
+            ),
+            "Existing-2.sgmodule"
+        )
+
+        draft.name = "Surge Relay"
+        draft.outputFolder = ""
+        XCTAssertEqual(
+            ModuleNamingPlanner.uniqueOutputFileName(
+                for: draft,
+                source: draft.sourceURL,
+                modules: [],
+                combinedModuleFileName: "Surge Relay"
+            ),
+            "Surge-Relay-2.sgmodule"
+        )
+
+        XCTAssertEqual(
+            ModuleNamingPlanner.uniqueOutputFileName(
+                preferredFileName: "My Module.sgmodule",
+                folder: "Folder",
+                unavailable: ["folder/my module.sgmodule"],
+                preservesExistingFileName: true
+            ),
+            "My Module-2.sgmodule"
+        )
+    }
+
+    func testModuleNamingPlannerNormalizesLoadedModulesWithoutLosingLocalPaths() {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let localSource = root.appending(path: "Ads/My Module.sgmodule").absoluteString
+        let local = RelayModule(
+            name: "Imported Local",
+            sourceURL: localSource,
+            outputFileName: "Old Generated Name",
+            outputFolder: " /Ads/ ",
+            storageLocation: .local,
+            localStorageRelativePath: nil,
+            preservesOutputFileName: false
+        )
+        let combinedCollision = RelayModule(
+            name: "Combined",
+            sourceURL: "https://example.com/combined.sgmodule",
+            outputFileName: "Surge Relay",
+            storageLocation: .gitHub
+        )
+
+        let normalized = ModuleNamingPlanner.normalizedModuleNaming(
+            [local, combinedCollision],
+            combinedFileName: "Surge Relay",
+            localModuleDirectory: root.path
+        )
+
+        XCTAssertEqual(normalized[0].outputFolder, "Ads")
+        XCTAssertEqual(normalized[0].outputFileName, "My Module.sgmodule")
+        XCTAssertEqual(normalized[0].localStorageRelativePath, "Ads/My Module.sgmodule")
+        XCTAssertTrue(normalized[0].preservesOutputFileName)
+        XCTAssertEqual(normalized[1].outputFileName, "Surge-Relay-2.sgmodule")
+    }
+
     func testUpdateFailureFormatterExplainsOriginalHTTPFailure() {
         let sourceURL = "https://raw.githubusercontent.com/example/repo/main/Missing.sgmodule?token=secret"
         let message = UpdateFailureFormatter.detailedMessage(
