@@ -123,12 +123,11 @@ struct ModulesView: View {
     }
 
     private func hasRemoteSource(_ module: RelayModule) -> Bool {
-        guard let url = URL(string: module.sourceURL) else { return false }
-        return ["http", "https"].contains(url.scheme?.lowercased())
+        module.hasRemoteOriginalSource
     }
 
     private func hasLocalSource(_ module: RelayModule) -> Bool {
-        URL(string: module.sourceURL)?.isFileURL == true
+        !module.hasRemoteOriginalSource && URL(string: module.sourceURL)?.isFileURL == true
     }
 
     private func searchableText(for module: RelayModule) -> String {
@@ -1433,6 +1432,7 @@ private struct ModuleDetailView: View {
             detailRow("来源格式", value: module.sourceFormatDisplayTitle, icon: "doc.text")
             if let subscription = module.scriptHubSubscription {
                 detailRow("来源记录", value: subscription.displaySummary, icon: "point.3.connected.trianglepath.dotted")
+                detailRow("模块链接", value: subscription.subscriptionURL, icon: "link.badge.plus", monospaced: true, copyValue: subscription.subscriptionURL)
                 if let outputName = subscription.outputName {
                     detailRow("原输出名", value: outputName, icon: "doc.text", monospaced: true)
                 }
@@ -1622,17 +1622,19 @@ private struct ModuleDetailView: View {
     }
 
     private var sourceAddressDisplay: String {
-        if let url = URL(string: module.sourceURL), url.isFileURL {
+        let sourceURL = module.effectiveOriginalSourceURL
+        if let url = URL(string: sourceURL), url.isFileURL {
             return url.path
         }
-        return module.sourceURL.removingPercentEncoding ?? module.sourceURL
+        return sourceURL.removingPercentEncoding ?? sourceURL
     }
 
     private var sourceAddressCopyValue: String {
-        if let url = URL(string: module.sourceURL), url.isFileURL {
+        let sourceURL = module.effectiveOriginalSourceURL
+        if let url = URL(string: sourceURL), url.isFileURL {
             return url.path
         }
-        return module.sourceURL
+        return sourceURL
     }
 
     private var statusIcon: String {

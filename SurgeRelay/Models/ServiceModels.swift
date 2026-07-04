@@ -321,7 +321,7 @@ struct UpdateAdmission: Equatable, Sendable {
             return .rejected(reason)
         }
         guard updateableModuleCount > 0 else {
-            return .rejected("没有可更新的模块。请开启独立发布，或启用总模块并选择包含来源。")
+            return .rejected("没有可更新的模块。请添加远程原始地址，或扫描带 Script-Hub 模块链接的本地模块。")
         }
         return .accepted("已开始更新全部模块。")
     }
@@ -335,7 +335,7 @@ struct UpdateAdmission: Equatable, Sendable {
             return .rejected(busyMessage(statusMessage: statusMessage))
         }
         guard updateableModuleCount > 0 else {
-            return .rejected("没有可更新的模块。请开启独立发布，或启用总模块并选择包含来源。")
+            return .rejected("没有可更新的模块。请添加远程原始地址，或扫描带 Script-Hub 模块链接的本地模块。")
         }
         return .accepted("已开始更新全部模块。")
     }
@@ -351,10 +351,10 @@ struct UpdateAdmission: Equatable, Sendable {
             return .rejected(reason)
         }
         guard moduleIsUpdateable else {
-            return .rejected("“\(module.name)”没有可生成的输出，请开启独立发布，或启用总模块并将其包含后再更新。")
+            return .rejected("“\(module.name)”没有远程原始地址，无法从上游更新。")
         }
         guard updateableModuleCount > 0 else {
-            return .rejected("没有可更新的模块。请开启独立发布，或启用总模块并选择包含来源。")
+            return .rejected("没有可更新的模块。请添加远程原始地址，或扫描带 Script-Hub 模块链接的本地模块。")
         }
         return .accepted("已开始更新 \(module.name)。")
     }
@@ -370,10 +370,10 @@ struct UpdateAdmission: Equatable, Sendable {
             return .rejected(busyMessage(statusMessage: statusMessage))
         }
         guard moduleIsUpdateable else {
-            return .rejected("“\(module.name)”没有可生成的输出，请开启独立发布，或启用总模块并将其包含后再更新。")
+            return .rejected("“\(module.name)”没有远程原始地址，无法从上游更新。")
         }
         guard updateableModuleCount > 0 else {
-            return .rejected("没有可更新的模块。请开启独立发布，或启用总模块并选择包含来源。")
+            return .rejected("没有可更新的模块。请添加远程原始地址，或扫描带 Script-Hub 模块链接的本地模块。")
         }
         return .accepted("已开始更新 \(module.name)。")
     }

@@ -346,7 +346,7 @@ final class AppModel {
     }
 
     private func shouldUpdateModule(_ module: RelayModule) -> Bool {
-        shouldContributeToCombined(module) || module.publishesStandalone
+        module.hasRemoteOriginalSource || shouldContributeToCombined(module) || module.publishesStandalone
     }
 
     func setCombinedModuleEnabled(_ enabled: Bool) {
@@ -664,7 +664,7 @@ final class AppModel {
                     github: settings.github.isConfigured ? settings.github : nil
                 )
                 if let subscription = ModuleMetadataParser.scriptHubSubscription(in: result.content) {
-                    module.scriptHubSubscription = subscription
+                    _ = module.applyScriptHubSubscriptionMetadata(subscription)
                 }
                 try await fileStore.writeComponent(result.content, id: module.id)
                 let fingerprint = await processingWorker.contentFingerprint(
@@ -1121,7 +1121,7 @@ final class AppModel {
                     relativeTo: module.sourceURL
                 )
                 if let subscription = ModuleMetadataParser.scriptHubSubscription(in: effectiveContent) {
-                    module.scriptHubSubscription = subscription
+                    _ = module.applyScriptHubSubscriptionMetadata(subscription)
                 }
                 let preferredIcon = module.customIconURL.flatMap(URL.init(string:)) ?? detectedIcon
                 module.iconURL = preferredIcon?.absoluteString
@@ -1652,43 +1652,14 @@ final class AppModel {
         for moduleValue in modules {
             guard let content = try? await fileStore.readComponent(id: moduleValue.id) else { continue }
             var module = moduleValue
+            var moduleChanged = false
             if await fileStore.hasOverride(id: module.id), module.overrideBaseHash == nil,
                let converted = try? await fileStore.readConvertedComponent(id: module.id) {
                 module.overrideBaseHash = Data(converted.utf8).sha256String
-                changed = true
+                moduleChanged = true
             }
             if let subscription = ModuleMetadataParser.scriptHubSubscription(in: content) {
-                let sourceWasFile = URL(string: module.sourceURL)?.isFileURL == true
-                if module.scriptHubSubscription != subscription {
-                    module.scriptHubSubscription = subscription
-                    changed = true
-                }
-                if sourceWasFile || module.sourceURL.hasPrefix("http://script.hub/") || module.sourceURL.hasPrefix("https://script.hub/") {
-                    module.sourceURL = subscription.originalURL
-                    module.sourceETag = nil
-                    module.sourceLastModified = nil
-                    module.sourceContentHash = nil
-                    module.sourceCheckedAt = nil
-                    module.conversionEngineRevision = nil
-                    changed = true
-                }
-                if let sourceFormat = subscription.sourceFormat,
-                   sourceWasFile || module.sourceFormat == .automatic || module.sourceFormat == .surge {
-                    if module.sourceFormat != sourceFormat {
-                        module.sourceFormat = sourceFormat
-                        changed = true
-                    }
-                }
-                if sourceWasFile || module.scriptHubOptions == ScriptHubOptions() {
-                    if module.scriptHubOptions != subscription.options {
-                        module.scriptHubOptions = subscription.options
-                        changed = true
-                    }
-                }
-                if module.category.isEmpty, let category = subscription.category, !category.isEmpty {
-                    module.category = category
-                    changed = true
-                }
+                moduleChanged = module.applyScriptHubSubscriptionMetadata(subscription) || moduleChanged
             }
             let detectedIcon = await processingWorker.iconURL(in: content, relativeTo: module.sourceURL)
             let preferredIcon = module.customIconURL.flatMap(URL.init(string:)) ?? detectedIcon
@@ -1700,7 +1671,8 @@ final class AppModel {
             let resolvedFormat = detectedFormat(for: module.sourceFormat, source: module.sourceURL)
             let formatChanged = module.detectedSourceFormat != resolvedFormat
             if formatChanged { module.detectedSourceFormat = resolvedFormat }
-            if iconChanged || formatChanged {
+            moduleChanged = moduleChanged || iconChanged || formatChanged
+            if moduleChanged {
                 replace(module)
                 changed = true
             }

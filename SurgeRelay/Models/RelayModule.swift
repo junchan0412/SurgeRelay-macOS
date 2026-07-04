@@ -290,6 +290,57 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         return "自动识别（\(resolved.shortTitle)）"
     }
 
+    var effectiveOriginalSourceURL: String {
+        scriptHubSubscription?.originalURL ?? sourceURL
+    }
+
+    var hasRemoteOriginalSource: Bool {
+        guard let scheme = URL(string: effectiveOriginalSourceURL)?.scheme?.lowercased() else {
+            return false
+        }
+        return scheme == "http" || scheme == "https"
+    }
+
+    mutating func applyScriptHubSubscriptionMetadata(_ subscription: ScriptHubSubscriptionInfo) -> Bool {
+        var changed = false
+        let sourceWasFile = URL(string: sourceURL)?.isFileURL == true
+        let sourceWasScriptHub = sourceURL.hasPrefix("http://script.hub/") || sourceURL.hasPrefix("https://script.hub/")
+
+        if scriptHubSubscription != subscription {
+            scriptHubSubscription = subscription
+            changed = true
+        }
+        if sourceWasFile || sourceWasScriptHub {
+            if sourceURL != subscription.originalURL {
+                sourceURL = subscription.originalURL
+                sourceETag = nil
+                sourceLastModified = nil
+                sourceContentHash = nil
+                sourceCheckedAt = nil
+                conversionEngineRevision = nil
+                changed = true
+            }
+        }
+        if let subscriptionSourceFormat = subscription.sourceFormat,
+           sourceWasFile || sourceFormat == .automatic || sourceFormat == .surge {
+            if sourceFormat != subscriptionSourceFormat {
+                sourceFormat = subscriptionSourceFormat
+                changed = true
+            }
+        }
+        if sourceWasFile || scriptHubOptions == ScriptHubOptions() {
+            if scriptHubOptions != subscription.options {
+                scriptHubOptions = subscription.options
+                changed = true
+            }
+        }
+        if category.isEmpty, let subscriptionCategory = subscription.category, !subscriptionCategory.isEmpty {
+            category = subscriptionCategory
+            changed = true
+        }
+        return changed
+    }
+
     var publishedRelativePath: String {
         ModuleOutputFolder.relativePath(
             fileName: outputFileName,

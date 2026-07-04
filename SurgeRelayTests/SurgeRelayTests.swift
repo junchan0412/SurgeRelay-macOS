@@ -63,6 +63,40 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertTrue(info.options.enableJQ)
     }
 
+    func testRelayModuleAppliesScriptHubSubscriptionMetadataToLocalSource() throws {
+        let content = """
+        #SUBSCRIBED http://script.hub/file/_start_/https://raw.githubusercontent.com/example/repo/main/QuantumultX/demo.conf/_end_/Demo.sgmodule?type=qx-rewrite&target=surge-module&category=%23%E5%B7%A5%E5%85%B7&del=false&jqEnabled=true
+        """
+        let subscription = try XCTUnwrap(ModuleMetadataParser.scriptHubSubscription(in: content))
+        var module = RelayModule(
+            name: "Imported",
+            sourceURL: URL(filePath: "/tmp/Demo.sgmodule").absoluteString,
+            sourceFormat: .surge,
+            outputFileName: "Demo.sgmodule",
+            sourceETag: "old-etag",
+            sourceLastModified: "old-date",
+            sourceContentHash: "old-hash",
+            sourceCheckedAt: Date(timeIntervalSince1970: 1),
+            conversionEngineRevision: "old-engine"
+        )
+
+        XCTAssertTrue(module.applyScriptHubSubscriptionMetadata(subscription))
+
+        XCTAssertEqual(module.sourceURL, "https://raw.githubusercontent.com/example/repo/main/QuantumultX/demo.conf")
+        XCTAssertEqual(module.effectiveOriginalSourceURL, module.sourceURL)
+        XCTAssertTrue(module.hasRemoteOriginalSource)
+        XCTAssertEqual(module.sourceFormat, .quantumultX)
+        XCTAssertEqual(module.category, "#工具")
+        XCTAssertEqual(module.scriptHubSubscription, subscription)
+        XCTAssertTrue(module.scriptHubOptions.enableJQ)
+        XCTAssertFalse(module.scriptHubOptions.removeCommentedRewrites)
+        XCTAssertNil(module.sourceETag)
+        XCTAssertNil(module.sourceLastModified)
+        XCTAssertNil(module.sourceContentHash)
+        XCTAssertNil(module.sourceCheckedAt)
+        XCTAssertNil(module.conversionEngineRevision)
+    }
+
     func testModuleArgumentMaterializePreservesSemanticComments() {
         let content = """
         #!arguments=Notify:开启通知
@@ -431,11 +465,11 @@ final class SurgeRelayTests: XCTestCase {
             statusMessage: "准备就绪"
         )
         XCTAssertFalse(empty.isAccepted)
-        XCTAssertEqual(empty.message, "没有可更新的模块。请开启独立发布，或启用总模块并选择包含来源。")
+        XCTAssertEqual(empty.message, "没有可更新的模块。请添加远程原始地址，或扫描带 Script-Hub 模块链接的本地模块。")
 
         let disabled = RelayModule(
             name: "Demo",
-            sourceURL: "https://example.com/demo.sgmodule",
+            sourceURL: URL(filePath: "/tmp/demo.sgmodule").absoluteString,
             outputFileName: "Demo",
             isEnabled: false
         )
@@ -447,7 +481,7 @@ final class SurgeRelayTests: XCTestCase {
             statusMessage: "准备就绪"
         )
         XCTAssertFalse(disabledAdmission.isAccepted)
-        XCTAssertEqual(disabledAdmission.message, "“Demo”没有可生成的输出，请开启独立发布，或启用总模块并将其包含后再更新。")
+        XCTAssertEqual(disabledAdmission.message, "“Demo”没有远程原始地址，无法从上游更新。")
 
         let enabled = RelayModule(
             name: "Demo",

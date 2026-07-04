@@ -3,6 +3,22 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.3.6</title>
+            <pubDate>Sat, 04 Jul 2026 21:20:59 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.6</link>
+            <sparkle:version>55</sparkle:version>
+            <sparkle:shortVersionString>1.3.6</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.3.6
+
+
+- 修复本地已转换模块中的 Script-Hub `#SUBSCRIBED` 记录解析后没有写回模块列表的问题；启动后会把这类模块恢复为原始脚本地址、来源格式、参数和标签。
+- 更新准入改为识别远程原始地址；即使模块未开启独立发布、也未加入总模块，只要有可更新的原始地址就可以参与“更新全部”。
+- 模块详情页优先展示 Script-Hub 原始地址，并新增完整“模块链接”记录，方便核对本地文件中保存的 `#SUBSCRIBED` 信息。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.3.6/Surge-Relay-1.3.6.app.zip" length="9265288" type="application/zip" sparkle:edSignature="LDeRquYzZUt9a0tSVjdcBV0xZxvifbFOEgZjWZ8r3EICL+cmlfm83vdXRU8dk9nm3Lwf3shSH0EiWpyV6U9wDA=="/>
+        </item>
+        <item>
             <title>1.3.5</title>
             <pubDate>Sat, 04 Jul 2026 20:15:05 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.5</link>
