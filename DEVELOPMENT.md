@@ -49,6 +49,8 @@ Manual GitHub publishing has two paths:
 
 All publishable module selection should flow through `PublishPlan` / `PublishCoordinator`. Do not recalculate publishable IDs ad hoc in UI, Web API, or `AppModel`: the same plan owns standalone modules, combined-module contributors, generated asset IDs, scope labels, and the "nothing to publish" decision.
 
+Automatic GitHub publish readiness belongs in `AutomaticPublishPlanner`. Keep the settings/token/standalone-module/cache-output admission checks there so update completion, delayed scheduling, and scheduled execution do not drift into different skip rules.
+
 Keep the selected publish path conservative: it should merge new paths into the known GitHub publish list but must not prune paths that belong to unselected modules.
 
 Local publish self-overwrite checks also belong in `PublishCoordinator` with paths resolved by `LocalSourcePathResolver`. If a local source file and the standalone output resolve to the same relative path, skip that export instead of writing over the user's original module.

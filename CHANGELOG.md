@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将 GitHub 自动发布的配置、Token、独立模块和缓存输出准入判断集中到 `AutomaticPublishPlanner`，并补充纯逻辑测试，减少调度和执行阶段规则分叉。
 - 将 Web 资源语法检查和无依赖行为/DOM 测试纳入发布配置预检，避免发布前漏跑 Web 管理回归测试。
 - 新增无需证书和 GitHub secret 的发布配置预检，并接入 GitHub Actions 证书导入之前，提前检查版本号、Sparkle、appcast、entitlement、发布脚本和 workflow 配置一致性。
 - 将主窗口侧边栏、模块行、批量选择勾选和底部状态卡拆出到 `ModuleSidebarView.swift`，让 `ModulesView.swift` 更专注于 split-view 编排、搜索、详情和 sheet 状态。

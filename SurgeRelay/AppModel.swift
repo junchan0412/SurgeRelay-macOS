@@ -1055,10 +1055,9 @@ final class AppModel {
             guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
             await cleanupLegacyOutputFiles()
             guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
-            let canUseAutomaticGitHubPublish = settings.publishToGitHub &&
-                settings.automaticallyPublish &&
-                settings.github.isConfigured &&
-                !ensureGitHubTokenLoaded(showStatusMessage: false).isEmpty
+            let canUseAutomaticGitHubPublish = AutomaticPublishPlanner.canUseAutomaticPublishing(
+                context: automaticPublishContext()
+            )
             let pendingLocalCleanupFileCount = pendingPublishPreview?.destination == .local
                 ? pendingPublishPreview?.deletedFiles.count
                 : nil
@@ -1113,10 +1112,12 @@ final class AppModel {
     }
 
     private func scheduleAutomaticPublish() {
-        guard settings.publishToGitHub, settings.automaticallyPublish, settings.github.isConfigured else { return }
-        guard !ensureGitHubTokenLoaded(showStatusMessage: false).isEmpty else { return }
-        guard AutomaticPublishPlanner.shouldRunScheduledPublish(plan: githubPublishPlan) else {
-            clearAutomaticPublishSchedule()
+        let admission = AutomaticPublishPlanner.scheduleAdmission(
+            context: automaticPublishContext(),
+            plan: githubPublishPlan
+        )
+        guard admission.isAccepted else {
+            applyAutomaticPublishAdmission(admission)
             return
         }
         automaticPublishTask?.cancel()
@@ -1129,25 +1130,14 @@ final class AppModel {
             while self.isWorking, !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(250))
             }
-            guard !Task.isCancelled,
-                  self.settings.publishToGitHub,
-                  self.settings.automaticallyPublish,
-                  self.settings.github.isConfigured else {
-                self.clearAutomaticPublishSchedule()
-                return
-            }
-            guard !self.ensureGitHubTokenLoaded(showStatusMessage: false).isEmpty else {
-                self.clearAutomaticPublishSchedule()
-                return
-            }
-            guard AutomaticPublishPlanner.shouldRunScheduledPublish(plan: self.githubPublishPlan) else {
-                self.clearAutomaticPublishSchedule()
-                self.statusMessage = AutomaticPublishPlanner.noStandaloneModulesStatus
-                return
-            }
-            guard await self.hasGitHubAutomaticPublishableFiles() else {
-                self.clearAutomaticPublishSchedule()
-                self.statusMessage = AutomaticPublishPlanner.noStandaloneFilesStatus
+            guard !Task.isCancelled else { return }
+            let runAdmission = AutomaticPublishPlanner.runAdmission(
+                context: self.automaticPublishContext(),
+                plan: self.githubPublishPlan,
+                hasCachedStandaloneOutput: await self.hasGitHubAutomaticPublishableFiles()
+            )
+            guard runAdmission.isAccepted else {
+                self.applyAutomaticPublishAdmission(runAdmission)
                 return
             }
             self.clearAutomaticPublishSchedule()
@@ -2070,6 +2060,22 @@ final class AppModel {
                 )
             }
         )
+    }
+
+    private func automaticPublishContext() -> AutomaticPublishContext {
+        AutomaticPublishPlanner.context(
+            settings: settings,
+            tokenIsAvailable: !ensureGitHubTokenLoaded(showStatusMessage: false).isEmpty
+        )
+    }
+
+    private func applyAutomaticPublishAdmission(_ admission: AutomaticPublishAdmission) {
+        if admission.shouldClearSchedule {
+            clearAutomaticPublishSchedule()
+        }
+        if let statusMessage = admission.statusMessage {
+            self.statusMessage = statusMessage
+        }
     }
 
     private func hasGitHubAutomaticPublishableFiles() async -> Bool {

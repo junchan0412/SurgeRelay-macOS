@@ -1,8 +1,80 @@
 import Foundation
 
+struct AutomaticPublishContext: Equatable, Sendable {
+    var publishToGitHub: Bool
+    var automaticallyPublish: Bool
+    var gitHubConfigured: Bool
+    var tokenAvailable: Bool
+
+    var isConfigured: Bool {
+        publishToGitHub && automaticallyPublish && gitHubConfigured
+    }
+
+    var canUseAutomaticPublishing: Bool {
+        isConfigured && tokenAvailable
+    }
+}
+
+struct AutomaticPublishAdmission: Equatable, Sendable {
+    var isAccepted: Bool
+    var shouldClearSchedule: Bool
+    var statusMessage: String?
+
+    static let accepted = AutomaticPublishAdmission(
+        isAccepted: true,
+        shouldClearSchedule: false,
+        statusMessage: nil
+    )
+
+    static func rejected(statusMessage: String? = nil) -> AutomaticPublishAdmission {
+        AutomaticPublishAdmission(
+            isAccepted: false,
+            shouldClearSchedule: true,
+            statusMessage: statusMessage
+        )
+    }
+}
+
 enum AutomaticPublishPlanner {
     static let noStandaloneModulesStatus = "没有开启独立发布的模块，已跳过 GitHub 自动发布"
     static let noStandaloneFilesStatus = "没有可自动发布的独立模块文件，已跳过 GitHub 自动发布"
+
+    static func context(settings: AppSettings, tokenIsAvailable: Bool) -> AutomaticPublishContext {
+        AutomaticPublishContext(
+            publishToGitHub: settings.publishToGitHub,
+            automaticallyPublish: settings.automaticallyPublish,
+            gitHubConfigured: settings.github.isConfigured,
+            tokenAvailable: tokenIsAvailable
+        )
+    }
+
+    static func canUseAutomaticPublishing(context: AutomaticPublishContext) -> Bool {
+        context.canUseAutomaticPublishing
+    }
+
+    static func scheduleAdmission(
+        context: AutomaticPublishContext,
+        plan: PublishPlan
+    ) -> AutomaticPublishAdmission {
+        guard context.canUseAutomaticPublishing else { return .rejected() }
+        guard shouldRunScheduledPublish(plan: plan) else { return .rejected() }
+        return .accepted
+    }
+
+    static func runAdmission(
+        context: AutomaticPublishContext,
+        plan: PublishPlan,
+        hasCachedStandaloneOutput: Bool
+    ) -> AutomaticPublishAdmission {
+        guard context.canUseAutomaticPublishing else { return .rejected() }
+        guard shouldRunScheduledPublish(plan: plan) else {
+            return .rejected(statusMessage: noStandaloneModulesStatus)
+        }
+        guard hasCachedStandaloneOutput else {
+            return .rejected(statusMessage: noStandaloneFilesStatus)
+        }
+        return .accepted
+    }
 
     static func shouldQueueAfterModuleUpdate(plan: PublishPlan, contentChanged: Bool) -> Bool {
         contentChanged && shouldRunScheduledPublish(plan: plan)

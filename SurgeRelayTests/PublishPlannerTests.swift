@@ -324,6 +324,131 @@ final class PublishPlannerTests: XCTestCase {
         ))
     }
 
+    func testAutomaticPublishPlannerBuildsContextFromSettings() {
+        var settings = AppSettings()
+
+        XCTAssertEqual(
+            AutomaticPublishPlanner.context(settings: settings, tokenIsAvailable: true),
+            AutomaticPublishContext(
+                publishToGitHub: true,
+                automaticallyPublish: true,
+                gitHubConfigured: true,
+                tokenAvailable: true
+            )
+        )
+        XCTAssertTrue(
+            AutomaticPublishPlanner.canUseAutomaticPublishing(
+                context: AutomaticPublishPlanner.context(settings: settings, tokenIsAvailable: true)
+            )
+        )
+
+        settings.publishToGitHub = false
+        XCTAssertFalse(
+            AutomaticPublishPlanner.canUseAutomaticPublishing(
+                context: AutomaticPublishPlanner.context(settings: settings, tokenIsAvailable: true)
+            )
+        )
+
+        settings.publishToGitHub = true
+        settings.automaticallyPublish = false
+        XCTAssertFalse(
+            AutomaticPublishPlanner.canUseAutomaticPublishing(
+                context: AutomaticPublishPlanner.context(settings: settings, tokenIsAvailable: true)
+            )
+        )
+
+        settings.automaticallyPublish = true
+        settings.github.owner = ""
+        XCTAssertFalse(
+            AutomaticPublishPlanner.canUseAutomaticPublishing(
+                context: AutomaticPublishPlanner.context(settings: settings, tokenIsAvailable: true)
+            )
+        )
+
+        settings.github.owner = "owner"
+        XCTAssertFalse(
+            AutomaticPublishPlanner.canUseAutomaticPublishing(
+                context: AutomaticPublishPlanner.context(settings: settings, tokenIsAvailable: false)
+            )
+        )
+    }
+
+    func testAutomaticPublishPlannerBuildsAdmissionDecisions() {
+        let standalone = RelayModule(
+            id: UUID(),
+            name: "Standalone",
+            sourceURL: "https://example.com/standalone.sgmodule",
+            outputFileName: "Standalone",
+            publishesStandalone: true
+        )
+        let standalonePlan = PublishPlan(
+            standaloneModules: [standalone],
+            combinedModuleIDs: [UUID()]
+        )
+        let combinedOnlyPlan = PublishPlan(
+            standaloneModules: [],
+            combinedModuleIDs: [UUID()]
+        )
+        let readyContext = AutomaticPublishContext(
+            publishToGitHub: true,
+            automaticallyPublish: true,
+            gitHubConfigured: true,
+            tokenAvailable: true
+        )
+        let missingTokenContext = AutomaticPublishContext(
+            publishToGitHub: true,
+            automaticallyPublish: true,
+            gitHubConfigured: true,
+            tokenAvailable: false
+        )
+
+        XCTAssertEqual(
+            AutomaticPublishPlanner.scheduleAdmission(
+                context: readyContext,
+                plan: standalonePlan
+            ),
+            .accepted
+        )
+        XCTAssertEqual(
+            AutomaticPublishPlanner.scheduleAdmission(
+                context: missingTokenContext,
+                plan: standalonePlan
+            ),
+            .rejected()
+        )
+        XCTAssertEqual(
+            AutomaticPublishPlanner.scheduleAdmission(
+                context: readyContext,
+                plan: combinedOnlyPlan
+            ),
+            .rejected()
+        )
+        XCTAssertEqual(
+            AutomaticPublishPlanner.runAdmission(
+                context: readyContext,
+                plan: standalonePlan,
+                hasCachedStandaloneOutput: true
+            ),
+            .accepted
+        )
+        XCTAssertEqual(
+            AutomaticPublishPlanner.runAdmission(
+                context: readyContext,
+                plan: combinedOnlyPlan,
+                hasCachedStandaloneOutput: true
+            ),
+            .rejected(statusMessage: AutomaticPublishPlanner.noStandaloneModulesStatus)
+        )
+        XCTAssertEqual(
+            AutomaticPublishPlanner.runAdmission(
+                context: readyContext,
+                plan: standalonePlan,
+                hasCachedStandaloneOutput: false
+            ),
+            .rejected(statusMessage: AutomaticPublishPlanner.noStandaloneFilesStatus)
+        )
+    }
+
     func testAutomaticPublishPlannerChecksStandaloneCachedOutput() async {
         let standaloneID = UUID()
         let standalone = RelayModule(
