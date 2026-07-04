@@ -534,53 +534,17 @@ final class AppModel {
         defer { endWork(.importingLocalModules) }
 
         registerLocalChange()
+        let importPlan = LocalModuleImportPlanner.plan(
+            candidates: candidates,
+            existingModules: modules,
+            combinedModuleFileName: settings.combinedModuleFileName
+        )
         var imported: [RelayModule] = []
-        var failures: [String] = []
-        var unavailablePaths = Set(modules.map { $0.publishedRelativePath.lowercased() })
-        let combinedPath = ModuleOutputFolder.relativePath(
-            fileName: settings.combinedModuleFileName,
-            folder: ModuleOutputFolder.root
-        ).lowercased()
-        unavailablePaths.insert(combinedPath)
+        var failures = importPlan.failures
 
-        for candidate in candidates {
+        for entry in importPlan.entries {
             guard shouldContinueCurrentWork() else { return }
-            let name = candidate.name.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !name.isEmpty else {
-                failures.append("\(candidate.relativePath)：模块名称不能为空")
-                continue
-            }
-            let outputFolder = ModuleOutputFolder.normalized(candidate.outputFolder)
-            let outputFileName = ModuleNamingPlanner.uniqueOutputFileName(
-                preferredFileName: candidate.outputFileName,
-                folder: outputFolder,
-                unavailable: unavailablePaths,
-                preservesExistingFileName: true
-            )
-            unavailablePaths.insert(
-                ModuleOutputFolder.relativePath(
-                    fileName: outputFileName,
-                    folder: outputFolder,
-                    preservesExistingFileName: true
-                ).lowercased()
-            )
-            var module = RelayModule(
-                name: name,
-                sourceURL: candidate.sourceURL,
-                sourceFormat: candidate.sourceFormat,
-                outputFileName: outputFileName,
-                category: candidate.category,
-                outputFolder: outputFolder,
-                storageLocation: .local,
-                localStorageRelativePath: candidate.localStorageRelativePath,
-                preservesOutputFileName: true,
-                isEnabled: false,
-                scriptHubOptions: candidate.scriptHubOptions,
-                scriptHubSubscription: candidate.scriptHubSubscription,
-                detectedSourceFormat: candidate.sourceFormat == .automatic ? nil : candidate.sourceFormat,
-                sourceContentHash: candidate.sourceContentHash,
-                sourceCheckedAt: .now
-            )
+            var module = entry.module
             do {
                 let result = try await scriptHubClient.convert(
                     module: module,
@@ -601,7 +565,7 @@ final class AppModel {
                 imported.append(module)
             } catch {
                 guard shouldContinueCurrentWork() else { return }
-                failures.append("\(candidate.relativePath)：\(error.localizedDescription)")
+                failures.append("\(entry.candidate.relativePath)：\(error.localizedDescription)")
             }
         }
 

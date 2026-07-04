@@ -8,6 +8,7 @@
 - 更新失败时在模块列表、详情首屏和 Web 管理端顶部直接显示原始链接错误原因；GitHub 自动发布现在必须至少有一个模块开启独立发布，否则不会排队或执行。
 - GitHub 自动发布的排队和执行入口统一使用 `AutomaticPublishPlanner` 判定；仅启用总模块但没有任何独立发布模块时会明确跳过。
 - 将本地模块扫描和本地模块文件夹枚举从 `AppModel.swift` 抽出到 `LocalModuleScanner.swift`，让 AppModel 继续收敛为状态协调器。
+- 将本地模块导入候选的命名、去重、失败预检查和模块构建抽出到 `LocalModuleImportPlanner`，让 AppModel 只负责执行转换与缓存写入。
 - 将旧发布输出清理的目录和文件名规划抽出到 `LegacyOutputCleanupPlanner`，减少 AppModel 中的历史兼容路径计算。
 - 将 Web 管理端模块搜索字段抽出到 `web-logic.js`，让列表搜索与列表刷新签名共享可测试的字段维护入口。
 - 将 Web 管理端 Script-Hub 高级选项 schema 抽出到 `web-options.js`，让编辑器选项配置独立于主前端状态与渲染逻辑。

@@ -640,4 +640,122 @@ final class ModulePlanningTests: XCTestCase {
         XCTAssertEqual(plan.module.lastUpdatedAt, module.lastUpdatedAt)
         XCTAssertEqual(plan.module.contentHash, module.contentHash)
     }
+
+    func testLocalModuleImportPlannerBuildsLocalModulesAndAvoidsReservedPaths() {
+        let plannedAt = Date(timeIntervalSince1970: 10_000)
+        let existing = RelayModule(
+            name: "Existing",
+            sourceURL: "https://example.com/existing.sgmodule",
+            outputFileName: "Existing.sgmodule",
+            outputFolder: "Ads"
+        )
+        let combinedCollision = scanCandidate(
+            relativePath: "Relay.sgmodule",
+            localStorageRelativePath: "Relay.sgmodule",
+            sourceURL: "https://example.com/relay.conf",
+            sourceFormat: .quantumultX,
+            name: "  Imported Relay  ",
+            outputFileName: "Relay.sgmodule",
+            category: " #工具 ",
+            sourceContentHash: "source-hash"
+        )
+        let existingCollision = scanCandidate(
+            relativePath: "Ads/Existing.sgmodule",
+            localStorageRelativePath: "Ads/Existing.sgmodule",
+            sourceURL: "https://example.com/ads.conf",
+            sourceFormat: .loon,
+            name: "Ads",
+            outputFileName: "Existing.sgmodule",
+            outputFolder: "Ads"
+        )
+
+        let plan = LocalModuleImportPlanner.plan(
+            candidates: [combinedCollision, existingCollision],
+            existingModules: [existing],
+            combinedModuleFileName: "Relay",
+            plannedAt: plannedAt
+        )
+
+        XCTAssertTrue(plan.failures.isEmpty)
+        XCTAssertEqual(plan.entries.count, 2)
+        let relay = plan.entries[0].module
+        XCTAssertEqual(relay.name, "Imported Relay")
+        XCTAssertEqual(relay.sourceFormat, .quantumultX)
+        XCTAssertEqual(relay.outputFileName, "Relay-2.sgmodule")
+        XCTAssertEqual(relay.outputFolder, "")
+        XCTAssertEqual(relay.category, "#工具")
+        XCTAssertEqual(relay.storageLocation, .local)
+        XCTAssertEqual(relay.localStorageRelativePath, "Relay.sgmodule")
+        XCTAssertTrue(relay.preservesOutputFileName)
+        XCTAssertFalse(relay.isEnabled)
+        XCTAssertTrue(relay.publishesStandalone)
+        XCTAssertEqual(relay.detectedSourceFormat, .quantumultX)
+        XCTAssertEqual(relay.sourceContentHash, "source-hash")
+        XCTAssertEqual(relay.sourceCheckedAt, plannedAt)
+        XCTAssertEqual(relay.createdAt, plannedAt)
+
+        let ads = plan.entries[1].module
+        XCTAssertEqual(ads.outputFolder, "Ads")
+        XCTAssertEqual(ads.outputFileName, "Existing-2.sgmodule")
+        XCTAssertEqual(ads.publishedRelativePath, "Ads/Existing-2.sgmodule")
+        XCTAssertEqual(ads.detectedSourceFormat, .loon)
+    }
+
+    func testLocalModuleImportPlannerRecordsInvalidNamesAndDeduplicatesCandidates() {
+        let blank = scanCandidate(
+            relativePath: "Blank.sgmodule",
+            name: "   ",
+            outputFileName: "Blank.sgmodule"
+        )
+        let first = scanCandidate(
+            relativePath: "Tools/Demo.sgmodule",
+            name: "Demo One",
+            outputFileName: "Demo.sgmodule",
+            outputFolder: "Tools"
+        )
+        let second = scanCandidate(
+            relativePath: "Tools/Demo Copy.sgmodule",
+            name: "Demo Two",
+            outputFileName: "Demo.sgmodule",
+            outputFolder: "Tools"
+        )
+
+        let plan = LocalModuleImportPlanner.plan(
+            candidates: [blank, first, second],
+            existingModules: [],
+            combinedModuleFileName: "Relay",
+            plannedAt: Date(timeIntervalSince1970: 20_000)
+        )
+
+        XCTAssertEqual(plan.failures, ["Blank.sgmodule：模块名称不能为空"])
+        XCTAssertEqual(plan.entries.map(\.candidate.relativePath), ["Tools/Demo.sgmodule", "Tools/Demo Copy.sgmodule"])
+        XCTAssertEqual(plan.entries.map(\.module.outputFileName), ["Demo.sgmodule", "Demo-2.sgmodule"])
+        XCTAssertEqual(plan.entries.map(\.module.publishedRelativePath), ["Tools/Demo.sgmodule", "Tools/Demo-2.sgmodule"])
+    }
+
+    private func scanCandidate(
+        relativePath: String,
+        localStorageRelativePath: String? = nil,
+        sourceURL: String = "https://example.com/source.sgmodule",
+        sourceFormat: ModuleSourceFormat = .surge,
+        name: String = "Demo",
+        outputFileName: String = "Demo.sgmodule",
+        category: String = "",
+        outputFolder: String = "",
+        sourceContentHash: String? = nil
+    ) -> LocalModuleScanCandidate {
+        LocalModuleScanCandidate(
+            relativePath: relativePath,
+            localStorageRelativePath: localStorageRelativePath ?? relativePath,
+            sourceURL: sourceURL,
+            sourceFormat: sourceFormat,
+            name: name,
+            outputFileName: outputFileName,
+            category: category,
+            outputFolder: outputFolder,
+            scriptHubOptions: ScriptHubOptions(),
+            scriptHubSubscription: nil,
+            sourceContentHash: sourceContentHash
+        )
+    }
 }
