@@ -80,6 +80,7 @@ struct RelayCard<Content: View>: View {
 
 struct StatusPill: View {
     let state: ModuleUpdateState
+    var detail: String?
 
     private var color: Color {
         switch state {
@@ -91,12 +92,22 @@ struct StatusPill: View {
     }
 
     var body: some View {
-        Label(state.title, systemImage: state == .updating ? "arrow.triangle.2.circlepath" : "circle.fill")
+        Label(title, systemImage: state == .updating ? "arrow.triangle.2.circlepath" : "circle.fill")
             .font(.caption)
+            .lineLimit(1)
             .foregroundStyle(color)
             .padding(.horizontal, 9)
             .padding(.vertical, 5)
             .background(color.opacity(0.12), in: Capsule())
+    }
+
+    private var title: String {
+        guard state == .failed,
+              let detail,
+              !detail.isEmpty else {
+            return state.title
+        }
+        return "\(state.title)：\(detail)"
     }
 }
 

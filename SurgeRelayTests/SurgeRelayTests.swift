@@ -356,6 +356,79 @@ final class SurgeRelayTests: XCTestCase {
         )
     }
 
+    func testUpdateFailureFormatterExplainsOriginalHTTPFailure() {
+        let sourceURL = "https://raw.githubusercontent.com/example/repo/main/Missing.sgmodule?token=secret"
+        let message = UpdateFailureFormatter.detailedMessage(
+            for: RelayError.httpFailure(status: 404, message: "404: Not Found"),
+            sourceURL: sourceURL
+        )
+
+        XCTAssertTrue(message.contains("原始链接返回 404"))
+        XCTAssertTrue(message.contains("Not Found"))
+        XCTAssertTrue(message.contains("https://raw.githubusercontent.com/example/repo/main/Missing.sgmodule"))
+        XCTAssertFalse(message.contains("token=secret"))
+        let summary = UpdateFailureFormatter.summary(from: message, maxLength: 10)
+        XCTAssertTrue(summary.hasPrefix("原始链接返回"))
+        XCTAssertTrue(summary.hasSuffix("…"))
+    }
+
+    func testUpdateFailureFormatterKeepsSourceCheckReasonWhenConversionIsGeneric() {
+        let message = UpdateFailureFormatter.detailedMessage(
+            for: RelayError.invalidOutput("Script-Hub 转换失败。"),
+            sourceURL: "https://example.com/missing.conf",
+            sourceCheckError: RelayError.httpFailure(status: 404, message: "")
+        )
+
+        XCTAssertTrue(message.contains("原始链接返回 404"))
+        XCTAssertTrue(message.contains("转换阶段同时失败"))
+    }
+
+    func testPublishCoordinatorRequiresAtLeastOnePublishableModule() {
+        let standalone = RelayModule(
+            id: UUID(),
+            name: "Standalone",
+            sourceURL: "https://example.com/standalone.sgmodule",
+            outputFileName: "Standalone",
+            publishesStandalone: true,
+            isEnabled: false
+        )
+        let combinedOnly = RelayModule(
+            id: UUID(),
+            name: "Combined",
+            sourceURL: "https://example.com/combined.sgmodule",
+            outputFileName: "Combined",
+            publishesStandalone: false,
+            isEnabled: true
+        )
+        let ignored = RelayModule(
+            id: UUID(),
+            name: "Ignored",
+            sourceURL: "https://example.com/ignored.sgmodule",
+            outputFileName: "Ignored",
+            publishesStandalone: false,
+            isEnabled: false
+        )
+
+        XCTAssertEqual(
+            PublishCoordinator.publishableModuleIDs(
+                modules: [standalone, combinedOnly, ignored],
+                combinedModuleEnabled: true
+            ),
+            Set([standalone.id, combinedOnly.id])
+        )
+        XCTAssertEqual(
+            PublishCoordinator.publishableModuleIDs(
+                modules: [standalone, combinedOnly, ignored],
+                combinedModuleEnabled: false
+            ),
+            Set([standalone.id])
+        )
+        XCTAssertFalse(PublishCoordinator.hasPublishableModuleSelection(
+            modules: [ignored],
+            combinedModuleEnabled: true
+        ))
+    }
+
     func testModuleSearchIndexIncludesDisplayedMetadata() {
         let module = RelayModule(
             name: "Video Enhancer",

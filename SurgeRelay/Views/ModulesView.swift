@@ -1711,10 +1711,19 @@ private struct ModuleDetailView: View {
     }
 
     private var summaryUpdateValue: String {
+        if module.state == .failed, let failureSummary {
+            return failureSummary
+        }
         if let lastUpdatedAt = module.lastUpdatedAt {
             return lastUpdatedAt.formatted(date: .abbreviated, time: .shortened)
         }
         return module.state.title
+    }
+
+    private var failureSummary: String? {
+        guard let error = module.lastError else { return nil }
+        let summary = UpdateFailureFormatter.summary(from: error)
+        return summary.isEmpty ? nil : summary
     }
 
     private var statusColor: Color {
@@ -1767,13 +1776,13 @@ private struct ModuleDetailView: View {
     private var metadataPillLayout: some View {
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 8) {
-                StatusPill(state: module.state)
+                StatusPill(state: module.state, detail: failureSummary)
                 ForEach(metadataPills) { pill in
                     metadataPill(pill.title, systemImage: pill.systemImage)
                 }
             }
             VStack(alignment: .leading, spacing: 6) {
-                StatusPill(state: module.state)
+                StatusPill(state: module.state, detail: failureSummary)
                 ForEach(metadataPills) { pill in
                     metadataPill(pill.title, systemImage: pill.systemImage)
                 }

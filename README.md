@@ -161,7 +161,7 @@ EXPECT_ADHOC_SIGNATURE=0 \
 EXPECTED_CODESIGN_AUTHORITY="Surge Relay Self-Signed Code Signing" \
 ./script/verify_github_release_assets.sh \
   --repo junchan0412/SurgeRelay-macOS \
-  --tag v1.3.6
+  --tag v1.3.7
 ```
 
 ## 开源协议

@@ -3,6 +3,23 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.3.7</title>
+            <pubDate>Sat, 04 Jul 2026 21:41:31 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.7</link>
+            <sparkle:version>56</sparkle:version>
+            <sparkle:shortVersionString>1.3.7</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.3.7
+
+
+- 更新失败时会记录并展示更明确的原因；原始链接返回 404、403、429、超时、DNS 或 HTTPS 证书异常时，会在模块详情和顶部更新摘要中显示可读说明。
+- 更新流程会保留来源预检查失败原因；当转换阶段只返回泛化错误时，也能提示原始链接是否已经 404 或不可访问。
+- GitHub 自动发布新增空发布保护：没有任何独立发布模块、也没有进入总模块的模块时，会跳过自动发布，不再弹出“没有可发布的模块文件”失败提示。
+- GitHub 发布资产只跟随会发布的独立模块或总模块上传，避免未发布模块的 Script-Hub 生成资产被单独加入发布候选。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.3.7/Surge-Relay-1.3.7.app.zip" length="9283729" type="application/zip" sparkle:edSignature="tTDH8KCOZgA0SA44PRDEanzH/DFohWwZCj1bzUVrX3r9xGfsQlIuWlo4za9hOHkhbAGNME41JTHOTa44v/XnCw=="/>
+        </item>
+        <item>
             <title>1.3.6</title>
             <pubDate>Sat, 04 Jul 2026 21:20:59 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.6</link>

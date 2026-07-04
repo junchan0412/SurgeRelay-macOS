@@ -1033,6 +1033,7 @@ final class AppModel {
             var module = moduleValue
             let startedAt = Date.now
             var revisionSnapshot: SourceRevisionSnapshot?
+            var sourceCheckFailure: (any Error)?
             synchronizingModuleID = module.id
             setState(id: module.id, state: .updating, error: nil)
             statusMessage = "正在检查 \(module.name)…"
@@ -1075,6 +1076,7 @@ final class AppModel {
                             revisionSnapshot = snapshot
                         }
                     } catch {
+                        sourceCheckFailure = error
                         // A failed lightweight check must not prevent the normal conversion path.
                     }
                 }
@@ -1160,7 +1162,12 @@ final class AppModel {
             } catch {
                 guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
                 failures += 1
-                setState(id: module.id, state: .failed, error: error.localizedDescription)
+                let failureMessage = updateFailureMessage(
+                    for: error,
+                    module: module,
+                    sourceCheckFailure: sourceCheckFailure
+                )
+                setState(id: module.id, state: .failed, error: failureMessage)
                 if let cached = try? await fileStore.readComponent(id: module.id) {
                     let current = modules.first(where: { $0.id == module.id }) ?? module
                     let materialized = await processingWorker.materialize(
@@ -1175,7 +1182,7 @@ final class AppModel {
                         moduleName: module.name,
                         outcome: .cachedAfterFailure,
                         duration: Date.now.timeIntervalSince(startedAt),
-                        message: error.localizedDescription,
+                        message: failureMessage,
                         usedCache: true
                     ))
                 } else {
@@ -1187,7 +1194,7 @@ final class AppModel {
                         moduleName: module.name,
                         outcome: .failed,
                         duration: Date.now.timeIntervalSince(startedAt),
-                        message: error.localizedDescription
+                        message: failureMessage
                     ))
                 }
             }
@@ -1274,6 +1281,13 @@ final class AppModel {
     private func scheduleAutomaticPublish() {
         guard settings.publishToGitHub, settings.automaticallyPublish, settings.github.isConfigured else { return }
         guard !ensureGitHubTokenLoaded(showStatusMessage: false).isEmpty else { return }
+        guard PublishCoordinator.hasPublishableModuleSelection(
+            modules: modules,
+            combinedModuleEnabled: settings.combinedModuleEnabled
+        ) else {
+            clearAutomaticPublishSchedule()
+            return
+        }
         automaticPublishTask?.cancel()
         let scheduledAt = Date.now
         automaticPublishScheduledAt = scheduledAt
@@ -1293,6 +1307,11 @@ final class AppModel {
             }
             guard !self.ensureGitHubTokenLoaded(showStatusMessage: false).isEmpty else {
                 self.clearAutomaticPublishSchedule()
+                return
+            }
+            guard await self.hasGitHubPublishableFiles() else {
+                self.clearAutomaticPublishSchedule()
+                self.statusMessage = "没有启用发布的模块，已跳过 GitHub 自动发布"
                 return
             }
             self.clearAutomaticPublishSchedule()
@@ -1718,10 +1737,9 @@ final class AppModel {
         }
         if includeAssets {
             try checkCurrentWorkCancellation()
-            let assetModuleIDs = Set(
-                modules
-                    .filter(shouldUpdateModule)
-                    .map(\.id)
+            let assetModuleIDs = PublishCoordinator.publishableModuleIDs(
+                modules: modules,
+                combinedModuleEnabled: settings.combinedModuleEnabled
             )
             files.append(contentsOf: try await fileStore.generatedAssetFiles(for: assetModuleIDs))
         }
@@ -2248,6 +2266,34 @@ final class AppModel {
         guard !entries.isEmpty else { return }
         updateHistory = Array((entries.reversed() + updateHistory).prefix(200))
         PersistenceStore.saveUpdateHistory(updateHistory)
+    }
+
+    private func updateFailureMessage(
+        for error: any Error,
+        module: RelayModule,
+        sourceCheckFailure: (any Error)? = nil
+    ) -> String {
+        let current = modules.first(where: { $0.id == module.id }) ?? module
+        return UpdateFailureFormatter.detailedMessage(
+            for: error,
+            sourceURL: current.effectiveOriginalSourceURL,
+            sourceCheckError: sourceCheckFailure
+        )
+    }
+
+    private func hasGitHubPublishableFiles() async -> Bool {
+        if settings.combinedModuleEnabled,
+           modules.contains(where: \.isEnabled),
+           (try? await fileStore.readCombined()) != nil {
+            return true
+        }
+
+        for module in modules where module.publishesStandalone {
+            if await fileStore.hasComponent(id: module.id) {
+                return true
+            }
+        }
+        return false
     }
 
     private func localModuleOutputFolders() -> [String] {
