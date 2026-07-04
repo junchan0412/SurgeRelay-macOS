@@ -65,6 +65,10 @@ require_executable() {
   [[ -x "$1" ]] || fail "script is not executable: $1"
 }
 
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || fail "missing command: $1"
+}
+
 require_contains() {
   local file="$1"
   local needle="$2"
@@ -125,6 +129,29 @@ ok "verified version, Sparkle, and entitlement configuration"
 
 require_contains "$ROOT_DIR/CHANGELOG.md" "## $VERSION" "CHANGELOG.md"
 ok "verified changelog section for $VERSION"
+
+require_command node
+for resource in \
+  "$ROOT_DIR/SurgeRelay/WebResources/web-logic.js" \
+  "$ROOT_DIR/SurgeRelay/WebResources/web-options.js" \
+  "$ROOT_DIR/SurgeRelay/WebResources/web-format.js" \
+  "$ROOT_DIR/SurgeRelay/WebResources/web-markup.js" \
+  "$ROOT_DIR/SurgeRelay/WebResources/web-api.js" \
+  "$ROOT_DIR/SurgeRelay/WebResources/web-state.js" \
+  "$ROOT_DIR/SurgeRelay/WebResources/app.js"
+do
+  require_file "$resource"
+  node --check "$resource" >/dev/null
+done
+
+for web_test in \
+  "$ROOT_DIR/script/test_web_resources.mjs" \
+  "$ROOT_DIR/script/test_web_dom_resources.mjs"
+do
+  require_file "$web_test"
+  node "$web_test"
+done
+ok "verified web resource syntax and behavior tests"
 
 if [[ -f "$APPCAST_PATH" ]]; then
   xmllint --noout "$APPCAST_PATH"

@@ -176,7 +176,7 @@ Before importing signing certificates or calling GitHub, run the local release p
 VERSION=1.3.8 ./script/check_release_configuration.sh
 ```
 
-The preflight checks version/build consistency, Sparkle feed and public key metadata, the latest appcast entry, the release entitlement, shell syntax for release scripts, and the GitHub Actions release entrypoint.
+The preflight checks version/build consistency, Sparkle feed and public key metadata, Web resource syntax and behavior/DOM tests, the latest appcast entry, the release entitlement, shell syntax for release scripts, and the GitHub Actions release entrypoint.
 
 Build release assets with:
 
