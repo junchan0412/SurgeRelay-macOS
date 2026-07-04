@@ -14,6 +14,14 @@ This document records the project conventions needed to maintain this fork.
 - Local/GitHub publishing: `SurgeRelay/AppModel.swift`, `SurgeRelay/Services/ModuleFileStore.swift`, `SurgeRelay/Services/GitHubClient.swift`
 - Module metadata parsing: `SurgeRelay/Utilities/ModuleMetadataParser.swift`
 
+## View Boundaries
+
+Keep `ModulesView.swift` focused on the split-view shell, sidebar filtering, selection, editor presentation, and per-module detail composition.
+
+- `CombinedModuleViews.swift` owns the combined-module sidebar row, combined-module detail page, and publish-preview summary UI.
+- `DetailInfoViews.swift` owns reusable detail rows and section chrome used by module and combined-module detail pages.
+- Shared preview/editor components that are not specific to the module list stay in `Components.swift`.
+
 ## Publishing Model
 
 `AppSettings.storageMode` is retained as a legacy compatibility field. New code should use:
