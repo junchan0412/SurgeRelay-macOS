@@ -1905,38 +1905,18 @@ final class AppModel {
     }
 
     private func legacyOutputCleanupDirectories() -> [String] {
-        Self.legacyOutputCleanupDirectories(
+        LegacyOutputCleanupPlanner.cleanupDirectories(
             outputDirectory: settings.outputDirectory,
             configurationDirectory: configurationDirectoryPath,
             localModuleDirectory: settings.localModuleDirectory
         )
     }
 
-    nonisolated static func legacyOutputCleanupDirectories(
-        outputDirectory: String,
-        configurationDirectory: String,
-        localModuleDirectory: String
-    ) -> [String] {
-        let localRoot = URL(filePath: localModuleDirectory, directoryHint: .isDirectory)
-            .standardizedFileURL
-            .path
-        var seen = Set<String>()
-        return [outputDirectory, configurationDirectory].compactMap { path in
-            let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { return nil }
-            let standardized = URL(filePath: trimmed, directoryHint: .isDirectory).standardizedFileURL.path
-            guard standardized != localRoot, seen.insert(standardized).inserted else { return nil }
-            return standardized
-        }
-    }
-
     private func legacyPublishedRelativePaths() -> [String] {
-        [
-            settings.combinedModuleFileName,
-            "Surge-Relay.sgmodule",
-            settings.managedEngineFileName,
-            "Script-Hub-Relay.sgmodule"
-        ].map(FilenameSanitizer.sgmoduleName(from:))
+        LegacyOutputCleanupPlanner.publishedRelativePaths(
+            combinedModuleFileName: settings.combinedModuleFileName,
+            managedEngineFileName: settings.managedEngineFileName
+        )
     }
 
     var combinedRawURL: URL? {

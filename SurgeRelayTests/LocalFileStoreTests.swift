@@ -296,13 +296,28 @@ final class LocalFileStoreTests: XCTestCase {
         let localRoot = root.appending(path: "SurgeRoot", directoryHint: .isDirectory)
         let configuration = localRoot.appending(path: "Surge Relay", directoryHint: .isDirectory)
 
-        let directories = AppModel.legacyOutputCleanupDirectories(
+        let directories = LegacyOutputCleanupPlanner.cleanupDirectories(
             outputDirectory: localRoot.path,
             configurationDirectory: configuration.path,
             localModuleDirectory: localRoot.path
         )
 
         XCTAssertEqual(directories, [configuration.standardizedFileURL.path])
+    }
+
+    func testLegacyOutputCleanupPlannerBuildsKnownPublishedPaths() {
+        XCTAssertEqual(
+            LegacyOutputCleanupPlanner.publishedRelativePaths(
+                combinedModuleFileName: "Daily Relay",
+                managedEngineFileName: "Engine Relay"
+            ),
+            [
+                "Daily-Relay.sgmodule",
+                "Surge-Relay.sgmodule",
+                "Engine-Relay.sgmodule",
+                "Script-Hub-Relay.sgmodule"
+            ]
+        )
     }
 
     func testGeneratedAssetFilesCanBeFilteredByModuleID() async throws {
