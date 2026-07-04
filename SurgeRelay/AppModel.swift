@@ -1,7 +1,6 @@
 import AppKit
 import Foundation
 import Observation
-import Security
 
 enum AppRuntimeOptions {
     static var isUIQAMode: Bool {
@@ -64,19 +63,6 @@ final class AppModel {
     @ObservationIgnored private var githubModuleOutputFoldersLastRefreshedAt: Date?
     @ObservationIgnored private var githubModuleOutputFoldersConfiguration: GitHubSettings?
     @ObservationIgnored private static let automaticPublishDelaySeconds = 30
-
-    private struct GitHubTokenLoadResult {
-        var token: String
-        var storageStatus: CredentialStorageStatus
-        var shouldClearLegacyToken: Bool
-        var statusMessage: String?
-    }
-
-    private struct WebAccessTokenLoadResult {
-        var token: String
-        var storageStatus: CredentialStorageStatus
-        var statusMessage: String?
-    }
 
     init() {
         var loadedSettings = PersistenceStore.loadSettings()
@@ -141,80 +127,6 @@ final class AppModel {
         return true
     }
 
-    private static func loadGitHubToken(migratingLegacyToken legacyToken: String) -> GitHubTokenLoadResult {
-        let legacyToken = legacyToken.trimmingCharacters(in: .whitespacesAndNewlines)
-        do {
-            let storedToken = try KeychainStore.loadGitHubToken()
-            if !storedToken.isEmpty {
-                return GitHubTokenLoadResult(
-                    token: storedToken,
-                    storageStatus: .keychain,
-                    shouldClearLegacyToken: true,
-                    statusMessage: legacyToken.isEmpty ? nil : "GitHub Token 已改由系统钥匙串管理"
-                )
-            }
-            guard !legacyToken.isEmpty else {
-                return GitHubTokenLoadResult(
-                    token: "",
-                    storageStatus: .notConfigured,
-                    shouldClearLegacyToken: true
-                )
-            }
-            try KeychainStore.saveGitHubToken(legacyToken)
-            return GitHubTokenLoadResult(
-                token: legacyToken,
-                storageStatus: .keychain,
-                shouldClearLegacyToken: true,
-                statusMessage: "GitHub Token 已从同步配置迁移到系统钥匙串"
-            )
-        } catch {
-            guard !legacyToken.isEmpty else {
-                return GitHubTokenLoadResult(
-                    token: "",
-                    storageStatus: .unavailable,
-                    shouldClearLegacyToken: false
-                )
-            }
-            return GitHubTokenLoadResult(
-                token: legacyToken,
-                storageStatus: .legacyConfigurationFallback,
-                shouldClearLegacyToken: false,
-                statusMessage: "无法访问系统钥匙串，暂时沿用旧同步配置中的 GitHub Token"
-            )
-        }
-    }
-
-    private static func loadWebAccessToken() -> WebAccessTokenLoadResult {
-        do {
-            let storedToken = try KeychainStore.loadWebAccessToken()
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            if !storedToken.isEmpty {
-                return WebAccessTokenLoadResult(token: storedToken, storageStatus: .keychain)
-            }
-            let token = generateWebAccessToken()
-            try KeychainStore.saveWebAccessToken(token)
-            return WebAccessTokenLoadResult(token: token, storageStatus: .keychain)
-        } catch {
-            return WebAccessTokenLoadResult(
-                token: generateWebAccessToken(),
-                storageStatus: .memoryOnly,
-                statusMessage: "无法访问系统钥匙串，Web 管理访问令牌仅在本次运行中有效"
-            )
-        }
-    }
-
-    private static func generateWebAccessToken() -> String {
-        var bytes = [UInt8](repeating: 0, count: 32)
-        let status = bytes.withUnsafeMutableBytes { buffer in
-            SecRandomCopyBytes(kSecRandomDefault, buffer.count, buffer.baseAddress!)
-        }
-        if status == errSecSuccess {
-            return bytes.map { String(format: "%02x", $0) }.joined()
-        }
-        return UUID().uuidString.replacingOccurrences(of: "-", with: "")
-            + UUID().uuidString.replacingOccurrences(of: "-", with: "")
-    }
-
     @discardableResult
     func ensureGitHubTokenLoaded(showStatusMessage: Bool = false) -> String {
         let legacyToken = settings.githubToken.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -224,7 +136,7 @@ final class AppModel {
             return githubToken.trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
-        let tokenLoad = Self.loadGitHubToken(migratingLegacyToken: settings.githubToken)
+        let tokenLoad = CredentialTokenCoordinator.loadGitHubToken(migratingLegacyToken: settings.githubToken)
         githubToken = tokenLoad.token
         githubTokenStorageStatus = tokenLoad.storageStatus
         if tokenLoad.shouldClearLegacyToken {
@@ -242,7 +154,7 @@ final class AppModel {
         let current = webAccessToken.trimmingCharacters(in: .whitespacesAndNewlines)
         guard current.isEmpty || webAccessTokenStorageStatus == .notChecked else { return current }
 
-        let tokenLoad = Self.loadWebAccessToken()
+        let tokenLoad = CredentialTokenCoordinator.loadWebAccessToken()
         webAccessToken = tokenLoad.token
         webAccessTokenStorageStatus = tokenLoad.storageStatus
         if showStatusMessage, let message = tokenLoad.statusMessage {
@@ -276,7 +188,7 @@ final class AppModel {
     }
 
     func resetWebAccessToken() {
-        let token = Self.generateWebAccessToken()
+        let token = CredentialTokenCoordinator.generateWebAccessToken()
         webAccessToken = token
         do {
             try KeychainStore.saveWebAccessToken(token)

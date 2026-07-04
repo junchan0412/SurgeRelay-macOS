@@ -26,6 +26,7 @@
 		D20D20D20D20D20D20D20D20 /* ModulePreviewContentProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20E20E20E20E20E20E20E20 /* ModulePreviewContentProvider.swift */; };
 		D30D30D30D30D30D30D30D30 /* ModuleNamingPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E30E30E30E30E30E30E30E30 /* ModuleNamingPlanner.swift */; };
 		D40D40D40D40D40D40D40D40 /* PublishedAddressResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = E40E40E40E40E40E40E40E40 /* PublishedAddressResolver.swift */; };
+		D50D50D50D50D50D50D50D50 /* CredentialTokenCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E50E50E50E50E50E50E50E50 /* CredentialTokenCoordinator.swift */; };
 		280C7E38DAD9F18ED8090287 /* ModuleEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E43B99091BF5C4100CE1DA0E /* ModuleEditorView.swift */; };
 		285A582F1C5CC5AF92DF0E7B /* doc.text.svg in Resources */ = {isa = PBXBuildFile; fileRef = 891546F1DD330D7407BFA7E0 /* doc.text.svg */; };
 		2AD845464760705F3E0982BE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3AE70978C59AAF84436C3194 /* Assets.xcassets */; };
@@ -207,6 +208,7 @@
 		E20E20E20E20E20E20E20E20 /* ModulePreviewContentProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModulePreviewContentProvider.swift; sourceTree = "<group>"; };
 		E30E30E30E30E30E30E30E30 /* ModuleNamingPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleNamingPlanner.swift; sourceTree = "<group>"; };
 		E40E40E40E40E40E40E40E40 /* PublishedAddressResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishedAddressResolver.swift; sourceTree = "<group>"; };
+		E50E50E50E50E50E50E50E50 /* CredentialTokenCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialTokenCoordinator.swift; sourceTree = "<group>"; };
 		BDD7A6C8082510469A2FA843 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		C9B8AF8AB1ACDCB66A0C8FC1 /* checkmark.svg */ = {isa = PBXFileReference; path = checkmark.svg; sourceTree = "<group>"; };
 		D0DDEE5D89E10E2659D8FC1F /* network.svg */ = {isa = PBXFileReference; path = network.svg; sourceTree = "<group>"; };
@@ -290,6 +292,7 @@
 				354B1BF761ABD7AADD982A17 /* EngineStore.swift */,
 				6D546CD4ADCE23EA73DE271A /* GitHubClient.swift */,
 				6B63578065A9F7B8CC166FF2 /* KeychainStore.swift */,
+				E50E50E50E50E50E50E50E50 /* CredentialTokenCoordinator.swift */,
 				00FF1B0D1608D65FBA6451BE /* LaunchAtLoginService.swift */,
 				B91B91B91B91B91B91B91B91 /* LegacyOutputCleanupPlanner.swift */,
 				B92B92B92B92B92B92B92B92 /* LocalModuleScanner.swift */,
@@ -611,6 +614,7 @@
 				407E672ECAD57CD270BB44B7 /* FilenameSanitizer.swift in Sources */,
 				CA5FB083B1568EEEEA50DBAF /* GitHubClient.swift in Sources */,
 				75B5F5E0E0AF845CD0C5FACE /* KeychainStore.swift in Sources */,
+				D50D50D50D50D50D50D50D50 /* CredentialTokenCoordinator.swift in Sources */,
 				91BF72296DEE134A528EDF1B /* LaunchAtLoginService.swift in Sources */,
 				91C91C91C91C91C91C91C91C /* LegacyOutputCleanupPlanner.swift in Sources */,
 				92C92C92C92C92C92C92C92C /* LocalModuleScanner.swift in Sources */,

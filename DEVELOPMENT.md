@@ -64,6 +64,8 @@ Module output naming belongs in `ModuleNamingPlanner`. Keep output-file uniquene
 
 User-visible publish addresses belong in `PublishedAddressResolver`. Keep GitHub publication gating, standalone module URL eligibility, combined-module GitHub URL generation, and local combined-module file URL generation there. `AppSettings` should remain configuration data, while AppModel, views, Web management, and diagnostics consume resolved addresses through AppModel forwarding properties.
 
+Credential loading and token migration belong in `CredentialTokenCoordinator`. Keep GitHub Token legacy-settings migration, keychain-unavailable fallback, Web management access-token generation, and memory-only degradation there. `AppModel` should apply the returned token, storage status, status message, and persistence side effects rather than duplicating keychain decision branches inline.
+
 ## Existing Module Safety
 
 Do not overwrite or delete user-owned modules unless the file is known to be managed by Surge Relay.

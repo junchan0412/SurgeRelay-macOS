@@ -18,6 +18,7 @@
 - 将模块预览内容读取、本地 Surge 源文件缓存恢复、参数物化和元数据应用抽出到 `ModulePreviewContentProvider`，让 AppModel 继续收敛为状态协调器。
 - 将模块输出文件命名、本地存储相对路径推导、格式探测和启动时命名归一化抽出到 `ModuleNamingPlanner`，并补充本地原模块路径保护与重名规避测试。
 - 将总模块 GitHub 地址、本地总模块文件地址和独立模块订阅地址解析抽出到 `PublishedAddressResolver`，让设置模型只保留配置数据。
+- 将 GitHub Token 旧配置迁移、钥匙串加载失败回退和 Web 管理访问令牌生成抽出到 `CredentialTokenCoordinator`，并补齐无真实钥匙串依赖的异常分支测试。
 - 将维护文档和 Release 构建脚本的默认 Xcode 路径更新为 macOS 27 beta 使用的 `Xcode-beta.app`，脚本仍保留旧路径作为 fallback。
 - 404 更新失败说明补充仓库公开性和访问权限检查建议；Web 管理端失败详情新增“复制错误”按钮。
 - Web 管理端新增失败模块筛选按钮，可在存在更新失败时一键只看失败模块。
