@@ -34,6 +34,35 @@
     return summary ? `${stateTitle}：${summary}` : stateTitle;
   }
 
+  function moduleSearchText(module) {
+    return [
+      module.name,
+      module.sourceURL,
+      module.effectiveOriginalSourceURL,
+      module.sourceFormatTitle,
+      module.sourceOriginTitle,
+      module.storageLocationTitle,
+      module.relationshipSummary,
+      module.outputFileName,
+      module.publishedRelativePath,
+      module.category,
+      module.outputFolder,
+      module.iconURL,
+      module.customIconURL,
+      module.stateTitle,
+      module.sourceContentHash,
+      module.sourceETag,
+      module.sourceLastModified,
+      module.lastError,
+      module.publishesStandalone ? '独立模块' : '不发布独立模块'
+    ].map(value => String(value ?? '')).join('\n').toLocaleLowerCase();
+  }
+
+  function moduleMatchesSearch(module, query) {
+    const normalizedQuery = String(query || '').trim().toLocaleLowerCase();
+    return !normalizedQuery || moduleSearchText(module).includes(normalizedQuery);
+  }
+
   function folderTitle(folder) {
     return folder ? folder : '根目录';
   }
@@ -127,6 +156,8 @@
     moduleListSignature,
     moduleSubtitle,
     moduleStatusTitle,
+    moduleSearchText,
+    moduleMatchesSearch,
     folderTitle,
     publishedRelativePathForDraft,
     outputPathNotice,

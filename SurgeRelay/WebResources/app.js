@@ -406,14 +406,8 @@ function patchSidebarLive() {
 
 function renderSidebar() {
   if (!state) return;
-  const query = ui.search.value.trim().toLocaleLowerCase();
-  const modules = state.modules.filter(module => [
-    module.name, module.sourceURL, module.effectiveOriginalSourceURL, module.sourceFormatTitle,
-    module.sourceOriginTitle, module.storageLocationTitle, module.relationshipSummary,
-    module.outputFileName, module.publishedRelativePath, module.category, module.outputFolder, module.iconURL, module.customIconURL,
-    module.sourceContentHash, module.sourceETag, module.sourceLastModified, module.lastError,
-    module.publishesStandalone ? '独立模块' : '不发布独立模块'
-  ].join('\n').toLocaleLowerCase().includes(query));
+  const query = ui.search.value.trim();
+  const modules = state.modules.filter(module => webLogic.moduleMatchesSearch(module, query));
   ui.summaryRow.hidden = !state.combined.isEnabled;
   if (state.combined.isEnabled) ui.summarySubtitle.textContent = `${state.combined.enabledCount} 个来源 · 总模块订阅`;
   ui.summaryRow.classList.toggle('selected', state.combined.isEnabled && selectedID === 'combined');

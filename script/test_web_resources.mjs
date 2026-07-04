@@ -94,6 +94,40 @@ assert.notEqual(
 );
 
 assert.equal(
+  logic.moduleMatchesSearch({
+    ...signatureBase,
+    outputFileName: 'Demo File.sgmodule',
+    category: 'Ads',
+    lastError: '原始链接返回 404',
+    publishesStandalone: false
+  }, ' demo file '),
+  true
+);
+assert.equal(
+  logic.moduleMatchesSearch({
+    ...signatureBase,
+    outputFileName: 'Demo File.sgmodule',
+    category: 'Ads',
+    lastError: '原始链接返回 404',
+    publishesStandalone: false
+  }, '原始链接返回 404'),
+  true
+);
+assert.equal(
+  logic.moduleMatchesSearch({
+    ...signatureBase,
+    outputFileName: 'Demo File.sgmodule',
+    category: 'Ads',
+    publishesStandalone: false
+  }, '不发布独立模块'),
+  true
+);
+assert.equal(
+  logic.moduleMatchesSearch(signatureBase, '不存在的模块字段'),
+  false
+);
+
+assert.equal(
   logic.moduleSubtitle({
     relationshipSummary: 'GitHub 模块 · 远程 Surge 模块',
     category: 'Ads',
