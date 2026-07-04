@@ -58,6 +58,16 @@ const {
   advancedGroupMarkup
 } = webMarkup;
 
+const webAPI = window.SurgeRelayWebAPI;
+if (!webAPI) throw new Error('web-api.js must load before app.js');
+const apiClient = webAPI.createAPIClient({
+  fetch: window.fetch.bind(window),
+  Headers: window.Headers,
+  location: window.location,
+  history: window.history,
+  prompt: message => window.prompt(message)
+});
+
 let state = null;
 let selectedID = null;
 let detailTab = 'info';
@@ -71,11 +81,10 @@ let nameLookupTimer = null;
 let nameLookupSequence = 0;
 let autoFilledName = '';
 let manualNameEdited = false;
-let webAccessToken = '';
 let stateEvents = null;
 const mobileLayout = window.matchMedia('(max-width: 700px)');
 
-initializeAccessToken();
+apiClient.initializeAccessToken();
 initializeHistoryState();
 
 ui.advancedOptions.innerHTML = `<p class="advanced-intro">这些选项由 App 内置的 Script‑Hub 引擎执行，并随当前模块保存。留空即采用上游默认行为。</p>${advancedGroups.map(advancedGroupMarkup).join('')}`;
@@ -136,35 +145,12 @@ ui.detail.addEventListener('click', handleDetailClick);
 ui.detail.addEventListener('change', handleDetailChange);
 window.addEventListener('popstate', handleHistoryNavigation);
 
-establishSession()
+apiClient.establishSession()
   .catch(error => showToast(error.message, true))
   .finally(() => loadState(true, true).finally(startStateEvents));
 
-async function api(path, options = {}) {
-  const headers = new Headers(options.headers || {});
-  let body = options.body;
-  if (options.json !== undefined) { headers.set('Content-Type', 'application/json'); body = JSON.stringify(options.json); }
-  if (options.includeAccessToken && webAccessToken) headers.set('Authorization', `Bearer ${webAccessToken}`);
-  const response = await fetch(path, {
-    method: options.method || 'GET',
-    headers,
-    body,
-    credentials: 'same-origin'
-  });
-  if (response.status === 401 && await promptForAccessToken()) {
-    if (path !== '/api/session') {
-      await establishSession();
-      return api(path, options);
-    }
-    return api(path, options);
-  }
-  if (!response.ok) {
-    let message = `请求失败（${response.status}）`;
-    try { message = (await response.json()).message || message; } catch (_) {}
-    throw new Error(message);
-  }
-  const contentType = response.headers.get('content-type') || '';
-  return contentType.includes('application/json') ? response.json() : response.text();
+function api(path, options = {}) {
+  return apiClient.request(path, options);
 }
 
 async function loadState(initial = false, renderCurrentDetail = false) {
@@ -238,37 +224,11 @@ function startStateEvents() {
     stateEvents?.close();
     stateEvents = null;
     if (!document.hidden) {
-      establishSession()
+      apiClient.establishSession()
         .catch(() => {})
         .finally(() => loadState(false, false).finally(() => setTimeout(startStateEvents, 3000)));
     }
   };
-}
-
-async function establishSession() {
-  if (!webAccessToken) return;
-  await api('/api/session', { method: 'POST', includeAccessToken: true });
-}
-
-function initializeAccessToken() {
-  const url = new URL(location.href);
-  const token = url.searchParams.get('token') || '';
-  webAccessToken = token.trim();
-  if (token) {
-    url.searchParams.delete('token');
-    history.replaceState(history.state, '', url);
-  }
-}
-
-function storeAccessToken(token) {
-  webAccessToken = token.trim();
-}
-
-async function promptForAccessToken() {
-  const token = window.prompt('请输入 Web 管理访问令牌');
-  if (!token) return false;
-  storeAccessToken(token);
-  return true;
 }
 
 function patchLiveState(previous, next) {

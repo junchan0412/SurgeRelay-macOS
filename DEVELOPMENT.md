@@ -117,6 +117,8 @@ Web management formatting helpers live in `WebResources/web-format.js`. Keep HTM
 
 Web management markup helpers live in `WebResources/web-markup.js`. Keep reusable HTML fragments such as detail rows, preview shells, argument controls, advanced option rows, latest-publish sections, and publish-file lists there; `app.js` should compose those fragments with live state instead of owning their escaping details.
 
+Web management API/session helpers live in `WebResources/web-api.js`. Keep URL token extraction, session bootstrap, request headers, JSON body handling, same-origin credentials, error payload parsing, and 401 token retry there; `app.js` should call the client instead of directly owning fetch/session details.
+
 ## Build And Test
 
 `ModelAndCoordinatorTests.swift` owns pure model/coordinator coverage, including source metadata restoration, update failure formatting, summary counts, diagnostics, preview content, and credential coordination. `ModulePlanningTests.swift` owns module naming, draft validation and planning, local import planning, output path inspection, output-folder catalogs, and local self-export protection. `AppSettingsTests.swift` owns settings decoding, migration defaults, and combined-module setting defaults. `SecurityDiagnosticsTests.swift` owns keychain round trips, credential diagnostics, keychain probe snapshots, and installation diagnostics. `ScriptHubTests.swift` owns Script-Hub conversion URLs, upstream pinning and script hashes, embedded-engine bridge safety, native Surge conversion, argument materialization, advanced option summaries, and sanitizer behavior. `PublishPlannerTests.swift` owns publish-plan selection, GitHub publish result planning, automatic publish status text, update-completion status text, publish-file assembly, and local published-file manifest planning. `LocalFileStoreTests.swift` owns local configuration migration, local module scanning, local publish safety, legacy cleanup, root diagnostics, and generated asset file coverage. `WebManagementTests.swift` owns Web management request parsing, API payload, session cookie, same-origin, throttling, response hardening, and icon content-type coverage. `GitHubReleaseTests.swift` owns GitHub settings, remote directory discovery, release asset parsing, checksum validation, and install guidance coverage. `GitHubPublishTests.swift` owns GitHub publish diffing, preview, duplicate path rejection, commit snapshots, and reference-move retry coverage; GitHub network fakes belong in `GitHubTestSupport.swift`. Keep shrinking the larger test files by moving similarly cohesive tests into focused files instead of adding more unrelated cases there.
@@ -128,6 +130,7 @@ node --check SurgeRelay/WebResources/web-logic.js
 node --check SurgeRelay/WebResources/web-options.js
 node --check SurgeRelay/WebResources/web-format.js
 node --check SurgeRelay/WebResources/web-markup.js
+node --check SurgeRelay/WebResources/web-api.js
 node --check SurgeRelay/WebResources/app.js
 node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs

@@ -6,11 +6,13 @@ const logicSource = readFileSync(new URL('../SurgeRelay/WebResources/web-logic.j
 const optionsSource = readFileSync(new URL('../SurgeRelay/WebResources/web-options.js', import.meta.url), 'utf8');
 const formatSource = readFileSync(new URL('../SurgeRelay/WebResources/web-format.js', import.meta.url), 'utf8');
 const markupSource = readFileSync(new URL('../SurgeRelay/WebResources/web-markup.js', import.meta.url), 'utf8');
+const apiSource = readFileSync(new URL('../SurgeRelay/WebResources/web-api.js', import.meta.url), 'utf8');
 const context = vm.createContext({ console, URL });
 vm.runInContext(logicSource, context, { filename: 'web-logic.js' });
 vm.runInContext(optionsSource, context, { filename: 'web-options.js' });
 vm.runInContext(formatSource, context, { filename: 'web-format.js' });
 vm.runInContext(markupSource, context, { filename: 'web-markup.js' });
+vm.runInContext(apiSource, context, { filename: 'web-api.js' });
 
 const logic = context.SurgeRelayWebLogic;
 assert.ok(logic, 'web logic should install a global testable API');
@@ -20,6 +22,8 @@ const format = context.SurgeRelayWebFormat;
 assert.ok(format, 'web format should install a global testable API');
 const markup = context.SurgeRelayWebMarkup;
 assert.ok(markup, 'web markup should install a global testable API');
+const api = context.SurgeRelayWebAPI;
+assert.ok(api, 'web api should install a global testable API');
 assert.equal(options.scriptHubDefaults.removeCommentedRewrites, true);
 assert.ok(
   options.advancedGroups.some(group => group.id === 'script-conversion'),
@@ -188,17 +192,73 @@ assert.match(markup.latestPublishSection({
   deletedFiles: ['Old.sgmodule']
 }), /A&amp;B\.sgmodule/);
 
+const tokenHistory = { state: { route: 'modules' }, replacedURL: '', replaceState(state, title, url) { this.state = state; this.replacedURL = String(url); } };
+const tokenClient = api.createAPIClient({
+  fetch: async () => ({ ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => ({ ok: true }) }),
+  Headers,
+  location: { href: 'https://relay.example.test/?token=secret-token&module=one' },
+  history: tokenHistory
+});
+assert.equal(tokenClient.initializeAccessToken(), 'secret-token');
+assert.equal(tokenClient.accessToken, 'secret-token');
+assert.doesNotMatch(tokenHistory.replacedURL, /token=/);
+assert.match(tokenHistory.replacedURL, /module=one/);
+
+let capturedRequest = null;
+const requestClient = api.createAPIClient({
+  fetch: async (path, options) => {
+    capturedRequest = { path, options };
+    return {
+      ok: true,
+      status: 200,
+      headers: { get: name => name.toLowerCase() === 'content-type' ? 'application/json' : '' },
+      json: async () => ({ saved: true })
+    };
+  },
+  Headers,
+  accessToken: 'token-1'
+});
+assert.deepEqual(await requestClient.request('/api/demo', {
+  method: 'POST',
+  json: { enabled: true },
+  includeAccessToken: true
+}), { saved: true });
+assert.equal(capturedRequest.path, '/api/demo');
+assert.equal(capturedRequest.options.method, 'POST');
+assert.equal(capturedRequest.options.credentials, 'same-origin');
+assert.equal(capturedRequest.options.headers.get('Content-Type'), 'application/json');
+assert.equal(capturedRequest.options.headers.get('Authorization'), 'Bearer token-1');
+assert.equal(capturedRequest.options.body, '{"enabled":true}');
+
+const retryPaths = [];
+const retryClient = api.createAPIClient({
+  fetch: async path => {
+    retryPaths.push(path);
+    if (retryPaths.length === 1) {
+      return { ok: false, status: 401, headers: { get: () => '' }, json: async () => ({ message: 'unauthorized' }) };
+    }
+    return { ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => ({ recovered: true }) };
+  },
+  Headers,
+  prompt: () => 'fresh-token'
+});
+assert.deepEqual(await retryClient.request('/api/state'), { recovered: true });
+assert.deepEqual(retryPaths, ['/api/state', '/api/session', '/api/state']);
+assert.equal(retryClient.accessToken, 'fresh-token');
+
 const indexHTML = readFileSync(new URL('../SurgeRelay/WebResources/index.html', import.meta.url), 'utf8');
 const logicScriptIndex = indexHTML.indexOf('/web-logic.js');
 const optionsScriptIndex = indexHTML.indexOf('/web-options.js');
 const formatScriptIndex = indexHTML.indexOf('/web-format.js');
 const markupScriptIndex = indexHTML.indexOf('/web-markup.js');
+const apiScriptIndex = indexHTML.indexOf('/web-api.js');
 const appScriptIndex = indexHTML.indexOf('/app.js');
 assert.ok(logicScriptIndex >= 0, 'index should load web-logic.js');
 assert.ok(optionsScriptIndex > logicScriptIndex, 'web-options.js must load after web-logic.js');
 assert.ok(formatScriptIndex > optionsScriptIndex, 'web-format.js must load after web-options.js');
 assert.ok(markupScriptIndex > formatScriptIndex, 'web-markup.js must load after web-format.js');
-assert.ok(appScriptIndex > markupScriptIndex, 'web-markup.js must load before app.js');
+assert.ok(apiScriptIndex > markupScriptIndex, 'web-api.js must load after web-markup.js');
+assert.ok(appScriptIndex > apiScriptIndex, 'web-api.js must load before app.js');
 assert.match(indexHTML, /name="storageLocation"/);
 assert.match(indexHTML, /name="outputFolder"/);
 assert.match(indexHTML, /id="output-path-preview"/);
