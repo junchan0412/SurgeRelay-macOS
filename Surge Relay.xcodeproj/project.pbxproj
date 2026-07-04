@@ -96,6 +96,7 @@
 		A44A44A44A44A44A44A44A44 /* LocalModuleImportPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B44B44B44B44B44B44B44B44 /* LocalModuleImportPreviewView.swift */; };
 		A55A55A55A55A55A55A55A55 /* ModuleDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B55B55B55B55B55B55B55B55 /* ModuleDetailView.swift */; };
 		A80A80A80A80A80A80A80A80 /* ModuleSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80B80B80B80B80B80B80B80 /* ModuleSidebarView.swift */; };
+		A81A81A81A81A81A81A81A81 /* ModuleDetailSummaryHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B81B81B81B81B81B81B81B81 /* ModuleDetailSummaryHeader.swift */; };
 		A66A66A66A66A66A66A66A66 /* SettingsCredentialsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B96B96B96B96B96B96B96B96 /* SettingsCredentialsView.swift */; };
 		A77A77A77A77A77A77A77A77 /* SettingsWebManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B97B97B97B97B97B97B97B97 /* SettingsWebManagementView.swift */; };
 		A78A78A78A78A78A78A78A78 /* SettingsGeneralView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B98B98B98B98B98B98B98B98 /* SettingsGeneralView.swift */; };
@@ -217,6 +218,7 @@
 		B44B44B44B44B44B44B44B44 /* LocalModuleImportPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModuleImportPreviewView.swift; sourceTree = "<group>"; };
 		B55B55B55B55B55B55B55B55 /* ModuleDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleDetailView.swift; sourceTree = "<group>"; };
 		B80B80B80B80B80B80B80B80 /* ModuleSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleSidebarView.swift; sourceTree = "<group>"; };
+		B81B81B81B81B81B81B81B81 /* ModuleDetailSummaryHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleDetailSummaryHeader.swift; sourceTree = "<group>"; };
 		B92B92B92B92B92B92B92B92 /* LocalModuleScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModuleScanner.swift; sourceTree = "<group>"; };
 		B93B93B93B93B93B93B93B93 /* LocalModuleImportPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModuleImportPlanner.swift; sourceTree = "<group>"; };
 		B94B94B94B94B94B94B94B94 /* ModuleSearchIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleSearchIndex.swift; sourceTree = "<group>"; };
@@ -304,6 +306,7 @@
 				B22B22B22B22B22B22B22B22 /* DetailInfoViews.swift */,
 				B44B44B44B44B44B44B44B44 /* LocalModuleImportPreviewView.swift */,
 				B79782FA982FB6C66E5D50BA /* MenuBarContent.swift */,
+				B81B81B81B81B81B81B81B81 /* ModuleDetailSummaryHeader.swift */,
 				B55B55B55B55B55B55B55B55 /* ModuleDetailView.swift */,
 				E43B99091BF5C4100CE1DA0E /* ModuleEditorView.swift */,
 				B80B80B80B80B80B80B80B80 /* ModuleSidebarView.swift */,
@@ -694,6 +697,7 @@
 				709FF80593ADF6216AF25D9D /* RelayModule.swift in Sources */,
 				AA8F7B5F28379ACDB4DDEDB9 /* RootView.swift in Sources */,
 				A80A80A80A80A80A80A80A80 /* ModuleSidebarView.swift in Sources */,
+				A81A81A81A81A81A81A81A81 /* ModuleDetailSummaryHeader.swift in Sources */,
 				089528920AE30C1DC82F1C30 /* ScriptHubAdvancedOptionsView.swift in Sources */,
 				3EE4F5BD7D273B859D69002E /* ScriptHubClient.swift in Sources */,
 				B9B9B9B9B9B9B9B9B9B9B9B9 /* SettingsComponents.swift in Sources */,
