@@ -7,12 +7,14 @@ const optionsSource = readFileSync(new URL('../SurgeRelay/WebResources/web-optio
 const formatSource = readFileSync(new URL('../SurgeRelay/WebResources/web-format.js', import.meta.url), 'utf8');
 const markupSource = readFileSync(new URL('../SurgeRelay/WebResources/web-markup.js', import.meta.url), 'utf8');
 const apiSource = readFileSync(new URL('../SurgeRelay/WebResources/web-api.js', import.meta.url), 'utf8');
+const stateSource = readFileSync(new URL('../SurgeRelay/WebResources/web-state.js', import.meta.url), 'utf8');
 const context = vm.createContext({ console, URL });
 vm.runInContext(logicSource, context, { filename: 'web-logic.js' });
 vm.runInContext(optionsSource, context, { filename: 'web-options.js' });
 vm.runInContext(formatSource, context, { filename: 'web-format.js' });
 vm.runInContext(markupSource, context, { filename: 'web-markup.js' });
 vm.runInContext(apiSource, context, { filename: 'web-api.js' });
+vm.runInContext(stateSource, context, { filename: 'web-state.js' });
 
 const logic = context.SurgeRelayWebLogic;
 assert.ok(logic, 'web logic should install a global testable API');
@@ -24,6 +26,8 @@ const markup = context.SurgeRelayWebMarkup;
 assert.ok(markup, 'web markup should install a global testable API');
 const api = context.SurgeRelayWebAPI;
 assert.ok(api, 'web api should install a global testable API');
+const stateHelpers = context.SurgeRelayWebState;
+assert.ok(stateHelpers, 'web state should install a global testable API');
 assert.equal(options.scriptHubDefaults.removeCommentedRewrites, true);
 assert.ok(
   options.advancedGroups.some(group => group.id === 'script-conversion'),
@@ -246,19 +250,106 @@ assert.deepEqual(await retryClient.request('/api/state'), { recovered: true });
 assert.deepEqual(retryPaths, ['/api/state', '/api/session', '/api/state']);
 assert.equal(retryClient.accessToken, 'fresh-token');
 
+const navigationState = {
+  combined: { isEnabled: true },
+  modules: [{ id: 'module-1' }, { id: 'module-2' }]
+};
+assert.equal(stateHelpers.combinedEnabled(navigationState), true);
+assert.equal(stateHelpers.fallbackSelection(navigationState, false), 'combined');
+assert.equal(stateHelpers.fallbackSelection(navigationState, true), null);
+const requestedSelection = stateHelpers.resolveInitialSelection(navigationState, {
+  requestedModuleID: 'module-2',
+  isMobile: false
+});
+assert.equal(requestedSelection.selectedID, 'module-2');
+assert.equal(requestedSelection.hasSelection, true);
+const mobileSelection = stateHelpers.resolveInitialSelection(navigationState, {
+  requestedModuleID: 'missing',
+  isMobile: true
+});
+assert.equal(mobileSelection.selectedID, null);
+assert.equal(mobileSelection.hasSelection, false);
+const normalizedSelection = stateHelpers.normalizeSelection({
+  combined: { isEnabled: false },
+  modules: [{ id: 'module-1' }]
+}, 'combined', false);
+assert.equal(normalizedSelection.selectedID, 'module-1');
+assert.equal(normalizedSelection.changed, true);
+assert.equal(
+  stateHelpers.moduleIDFromLocation({ href: 'https://relay.example.test/?module=module-1&token=redacted' }),
+  'module-1'
+);
+assert.doesNotMatch(
+  String(stateHelpers.urlWithoutModule({ href: 'https://relay.example.test/?module=module-1&token=redacted' })),
+  /module=/
+);
+assert.match(
+  String(stateHelpers.urlWithModule({ href: 'https://relay.example.test/?token=redacted' }, 'module-2')),
+  /module=module-2/
+);
+
+let eventSource = null;
+const appliedStates = [];
+const reloads = [];
+const reconnectTimers = [];
+let sessionRefreshCount = 0;
+class TestEventSource {
+  constructor(url) {
+    this.url = url;
+    this.listeners = new Map();
+    eventSource = this;
+  }
+
+  addEventListener(type, handler) {
+    this.listeners.set(type, handler);
+  }
+
+  close() {
+    this.closed = true;
+  }
+}
+const eventController = stateHelpers.createStateEventController({
+  EventSource: TestEventSource,
+  document: { hidden: false },
+  setInterval: () => 0,
+  setTimeout: (handler, delay) => {
+    reconnectTimers.push({ handler, delay });
+    return reconnectTimers.length;
+  },
+  applyState: (...args) => appliedStates.push(args),
+  loadState: async (...args) => reloads.push(args),
+  establishSession: async () => { sessionRefreshCount += 1; },
+  reconnectDelay: 25
+});
+eventController.start();
+assert.equal(eventSource.url, '/api/events');
+eventSource.listeners.get('state')({ data: '{"modules":[]}' });
+assert.equal(appliedStates[0][0].modules.length, 0);
+assert.equal(appliedStates[0][1], false);
+assert.equal(appliedStates[0][2], false);
+eventSource.onerror();
+await new Promise(resolve => setImmediate(resolve));
+await new Promise(resolve => setImmediate(resolve));
+assert.equal(eventSource.closed, true);
+assert.equal(sessionRefreshCount, 1);
+assert.deepEqual(reloads[0], [false, false]);
+assert.equal(reconnectTimers[0].delay, 25);
+
 const indexHTML = readFileSync(new URL('../SurgeRelay/WebResources/index.html', import.meta.url), 'utf8');
 const logicScriptIndex = indexHTML.indexOf('/web-logic.js');
 const optionsScriptIndex = indexHTML.indexOf('/web-options.js');
 const formatScriptIndex = indexHTML.indexOf('/web-format.js');
 const markupScriptIndex = indexHTML.indexOf('/web-markup.js');
 const apiScriptIndex = indexHTML.indexOf('/web-api.js');
+const stateScriptIndex = indexHTML.indexOf('/web-state.js');
 const appScriptIndex = indexHTML.indexOf('/app.js');
 assert.ok(logicScriptIndex >= 0, 'index should load web-logic.js');
 assert.ok(optionsScriptIndex > logicScriptIndex, 'web-options.js must load after web-logic.js');
 assert.ok(formatScriptIndex > optionsScriptIndex, 'web-format.js must load after web-options.js');
 assert.ok(markupScriptIndex > formatScriptIndex, 'web-markup.js must load after web-format.js');
 assert.ok(apiScriptIndex > markupScriptIndex, 'web-api.js must load after web-markup.js');
-assert.ok(appScriptIndex > apiScriptIndex, 'web-api.js must load before app.js');
+assert.ok(stateScriptIndex > apiScriptIndex, 'web-state.js must load after web-api.js');
+assert.ok(appScriptIndex > stateScriptIndex, 'web-state.js must load before app.js');
 assert.match(indexHTML, /name="storageLocation"/);
 assert.match(indexHTML, /name="outputFolder"/);
 assert.match(indexHTML, /id="output-path-preview"/);

@@ -18,6 +18,7 @@
 - 将 Web 管理端 HTML 转义、日期格式化和预览高亮抽出到 `web-format.js`，继续缩小 `app.js` 的渲染辅助职责。
 - 将 Web 管理端详情行、预览壳、参数行、高级选项和发布文件列表 markup 抽出到 `web-markup.js`，让 `app.js` 更专注于状态、API 与事件。
 - 将 Web 管理端访问令牌提取、会话建立、统一请求和 401 重试抽出到 `web-api.js`，让 `app.js` 继续收敛为 UI 状态协调。
+- 将 Web 管理端初始选择、移动端历史 URL 和 EventSource 重连抽出到 `web-state.js`，减少 `app.js` 中页面状态协调逻辑。
 - 将 Web 管理 HTTP 请求/响应模型、解析器、认证节流和安全响应头抽出到 `WebManagementHTTP.swift`，让 `WebManagementServer` 更专注于 Network 连接生命周期。
 - 将桌面端模块搜索索引抽出到 `ModuleSearchIndex` 服务文件，避免主模块视图继续承载纯搜索字段拼装逻辑。
 - 将设置页通用表单、分区、行组件和窗口 chrome 配置抽出到 `SettingsComponents.swift`，为后续继续拆分凭据与诊断页面降低耦合。

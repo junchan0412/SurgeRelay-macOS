@@ -68,6 +68,9 @@ const apiClient = webAPI.createAPIClient({
   prompt: message => window.prompt(message)
 });
 
+const webState = window.SurgeRelayWebState;
+if (!webState) throw new Error('web-state.js must load before app.js');
+
 let state = null;
 let selectedID = null;
 let detailTab = 'info';
@@ -81,8 +84,16 @@ let nameLookupTimer = null;
 let nameLookupSequence = 0;
 let autoFilledName = '';
 let manualNameEdited = false;
-let stateEvents = null;
 const mobileLayout = window.matchMedia('(max-width: 700px)');
+const stateEventController = webState.createStateEventController({
+  EventSource: window.EventSource,
+  document,
+  setInterval: window.setInterval.bind(window),
+  setTimeout: window.setTimeout.bind(window),
+  loadState: (...args) => loadState(...args),
+  applyState: (...args) => applyState(...args),
+  establishSession: () => apiClient.establishSession()
+});
 
 apiClient.initializeAccessToken();
 initializeHistoryState();
@@ -165,17 +176,12 @@ function applyState(next, initial = false, renderCurrentDetail = false) {
     const previousSelectedID = selectedID;
     state = next;
     if (initial) {
-      const requested = new URL(location.href).searchParams.get('module');
-      if ((requested === 'combined' && combinedEnabled(next)) || (requested && next.modules.some(module => module.id === requested))) {
-        selectedID = requested;
-        ui.body.classList.add('has-selection');
-      } else if (mobileLayout.matches) {
-        selectedID = null;
-        ui.body.classList.remove('has-selection');
-      } else {
-        selectedID = fallbackSelection(next);
-        ui.body.classList.toggle('has-selection', Boolean(selectedID));
-      }
+      const initialSelection = webState.resolveInitialSelection(next, {
+        requestedModuleID: webState.moduleIDFromLocation(location),
+        isMobile: mobileLayout.matches
+      });
+      selectedID = initialSelection.selectedID;
+      ui.body.classList.toggle('has-selection', initialSelection.hasSelection);
     }
     const selectionChanged = normalizeSelection(next) || previousSelectedID !== selectedID;
     ui.body.classList.toggle('has-selection', Boolean(selectedID));
@@ -190,45 +196,21 @@ function applyState(next, initial = false, renderCurrentDetail = false) {
 }
 
 function combinedEnabled(snapshot = state) {
-  return Boolean(snapshot?.combined?.isEnabled);
+  return webState.combinedEnabled(snapshot);
 }
 
 function fallbackSelection(snapshot = state) {
-  if (!snapshot || mobileLayout.matches) return null;
-  if (combinedEnabled(snapshot)) return 'combined';
-  return snapshot.modules[0]?.id || null;
+  return webState.fallbackSelection(snapshot, mobileLayout.matches);
 }
 
 function normalizeSelection(snapshot = state) {
-  const before = selectedID;
-  if (selectedID === 'combined' && !combinedEnabled(snapshot)) selectedID = fallbackSelection(snapshot);
-  if (selectedID && selectedID !== 'combined' && !snapshot.modules.some(module => module.id === selectedID)) {
-    selectedID = fallbackSelection(snapshot);
-  }
-  if (!selectedID && !mobileLayout.matches) selectedID = fallbackSelection(snapshot);
-  return before !== selectedID;
+  const result = webState.normalizeSelection(snapshot, selectedID, mobileLayout.matches);
+  selectedID = result.selectedID;
+  return result.changed;
 }
 
 function startStateEvents() {
-  if (!('EventSource' in window)) {
-    setInterval(() => { if (!document.hidden) loadState(false, false); }, 5000);
-    return;
-  }
-  if (stateEvents) stateEvents.close();
-  stateEvents = new EventSource('/api/events');
-  stateEvents.addEventListener('state', event => {
-    try { applyState(JSON.parse(event.data), false, false); }
-    catch (_) { /* The next event contains a complete state snapshot. */ }
-  });
-  stateEvents.onerror = () => {
-    stateEvents?.close();
-    stateEvents = null;
-    if (!document.hidden) {
-      apiClient.establishSession()
-        .catch(() => {})
-        .finally(() => loadState(false, false).finally(() => setTimeout(startStateEvents, 3000)));
-    }
-  };
+  stateEventController.start();
 }
 
 function patchLiveState(previous, next) {
@@ -806,22 +788,17 @@ function selectItem(id, pushHistory = true) {
   selectedID = id; detailTab = 'info'; ui.body.classList.add('has-selection');
   resetHorizontalScroll();
   if (pushHistory) {
-    const url = new URL(location.href);
-    url.searchParams.set('module', id);
-    history.pushState({ surgeRelay: true, view: 'detail', module: id, cameFromList }, '', url);
+    history.pushState({ surgeRelay: true, view: 'detail', module: id, cameFromList }, '', webState.urlWithModule(location, id));
   }
   renderSidebar(); renderDetail(false);
 }
 
 function initializeHistoryState() {
-  const module = new URL(location.href).searchParams.get('module');
+  const module = webState.moduleIDFromLocation(location);
   if (history.state?.surgeRelay) return;
   if (module) {
-    const detailURL = new URL(location.href);
-    const listURL = new URL(location.href);
-    listURL.searchParams.delete('module');
-    history.replaceState({ surgeRelay: true, view: 'list', module: null }, '', listURL);
-    history.pushState({ surgeRelay: true, view: 'detail', module, cameFromList: true }, '', detailURL);
+    history.replaceState({ surgeRelay: true, view: 'list', module: null }, '', webState.urlWithoutModule(location));
+    history.pushState({ surgeRelay: true, view: 'detail', module, cameFromList: true }, '', webState.urlWithModule(location, module));
   } else {
     history.replaceState({ surgeRelay: true, view: 'list', module: null }, '', location.href);
   }
@@ -832,9 +809,7 @@ function showModuleList(replaceHistory = false) {
   detailTab = 'info';
   ui.body.classList.remove('has-selection');
   resetHorizontalScroll();
-  const url = new URL(location.href);
-  url.searchParams.delete('module');
-  if (replaceHistory) history.replaceState({ surgeRelay: true, view: 'list', module: null }, '', url);
+  if (replaceHistory) history.replaceState({ surgeRelay: true, view: 'list', module: null }, '', webState.urlWithoutModule(location));
   renderSidebar();
   renderDetail(false);
 }
@@ -846,7 +821,7 @@ function navigateBackToList() {
 }
 
 function handleHistoryNavigation(event) {
-  const module = new URL(location.href).searchParams.get('module');
+  const module = webState.moduleIDFromLocation(location);
   if (mobileLayout.matches && (!module || event.state?.view === 'list')) {
     showModuleList(false);
     return;
