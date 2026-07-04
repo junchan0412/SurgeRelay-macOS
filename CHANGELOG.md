@@ -14,6 +14,7 @@
 - 将 Web 管理 HTTP 解析、同源校验、会话 cookie、安全响应头和图标内容类型测试拆分到 `WebManagementTests.swift`，继续缩小主测试文件。
 - 将 GitHub 配置、远端目录读取、Release 资产解析、校验和与安装建议测试拆分到 `GitHubReleaseTests.swift`，并抽出共用 GitHub URLProtocol 测试支持。
 - 将 GitHub 发布 diff、预览、重复路径保护和引用移动重试测试拆分到 `GitHubPublishTests.swift`。
+- 将本地配置迁移、模块根目录扫描、本地发布安全和生成资产文件测试拆分到 `LocalFileStoreTests.swift`。
 
 ## 1.3.8
 
