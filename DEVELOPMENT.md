@@ -88,6 +88,12 @@ The local scanner must prefer this original URL over the local generated file pa
 Use the local Xcode beta explicitly:
 
 ```bash
+node --check SurgeRelay/WebResources/web-logic.js
+node --check SurgeRelay/WebResources/app.js
+node script/test_web_resources.mjs
+```
+
+```bash
 DEVELOPER_DIR="/Volumes/TR 5000/Applications/Xcode.app/Contents/Developer" \
 xcodebuild test \
   -project "Surge Relay.xcodeproj" \
@@ -101,7 +107,7 @@ The active maintenance machine may print CoreSimulator version warnings even for
 
 The module list should not eagerly read every converted preview at launch. `ModulesView` keeps metadata-only search available immediately and builds the heavier converted-content search index only after the user enters a search query. Preserve that lazy behavior when changing search or preview code.
 
-Web management list updates use `moduleListSignature(module)` in `WebResources/app.js` to decide whether a sidebar re-render is needed. When adding fields that affect list rows, search subtitles, icons, relationship labels, or failure state, update that signature in one place.
+Web management list updates use `moduleListSignature(module)` from `WebResources/web-logic.js` to decide whether a sidebar re-render is needed. When adding fields that affect list rows, search subtitles, icons, relationship labels, or failure state, update that signature in one place and run `node script/test_web_resources.mjs`.
 
 ## Release
 

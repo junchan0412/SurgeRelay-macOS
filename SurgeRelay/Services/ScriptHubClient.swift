@@ -159,7 +159,7 @@ actor SourceRevisionService {
     }
 
     func check(_ module: RelayModule) async throws -> SourceRevisionResult {
-        guard let url = URL(string: module.sourceURL) else {
+        guard let url = URL(string: module.effectiveOriginalSourceURL) else {
             throw RelayError.invalidSourceURL
         }
         if url.isFileURL {

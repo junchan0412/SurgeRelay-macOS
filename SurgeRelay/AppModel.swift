@@ -1196,10 +1196,15 @@ final class AppModel {
             } catch {
                 guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
                 failures += 1
+                let sourceFailure = await sourceCheckFailureAfterConversionFailure(
+                    error,
+                    module: module,
+                    existingFailure: sourceCheckFailure
+                )
                 let failureMessage = updateFailureMessage(
                     for: error,
                     module: module,
-                    sourceCheckFailure: sourceCheckFailure
+                    sourceCheckFailure: sourceFailure
                 )
                 setState(id: module.id, state: .failed, error: failureMessage)
                 if let cached = try? await fileStore.readComponent(id: module.id) {
@@ -2349,6 +2354,25 @@ final class AppModel {
             sourceURL: current.effectiveOriginalSourceURL,
             sourceCheckError: sourceCheckFailure
         )
+    }
+
+    private func sourceCheckFailureAfterConversionFailure(
+        _ error: any Error,
+        module: RelayModule,
+        existingFailure: (any Error)?
+    ) async -> (any Error)? {
+        if let existingFailure { return existingFailure }
+        guard !UpdateFailureFormatter.isActionableNetworkFailure(error),
+              module.hasRemoteOriginalSource else {
+            return nil
+        }
+
+        do {
+            _ = try await sourceRevisionService.check(module)
+            return nil
+        } catch {
+            return error
+        }
     }
 
     private func missingCacheFailureDetail(moduleName: String, failureMessage: String) -> String {

@@ -1103,7 +1103,7 @@ enum UpdateFailureFormatter {
         return error.localizedDescription
     }
 
-    private static func isActionableNetworkFailure(_ error: any Error) -> Bool {
+    static func isActionableNetworkFailure(_ error: any Error) -> Bool {
         if let relayError = error as? RelayError,
            case .httpFailure = relayError {
             return true

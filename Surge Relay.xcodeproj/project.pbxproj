@@ -65,6 +65,7 @@
 		9457731342986CF96B53EA0F /* CheckForUpdatesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8157D4CB748796B7AD783D8F /* CheckForUpdatesView.swift */; };
 		97E70C46C2E39CD56EDEBEB7 /* app-icon.png in Resources */ = {isa = PBXBuildFile; fileRef = 73AE036D60EE5A513D1BE243 /* app-icon.png */; };
 		A0543C2BA470C33854288294 /* app.js in Resources */ = {isa = PBXBuildFile; fileRef = FC3EC697C414F11A0F8E2D11 /* app.js */; };
+		A0643C2BA470C33854288294 /* web-logic.js in Resources */ = {isa = PBXBuildFile; fileRef = FC4EC697C414F11A0F8E2D11 /* web-logic.js */; };
 		A11A11A11A11A11A11A11A11 /* CombinedModuleViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B11B11B11B11B11B11B11B11 /* CombinedModuleViews.swift */; };
 		A22A22A22A22A22A22A22A22 /* DetailInfoViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22B22B22B22B22B22B22B22 /* DetailInfoViews.swift */; };
 		A33A33A33A33A33A33A33A33 /* PublishFileAssembler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B33B33B33B33B33B33B33 /* PublishFileAssembler.swift */; };
@@ -200,6 +201,7 @@
 		F53C80368CE81330FB2D723A /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		FB702CBBD9181A2CF6940B32 /* Surge Relay.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Surge Relay.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		FC3EC697C414F11A0F8E2D11 /* app.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = app.js; sourceTree = "<group>"; };
+		FC4EC697C414F11A0F8E2D11 /* web-logic.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "web-logic.js"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -279,6 +281,7 @@
 				3213BEA21A1958506F9250A1 /* apple-touch-icon.png */,
 				D9B853F6EB21124C4483BD3B /* index.html */,
 				3549A3C7816CDA81F931C49F /* manifest.webmanifest */,
+				FC4EC697C414F11A0F8E2D11 /* web-logic.js */,
 			);
 			path = WebResources;
 			sourceTree = "<group>";
@@ -523,6 +526,7 @@
 				59EAAF9E4B4CDDD06E5DBD4D /* square.stack.3d.up.svg in Resources */,
 				62E8C1BFFB984922B7271C2C /* tag.svg in Resources */,
 				BD7735DF69FE59DECD229AF2 /* trash.svg in Resources */,
+				A0643C2BA470C33854288294 /* web-logic.js in Resources */,
 				B7752C3B9A95AA5DCEF3FBE3 /* xmark.svg in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
