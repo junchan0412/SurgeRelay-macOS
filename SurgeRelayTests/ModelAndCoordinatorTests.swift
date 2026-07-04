@@ -1223,6 +1223,98 @@ final class ModelAndCoordinatorTests: XCTestCase {
         XCTAssertTrue(emptyPlan.assetModuleIDs.isEmpty)
     }
 
+    func testGitHubPublishPlannerBuildsStalePathPlanOnlyForSameRepository() {
+        var settings = GitHubSettings()
+        settings.owner = "someone"
+        settings.repository = "relay"
+        settings.branch = "main"
+        settings.directory = "surge/modules"
+        let repositoryKey = PublishCoordinator.repositoryKey(settings)
+
+        let sameRepositoryPlan = GitHubPublishPlanner.pathPlan(
+            currentPaths: ["A.sgmodule", "Folder/C.sgmodule"],
+            settings: settings,
+            knownRepositoryKey: repositoryKey,
+            knownPublishedPaths: ["A.sgmodule", "B.sgmodule", "Folder/C.sgmodule"]
+        )
+
+        XCTAssertEqual(sameRepositoryPlan.repositoryKey, "someone/relay/main/surge/modules")
+        XCTAssertEqual(sameRepositoryPlan.currentPaths, ["A.sgmodule", "Folder/C.sgmodule"])
+        XCTAssertEqual(sameRepositoryPlan.stalePaths, ["B.sgmodule"])
+
+        let movedRepositoryPlan = GitHubPublishPlanner.pathPlan(
+            currentPaths: ["A.sgmodule"],
+            settings: settings,
+            knownRepositoryKey: "someone/relay/dev/surge/modules",
+            knownPublishedPaths: ["A.sgmodule", "Old.sgmodule"]
+        )
+
+        XCTAssertTrue(movedRepositoryPlan.stalePaths.isEmpty)
+    }
+
+    func testGitHubPublishPlannerMergesSelectedPublishPathsOnlyForSameRepository() {
+        var settings = GitHubSettings()
+        settings.owner = "someone"
+        settings.repository = "relay"
+        settings.branch = "main"
+        settings.directory = "modules"
+        let repositoryKey = PublishCoordinator.repositoryKey(settings)
+
+        let sameRepositoryUpdate = GitHubPublishPlanner.selectedPublishPathUpdate(
+            currentPaths: ["B.sgmodule", "C.sgmodule"],
+            settings: settings,
+            knownRepositoryKey: repositoryKey,
+            knownPublishedPaths: ["A.sgmodule", "B.sgmodule"]
+        )
+
+        XCTAssertEqual(sameRepositoryUpdate.repositoryKey, repositoryKey)
+        XCTAssertEqual(sameRepositoryUpdate.publishedPaths, ["A.sgmodule", "B.sgmodule", "C.sgmodule"])
+
+        let movedRepositoryUpdate = GitHubPublishPlanner.selectedPublishPathUpdate(
+            currentPaths: ["B.sgmodule", "C.sgmodule"],
+            settings: settings,
+            knownRepositoryKey: "someone/other/main/modules",
+            knownPublishedPaths: ["A.sgmodule"]
+        )
+
+        XCTAssertEqual(movedRepositoryUpdate.publishedPaths, ["B.sgmodule", "C.sgmodule"])
+    }
+
+    func testGitHubPublishPlannerBuildsMessagesHistoryAndNoFilesDecision() throws {
+        let report = PublishReport(
+            publishedFiles: ["A.sgmodule"],
+            deletedFiles: ["Old.sgmodule"],
+            commitSHA: "abcdef1234567890",
+            retriedAfterConflict: true
+        )
+
+        XCTAssertEqual(
+            GitHubPublishPlanner.successMessage(scopeTitle: "独立模块", report: report),
+            "远端分支已更新并重新同步；独立模块已发布到 GitHub（2 个文件变更）"
+        )
+        XCTAssertEqual(
+            GitHubPublishPlanner.automaticSuccessMessage(report: report),
+            "远端分支已更新并重新同步；已合并发布到 GitHub（2 个文件变更）"
+        )
+        XCTAssertEqual(
+            GitHubPublishPlanner.selectedSuccessMessage(report: report),
+            "远端分支已更新并重新同步；已发布所选模块到 GitHub（2 个文件变更）"
+        )
+
+        let entry = try XCTUnwrap(GitHubPublishPlanner.historyEntry(for: report))
+        XCTAssertEqual(entry.moduleName, "GitHub")
+        XCTAssertEqual(entry.outcome, .published)
+        XCTAssertEqual(entry.message, "原子提交 abcdef12：上传/更新 1 个，删除 1 个（已处理远端更新）")
+        XCTAssertTrue(entry.contentChanged)
+        XCTAssertEqual(entry.publishedFiles, ["A.sgmodule"])
+        XCTAssertEqual(entry.deletedFiles, ["Old.sgmodule"])
+        XCTAssertEqual(entry.commitSHA, "abcdef1234567890")
+
+        XCTAssertNil(GitHubPublishPlanner.historyEntry(for: PublishReport(publishedFiles: [])))
+        XCTAssertTrue(GitHubPublishPlanner.isNoFilesToPublish(RelayError.noFilesToPublish))
+        XCTAssertFalse(GitHubPublishPlanner.isNoFilesToPublish(RelayError.githubTokenMissing))
+    }
+
     func testAutomaticPublishPlannerBuildsSkipMessages() {
         XCTAssertEqual(
             AutomaticPublishPlanner.noStandaloneModulesStatus,

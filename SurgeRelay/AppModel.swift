@@ -1216,11 +1216,11 @@ final class AppModel {
                 guard self.shouldContinueCurrentWork() else { return }
                 self.statusMessage = report.changedFileCount == 0
                     ? "GitHub 内容没有变化，无需上传"
-                    : "\(self.githubPublishRetryPrefix(report))已合并发布到 GitHub（\(report.changedFileCount) 个文件变更）"
+                    : GitHubPublishPlanner.automaticSuccessMessage(report: report)
                 self.recordGitHubPublish(report)
             } catch {
                 guard !self.isCurrentWorkCancellation(error) else { return }
-                if self.isNoFilesToPublish(error) {
+                if GitHubPublishPlanner.isNoFilesToPublish(error) {
                     self.statusMessage = AutomaticPublishPlanner.noStandaloneFilesStatus
                     return
                 }
@@ -1315,7 +1315,7 @@ final class AppModel {
             recordGitHubPublish(report)
         } catch {
             if isCurrentWorkCancellation(error) { return }
-            if isNoFilesToPublish(error) {
+            if GitHubPublishPlanner.isNoFilesToPublish(error) {
                 statusMessage = "没有可发布的模块文件"
                 return
             }
@@ -1341,12 +1341,12 @@ final class AppModel {
             guard shouldContinueCurrentWork() else { return false }
             statusMessage = report.changedFileCount == 0
                 ? "所选模块没有文件需要发布"
-                : "\(githubPublishRetryPrefix(report))已发布所选模块到 GitHub（\(report.changedFileCount) 个文件变更）"
+                : GitHubPublishPlanner.selectedSuccessMessage(report: report)
             recordGitHubPublish(report)
             return true
         } catch {
             if isCurrentWorkCancellation(error) { return false }
-            if isNoFilesToPublish(error) {
+            if GitHubPublishPlanner.isNoFilesToPublish(error) {
                 statusMessage = "所选模块没有可发布的独立输出"
                 return false
             }
@@ -1373,7 +1373,7 @@ final class AppModel {
                 : "GitHub 内容没有变化"
         } catch {
             if isCurrentWorkCancellation(error) { return }
-            if isNoFilesToPublish(error) {
+            if GitHubPublishPlanner.isNoFilesToPublish(error) {
                 statusMessage = "没有可发布的模块文件，已跳过 GitHub 发布预览"
                 return
             }
@@ -1415,7 +1415,7 @@ final class AppModel {
             }
         } catch {
             if isCurrentWorkCancellation(error) { return }
-            if isNoFilesToPublish(error) {
+            if GitHubPublishPlanner.isNoFilesToPublish(error) {
                 pendingPublishPreview = nil
                 statusMessage = "没有可发布的模块文件"
                 return
@@ -1447,21 +1447,22 @@ final class AppModel {
         let files = try await currentPublishedFiles(combinedData: data, includeAssets: true, destination: .gitHub)
         try checkCurrentWorkCancellation()
         guard !files.isEmpty else { throw RelayError.noFilesToPublish }
-        let currentPaths = files.map(\.name)
-        let repositoryKey = githubPublishRepositoryKey(settings.github)
-        let stalePaths = settings.githubPublishedRepositoryKey == repositoryKey
-            ? settings.githubPublishedFilePaths.filter { !currentPaths.contains($0) }
-            : []
+        let pathPlan = GitHubPublishPlanner.pathPlan(
+            currentPaths: files.map(\.name),
+            settings: settings.github,
+            knownRepositoryKey: settings.githubPublishedRepositoryKey,
+            knownPublishedPaths: settings.githubPublishedFilePaths
+        )
         let report = try await githubClient.previewPublish(
             files: files,
-            deleting: stalePaths,
+            deleting: pathPlan.stalePaths,
             settings: settings.github,
             token: token
         )
         return PublishPreview(
             destination: .gitHub,
             targetDescription: "\(settings.github.owner)/\(settings.github.repository)@\(settings.github.branch)/\(settings.github.directory)",
-            activeFiles: currentPaths,
+            activeFiles: pathPlan.currentPaths,
             changedFiles: report.publishedFiles,
             deletedFiles: report.deletedFiles
         )
@@ -1485,12 +1486,13 @@ final class AppModel {
         let files = try await currentPublishedFiles(combinedData: data, includeAssets: true, destination: .gitHub)
         try checkCurrentWorkCancellation()
         guard !files.isEmpty else { throw RelayError.noFilesToPublish }
-        let currentPaths = files.map(\.name)
-        let repositoryKey = githubPublishRepositoryKey(settings.github)
-        let staleCandidates = settings.githubPublishedRepositoryKey == repositoryKey
-            ? settings.githubPublishedFilePaths.filter { !currentPaths.contains($0) }
-            : []
-        let stalePaths = allowDeleting ? staleCandidates : []
+        let pathPlan = GitHubPublishPlanner.pathPlan(
+            currentPaths: files.map(\.name),
+            settings: settings.github,
+            knownRepositoryKey: settings.githubPublishedRepositoryKey,
+            knownPublishedPaths: settings.githubPublishedFilePaths
+        )
+        let stalePaths = allowDeleting ? pathPlan.stalePaths : []
         try enterNonCancellableWorkPhase(
             statusMessage: "正在提交 GitHub 发布，已进入不可取消阶段…"
         )
@@ -1500,9 +1502,9 @@ final class AppModel {
             settings: settings.github,
             token: token
         )
-        if staleCandidates.isEmpty || allowDeleting {
-            settings.githubPublishedRepositoryKey = repositoryKey
-            settings.githubPublishedFilePaths = currentPaths
+        if pathPlan.stalePaths.isEmpty || allowDeleting {
+            settings.githubPublishedRepositoryKey = pathPlan.repositoryKey
+            settings.githubPublishedFilePaths = pathPlan.currentPaths
             saveSettings()
         }
         return report
@@ -1534,12 +1536,14 @@ final class AppModel {
             settings: settings.github,
             token: token
         )
-        let repositoryKey = githubPublishRepositoryKey(settings.github)
-        let knownPaths = settings.githubPublishedRepositoryKey == repositoryKey
-            ? settings.githubPublishedFilePaths
-            : []
-        settings.githubPublishedRepositoryKey = repositoryKey
-        settings.githubPublishedFilePaths = Array(Set(knownPaths).union(currentPaths)).sorted()
+        let pathUpdate = GitHubPublishPlanner.selectedPublishPathUpdate(
+            currentPaths: currentPaths,
+            settings: settings.github,
+            knownRepositoryKey: settings.githubPublishedRepositoryKey,
+            knownPublishedPaths: settings.githubPublishedFilePaths
+        )
+        settings.githubPublishedRepositoryKey = pathUpdate.repositoryKey
+        settings.githubPublishedFilePaths = pathUpdate.publishedPaths
         saveSettings()
         return report
     }
@@ -1732,8 +1736,7 @@ final class AppModel {
     }
 
     private func githubPublishSuccessMessage(_ report: PublishReport) -> String {
-        let scope = githubPublishPlan.scopeTitle
-        return "\(githubPublishRetryPrefix(report))\(scope)已发布到 GitHub（\(report.changedFileCount) 个文件变更）"
+        GitHubPublishPlanner.successMessage(scopeTitle: githubPublishPlan.scopeTitle, report: report)
     }
 
     private func legacyOutputCleanupDirectories() -> [String] {
@@ -2129,14 +2132,6 @@ final class AppModel {
         )
     }
 
-    private func isNoFilesToPublish(_ error: any Error) -> Bool {
-        guard let relayError = error as? RelayError,
-              case .noFilesToPublish = relayError else {
-            return false
-        }
-        return true
-    }
-
     private func hasGitHubAutomaticPublishableFiles() async -> Bool {
         await AutomaticPublishPlanner.hasCachedStandaloneOutput(
             plan: githubPublishPlan
@@ -2145,32 +2140,9 @@ final class AppModel {
         }
     }
 
-    private func githubPublishRepositoryKey(_ settings: GitHubSettings) -> String {
-        PublishCoordinator.repositoryKey(settings)
-    }
-
-    private func githubPublishRetryPrefix(_ report: PublishReport) -> String {
-        PublishCoordinator.retryPrefix(report)
-    }
-
     private func recordGitHubPublish(_ report: PublishReport) {
-        guard report.changedFileCount > 0 || report.commitSHA != nil else { return }
-        recordHistory([UpdateHistoryEntry(
-            moduleName: "GitHub",
-            outcome: .published,
-            duration: 0,
-            message: githubPublishHistoryMessage(commit: report.commitSHA, report: report),
-            contentChanged: report.changedFileCount > 0,
-            publishedFiles: report.publishedFiles,
-            deletedFiles: report.deletedFiles,
-            commitSHA: report.commitSHA
-        )])
-    }
-
-    private func githubPublishHistoryMessage(commit: String?, report: PublishReport) -> String {
-        let suffix = report.retriedAfterConflict ? "（已处理远端更新）" : ""
-        let commitText = commit.map { "原子提交 \($0.prefix(8))" } ?? "GitHub 内容已发布"
-        return "\(commitText)：上传/更新 \(report.publishedFiles.count) 个，删除 \(report.deletedFiles.count) 个\(suffix)"
+        guard let entry = GitHubPublishPlanner.historyEntry(for: report) else { return }
+        recordHistory([entry])
     }
 
 }
