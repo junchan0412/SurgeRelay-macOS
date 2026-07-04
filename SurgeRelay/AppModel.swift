@@ -1778,57 +1778,59 @@ final class AppModel {
         includeAssets: Bool,
         destination: PublishDestination
     ) async throws -> [PublishFile] {
-        let plan = githubPublishPlan
-        var files: [PublishFile] = []
-        if plan.includesCombined, let combinedData {
-            files.append(PublishFile(
-                name: FilenameSanitizer.sgmoduleName(from: settings.combinedModuleFileName),
-                data: combinedData
-            ))
-        }
-        for module in plan.standaloneModules {
-            try checkCurrentWorkCancellation()
-            try Task.checkCancellation()
-            if PublishCoordinator.shouldSkipStandaloneLocalExport(
-                module,
-                isLocalExport: destination == .local,
-                localModuleDirectory: settings.localModuleDirectory
-            ) {
-                continue
-            }
-            guard let content = try? await fileStore.readComponent(id: module.id) else { continue }
-            let materialized = await processingWorker.materialize(content, overrides: module.argumentOverrides)
-            let namedContent = await processingWorker.applyingModuleMetadata(
-                name: module.name,
-                category: module.category,
-                to: materialized
-            )
-            files.append(PublishFile(name: module.publishedRelativePath, data: Data(namedContent.utf8)))
-        }
-        if includeAssets {
-            try checkCurrentWorkCancellation()
-            files.append(contentsOf: try await fileStore.generatedAssetFiles(for: plan.assetModuleIDs))
-        }
-        return files
+        try await publishedFiles(
+            plan: githubPublishPlan,
+            combinedData: combinedData,
+            includeAssets: includeAssets,
+            destination: destination
+        )
     }
 
     private func selectedPublishedFiles(plan: PublishPlan) async throws -> [PublishFile] {
-        var files: [PublishFile] = []
-        for module in plan.standaloneModules {
-            try checkCurrentWorkCancellation()
-            try Task.checkCancellation()
-            guard let content = try? await fileStore.readComponent(id: module.id) else { continue }
-            let materialized = await processingWorker.materialize(content, overrides: module.argumentOverrides)
-            let namedContent = await processingWorker.applyingModuleMetadata(
-                name: module.name,
-                category: module.category,
-                to: materialized
-            )
-            files.append(PublishFile(name: module.publishedRelativePath, data: Data(namedContent.utf8)))
-        }
-        try checkCurrentWorkCancellation()
-        files.append(contentsOf: try await fileStore.generatedAssetFiles(for: plan.assetModuleIDs))
-        return files
+        try await publishedFiles(
+            plan: plan,
+            combinedData: nil,
+            includeAssets: true,
+            destination: .gitHub
+        )
+    }
+
+    private func publishedFiles(
+        plan: PublishPlan,
+        combinedData: Data?,
+        includeAssets: Bool,
+        destination: PublishDestination
+    ) async throws -> [PublishFile] {
+        try await PublishFileAssembler.files(
+            request: PublishFileAssemblyRequest(
+                plan: plan,
+                combinedData: combinedData,
+                combinedFileName: settings.combinedModuleFileName,
+                includeAssets: includeAssets,
+                destination: destination,
+                localModuleDirectory: settings.localModuleDirectory
+            ),
+            readComponent: { [fileStore] id in
+                try? await fileStore.readComponent(id: id)
+            },
+            generatedAssetFiles: { [fileStore] ids in
+                try await fileStore.generatedAssetFiles(for: ids)
+            },
+            materialize: { [processingWorker] content, overrides in
+                await processingWorker.materialize(content, overrides: overrides)
+            },
+            applyingModuleMetadata: { [processingWorker] name, category, content in
+                await processingWorker.applyingModuleMetadata(
+                    name: name,
+                    category: category,
+                    to: content
+                )
+            },
+            cancellationCheckpoint: {
+                try checkCurrentWorkCancellation()
+                try Task.checkCancellation()
+            }
+        )
     }
 
     private func writeCombinedModule(_ components: [(RelayModule, String)]) async throws {

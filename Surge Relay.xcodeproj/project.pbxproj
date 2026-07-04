@@ -66,6 +66,7 @@
 		A0543C2BA470C33854288294 /* app.js in Resources */ = {isa = PBXBuildFile; fileRef = FC3EC697C414F11A0F8E2D11 /* app.js */; };
 		A11A11A11A11A11A11A11A11 /* CombinedModuleViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B11B11B11B11B11B11B11B11 /* CombinedModuleViews.swift */; };
 		A22A22A22A22A22A22A22A22 /* DetailInfoViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22B22B22B22B22B22B22B22 /* DetailInfoViews.swift */; };
+		A33A33A33A33A33A33A33A33 /* PublishFileAssembler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B33B33B33B33B33B33B33 /* PublishFileAssembler.swift */; };
 		A539280CA083F785A10720E4 /* exclamationmark.triangle.svg in Resources */ = {isa = PBXBuildFile; fileRef = 36BAB6179FD0D6477CCD7527 /* exclamationmark.triangle.svg */; };
 		A8F3D6A87774ABA071E95490 /* eye.svg in Resources */ = {isa = PBXBuildFile; fileRef = 882056C6C077004DCDC917F2 /* eye.svg */; };
 		AA8F7B5F28379ACDB4DDEDB9 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDD7A6C8082510469A2FA843 /* RootView.swift */; };
@@ -172,6 +173,7 @@
 		B11B11B11B11B11B11B11B11 /* CombinedModuleViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CombinedModuleViews.swift; sourceTree = "<group>"; };
 		B79782FA982FB6C66E5D50BA /* MenuBarContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarContent.swift; sourceTree = "<group>"; };
 		B22B22B22B22B22B22B22B22 /* DetailInfoViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailInfoViews.swift; sourceTree = "<group>"; };
+		B33B33B33B33B33B33B33B33 /* PublishFileAssembler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishFileAssembler.swift; sourceTree = "<group>"; };
 		B7DAE6646C847419124DE9BB /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		B9CF6B25A0E233718DB970EF /* arrow.up.arrow.down.svg */ = {isa = PBXFileReference; path = arrow.up.arrow.down.svg; sourceTree = "<group>"; };
 		BB83E467F68776A168C3BBA3 /* ellipsis.svg */ = {isa = PBXFileReference; path = ellipsis.svg; sourceTree = "<group>"; };
@@ -256,6 +258,7 @@
 				0C15061B43CE01B2548616E5 /* ModuleIconStore.swift */,
 				DA24D7A4AEF1770EAB7A055B /* ModuleMerger.swift */,
 				D905BBAE1F590AB7B3F224FE /* PersistenceStore.swift */,
+				B33B33B33B33B33B33B33B33 /* PublishFileAssembler.swift */,
 				254A83429BCA625706A87254 /* ScriptHubClient.swift */,
 				098EA18AE40BB22B02102431 /* ScriptHubUpstreamService.swift */,
 				51D9670C12C677CBC8D96FA4 /* WebManagementAPI.swift */,
@@ -563,6 +566,7 @@
 				428F3605819F521142B80066 /* ModuleOrdering.swift in Sources */,
 				2DE2729D489CC5CF5737F164 /* ModulesView.swift in Sources */,
 				D00571D70301FFF75C0BACFE /* PersistenceStore.swift in Sources */,
+				A33A33A33A33A33A33A33A33 /* PublishFileAssembler.swift in Sources */,
 				709FF80593ADF6216AF25D9D /* RelayModule.swift in Sources */,
 				AA8F7B5F28379ACDB4DDEDB9 /* RootView.swift in Sources */,
 				089528920AE30C1DC82F1C30 /* ScriptHubAdvancedOptionsView.swift in Sources */,
