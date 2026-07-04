@@ -2055,7 +2055,7 @@ final class SurgeRelayTests: XCTestCase {
         )
     }
 
-    func testModuleArgumentsAreMaterializedAndMetadataIsRemoved() {
+    func testModuleArgumentsAreMaterializedAndArgumentMetadataIsRemoved() {
         let content = """
         #!name=Demo
         #!arguments=feature:true,mode:auto
@@ -2071,8 +2071,8 @@ final class SurgeRelayTests: XCTestCase {
 
         let result = ModuleArgumentProcessor.materialize(content, overrides: ["feature": "#", "mode": "show"])
         XCTAssertFalse(result.contains("#!arguments="))
-        XCTAssertFalse(result.contains("disabled ="))
-        XCTAssertFalse(result.contains("source note"))
+        XCTAssertTrue(result.contains("#disabled ="))
+        XCTAssertTrue(result.contains("source note"))
         XCTAssertTrue(result.contains("mode = show"))
     }
 

@@ -1413,6 +1413,34 @@ final class AppModel {
         }
     }
 
+    func publishModules(moduleIDs: Set<UUID>) async -> Bool {
+        guard !isWorking else { return false }
+        guard settings.publishToGitHub else {
+            statusMessage = "GitHub 发布未开启"
+            return false
+        }
+        guard !moduleIDs.isEmpty else {
+            statusMessage = "请选择要发布的模块"
+            return false
+        }
+        cancelAutomaticPublishSchedule()
+        beginWork(.publishing)
+        defer { endWork(.publishing) }
+        do {
+            let report = try await publishSelectedModulesInternal(moduleIDs: moduleIDs)
+            guard shouldContinueCurrentWork() else { return false }
+            statusMessage = report.changedFileCount == 0
+                ? "所选模块没有文件需要发布"
+                : "\(githubPublishRetryPrefix(report))已发布所选模块到 GitHub（\(report.changedFileCount) 个文件变更）"
+            recordGitHubPublish(report)
+            return true
+        } catch {
+            if isCurrentWorkCancellation(error) { return false }
+            presentedError = error.localizedDescription
+            return false
+        }
+    }
+
     func previewPublish() async {
         guard !isWorking else { return }
         guard settings.publishToGitHub else {
@@ -1553,6 +1581,42 @@ final class AppModel {
         return report
     }
 
+    private func publishSelectedModulesInternal(moduleIDs: Set<UUID>) async throws -> PublishReport {
+        try checkCurrentWorkCancellation()
+        try Task.checkCancellation()
+        let token = ensureGitHubTokenLoaded(showStatusMessage: false)
+        guard !token.isEmpty else { throw RelayError.githubTokenMissing }
+        let isPrivate = try await githubClient.test(settings: settings.github, token: token)
+        try checkCurrentWorkCancellation()
+        try Task.checkCancellation()
+        if settings.github.repositoryIsPrivate != isPrivate {
+            settings.github.repositoryIsPrivate = isPrivate
+            saveSettings()
+        }
+        let files = try await selectedPublishedFiles(moduleIDs: moduleIDs)
+        guard !files.isEmpty else {
+            throw RelayError.invalidOutput("所选模块没有可发布的独立输出。")
+        }
+        let currentPaths = files.map(\.name)
+        try enterNonCancellableWorkPhase(
+            statusMessage: "正在提交所选模块，已进入不可取消阶段…"
+        )
+        let report = try await githubClient.publish(
+            files: files,
+            deleting: [],
+            settings: settings.github,
+            token: token
+        )
+        let repositoryKey = githubPublishRepositoryKey(settings.github)
+        let knownPaths = settings.githubPublishedRepositoryKey == repositoryKey
+            ? settings.githubPublishedFilePaths
+            : []
+        settings.githubPublishedRepositoryKey = repositoryKey
+        settings.githubPublishedFilePaths = Array(Set(knownPaths).union(currentPaths)).sorted()
+        saveSettings()
+        return report
+    }
+
     private func rebuildCombinedFromCache() async {
         let rebuildGeneration = localChangeGeneration
         let enabled = settings.combinedModuleEnabled ? modules.filter(\.isEnabled) : []
@@ -1689,6 +1753,25 @@ final class AppModel {
             )
             files.append(contentsOf: try await fileStore.generatedAssetFiles(for: assetModuleIDs))
         }
+        return files
+    }
+
+    private func selectedPublishedFiles(moduleIDs: Set<UUID>) async throws -> [PublishFile] {
+        var files: [PublishFile] = []
+        for module in modules where moduleIDs.contains(module.id) && module.publishesStandalone {
+            try checkCurrentWorkCancellation()
+            try Task.checkCancellation()
+            guard let content = try? await fileStore.readComponent(id: module.id) else { continue }
+            let materialized = await processingWorker.materialize(content, overrides: module.argumentOverrides)
+            let namedContent = await processingWorker.applyingModuleMetadata(
+                name: module.name,
+                category: module.category,
+                to: materialized
+            )
+            files.append(PublishFile(name: module.publishedRelativePath, data: Data(namedContent.utf8)))
+        }
+        try checkCurrentWorkCancellation()
+        files.append(contentsOf: try await fileStore.generatedAssetFiles(for: moduleIDs))
         return files
     }
 

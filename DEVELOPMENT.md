@@ -23,6 +23,13 @@ This document records the project conventions needed to maintain this fork.
 
 Both can be enabled at the same time. Local export and GitHub publishing share `RelayModule.publishedRelativePath`, so folder handling must stay destination-neutral. When adding code that generates publish files, pass a `PublishDestination` so local self-export protection does not accidentally remove files from the GitHub publish set.
 
+Manual GitHub publishing has two paths:
+
+- publish all current outputs, with stale managed file deletion preview and confirmation
+- publish selected standalone modules only, with no stale deletion and with the selected modules' generated assets included
+
+Keep the selected publish path conservative: it should merge new paths into the known GitHub publish list but must not prune paths that belong to unselected modules.
+
 ## Existing Module Safety
 
 Do not overwrite or delete user-owned modules unless the file is known to be managed by Surge Relay.
@@ -55,15 +62,13 @@ Use the local Xcode beta explicitly:
 
 ```bash
 DEVELOPER_DIR="/Volumes/TR 5000/Applications/Xcode.app/Contents/Developer" \
-xcodebuild build \
+xcodebuild test \
   -project "Surge Relay.xcodeproj" \
-  -target "Surge RelayTests" \
+  -scheme "Surge Relay" \
   -destination "platform=macOS"
 ```
 
 The active maintenance machine may print CoreSimulator version warnings even for macOS builds. Treat them as environmental warnings unless the command exits non-zero.
-
-The shared scheme currently does not run `Surge RelayTests` directly as a test plan member. Building the test target is still useful because it compiles both the app and test sources.
 
 ## Release
 

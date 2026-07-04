@@ -51,6 +51,8 @@ struct ModulesView: View {
     @State private var localImportCandidates: [LocalModuleScanCandidate] = []
     @State private var localImportSkippedFiles: [LocalModuleScanSkippedFile] = []
     @State private var selectedLocalImportCandidateIDs = Set<String>()
+    @State private var isBatchSelecting = false
+    @State private var batchSelectedModuleIDs = Set<UUID>()
 
     private enum DetailTab: Hashable { case info, preview }
 
@@ -347,6 +349,33 @@ struct ModulesView: View {
                         .disabled(model.isWorking || !model.settings.publishToGitHub || !model.settings.github.isConfigured)
                         .help(model.settings.publishToGitHub ? "发布当前所有输出到 GitHub" : "未开启 GitHub 发布")
                         Button {
+                            isBatchSelecting.toggle()
+                            if !isBatchSelecting { batchSelectedModuleIDs.removeAll() }
+                        } label: {
+                            Label(isBatchSelecting ? "结束选择" : "多选", systemImage: isBatchSelecting ? "checkmark.circle" : "checklist")
+                        }
+                        .disabled(model.isWorking)
+                        if isBatchSelecting {
+                            Button {
+                                let ids = batchSelectedModuleIDs
+                                Task {
+                                    if await model.publishModules(moduleIDs: ids) {
+                                        batchSelectedModuleIDs.removeAll()
+                                        isBatchSelecting = false
+                                    }
+                                }
+                            } label: {
+                                Label("发布所选", systemImage: "square.and.arrow.up.on.square")
+                            }
+                            .disabled(
+                                model.isWorking ||
+                                batchSelectedModuleIDs.isEmpty ||
+                                !model.settings.publishToGitHub ||
+                                !model.settings.github.isConfigured
+                            )
+                            .help(batchSelectedModuleIDs.isEmpty ? "请选择要发布的模块" : "只发布勾选模块，不删除其他已发布文件")
+                        }
+                        Button {
                             scanLocalModulesForPreview()
                         } label: {
                             Label("扫描本地模块", systemImage: "folder.badge.plus")
@@ -487,13 +516,35 @@ struct ModulesView: View {
 
     @ViewBuilder
     private func moduleRow(_ module: RelayModule) -> some View {
-        ModuleRow(module: module)
+        HStack(spacing: 8) {
+            if isBatchSelecting {
+                Toggle("", isOn: batchSelectionBinding(for: module.id))
+                    .labelsHidden()
+                    .toggleStyle(.checkbox)
+                    .disabled(!module.publishesStandalone)
+                    .help(module.publishesStandalone ? "选择发布该模块" : "该模块未开启独立发布")
+            }
+            ModuleRow(module: module)
+        }
             .tag(module.id)
             .contextMenu {
                 Button("编辑") { presentEditor(module) }
                 Divider()
                 Button("删除", role: .destructive) { deleteCandidate = module }
             }
+    }
+
+    private func batchSelectionBinding(for id: UUID) -> Binding<Bool> {
+        Binding(
+            get: { batchSelectedModuleIDs.contains(id) },
+            set: { selected in
+                if selected {
+                    batchSelectedModuleIDs.insert(id)
+                } else {
+                    batchSelectedModuleIDs.remove(id)
+                }
+            }
+        )
     }
 }
 

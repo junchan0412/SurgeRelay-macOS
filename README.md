@@ -56,7 +56,7 @@ xattr -dr com.apple.quarantine "/Applications/Surge Relay.app"
 
 ## 发布目标
 
-在设置的“发布”页可以分别开启“发布到本地”和“发布到 GitHub”。两者可以同时开启：更新模块时会先刷新本地输出；如果 GitHub 自动发布开启，内容变化后会继续排队发布到 GitHub。工具栏的“发布全部”用于手动发布当前所有输出到 GitHub，发布前仍会执行删除预览和确认。
+在设置的“发布”页可以分别开启“发布到本地”和“发布到 GitHub”。两者可以同时开启：更新模块时会先刷新本地输出；如果 GitHub 自动发布开启，内容变化后会继续排队发布到 GitHub。工具栏的“发布全部”用于手动发布当前所有输出到 GitHub，发布前仍会执行删除预览和确认；“多选 / 发布所选”用于只提交勾选模块，不会删除其他已发布文件。
 
 开启本地发布后，需要配置本地模块根目录。常见路径类似：
 
@@ -161,7 +161,7 @@ EXPECT_ADHOC_SIGNATURE=0 \
 EXPECTED_CODESIGN_AUTHORITY="Surge Relay Self-Signed Code Signing" \
 ./script/verify_github_release_assets.sh \
   --repo junchan0412/SurgeRelay-macOS \
-  --tag v1.3.4
+  --tag v1.3.5
 ```
 
 ## 开源协议
