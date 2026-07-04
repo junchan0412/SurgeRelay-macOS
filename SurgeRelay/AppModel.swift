@@ -631,81 +631,72 @@ final class AppModel {
     }
 
     func moduleOutputFolderOptions(preserving selected: String? = nil) -> [String] {
-        var configuredFolders: [String] = []
-        if settings.publishToLocal {
-            configuredFolders.append(contentsOf: localModuleOutputFolders())
-        }
-        if settings.publishToGitHub {
-            configuredFolders.append(contentsOf: githubModuleOutputFolders)
-        }
-        return ModuleOutputFolder.options(
-            from: configuredFolders + settings.customModuleOutputFolders + modules.map(\.outputFolder),
+        ModuleOutputFolderCatalog.options(
+            settings: settings,
+            modules: modules,
+            localFolders: (try? LocalModuleFolderScanner.folders(in: settings.localModuleDirectory)) ?? [],
+            githubFolders: githubModuleOutputFolders,
             preserving: selected
         )
     }
 
     @discardableResult
     func createModuleOutputFolder(named rawValue: String) throws -> String {
-        let folder = ModuleOutputFolder.normalized(rawValue)
-        guard !folder.isEmpty else {
-            throw RelayError.invalidOutput("请输入文件夹名称。")
+        let plan = try ModuleOutputFolderCatalog.createPlan(
+            named: rawValue,
+            settings: settings,
+            githubModuleOutputFolders: githubModuleOutputFolders
+        )
+        if let localDirectoryURL = plan.localDirectoryURL {
+            try FileManager.default.createDirectory(at: localDirectoryURL, withIntermediateDirectories: true)
         }
-
-        if settings.publishToLocal {
-            let rootPath = settings.localModuleDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !rootPath.isEmpty else {
-                throw RelayError.invalidOutput("请先设置本地模块根目录。")
-            }
-            let root = URL(filePath: rootPath, directoryHint: .isDirectory)
-                .standardizedFileURL
-            var destination = root
-            for component in ModuleOutputFolder.components(folder) {
-                destination = destination.appending(path: component, directoryHint: .isDirectory)
-            }
-            try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
-        }
-
-        var folders = Set(settings.customModuleOutputFolders.map(ModuleOutputFolder.normalized))
-        folders.insert(folder)
-        settings.customModuleOutputFolders = ModuleOutputFolder.options(from: Array(folders))
-            .filter { !$0.isEmpty }
-        if !githubModuleOutputFolders.contains(folder) {
-            githubModuleOutputFolders = ModuleOutputFolder.options(from: githubModuleOutputFolders + [folder])
-        }
+        settings.customModuleOutputFolders = plan.customModuleOutputFolders
+        githubModuleOutputFolders = plan.githubModuleOutputFolders
         saveSettings()
-        statusMessage = settings.publishToLocal
-            ? "已创建/记录文件夹 \(folder)"
-            : "已添加 GitHub 文件夹 \(folder)，发布模块时会自动创建路径"
-        return folder
+        statusMessage = plan.statusMessage
+        return plan.folder
     }
 
     func refreshModuleOutputFolders(force: Bool = false) async {
-        guard settings.publishToGitHub, settings.github.isConfigured else {
-            githubModuleOutputFolders = [ModuleOutputFolder.root]
-            githubModuleOutputFoldersLastRefreshedAt = nil
-            githubModuleOutputFoldersConfiguration = nil
-            return
-        }
         let now = Date.now
-        if !force,
-           githubModuleOutputFoldersConfiguration == settings.github,
-           let lastRefresh = githubModuleOutputFoldersLastRefreshedAt,
-           now.timeIntervalSince(lastRefresh) < 300 {
+        switch ModuleOutputFolderCatalog.refreshDecision(
+            settings: settings,
+            cachedConfiguration: githubModuleOutputFoldersConfiguration,
+            lastRefreshedAt: githubModuleOutputFoldersLastRefreshedAt,
+            now: now,
+            force: force
+        ) {
+        case .reset(let state):
+            applyModuleOutputFolderRefreshState(state)
             return
+        case .reuseCached:
+            return
+        case .fetchRemote:
+            break
         }
+
         do {
             let token = githubTokenStorageStatus == .notChecked ? "" : githubToken
             let folders = try await githubClient.listDirectories(settings: settings.github, token: token)
-            githubModuleOutputFolders = ModuleOutputFolder.options(
-                from: folders + modules.map(\.outputFolder)
-            )
-            githubModuleOutputFoldersLastRefreshedAt = now
-            githubModuleOutputFoldersConfiguration = settings.github
+            applyModuleOutputFolderRefreshState(ModuleOutputFolderCatalog.successfulRefreshState(
+                remoteFolders: folders,
+                modules: modules,
+                settings: settings.github,
+                refreshedAt: now
+            ))
         } catch {
-            githubModuleOutputFolders = ModuleOutputFolder.options(from: modules.map(\.outputFolder))
-            githubModuleOutputFoldersLastRefreshedAt = now
-            githubModuleOutputFoldersConfiguration = settings.github
+            applyModuleOutputFolderRefreshState(ModuleOutputFolderCatalog.failedRefreshState(
+                modules: modules,
+                settings: settings.github,
+                refreshedAt: now
+            ))
         }
+    }
+
+    private func applyModuleOutputFolderRefreshState(_ state: ModuleOutputFolderRefreshState) {
+        githubModuleOutputFolders = state.githubModuleOutputFolders
+        githubModuleOutputFoldersLastRefreshedAt = state.lastRefreshedAt
+        githubModuleOutputFoldersConfiguration = state.configuration
     }
 
     func openConfigurationDirectory() {
@@ -2166,10 +2157,6 @@ final class AppModel {
         ) { [fileStore] id in
             await fileStore.hasComponent(id: id)
         }
-    }
-
-    private func localModuleOutputFolders() -> [String] {
-        (try? LocalModuleFolderScanner.folders(in: settings.localModuleDirectory)) ?? []
     }
 
     private func githubPublishRepositoryKey(_ settings: GitHubSettings) -> String {
