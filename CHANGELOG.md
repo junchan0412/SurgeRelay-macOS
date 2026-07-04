@@ -39,6 +39,7 @@
 - 将设置迁移、总模块默认值、钥匙串和安装诊断测试拆到 `AppSettingsTests.swift` 与 `SecurityDiagnosticsTests.swift`，继续缩小主测试文件。
 - 将模块命名、添加/编辑草稿、输出路径、输出文件夹目录和本地自覆盖保护测试拆到 `ModulePlanningTests.swift`。
 - 将模块刷新资格和启动时刷新判定测试拆到 `ModuleRefreshPlannerTests.swift`，继续收敛主协调器测试文件。
+- 将启动时缓存元数据刷新规则抽出到 `ModuleMetadataRefreshPlanner`，让 AppModel 只负责读取缓存、应用模块变更和维护图标缓存。
 - 将维护文档和 Release 构建脚本的默认 Xcode 路径更新为 macOS 27 beta 使用的 `Xcode-beta.app`，脚本仍保留旧路径作为 fallback。
 - 404 更新失败说明补充仓库公开性和访问权限检查建议；Web 管理端失败详情新增“复制错误”按钮。
 - Web 管理端新增失败模块筛选按钮，可在存在更新失败时一键只看失败模块。

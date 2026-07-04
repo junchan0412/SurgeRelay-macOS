@@ -1537,38 +1537,30 @@ final class AppModel {
         var changed = false
         for moduleValue in modules {
             guard let content = try? await fileStore.readComponent(id: moduleValue.id) else { continue }
-            var module = moduleValue
-            var moduleChanged = false
-            if await fileStore.hasOverride(id: module.id), module.overrideBaseHash == nil,
-               let converted = try? await fileStore.readConvertedComponent(id: module.id) {
-                module.overrideBaseHash = Data(converted.utf8).sha256String
-                moduleChanged = true
-            }
-            if let subscription = ModuleMetadataParser.scriptHubSubscription(in: content) {
-                moduleChanged = module.applyScriptHubSubscriptionMetadata(subscription) || moduleChanged
-            }
-            let detectedIcon = await processingWorker.iconURL(in: content, relativeTo: module.sourceURL)
-            let preferredIcon = module.customIconURL.flatMap(URL.init(string:)) ?? detectedIcon
-            let value = preferredIcon?.absoluteString
-            let iconChanged = module.iconURL != value
-            if iconChanged {
-                module.iconURL = value
-            }
-            let resolvedFormat = ModuleNamingPlanner.detectedFormat(
-                for: module.sourceFormat,
-                source: module.sourceURL
+            let hasOverride = await fileStore.hasOverride(id: moduleValue.id)
+            let convertedContent = hasOverride && moduleValue.overrideBaseHash == nil
+                ? try? await fileStore.readConvertedComponent(id: moduleValue.id)
+                : nil
+            let detectedIcon = await processingWorker.iconURL(in: content, relativeTo: moduleValue.sourceURL)
+            let plan = ModuleMetadataRefreshPlanner.plan(
+                module: moduleValue,
+                cachedContent: content,
+                convertedContent: convertedContent,
+                hasOverride: hasOverride,
+                detectedIconURL: detectedIcon
             )
-            let formatChanged = module.detectedSourceFormat != resolvedFormat
-            if formatChanged { module.detectedSourceFormat = resolvedFormat }
-            moduleChanged = moduleChanged || iconChanged || formatChanged
-            if moduleChanged {
-                replace(module)
+            if plan.isChanged {
+                replace(plan.module)
                 changed = true
             }
-            if let preferredIcon {
-                try? await iconStore.cacheIcon(from: preferredIcon, for: module.id, force: iconChanged)
+            if let preferredIcon = plan.preferredIconURL {
+                try? await iconStore.cacheIcon(
+                    from: preferredIcon,
+                    for: plan.module.id,
+                    force: plan.shouldRefreshIconCache
+                )
             } else {
-                try? await iconStore.removeIcon(for: module.id)
+                try? await iconStore.removeIcon(for: plan.module.id)
             }
         }
         if changed { try? persistModules() }
