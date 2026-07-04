@@ -91,6 +91,7 @@ Use the local Xcode beta explicitly:
 node --check SurgeRelay/WebResources/web-logic.js
 node --check SurgeRelay/WebResources/app.js
 node script/test_web_resources.mjs
+node script/test_web_dom_resources.mjs
 ```
 
 ```bash
@@ -108,6 +109,8 @@ The active maintenance machine may print CoreSimulator version warnings even for
 The module list should not eagerly read every converted preview at launch. `ModulesView` keeps metadata-only search available immediately and builds the heavier converted-content search index only after the user enters a search query. Preserve that lazy behavior when changing search or preview code.
 
 Web management list updates use `moduleListSignature(module)` from `WebResources/web-logic.js` to decide whether a sidebar re-render is needed. When adding fields that affect list rows, search subtitles, icons, relationship labels, or failure state, update that signature in one place and run `node script/test_web_resources.mjs`.
+
+`script/test_web_dom_resources.mjs` provides a dependency-free DOM harness for the Web management shell. Keep it focused on behavior that depends on the real `index.html` structure and `app.js` startup path: required nodes, initial state rendering, detail sections, update admission controls, and editor output-path preview behavior.
 
 ## Release
 

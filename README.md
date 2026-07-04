@@ -137,6 +137,7 @@ xcodebuild build \
 node --check SurgeRelay/WebResources/web-logic.js
 node --check SurgeRelay/WebResources/app.js
 node script/test_web_resources.mjs
+node script/test_web_dom_resources.mjs
 
 DEVELOPER_DIR="/Volumes/TR 5000/Applications/Xcode.app/Contents/Developer" \
 xcodebuild build-for-testing \
