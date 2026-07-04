@@ -49,6 +49,8 @@ Keep the selected publish path conservative: it should merge new paths into the 
 
 Shared module counts should flow through `ModuleCollectionSummary`. Main window status, menu bar text, Web management state, and diagnostics should not independently reimplement enabled, standalone, failed, latest-update, or updateable counts unless they need the actual module objects.
 
+Update failures should surface actionable causes through `UpdateFailureFormatter`. If an original source returns 404/401/403/429, times out, fails DNS, or fails TLS validation, store that reason on the module and in update history; aggregate alerts that block combined-module replacement should include the same reason rather than only the module name.
+
 ## Existing Module Safety
 
 Do not overwrite or delete user-owned modules unless the file is known to be managed by Surge Relay.
@@ -76,6 +78,8 @@ Treat this as data, not disposable commentary. `ModuleMetadataParser.scriptHubSu
 The local scanner must prefer this original URL over the local generated file path. `ModuleArgumentProcessor.materialize` must preserve ordinary comments so `#SUBSCRIBED` and user explanations survive standalone publish output.
 
 ## Build And Test
+
+`ModelAndCoordinatorTests.swift` owns pure model/coordinator coverage, including source metadata restoration, update failure formatting, summary counts, and publish-plan decisions. Keep shrinking the larger `SurgeRelayTests.swift` by moving similarly pure tests into focused files instead of adding more unrelated cases there.
 
 Use the local Xcode beta explicitly:
 

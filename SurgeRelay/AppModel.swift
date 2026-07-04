@@ -1058,6 +1058,7 @@ final class AppModel {
         var components: [(RelayModule, String)] = []
         var failures = 0
         var missingCache: [String] = []
+        var missingCacheDetails: [String] = []
         var contentChanged = false
         var newHistory: [UpdateHistoryEntry] = []
 
@@ -1221,6 +1222,10 @@ final class AppModel {
                 } else {
                     if shouldContributeToCombined(module) {
                         missingCache.append(module.name)
+                        missingCacheDetails.append(missingCacheFailureDetail(
+                            moduleName: module.name,
+                            failureMessage: failureMessage
+                        ))
                     }
                     newHistory.append(UpdateHistoryEntry(
                         moduleID: module.id,
@@ -1241,7 +1246,8 @@ final class AppModel {
 
         guard missingCache.isEmpty else {
             statusMessage = "无法重建总模块：\(missingCache.joined(separator: "、")) 尚无可用缓存"
-            presentedError = "以下来源首次转换失败，因此没有覆盖当前总模块：\n\(missingCache.joined(separator: "\n"))"
+            let details = missingCacheDetails.isEmpty ? missingCache.joined(separator: "\n") : missingCacheDetails.joined(separator: "\n")
+            presentedError = "以下来源首次转换失败，因此没有覆盖当前总模块：\n\(details)"
             return
         }
 
@@ -2343,6 +2349,11 @@ final class AppModel {
         )
     }
 
+    private func missingCacheFailureDetail(moduleName: String, failureMessage: String) -> String {
+        let indentedMessage = failureMessage.replacingOccurrences(of: "\n", with: "\n  ")
+        return "- \(moduleName)：\(indentedMessage)"
+    }
+
     private var hasGitHubPublishableModuleSelection: Bool {
         githubPublishPlan.hasPublishableModuleSelection
     }
@@ -2371,13 +2382,13 @@ final class AppModel {
     }
 
     private func hasGitHubPublishableFiles() async -> Bool {
-        if settings.combinedModuleEnabled,
-           modules.contains(where: \.isEnabled),
+        let plan = githubPublishPlan
+        if plan.includesCombined,
            (try? await fileStore.readCombined()) != nil {
             return true
         }
 
-        for module in modules where module.publishesStandalone {
+        for module in plan.standaloneModules {
             if await fileStore.hasComponent(id: module.id) {
                 return true
             }

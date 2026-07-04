@@ -23,6 +23,7 @@
 		2AD845464760705F3E0982BE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3AE70978C59AAF84436C3194 /* Assets.xcassets */; };
 		2ADF1ADFE70E63FE334C1B5C /* SurgeRelayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A632A09F875AFE2F6ADC7A42 /* SurgeRelayTests.swift */; };
 		2DE2729D489CC5CF5737F164 /* ModulesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F02309DE998787F453FD1166 /* ModulesView.swift */; };
+		2F4A5B6C7D8E9F0011223344 /* ModelAndCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F4A5B6C7D8E9F0011223344 /* ModelAndCoordinatorTests.swift */; };
 		307EBCC9173DAEC6727856BD /* ModuleMetadataParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BEEA07D7884F801CEDBF10E /* ModuleMetadataParser.swift */; };
 		30817299C54FAD6356760AD8 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDC7CEA42FDCD13847E9AC0F /* AppSettings.swift */; };
 		384BEBC6E1F8C9A0A53FB0FC /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B29AA0AD818A5D7F67A7471 /* AppModel.swift */; };
@@ -128,6 +129,7 @@
 		354B1BF761ABD7AADD982A17 /* EngineStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngineStore.swift; sourceTree = "<group>"; };
 		36BAB6179FD0D6477CCD7527 /* exclamationmark.triangle.svg */ = {isa = PBXFileReference; path = exclamationmark.triangle.svg; sourceTree = "<group>"; };
 		3AE70978C59AAF84436C3194 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		3F4A5B6C7D8E9F0011223344 /* ModelAndCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelAndCoordinatorTests.swift; sourceTree = "<group>"; };
 		41447934F9FEEEA0E8C36B5C /* ScriptHubAdvancedOptionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptHubAdvancedOptionsView.swift; sourceTree = "<group>"; };
 		430221E70D9636CAEFD900C5 /* link.svg */ = {isa = PBXFileReference; path = link.svg; sourceTree = "<group>"; };
 		462EAB132DEE9AF7DACDBFAF /* shippingbox.svg */ = {isa = PBXFileReference; path = shippingbox.svg; sourceTree = "<group>"; };
@@ -338,6 +340,7 @@
 		992FBA5B9AB9596787D9E76C /* SurgeRelayTests */ = {
 			isa = PBXGroup;
 			children = (
+				3F4A5B6C7D8E9F0011223344 /* ModelAndCoordinatorTests.swift */,
 				A632A09F875AFE2F6ADC7A42 /* SurgeRelayTests.swift */,
 			);
 			path = SurgeRelayTests;
@@ -513,6 +516,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2F4A5B6C7D8E9F0011223344 /* ModelAndCoordinatorTests.swift in Sources */,
 				2ADF1ADFE70E63FE334C1B5C /* SurgeRelayTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
