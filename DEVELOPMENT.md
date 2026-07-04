@@ -62,6 +62,8 @@ Preview content reads belong in `ModulePreviewContentProvider`. Keep cache looku
 
 Module output naming belongs in `ModuleNamingPlanner`. Keep output-file uniqueness checks, combined-module filename collision avoidance, detected source-format inference, local storage relative-path derivation, and loaded-module naming normalization there. AppModel should pass the current modules and settings into the planner instead of reimplementing path rules inline.
 
+User-visible publish addresses belong in `PublishedAddressResolver`. Keep GitHub publication gating, standalone module URL eligibility, combined-module GitHub URL generation, and local combined-module file URL generation there. `AppSettings` should remain configuration data, while AppModel, views, Web management, and diagnostics consume resolved addresses through AppModel forwarding properties.
+
 ## Existing Module Safety
 
 Do not overwrite or delete user-owned modules unless the file is known to be managed by Surge Relay.

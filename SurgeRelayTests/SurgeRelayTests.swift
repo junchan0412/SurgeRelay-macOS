@@ -530,19 +530,19 @@ final class SurgeRelayTests: XCTestCase {
 
         settings.publishToLocal = true
         settings.publishToGitHub = false
-        XCTAssertNil(settings.publishedURL(for: "My-Relay.sgmodule"))
+        XCTAssertNil(PublishedAddressResolver.githubURL(for: "My-Relay.sgmodule", settings: settings))
         XCTAssertEqual(
-            try XCTUnwrap(settings.localCombinedModuleURL).path,
+            try XCTUnwrap(PublishedAddressResolver.combinedLocalFileURL(settings: settings)).path,
             "/tmp/Surge Relay/My-Relay.sgmodule"
         )
 
         settings.publishToGitHub = true
         XCTAssertEqual(
-            try XCTUnwrap(settings.localCombinedModuleURL).path,
+            try XCTUnwrap(PublishedAddressResolver.combinedLocalFileURL(settings: settings)).path,
             "/tmp/Surge Relay/My-Relay.sgmodule"
         )
         XCTAssertEqual(
-            try XCTUnwrap(settings.publishedURL(for: "My-Relay.sgmodule")).host,
+            try XCTUnwrap(PublishedAddressResolver.githubURL(for: "My-Relay.sgmodule", settings: settings)).host,
             "raw.githubusercontent.com"
         )
     }
@@ -550,7 +550,7 @@ final class SurgeRelayTests: XCTestCase {
     func testAppSettingsDefaultDisablesCombinedModule() throws {
         let settings = try JSONDecoder().decode(AppSettings.self, from: Data("{}".utf8))
         XCTAssertFalse(settings.combinedModuleEnabled)
-        XCTAssertNil(settings.localCombinedModuleURL)
+        XCTAssertNil(PublishedAddressResolver.combinedLocalFileURL(settings: settings))
     }
 
     func testRelayModuleDecodesRegistryWithoutAdvancedOptions() throws {

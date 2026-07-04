@@ -496,6 +496,59 @@ final class ModelAndCoordinatorTests: XCTestCase {
         XCTAssertEqual(normalized[1].outputFileName, "Surge-Relay-2.sgmodule")
     }
 
+    func testPublishedAddressResolverBuildsOnlyAvailableAddresses() throws {
+        var settings = AppSettings()
+        settings.github.owner = "someone"
+        settings.github.repository = "relay"
+        settings.github.branch = "main"
+        settings.github.directory = "surge/modules"
+        settings.github.repositoryIsPrivate = false
+        settings.publishToGitHub = true
+        settings.publishToLocal = true
+        settings.combinedModuleEnabled = true
+        settings.combinedModuleFileName = "Surge Relay"
+        settings.localModuleDirectory = "/tmp/Surge Relay"
+        let published = RelayModule(
+            name: "Ads",
+            sourceURL: "https://example.com/ads.sgmodule",
+            outputFileName: "Ads",
+            outputFolder: "Folder",
+            publishesStandalone: true
+        )
+        let combinedOnly = RelayModule(
+            name: "Combined",
+            sourceURL: "https://example.com/combined.sgmodule",
+            outputFileName: "Combined",
+            publishesStandalone: false
+        )
+
+        XCTAssertEqual(
+            try XCTUnwrap(PublishedAddressResolver.standaloneURL(for: published, settings: settings)).absoluteString,
+            "https://raw.githubusercontent.com/someone/relay/main/surge/modules/Folder/Ads.sgmodule"
+        )
+        XCTAssertNil(PublishedAddressResolver.standaloneURL(for: combinedOnly, settings: settings))
+        XCTAssertEqual(
+            try XCTUnwrap(PublishedAddressResolver.combinedGitHubURL(settings: settings)).lastPathComponent,
+            "Surge-Relay.sgmodule"
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(PublishedAddressResolver.combinedLocalFileURL(settings: settings)).path,
+            "/tmp/Surge Relay/Surge-Relay.sgmodule"
+        )
+
+        settings.github.repositoryIsPrivate = true
+        XCTAssertNil(PublishedAddressResolver.standaloneURL(for: published, settings: settings))
+        settings.github.publicBaseURL = "https://surge-relay.example.workers.dev/"
+        XCTAssertEqual(
+            try XCTUnwrap(PublishedAddressResolver.standaloneURL(for: published, settings: settings)).absoluteString,
+            "https://surge-relay.example.workers.dev/Folder/Ads.sgmodule"
+        )
+
+        settings.publishToGitHub = false
+        XCTAssertNil(PublishedAddressResolver.combinedGitHubURL(settings: settings))
+        XCTAssertNil(PublishedAddressResolver.standaloneURL(for: published, settings: settings))
+    }
+
     func testUpdateFailureFormatterExplainsOriginalHTTPFailure() {
         let sourceURL = "https://raw.githubusercontent.com/example/repo/main/Missing.sgmodule?token=secret"
         let message = UpdateFailureFormatter.detailedMessage(

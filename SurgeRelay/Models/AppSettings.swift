@@ -225,18 +225,6 @@ struct AppSettings: Codable, Equatable, Sendable {
         return defaultScriptHubModuleURL
     }
 
-    func publishedURL(for fileName: String) -> URL? {
-        guard publishToGitHub else { return nil }
-        return github.publicURL(for: fileName)
-    }
-
-    var localCombinedModuleURL: URL? {
-        guard combinedModuleEnabled, publishToLocal else { return nil }
-        let directory = localModuleDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !directory.isEmpty else { return nil }
-        return URL(filePath: directory, directoryHint: .isDirectory)
-            .appending(path: FilenameSanitizer.sgmoduleName(from: combinedModuleFileName))
-    }
 }
 
 enum StorageMode: String, Codable, Sendable {

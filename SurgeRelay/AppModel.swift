@@ -1940,12 +1940,11 @@ final class AppModel {
     }
 
     var combinedRawURL: URL? {
-        guard settings.combinedModuleEnabled else { return nil }
-        return settings.publishedURL(for: FilenameSanitizer.sgmoduleName(from: settings.combinedModuleFileName))
+        PublishedAddressResolver.combinedGitHubURL(settings: settings)
     }
 
     var combinedLocalFileURL: URL? {
-        settings.localCombinedModuleURL
+        PublishedAddressResolver.combinedLocalFileURL(settings: settings)
     }
 
     var latestGitHubPublish: GitHubPublishSnapshot? {
@@ -1964,13 +1963,8 @@ final class AppModel {
         WebManagementController.accessModeTitle(settings: settings)
     }
 
-    private var webManagementHost: String {
-        WebManagementController.host(settings: settings)
-    }
-
     func rawURL(for module: RelayModule) -> URL? {
-        guard module.publishesStandalone else { return nil }
-        return settings.publishedURL(for: module.publishedRelativePath)
+        PublishedAddressResolver.standaloneURL(for: module, settings: settings)
     }
 
     func previewContent(for module: RelayModule) async throws -> String {
