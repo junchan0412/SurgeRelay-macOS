@@ -5,10 +5,12 @@ import vm from 'node:vm';
 const logicSource = readFileSync(new URL('../SurgeRelay/WebResources/web-logic.js', import.meta.url), 'utf8');
 const optionsSource = readFileSync(new URL('../SurgeRelay/WebResources/web-options.js', import.meta.url), 'utf8');
 const formatSource = readFileSync(new URL('../SurgeRelay/WebResources/web-format.js', import.meta.url), 'utf8');
+const markupSource = readFileSync(new URL('../SurgeRelay/WebResources/web-markup.js', import.meta.url), 'utf8');
 const context = vm.createContext({ console, URL });
 vm.runInContext(logicSource, context, { filename: 'web-logic.js' });
 vm.runInContext(optionsSource, context, { filename: 'web-options.js' });
 vm.runInContext(formatSource, context, { filename: 'web-format.js' });
+vm.runInContext(markupSource, context, { filename: 'web-markup.js' });
 
 const logic = context.SurgeRelayWebLogic;
 assert.ok(logic, 'web logic should install a global testable API');
@@ -16,6 +18,8 @@ const options = context.SurgeRelayWebOptions;
 assert.ok(options, 'web options should install a global testable API');
 const format = context.SurgeRelayWebFormat;
 assert.ok(format, 'web format should install a global testable API');
+const markup = context.SurgeRelayWebMarkup;
+assert.ok(markup, 'web markup should install a global testable API');
 assert.equal(options.scriptHubDefaults.removeCommentedRewrites, true);
 assert.ok(
   options.advancedGroups.some(group => group.id === 'script-conversion'),
@@ -165,16 +169,36 @@ assert.equal(format.escapeHTML('<tag attr="1">Tom & Jerry</tag>'), '&lt;tag attr
 assert.equal(format.formatDate('not-a-date', 'fallback'), 'fallback');
 assert.match(format.highlightCode('[General]\nkey = https://example.com/1'), /code-section/);
 assert.match(format.highlightCode('[General]\nkey = https://example.com/1'), /code-url/);
+assert.match(markup.detailRow('link', '原始地址', '<unsafe>'), /&lt;unsafe&gt;/);
+assert.match(markup.detailRow('link', '原始地址', '<a>ok</a>', true, 'https://example.com?a=1&b=2'), /data-value="https:\/\/example.com\?a=1&amp;b=2"/);
+assert.match(markup.previewShell('Demo <Module>', true), /Demo &lt;Module&gt;/);
+assert.match(markup.previewShell('Demo', true), /textarea/);
+assert.match(markup.argumentMarkup({ key: 'enabled<', value: 'true', defaultValue: 'false' }), /enabled&lt;/);
+assert.match(markup.advancedGroupMarkup({
+  id: 'unsafe"><',
+  title: '高级 <选项>',
+  description: '说明 & 帮助',
+  fields: [{ key: 'host', type: 'text', label: '主机', prompt: 'example.com', help: '仅测试' }]
+}), /data-option-group="unsafe&quot;&gt;&lt;"/);
+assert.match(markup.latestPublishSection({
+  commitSHA: 'abcdef123456',
+  commitURL: 'https://example.com/commit/abcdef',
+  date: '2026-07-04T12:00:00Z',
+  publishedFiles: ['A&B.sgmodule'],
+  deletedFiles: ['Old.sgmodule']
+}), /A&amp;B\.sgmodule/);
 
 const indexHTML = readFileSync(new URL('../SurgeRelay/WebResources/index.html', import.meta.url), 'utf8');
 const logicScriptIndex = indexHTML.indexOf('/web-logic.js');
 const optionsScriptIndex = indexHTML.indexOf('/web-options.js');
 const formatScriptIndex = indexHTML.indexOf('/web-format.js');
+const markupScriptIndex = indexHTML.indexOf('/web-markup.js');
 const appScriptIndex = indexHTML.indexOf('/app.js');
 assert.ok(logicScriptIndex >= 0, 'index should load web-logic.js');
 assert.ok(optionsScriptIndex > logicScriptIndex, 'web-options.js must load after web-logic.js');
 assert.ok(formatScriptIndex > optionsScriptIndex, 'web-format.js must load after web-options.js');
-assert.ok(appScriptIndex > formatScriptIndex, 'web-format.js must load before app.js');
+assert.ok(markupScriptIndex > formatScriptIndex, 'web-markup.js must load after web-format.js');
+assert.ok(appScriptIndex > markupScriptIndex, 'web-markup.js must load before app.js');
 assert.match(indexHTML, /name="storageLocation"/);
 assert.match(indexHTML, /name="outputFolder"/);
 assert.match(indexHTML, /id="output-path-preview"/);

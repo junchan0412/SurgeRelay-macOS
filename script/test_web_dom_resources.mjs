@@ -7,6 +7,7 @@ const indexHTML = readFileSync(new URL('SurgeRelay/WebResources/index.html', roo
 const logicSource = readFileSync(new URL('SurgeRelay/WebResources/web-logic.js', root), 'utf8');
 const optionsSource = readFileSync(new URL('SurgeRelay/WebResources/web-options.js', root), 'utf8');
 const formatSource = readFileSync(new URL('SurgeRelay/WebResources/web-format.js', root), 'utf8');
+const markupSource = readFileSync(new URL('SurgeRelay/WebResources/web-markup.js', root), 'utf8');
 const appSource = readFileSync(new URL('SurgeRelay/WebResources/app.js', root), 'utf8');
 
 const requiredIDs = [
@@ -430,6 +431,7 @@ context.globalThis = context;
 vm.runInContext(logicSource, context, { filename: 'web-logic.js' });
 vm.runInContext(optionsSource, context, { filename: 'web-options.js' });
 vm.runInContext(formatSource, context, { filename: 'web-format.js' });
+vm.runInContext(markupSource, context, { filename: 'web-markup.js' });
 vm.runInContext(appSource, context, { filename: 'app.js' });
 
 await flushAsync();

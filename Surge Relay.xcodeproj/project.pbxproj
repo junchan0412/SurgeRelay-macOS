@@ -91,6 +91,7 @@
 		A0643C2BA470C33854288294 /* web-logic.js in Resources */ = {isa = PBXBuildFile; fileRef = FC4EC697C414F11A0F8E2D11 /* web-logic.js */; };
 		A0743C2BA470C33854288294 /* web-options.js in Resources */ = {isa = PBXBuildFile; fileRef = FC5EC697C414F11A0F8E2D11 /* web-options.js */; };
 		A0843C2BA470C33854288294 /* web-format.js in Resources */ = {isa = PBXBuildFile; fileRef = FC6EC697C414F11A0F8E2D11 /* web-format.js */; };
+		A0943C2BA470C33854288294 /* web-markup.js in Resources */ = {isa = PBXBuildFile; fileRef = FC7EC697C414F11A0F8E2D11 /* web-markup.js */; };
 		A11A11A11A11A11A11A11A11 /* CombinedModuleViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B11B11B11B11B11B11B11B11 /* CombinedModuleViews.swift */; };
 		A22A22A22A22A22A22A22A22 /* DetailInfoViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22B22B22B22B22B22B22B22 /* DetailInfoViews.swift */; };
 		A33A33A33A33A33A33A33A33 /* PublishFileAssembler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B33B33B33B33B33B33B33 /* PublishFileAssembler.swift */; };
@@ -268,6 +269,7 @@
 		FC4EC697C414F11A0F8E2D11 /* web-logic.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "web-logic.js"; sourceTree = "<group>"; };
 		FC5EC697C414F11A0F8E2D11 /* web-options.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "web-options.js"; sourceTree = "<group>"; };
 		FC6EC697C414F11A0F8E2D11 /* web-format.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "web-format.js"; sourceTree = "<group>"; };
+		FC7EC697C414F11A0F8E2D11 /* web-markup.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "web-markup.js"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -376,6 +378,7 @@
 				FC4EC697C414F11A0F8E2D11 /* web-logic.js */,
 				FC5EC697C414F11A0F8E2D11 /* web-options.js */,
 				FC6EC697C414F11A0F8E2D11 /* web-format.js */,
+				FC7EC697C414F11A0F8E2D11 /* web-markup.js */,
 			);
 			path = WebResources;
 			sourceTree = "<group>";
@@ -628,6 +631,7 @@
 				A0643C2BA470C33854288294 /* web-logic.js in Resources */,
 				A0743C2BA470C33854288294 /* web-options.js in Resources */,
 				A0843C2BA470C33854288294 /* web-format.js in Resources */,
+				A0943C2BA470C33854288294 /* web-markup.js in Resources */,
 				B7752C3B9A95AA5DCEF3FBE3 /* xmark.svg in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
