@@ -9,6 +9,7 @@
 - 将本地模块扫描和本地模块文件夹枚举从 `AppModel.swift` 抽出到 `LocalModuleScanner.swift`，让 AppModel 继续收敛为状态协调器。
 - 将旧发布输出清理的目录和文件名规划抽出到 `LegacyOutputCleanupPlanner`，减少 AppModel 中的历史兼容路径计算。
 - 将 Web 管理端模块搜索字段抽出到 `web-logic.js`，让列表搜索与列表刷新签名共享可测试的字段维护入口。
+- 将桌面端模块搜索索引抽出到 `ModuleSearchIndex` 服务文件，避免主模块视图继续承载纯搜索字段拼装逻辑。
 - 发布候选统一通过 `PublishPlan` 计算，桌面发布、发布预览、生成资产和空发布判断共享同一套可测试逻辑，降低总模块/独立模块关系再次分叉的风险。
 - 桌面主窗口、菜单栏和 Web 管理端共用 `ModuleCollectionSummary` 计算模块总数、总模块来源数、独立发布数、失败数、最近更新时间和可更新数量。
 - 将总模块侧边栏、总模块详情、发布预览摘要和通用详情行拆出 `ModulesView.swift`，降低主模块视图单文件维护压力。

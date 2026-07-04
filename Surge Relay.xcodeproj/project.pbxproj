@@ -62,6 +62,7 @@
 		91BF72296DEE134A528EDF1B /* LaunchAtLoginService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00FF1B0D1608D65FBA6451BE /* LaunchAtLoginService.swift */; };
 		91C91C91C91C91C91C91C91C /* LegacyOutputCleanupPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B91B91B91B91B91B91B91B91 /* LegacyOutputCleanupPlanner.swift */; };
 		92C92C92C92C92C92C92C92C /* LocalModuleScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B92B92B92B92B92B92B92B92 /* LocalModuleScanner.swift */; };
+		94D94D94D94D94D94D94D94D /* ModuleSearchIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = B94B94B94B94B94B94B94B94 /* ModuleSearchIndex.swift */; };
 		920AB497FDE7DA286892FFB9 /* arrow.clockwise.svg in Resources */ = {isa = PBXBuildFile; fileRef = 1205EFC09D3CF22EAF9A2F9B /* arrow.clockwise.svg */; };
 		93D45771DAD23A3F8AD5473F /* MenuBarContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B79782FA982FB6C66E5D50BA /* MenuBarContent.swift */; };
 		9457731342986CF96B53EA0F /* CheckForUpdatesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8157D4CB748796B7AD783D8F /* CheckForUpdatesView.swift */; };
@@ -185,6 +186,7 @@
 		B44B44B44B44B44B44B44B44 /* LocalModuleImportPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModuleImportPreviewView.swift; sourceTree = "<group>"; };
 		B55B55B55B55B55B55B55B55 /* ModuleDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleDetailView.swift; sourceTree = "<group>"; };
 		B92B92B92B92B92B92B92B92 /* LocalModuleScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModuleScanner.swift; sourceTree = "<group>"; };
+		B94B94B94B94B94B94B94B94 /* ModuleSearchIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleSearchIndex.swift; sourceTree = "<group>"; };
 		B7DAE6646C847419124DE9BB /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		B9CF6B25A0E233718DB970EF /* arrow.up.arrow.down.svg */ = {isa = PBXFileReference; path = arrow.up.arrow.down.svg; sourceTree = "<group>"; };
 		BB83E467F68776A168C3BBA3 /* ellipsis.svg */ = {isa = PBXFileReference; path = ellipsis.svg; sourceTree = "<group>"; };
@@ -272,6 +274,7 @@
 				B92B92B92B92B92B92B92B92 /* LocalModuleScanner.swift */,
 				E1070DB686AADF6D51CF6CDB /* ModuleFileStore.swift */,
 				0C15061B43CE01B2548616E5 /* ModuleIconStore.swift */,
+				B94B94B94B94B94B94B94B94 /* ModuleSearchIndex.swift */,
 				DA24D7A4AEF1770EAB7A055B /* ModuleMerger.swift */,
 				D905BBAE1F590AB7B3F224FE /* PersistenceStore.swift */,
 				B33B33B33B33B33B33B33B33 /* PublishFileAssembler.swift */,
@@ -585,6 +588,7 @@
 				280C7E38DAD9F18ED8090287 /* ModuleEditorView.swift in Sources */,
 				72BFC19A86A6433A42A41F75 /* ModuleFileStore.swift in Sources */,
 				B46911120F2F5BB4C736DCDE /* ModuleIconStore.swift in Sources */,
+				94D94D94D94D94D94D94D94D /* ModuleSearchIndex.swift in Sources */,
 				6FD484283175DC8133118FF1 /* ModuleMerger.swift in Sources */,
 				307EBCC9173DAEC6727856BD /* ModuleMetadataParser.swift in Sources */,
 				428F3605819F521142B80066 /* ModuleOrdering.swift in Sources */,
