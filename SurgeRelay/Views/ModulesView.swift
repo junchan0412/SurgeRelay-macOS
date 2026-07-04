@@ -1,6 +1,34 @@
 import AppKit
 import SwiftUI
 
+enum ModuleSearchIndex {
+    static func text(for module: RelayModule, cachedContent: String? = nil) -> String {
+        var parts = [
+            module.name,
+            module.sourceURL,
+            module.outputFileName,
+            module.publishedRelativePath,
+            module.sourceFormatDisplayTitle,
+            module.category,
+            module.outputFolder,
+            ModuleOutputFolder.displayTitle(for: module.outputFolder),
+            module.publishesStandalone ? "独立模块" : "不发布独立模块",
+            module.state.title,
+        ]
+        if let iconURL = module.iconURL { parts.append(iconURL) }
+        if let customIconURL = module.customIconURL { parts.append(customIconURL) }
+        parts.append(contentsOf: module.argumentOverrides.flatMap { [$0.key, $0.value] })
+        if let data = try? JSONEncoder().encode(module.scriptHubOptions),
+           let text = String(data: data, encoding: .utf8) {
+            parts.append(text)
+        }
+        if let cachedContent {
+            parts.append(cachedContent)
+        }
+        return parts.joined(separator: "\n").lowercased()
+    }
+}
+
 struct ModulesView: View {
     @Environment(AppModel.self) private var model
     @State private var searchText = ""
@@ -41,21 +69,7 @@ struct ModulesView: View {
     }
 
     private func searchableText(for module: RelayModule) -> String {
-        var parts = [
-            module.name,
-            module.sourceURL,
-            module.outputFileName,
-            module.sourceFormatDisplayTitle,
-        ]
-        parts.append(contentsOf: module.argumentOverrides.flatMap { [$0.key, $0.value] })
-        if let data = try? JSONEncoder().encode(module.scriptHubOptions),
-           let text = String(data: data, encoding: .utf8) {
-            parts.append(text)
-        }
-        if let content = contentIndex[module.id] {
-            parts.append(content)
-        }
-        return parts.joined(separator: "\n").lowercased()
+        ModuleSearchIndex.text(for: module, cachedContent: contentIndex[module.id])
     }
 
     private var contentIndexToken: String {
@@ -161,12 +175,21 @@ struct ModulesView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(.regularMaterial, in: statusCardShape)
+        .overlay {
+            statusCardShape
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.24), lineWidth: 0.5)
+        }
+        .glassEffect(.regular, in: statusCardShape)
         .padding(.horizontal, 10)
         .padding(.bottom, 10)
         .animation(.snappy, value: model.workActivity)
         .animation(.snappy, value: model.presentedError)
         .animation(.snappy, value: model.automaticPublishRunsAt)
+    }
+
+    private var statusCardShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
     }
 
     private var latestUpdateText: String {
@@ -238,7 +261,10 @@ struct ModulesView: View {
                     )
                 }
             }
-            .safeAreaInset(edge: .bottom) { statusCard }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                statusCard
+                    .background(.bar)
+            }
             .navigationSplitViewColumnWidth(min: 280, ideal: 300, max: 380)
             .navigationTitle("模块")
             .toolbar {
@@ -341,14 +367,11 @@ struct ModulesView: View {
                 SettingsView()
                     .environment(model)
 
-                HStack {
+                SheetActionFooter {
                     Spacer()
                     Button("完成") { model.presentsSettings = false }
                         .keyboardShortcut(.defaultAction)
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 14)
-                .background(.ultraThinMaterial)
             }
             .frame(width: 620, height: 560)
         }
@@ -410,15 +433,155 @@ struct ModulesView: View {
     }
 }
 
+private struct ModuleDetailMetadataPill: Identifiable {
+    let title: String
+    let systemImage: String
+
+    var id: String { "\(systemImage)|\(title)" }
+}
+
+private struct ModuleDetailSummaryMetric: Identifiable {
+    let title: String
+    let value: String
+    let systemImage: String
+    let tint: Color
+
+    var id: String { "\(systemImage)|\(title)|\(value)" }
+}
+
+private struct DetailInfoSection<Content: View>: View {
+    let title: String
+    private let content: () -> Content
+
+    init(_ title: String, @ViewBuilder content: @escaping () -> Content) {
+        self.title = title
+        self.content = content
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.headline)
+                .padding(.leading, 2)
+            VStack(alignment: .leading, spacing: 8) {
+                content()
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color(nsColor: .separatorColor).opacity(0.18), lineWidth: 0.5)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct DetailInfoRow: View {
+    let label: String
+    let value: String
+    let icon: String
+    var monospaced = false
+    var copyValue: String?
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .frame(width: 20, alignment: .center)
+            Text(label)
+                .font(.callout.weight(.medium))
+                .foregroundStyle(.primary)
+                .frame(width: 104, alignment: .leading)
+            valueContent
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.vertical, 6)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color(nsColor: .separatorColor).opacity(0.16))
+                .frame(height: 0.5)
+                .padding(.leading, 32)
+        }
+    }
+
+    @ViewBuilder
+    private var valueContent: some View {
+        if let copyValue {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 10) {
+                    valueText(fixedHorizontal: true)
+                    TextCopyButton(text: copyValue)
+                        .layoutPriority(1)
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    valueText(fixedHorizontal: false)
+                    TextCopyButton(text: copyValue)
+                }
+            }
+        } else {
+            valueText(fixedHorizontal: false)
+        }
+    }
+
+    private func valueText(fixedHorizontal: Bool) -> some View {
+        Text(value)
+            .font(monospaced ? .system(.callout, design: .monospaced) : .callout)
+            .foregroundStyle(.secondary)
+            .textSelection(.enabled)
+            .lineLimit(fixedHorizontal ? 1 : (monospaced ? 3 : nil))
+            .truncationMode(.middle)
+            .fixedSize(horizontal: fixedHorizontal, vertical: true)
+            .frame(maxWidth: fixedHorizontal ? nil : .infinity, alignment: .leading)
+    }
+}
+
+private struct DetailControlRow<Content: View>: View {
+    let label: String
+    let icon: String
+    private let content: () -> Content
+
+    init(label: String, icon: String, @ViewBuilder content: @escaping () -> Content) {
+        self.label = label
+        self.icon = icon
+        self.content = content
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .frame(width: 20, alignment: .center)
+            Text(label)
+                .font(.callout.weight(.medium))
+                .foregroundStyle(.primary)
+                .frame(width: 104, alignment: .leading)
+            content()
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.vertical, 6)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color(nsColor: .separatorColor).opacity(0.16))
+                .frame(height: 0.5)
+                .padding(.leading, 32)
+        }
+    }
+}
+
 private struct CombinedModuleRow: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        HStack(spacing: 9) {
+        HStack(spacing: 10) {
             Image("SummaryIcon")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 28, height: 28)
+                .frame(width: 32, height: 32)
                 .clipShape(summaryIconShape)
                 .overlay {
                     summaryIconShape
@@ -435,73 +598,122 @@ private struct CombinedModuleRow: View {
             }
             Spacer(minLength: 4)
         }
-        .padding(.vertical, 7)
+        .padding(.vertical, 5)
     }
 
     private var summaryIconShape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 28 * ModuleIconView.cornerRadiusRatio, style: .continuous)
+        RoundedRectangle(cornerRadius: 32 * ModuleIconView.cornerRadiusRatio, style: .continuous)
     }
 }
 
 private struct CombinedModuleDetailView: View {
     @Environment(AppModel.self) private var model
 
+    private var includedModules: [RelayModule] {
+        model.modules.filter(\.isEnabled)
+    }
+
+    private var standaloneModules: [RelayModule] {
+        model.modules.filter(\.publishesStandalone)
+    }
+
+    private var failedModules: [RelayModule] {
+        model.modules.filter { $0.state == .failed }
+    }
+
     private var latestUpdateAt: Date? {
         model.modules.compactMap(\.lastUpdatedAt).max()
     }
 
     var body: some View {
-        Form {
-            Section("汇总模块") {
-                detailRow("名称", value: "Surge Relay 汇总", icon: "square.stack.3d.up.fill")
-                detailRow(
-                    "包含来源",
-                    value: "\(model.modules.filter(\.isEnabled).count) / \(model.modules.count)",
-                    icon: "shippingbox"
-                )
-                detailRow(
-                    "最新更新",
-                    value: latestUpdateAt?.formatted(date: .long, time: .standard) ?? "尚未更新",
-                    icon: "clock"
-                )
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                summaryHeader
+                contentSection
+                outputSection
+                latestPublishSection
+                publishPreviewSection
             }
-
-            if model.settings.storageMode == .local {
-                Section("总模块文件") {
-                    if let localURL = model.combinedLocalFileURL {
-                        Text(localURL.path)
-                            .font(.system(.callout, design: .monospaced))
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-            } else {
-                Section("总模块订阅地址") {
-                    if let rawURL = model.combinedRawURL {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text(rawURL.absoluteString)
-                                .font(.system(.callout, design: .monospaced))
-                                .textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            URLCopyButton(url: rawURL)
-                        }
-                    } else {
-                        Label("完成发布配置后，这里会显示稳定订阅地址。", systemImage: "info.circle")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-
-            latestPublishSection
-            publishPreviewSection
+            .frame(maxWidth: 760, alignment: .topLeading)
+            .padding(.horizontal, 32)
+            .padding(.vertical, 28)
+            .frame(maxWidth: .infinity, alignment: .top)
         }
-        .formStyle(.grouped)
+    }
+
+    private var summaryHeader: some View {
+        HStack(alignment: .center, spacing: 16) {
+            Image("SummaryIcon")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 56, height: 56)
+                .clipShape(RoundedRectangle(cornerRadius: 56 * ModuleIconView.cornerRadiusRatio, style: .continuous))
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Surge Relay 汇总")
+                    .font(.title2.weight(.semibold))
+                    .lineLimit(2)
+                    .textSelection(.enabled)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) { summaryPills }
+                    VStack(alignment: .leading, spacing: 6) { summaryPills }
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.24), lineWidth: 0.5)
+        }
+    }
+
+    @ViewBuilder
+    private var summaryPills: some View {
+        metadataPill("\(includedModules.count) 个来源", systemImage: "shippingbox")
+        metadataPill(model.settings.storageMode == .local ? "本地发布" : "GitHub 发布", systemImage: model.settings.storageMode == .local ? "folder" : "cloud")
+        if !failedModules.isEmpty {
+            metadataPill("\(failedModules.count) 个失败", systemImage: "exclamationmark.triangle", isWarning: true)
+        }
+    }
+
+    private var contentSection: some View {
+        detailSection("汇总内容") {
+            detailRow("包含来源", value: "\(includedModules.count) / \(model.modules.count)", icon: "shippingbox")
+            detailRow("独立模块", value: "\(standaloneModules.count) 个同时单独发布", icon: "doc.badge.gearshape")
+            detailRow("最新更新", value: latestUpdateAt?.formatted(date: .long, time: .standard) ?? "尚未更新", icon: "clock")
+            detailRow(
+                "总模块文件",
+                value: FilenameSanitizer.sgmoduleName(from: model.settings.combinedModuleFileName),
+                icon: "square.stack.3d.up",
+                monospaced: true
+            )
+        }
+    }
+
+    private var outputSection: some View {
+        detailSection(model.settings.storageMode == .local ? "总模块文件" : "总模块订阅") {
+            if model.settings.storageMode == .local {
+                if let localURL = model.combinedLocalFileURL {
+                    detailRow("文件位置", value: localURL.path, icon: "doc", monospaced: true, copyValue: localURL.path)
+                } else {
+                    Label("等待本地模块根目录配置。", systemImage: "info.circle")
+                        .foregroundStyle(.secondary)
+                }
+            } else if let rawURL = model.combinedRawURL {
+                detailRow("订阅地址", value: rawURL.absoluteString, icon: "link", monospaced: true, copyValue: rawURL.absoluteString)
+            } else {
+                Label("完成发布配置后，这里会显示稳定订阅地址。", systemImage: "info.circle")
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 
     @ViewBuilder
     private var latestPublishSection: some View {
         if model.settings.storageMode == .gitHub, let publish = model.latestGitHubPublish {
-            Section("最近 GitHub 发布") {
+            detailSection("最近 GitHub 发布") {
                 detailRow("提交", value: publish.commitDisplay, icon: "arrow.triangle.branch")
                 detailRow("时间", value: publish.date.formatted(date: .long, time: .standard), icon: "clock")
                 detailRow("变更", value: publish.fileSummary, icon: "doc.on.doc")
@@ -524,7 +736,7 @@ private struct CombinedModuleDetailView: View {
     private var publishPreviewSection: some View {
         let preview = relevantPublishPreview
         if model.settings.storageMode == .gitHub || preview != nil {
-            Section(model.settings.storageMode == .gitHub ? "GitHub 发布" : "本地清理") {
+            detailSection(model.settings.storageMode == .gitHub ? "GitHub 发布" : "本地清理") {
                 if model.settings.storageMode == .gitHub {
                     Button("预览发布…", systemImage: "square.and.arrow.up") {
                         Task { await model.previewPublish() }
@@ -564,15 +776,28 @@ private struct CombinedModuleDetailView: View {
         }
     }
 
-    private func detailRow(_ label: String, value: String, icon: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Label(label, systemImage: icon)
-                .frame(width: 108, alignment: .leading)
-            Text(value)
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
+    private func metadataPill(_ title: String, systemImage: String, isWarning: Bool = false) -> some View {
+        Label(title, systemImage: systemImage)
+            .font(.caption)
+            .lineLimit(1)
+            .foregroundStyle(isWarning ? .orange : .secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(.quaternary.opacity(0.45), in: Capsule())
+    }
+
+    private func detailSection<Content: View>(_ title: String, @ViewBuilder content: @escaping () -> Content) -> some View {
+        DetailInfoSection(title, content: content)
+    }
+
+    private func detailRow(
+        _ label: String,
+        value: String,
+        icon: String,
+        monospaced: Bool = false,
+        copyValue: String? = nil
+    ) -> some View {
+        DetailInfoRow(label: label, value: value, icon: icon, monospaced: monospaced, copyValue: copyValue)
     }
 }
 
@@ -709,32 +934,29 @@ private struct LocalModuleImportPreviewView: View {
 
             Divider()
 
-            List {
-                if !candidates.isEmpty {
-                    Section("可导入") {
-                        ForEach(candidates.indices, id: \.self) { index in
-                            importCandidateRow(index: index)
-                        }
-                    }
-                }
-
-                if !skippedFiles.isEmpty {
-                    Section("已跳过") {
-                        ForEach(skippedFiles) { file in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(file.relativePath)
-                                    .font(.caption)
-                                    .textSelection(.enabled)
-                                Text(file.reason)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                    .textSelection(.enabled)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    importSummaryCard
+                    if !candidates.isEmpty {
+                        importSection("可导入") {
+                            ForEach(candidates.indices, id: \.self) { index in
+                                importCandidateCard(index: index)
                             }
-                            .padding(.vertical, 5)
                         }
                     }
+                    if !skippedFiles.isEmpty {
+                        skippedFilesSection
+                    }
+                    if candidates.isEmpty && skippedFiles.isEmpty {
+                        ContentUnavailableView("没有可导入文件", systemImage: "folder")
+                            .frame(maxWidth: .infinity, minHeight: 260)
+                    }
                 }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 20)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
+            .scrollIndicators(.visible)
             .frame(minHeight: 300)
 
             Divider()
@@ -762,25 +984,91 @@ private struct LocalModuleImportPreviewView: View {
         .frame(width: 780, height: 560)
     }
 
+    private var importSummaryCard: some View {
+        HStack(alignment: .center, spacing: 14) {
+            Image(systemName: "tray.and.arrow.down")
+                .font(.system(size: 28, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 52, height: 52)
+                .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            VStack(alignment: .leading, spacing: 8) {
+                Text("本地模块扫描")
+                    .font(.title3.weight(.semibold))
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) { summaryPills }
+                    VStack(alignment: .leading, spacing: 6) { summaryPills }
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.24), lineWidth: 0.5)
+        }
+    }
+
+    @ViewBuilder
+    private var summaryPills: some View {
+        importPill("\(candidates.count) 个可导入", systemImage: "doc.text")
+        importPill("\(selectedCandidates.count) 个已选择", systemImage: "checkmark.circle")
+        if !skippedFiles.isEmpty {
+            importPill("\(skippedFiles.count) 个跳过", systemImage: "exclamationmark.triangle", isWarning: true)
+        }
+    }
+
     private var selectionSummary: String {
         if hasInvalidSelection { return "已选择项需要填写名称" }
         guard !candidates.isEmpty else { return "没有可导入文件" }
         return "已选择 \(selectedCandidates.count) / \(candidates.count)"
     }
 
-    private func importCandidateRow(index: Int) -> some View {
+    private var skippedFilesSection: some View {
+        importSection("已跳过") {
+            DisclosureGroup {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(skippedFiles) { file in
+                        skippedFileRow(file)
+                    }
+                }
+                .padding(.top, 6)
+            } label: {
+                Label("\(skippedFiles.count) 个文件", systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func importCandidateCard(index: Int) -> some View {
         let candidate = candidates[index]
+        let isSelected = selectedCandidateIDs.contains(candidate.id)
         return HStack(alignment: .top, spacing: 12) {
             Toggle("", isOn: selectionBinding(forID: candidate.id))
                 .labelsHidden()
                 .toggleStyle(.checkbox)
-                .padding(.top, 5)
+                .padding(.top, 14)
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text(candidate.relativePath)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+            Image(systemName: "doc.text")
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(isSelected ? .secondary : .tertiary)
+                .frame(width: 34, height: 34)
+                .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .padding(.top, 7)
+
+            VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(candidate.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "未命名模块" : candidate.name)
+                        .font(.headline)
+                        .foregroundStyle(isSelected ? .primary : .secondary)
+                        .lineLimit(1)
+                    Text(candidate.relativePath)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .textSelection(.enabled)
+                }
 
                 Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
                     GridRow {
@@ -807,10 +1095,57 @@ private struct LocalModuleImportPreviewView: View {
                     }
                 }
                 .font(.callout)
+                .disabled(!isSelected)
             }
         }
-        .padding(.vertical, 7)
-        .opacity(selectedCandidateIDs.contains(candidate.id) ? 1 : 0.55)
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(isSelected ? 0.22 : 0.12), lineWidth: 0.5)
+        }
+        .opacity(isSelected ? 1 : 0.58)
+    }
+
+    private func skippedFileRow(_ file: LocalModuleScanSkippedFile) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "minus.circle")
+                .foregroundStyle(.secondary)
+                .frame(width: 18)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(file.relativePath)
+                    .font(.caption)
+                    .textSelection(.enabled)
+                Text(file.reason)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 4)
+    }
+
+    private func importPill(_ title: String, systemImage: String, isWarning: Bool = false) -> some View {
+        Label(title, systemImage: systemImage)
+            .font(.caption)
+            .lineLimit(1)
+            .foregroundStyle(isWarning ? .orange : .secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(.quaternary.opacity(0.45), in: Capsule())
+    }
+
+    private func importSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.headline)
+            VStack(alignment: .leading, spacing: 8) {
+                content()
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func selectionBinding(forID id: String) -> Binding<Bool> {
@@ -862,11 +1197,13 @@ private struct ModuleRow: View {
     let module: RelayModule
 
     var body: some View {
-        HStack(spacing: 9) {
-            ModuleIconView(module: module, size: 28)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(module.name).fontWeight(.medium).lineLimit(1)
-                Text(module.sourceFormatDisplayTitle)
+        HStack(spacing: 10) {
+            ModuleIconView(module: module, size: 32)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(module.name)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -875,6 +1212,11 @@ private struct ModuleRow: View {
             if module.state == .updating {
                 ProgressView()
                     .controlSize(.small)
+            } else {
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 7, height: 7)
+                    .help(module.state.title)
             }
             if model.settings.combinedModuleEnabled {
                 Toggle("包含", isOn: Binding(
@@ -889,6 +1231,26 @@ private struct ModuleRow: View {
         .padding(.vertical, 5)
         .opacity(model.settings.combinedModuleEnabled && !module.isEnabled ? 0.55 : 1)
     }
+
+    private var subtitle: String {
+        var parts = [module.sourceFormatDisplayTitle]
+        if !module.category.isEmpty { parts.append(module.category) }
+        let folder = ModuleOutputFolder.normalized(module.outputFolder)
+        if folder != ModuleOutputFolder.root {
+            parts.append(ModuleOutputFolder.displayTitle(for: folder))
+        }
+        if !module.publishesStandalone { parts.append("不发布独立模块") }
+        return parts.joined(separator: " · ")
+    }
+
+    private var statusColor: Color {
+        switch module.state {
+        case .never: .secondary
+        case .updating: .blue
+        case .current: .green
+        case .failed: .red
+        }
+    }
 }
 
 private struct ModuleDetailView: View {
@@ -898,107 +1260,202 @@ private struct ModuleDetailView: View {
     let onEdit: () -> Void
 
     var body: some View {
-        Form {
-                Section("模块信息") {
-                    detailRow("原始地址", value: module.sourceURL, icon: "link")
-                    detailRow("来源格式", value: module.sourceFormatDisplayTitle, icon: "doc.text")
-                    detailRow("独立模块", value: module.publishesStandalone ? "发布" : "不发布", icon: "doc.badge.gearshape")
-                    if model.settings.combinedModuleEnabled {
-                        detailRow("总模块", value: module.isEnabled ? "包含" : "不包含", icon: "square.stack.3d.up")
-                        detailRow(
-                            model.settings.storageMode == .local ? "汇总文件" : "汇总订阅",
-                            value: combinedOutputLocation,
-                            icon: "square.stack.3d.up"
-                        )
-                    }
-                    detailRow("上次更新", value: module.lastUpdatedAt?.formatted(date: .long, time: .standard) ?? "从未更新", icon: "clock")
-                    Button("编辑模块…", systemImage: "pencil", action: onEdit)
-                }
-
-                if let summary = module.scriptHubOptions.configuredSummary {
-                    Section("高级设置") {
-                        Label {
-                            Text(summary)
-                                .foregroundStyle(.secondary)
-                                .textSelection(.enabled)
-                        } icon: {
-                            Image(systemName: "slider.horizontal.3")
-                        }
-                    }
-                }
-
-                if !argumentInfo.definitions.isEmpty {
-                    Section("模块参数") {
-                        ForEach(argumentInfo.definitions) { definition in
-                            argumentControl(definition)
-                        }
-                        HStack {
-                            Text("修改会立即应用")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Button("恢复默认值") {
-                                model.resetModuleArguments(moduleID: module.id)
-                            }
-                            .disabled(module.argumentOverrides.isEmpty)
-                        }
-                        if let help = argumentInfo.helpText {
-                            DisclosureGroup("参数说明") {
-                                Text(help)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .textSelection(.enabled)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.vertical, 6)
-                            }
-                        }
-                    }
-                }
-
-                if model.settings.storageMode == .gitHub {
-                    Section(model.settings.github.repositoryIsPrivate == true ? "Cloudflare" : "GitHub") {
-                        if !module.publishesStandalone {
-                            Label("该模块未开启独立发布。", systemImage: "pause.circle")
-                                .foregroundStyle(.secondary)
-                        } else if let rawURL = model.rawURL(for: module) {
-                            VStack(alignment: .leading, spacing: 10) {
-                                Text(rawURL.absoluteString)
-                                    .font(.system(.callout, design: .monospaced))
-                                    .textSelection(.enabled)
-                                HStack {
-                                    URLCopyButton(url: rawURL)
-                                }
-                            }
-                        } else {
-                            Label("完成发布配置后，这里会出现该模块自己的稳定地址。", systemImage: "info.circle")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-
-                if let error = module.lastError {
-                    Section("最近一次更新失败") {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Label("更新失败", systemImage: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.red)
-                            Text(error).textSelection(.enabled)
-                            Text(failureCacheNote)
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                }
-
-                if module.hasOverrideConflict {
-                    Section("本地编辑冲突") {
-                        Label("上游模块已经变化，本地编辑仍在使用。请前往“预览”比较后决定保留或恢复。", systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
-                    }
-                }
-
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                moduleSummaryHeader
+                sourceAndOutputSection
+                synchronizationSection
+                advancedSection
+                argumentsSection
+                publishingSection
+                diagnosticsSection
+            }
+            .frame(maxWidth: 760, alignment: .topLeading)
+            .padding(.horizontal, 32)
+            .padding(.vertical, 28)
+            .frame(maxWidth: .infinity, alignment: .top)
         }
-        .formStyle(.grouped)
         .task(id: "\(module.id.uuidString)-\(module.contentHash ?? "")") {
             argumentInfo = await model.moduleArgumentInfo(for: module)
+        }
+    }
+
+    private var moduleSummaryHeader: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 16) {
+                ModuleIconView(module: module, size: 56)
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(module.name)
+                            .font(.title2.weight(.semibold))
+                            .lineLimit(2)
+                            .textSelection(.enabled)
+                        metadataPillLayout
+                    }
+                    Spacer(minLength: 0)
+                    Button("编辑模块…", systemImage: "pencil", action: onEdit)
+                }
+            }
+            summaryMetricLayout
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.24), lineWidth: 0.5)
+        }
+    }
+
+    private var sourceAndOutputSection: some View {
+        detailSection("来源与输出") {
+            detailRow("原始地址", value: sourceAddressDisplay, icon: "link", monospaced: true, copyValue: sourceAddressCopyValue)
+            detailRow("来源格式", value: module.sourceFormatDisplayTitle, icon: "doc.text")
+            detailRow("模块标签", value: module.category.isEmpty ? "未设置" : module.category, icon: "tag")
+            detailRow("存放文件夹", value: ModuleOutputFolder.displayTitle(for: module.outputFolder), icon: "folder")
+            detailRow(
+                "输出文件",
+                value: module.publishesStandalone ? module.publishedRelativePath : "未开启独立发布",
+                icon: "doc.badge.gearshape",
+                monospaced: module.publishesStandalone,
+                copyValue: module.publishesStandalone ? module.publishedRelativePath : nil
+            )
+            detailRow("图标来源", value: iconSourceDescription, icon: "photo")
+            if let iconURLDisplay {
+                detailRow("图标地址", value: iconURLDisplay, icon: "link", monospaced: true, copyValue: iconURLDisplay)
+            }
+        }
+    }
+
+    private var synchronizationSection: some View {
+        detailSection("同步状态") {
+            detailRow("更新状态", value: module.state.title, icon: statusIcon)
+            detailRow("创建时间", value: module.createdAt.formatted(date: .long, time: .standard), icon: "calendar")
+            detailRow("上次更新", value: module.lastUpdatedAt?.formatted(date: .long, time: .standard) ?? "从未更新", icon: "clock")
+            detailRow("来源检查", value: module.sourceCheckedAt?.formatted(date: .long, time: .standard) ?? "尚未检查", icon: "dot.radiowaves.left.and.right")
+            detailRow(
+                "内容 hash",
+                value: module.contentHash.map { String($0.prefix(12)) } ?? "尚未生成",
+                icon: "number",
+                monospaced: true,
+                copyValue: module.contentHash
+            )
+            if let sourceContentHash = module.sourceContentHash {
+                detailRow("来源 hash", value: String(sourceContentHash.prefix(12)), icon: "number", monospaced: true, copyValue: sourceContentHash)
+            }
+            if let sourceETag = module.sourceETag {
+                detailRow("来源 ETag", value: sourceETag, icon: "tag", monospaced: true, copyValue: sourceETag)
+            }
+            if let sourceLastModified = module.sourceLastModified {
+                detailRow("来源修改时间", value: sourceLastModified, icon: "calendar.badge.clock", monospaced: true)
+            }
+            detailRow(
+                "转换引擎",
+                value: module.conversionEngineRevision.map { String($0.prefix(12)) } ?? "原生 Surge 模块",
+                icon: "cpu",
+                monospaced: module.conversionEngineRevision != nil,
+                copyValue: module.conversionEngineRevision
+            )
+            if model.settings.combinedModuleEnabled {
+                detailRow("总模块", value: module.isEnabled ? "包含" : "不包含", icon: "square.stack.3d.up")
+                detailRow(
+                    model.settings.storageMode == .local ? "汇总文件" : "汇总订阅",
+                    value: combinedOutputLocation,
+                    icon: "square.stack.3d.up",
+                    monospaced: true,
+                    copyValue: combinedOutputLocation == "等待 GitHub 发布配置" ? nil : combinedOutputLocation
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var advancedSection: some View {
+        if let summary = module.scriptHubOptions.configuredSummary {
+            detailSection("高级设置") {
+                Label {
+                    Text(summary)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                } icon: {
+                    Image(systemName: "slider.horizontal.3")
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var argumentsSection: some View {
+        if !argumentInfo.definitions.isEmpty {
+            detailSection("模块参数") {
+                ForEach(argumentInfo.definitions) { definition in
+                    argumentControl(definition)
+                }
+                HStack {
+                    Text("修改会立即应用")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("恢复默认值") {
+                        model.resetModuleArguments(moduleID: module.id)
+                    }
+                    .disabled(module.argumentOverrides.isEmpty)
+                }
+                if let help = argumentInfo.helpText {
+                    DisclosureGroup("参数说明") {
+                        Text(help)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 6)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var publishingSection: some View {
+        if model.settings.storageMode == .gitHub {
+            detailSection(model.settings.github.repositoryIsPrivate == true ? "Cloudflare" : "GitHub") {
+                if !module.publishesStandalone {
+                    Label("该模块未开启独立发布。", systemImage: "pause.circle")
+                        .foregroundStyle(.secondary)
+                } else if let rawURL = model.rawURL(for: module) {
+                    detailRow("订阅地址", value: rawURL.absoluteString, icon: "link", monospaced: true, copyValue: rawURL.absoluteString)
+                } else {
+                    Label("完成发布配置后，这里会出现该模块自己的稳定地址。", systemImage: "info.circle")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } else if module.publishesStandalone {
+            detailSection("本地文件") {
+                detailRow("文件位置", value: localPublishedPath, icon: "doc", monospaced: true, copyValue: localPublishedPath)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var diagnosticsSection: some View {
+        if let error = module.lastError {
+            detailSection("最近一次更新失败") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("更新失败", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                    Text(error).textSelection(.enabled)
+                    Text(failureCacheNote)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+
+        if module.hasOverrideConflict {
+            detailSection("本地编辑冲突") {
+                Label("上游模块已经变化，本地编辑仍在使用。请前往“预览”比较后决定保留或恢复。", systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+            }
         }
     }
 
@@ -1007,32 +1464,219 @@ private struct ModuleDetailView: View {
         return model.combinedRawURL?.absoluteString ?? "等待 GitHub 发布配置"
     }
 
+    private var localPublishedPath: String {
+        URL(filePath: model.settings.localModuleDirectory, directoryHint: .isDirectory)
+            .appending(path: module.publishedRelativePath)
+            .path
+    }
+
+    private var iconSourceDescription: String {
+        if module.customIconURL != nil {
+            return "自定义图标（仅展示）"
+        }
+        if module.iconURL != nil {
+            return "来源元数据（仅展示）"
+        }
+        return "默认图标"
+    }
+
+    private var iconURLDisplay: String? {
+        module.customIconURL ?? module.iconURL
+    }
+
+    private var sourceAddressDisplay: String {
+        if let url = URL(string: module.sourceURL), url.isFileURL {
+            return url.path
+        }
+        return module.sourceURL.removingPercentEncoding ?? module.sourceURL
+    }
+
+    private var sourceAddressCopyValue: String {
+        if let url = URL(string: module.sourceURL), url.isFileURL {
+            return url.path
+        }
+        return module.sourceURL
+    }
+
+    private var statusIcon: String {
+        switch module.state {
+        case .never: "circle"
+        case .updating: "arrow.triangle.2.circlepath"
+        case .current: "checkmark.circle"
+        case .failed: "exclamationmark.triangle"
+        }
+    }
+
     private var failureCacheNote: String {
         model.settings.combinedModuleEnabled
             ? "如果该来源有缓存，总模块会继续沿用它上一次成功版本。"
             : "如果该来源有缓存，模块输出会继续沿用它上一次成功版本。"
     }
 
+    private var metadataPills: [ModuleDetailMetadataPill] {
+        var pills = [
+            ModuleDetailMetadataPill(title: module.sourceFormatDisplayTitle, systemImage: "doc.text")
+        ]
+        if !module.category.isEmpty {
+            pills.append(ModuleDetailMetadataPill(title: module.category, systemImage: "tag"))
+        }
+        let folder = ModuleOutputFolder.normalized(module.outputFolder)
+        if folder != ModuleOutputFolder.root {
+            pills.append(ModuleDetailMetadataPill(
+                title: ModuleOutputFolder.displayTitle(for: folder),
+                systemImage: "folder"
+            ))
+        }
+        pills.append(ModuleDetailMetadataPill(
+            title: module.publishesStandalone ? "独立发布" : "不发布独立模块",
+            systemImage: module.publishesStandalone ? "checkmark.circle" : "pause.circle"
+        ))
+        if model.settings.combinedModuleEnabled {
+            pills.append(ModuleDetailMetadataPill(
+                title: module.isEnabled ? "包含在总模块" : "不进总模块",
+                systemImage: "square.stack.3d.up"
+            ))
+        }
+        return pills
+    }
+
+    private var summaryMetrics: [ModuleDetailSummaryMetric] {
+        [
+            ModuleDetailSummaryMetric(
+                title: "输出",
+                value: summaryOutputValue,
+                systemImage: module.publishesStandalone ? "doc.badge.gearshape" : "pause.circle",
+                tint: .secondary
+            ),
+            ModuleDetailSummaryMetric(
+                title: "更新",
+                value: summaryUpdateValue,
+                systemImage: statusIcon,
+                tint: statusColor
+            ),
+            ModuleDetailSummaryMetric(
+                title: "图标",
+                value: iconSourceDescription,
+                systemImage: module.iconURL == nil ? "shippingbox" : "photo",
+                tint: .secondary
+            )
+        ]
+    }
+
+    private var summaryOutputValue: String {
+        guard module.publishesStandalone else { return "不发布独立模块" }
+        return module.publishedRelativePath
+    }
+
+    private var summaryUpdateValue: String {
+        if let lastUpdatedAt = module.lastUpdatedAt {
+            return lastUpdatedAt.formatted(date: .abbreviated, time: .shortened)
+        }
+        return module.state.title
+    }
+
+    private var statusColor: Color {
+        switch module.state {
+        case .never: .secondary
+        case .updating: .blue
+        case .current: .green
+        case .failed: .red
+        }
+    }
+
+    private var summaryMetricLayout: some View {
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 152), spacing: 8, alignment: .top)],
+            alignment: .leading,
+            spacing: 8
+        ) {
+            ForEach(summaryMetrics) { metric in
+                summaryMetric(metric)
+            }
+        }
+    }
+
+    private func summaryMetric(_ metric: ModuleDetailSummaryMetric) -> some View {
+        HStack(alignment: .top, spacing: 9) {
+            Image(systemName: metric.systemImage)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(metric.tint)
+                .frame(width: 18, height: 18)
+                .background(metric.tint.opacity(0.14), in: .rect(cornerRadius: 5))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(metric.title)
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.tertiary)
+                Text(metric.value)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .truncationMode(.middle)
+                    .textSelection(.enabled)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, minHeight: 54, alignment: .topLeading)
+        .background(.quaternary.opacity(0.32), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+    }
+
+    private var metadataPillLayout: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                StatusPill(state: module.state)
+                ForEach(metadataPills) { pill in
+                    metadataPill(pill.title, systemImage: pill.systemImage)
+                }
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                StatusPill(state: module.state)
+                ForEach(metadataPills) { pill in
+                    metadataPill(pill.title, systemImage: pill.systemImage)
+                }
+            }
+        }
+    }
+
+    private func metadataPill(_ title: String, systemImage: String) -> some View {
+        Label(title, systemImage: systemImage)
+            .font(.caption)
+            .lineLimit(1)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(.quaternary.opacity(0.45), in: Capsule())
+    }
+
+    private func detailSection<Content: View>(_ title: String, @ViewBuilder content: @escaping () -> Content) -> some View {
+        DetailInfoSection(title, content: content)
+    }
+
     @ViewBuilder
     private func argumentControl(_ definition: ModuleArgumentDefinition) -> some View {
         let value = argumentValue(for: definition)
         if ["true", "false"].contains(definition.defaultValue.lowercased()) {
-            Toggle(definition.key, isOn: Binding(
-                get: { argumentValue(for: definition).lowercased() == "true" },
-                set: { enabled in
-                    model.setModuleArgument(
-                        moduleID: module.id,
-                        key: definition.key,
-                        value: enabled ? "true" : "false",
-                        defaultValue: definition.defaultValue
-                    )
-                }
-            ))
-            .toggleStyle(.switch)
+            DetailControlRow(label: definition.key, icon: "switch.2") {
+                Toggle(definition.key, isOn: Binding(
+                    get: { argumentValue(for: definition).lowercased() == "true" },
+                    set: { enabled in
+                        model.setModuleArgument(
+                            moduleID: module.id,
+                            key: definition.key,
+                            value: enabled ? "true" : "false",
+                            defaultValue: definition.defaultValue
+                        )
+                    }
+                ))
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
+            }
         } else {
-            LabeledContent(definition.key) {
+            DetailControlRow(label: definition.key, icon: "text.cursor") {
                 TextField(
-                    "",
+                    definition.key,
                     text: Binding(
                         get: { argumentValue(for: definition) },
                         set: { newValue in
@@ -1060,14 +1704,13 @@ private struct ModuleDetailView: View {
             ?? definition.defaultValue
     }
 
-    private func detailRow(_ label: String, value: String, icon: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Label(label, systemImage: icon)
-                .frame(width: 108, alignment: .leading)
-            Text(value)
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
+    private func detailRow(
+        _ label: String,
+        value: String,
+        icon: String,
+        monospaced: Bool = false,
+        copyValue: String? = nil
+    ) -> some View {
+        DetailInfoRow(label: label, value: value, icon: icon, monospaced: monospaced, copyValue: copyValue)
     }
 }

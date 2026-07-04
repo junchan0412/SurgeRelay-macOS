@@ -16,6 +16,12 @@ enum PersistenceStore {
     ]
 
     static var configurationDirectoryURL: URL {
+        if AppRuntimeOptions.isUIQAMode {
+            let directory = FileManager.default.temporaryDirectory
+                .appending(path: "SurgeRelayUIQA/Configuration", directoryHint: .isDirectory)
+            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            return directory
+        }
         let path = UserDefaults.standard.string(forKey: configurationDirectoryKey)
             ?? AppSettings.defaultConfigurationDirectory
         let directory = URL(filePath: path, directoryHint: .isDirectory)

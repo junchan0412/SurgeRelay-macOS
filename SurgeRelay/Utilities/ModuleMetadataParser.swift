@@ -88,8 +88,24 @@ enum ModuleMetadataParser {
         return line + "\n" + normalized
     }
 
+    static func removingIconMetadata(from content: String) -> String {
+        let normalized = content.replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+        return normalized
+            .components(separatedBy: "\n")
+            .filter { !isIconMetadataLine($0) }
+            .joined(separator: "\n")
+    }
+
     static func applyingModuleMetadata(name: String, category: String, to content: String) -> String {
-        applyingCategory(category, to: applyingDisplayName(name, to: content))
+        removingIconMetadata(from: applyingCategory(category, to: applyingDisplayName(name, to: content)))
+    }
+
+    private static func isIconMetadataLine(_ line: String) -> Bool {
+        guard let expression = try? NSRegularExpression(pattern: #"(?i)^\s*#!\s*icon\s*="#) else {
+            return false
+        }
+        return expression.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) != nil
     }
 }
 

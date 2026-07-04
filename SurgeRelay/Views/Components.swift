@@ -91,7 +91,7 @@ struct StatusPill: View {
     }
 
     var body: some View {
-        Label(state.title, systemImage: state == .updating ? "arrow.trianglehead.2.clockwise.rotate.90" : "circle.fill")
+        Label(state.title, systemImage: state == .updating ? "arrow.triangle.2.circlepath" : "circle.fill")
             .font(.caption)
             .foregroundStyle(color)
             .padding(.horizontal, 9)
@@ -127,25 +127,56 @@ struct StatCard: View {
 
 struct URLCopyButton: View {
     let url: URL
+
+    var body: some View {
+        TextCopyButton(text: url.absoluteString, title: "拷贝地址")
+    }
+}
+
+struct TextCopyButton: View {
+    let text: String
+    var title = "拷贝"
+    var copiedTitle = "已拷贝"
     @State private var copied = false
 
     var body: some View {
         Button {
             guard !copied else { return }
             NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(url.absoluteString, forType: .string)
+            NSPasteboard.general.setString(text, forType: .string)
             withAnimation(.snappy) { copied = true }
             Task {
                 try? await Task.sleep(for: .seconds(1.5))
                 withAnimation(.snappy) { copied = false }
             }
         } label: {
-            Label(copied ? "已拷贝" : "拷贝地址",
+            Label(copied ? copiedTitle : title,
                   systemImage: copied ? "checkmark.circle.fill" : "doc.on.doc")
                 .contentTransition(.symbolEffect(.replace))
         }
         .buttonStyle(.bordered)
+        .controlSize(.small)
         .tint(copied ? .green : .accentColor)
+        .disabled(text.isEmpty)
+    }
+}
+
+struct SheetActionFooter<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        HStack(spacing: 10) {
+            content
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity)
+        .background(.bar)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Color(nsColor: .separatorColor).opacity(0.14))
+                .frame(height: 0.5)
+        }
     }
 }
 

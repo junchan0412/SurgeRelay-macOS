@@ -2,6 +2,8 @@ import Foundation
 
 @MainActor
 enum WebManagementAPI {
+    nonisolated static let webContentSecurityPolicy = "default-src 'self'; img-src 'self' data: http: https:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+
     static func eventPayload(model: AppModel) -> String {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -210,15 +212,24 @@ enum WebManagementAPI {
                     sourceFormat: module.sourceFormat.rawValue,
                     sourceFormatTitle: module.sourceFormatDisplayTitle,
                     outputFileName: module.outputFileName,
+                    publishedRelativePath: module.publishedRelativePath,
                     category: module.category,
                     outputFolder: module.outputFolder,
                     publishesStandalone: module.publishesStandalone,
                     isEnabled: module.isEnabled,
                     state: module.state.rawValue,
                     stateTitle: module.state.title,
+                    createdAt: module.createdAt,
                     lastUpdatedAt: module.lastUpdatedAt,
+                    sourceCheckedAt: module.sourceCheckedAt,
+                    contentHash: module.contentHash,
+                    sourceETag: module.sourceETag,
+                    sourceLastModified: module.sourceLastModified,
+                    sourceContentHash: module.sourceContentHash,
+                    conversionEngineRevision: module.conversionEngineRevision,
                     lastError: module.lastError,
                     iconURL: iconURL(for: module),
+                    customIconURL: module.customIconURL,
                     publishedURL: model.rawURL(for: module)?.absoluteString,
                     advancedSummary: module.scriptHubOptions.configuredSummary,
                     hasOverrideConflict: module.hasOverrideConflict,
@@ -255,30 +266,49 @@ enum WebManagementAPI {
     }
 
     private static func iconURL(for module: RelayModule) -> String? {
-        if FileManager.default.fileExists(atPath: ModuleIconStore.cachedURL(for: module.id).path) {
+        if cachedIconData(for: module) != nil {
             return "/api/modules/\(module.id.uuidString.lowercased())/icon"
         }
         return module.iconURL
     }
 
     private static func iconResponse(for module: RelayModule) -> WebHTTPResponse {
-        let url = ModuleIconStore.cachedURL(for: module.id)
-        guard let data = try? Data(contentsOf: url), !data.isEmpty else {
+        guard let icon = cachedIconData(for: module) else {
             return .error(status: 404, message: "没有可用的模块图标。")
         }
         return WebHTTPResponse(
-            contentType: imageContentType(data),
+            contentType: icon.contentType,
             headers: ["Cache-Control": "private, max-age=3600"],
-            body: data
+            body: icon.data
         )
     }
 
-    private static func imageContentType(_ data: Data) -> String {
+    private static func cachedIconData(for module: RelayModule) -> (data: Data, contentType: String)? {
+        let url = ModuleIconStore.cachedURL(for: module.id)
+        guard let data = try? Data(contentsOf: url),
+              !data.isEmpty,
+              let contentType = imageContentType(data) else {
+            return nil
+        }
+        return (data, contentType)
+    }
+
+    nonisolated static func imageContentType(_ data: Data) -> String? {
         if data.starts(with: [0x89, 0x50, 0x4E, 0x47]) { return "image/png" }
         if data.starts(with: [0xFF, 0xD8, 0xFF]) { return "image/jpeg" }
         if data.starts(with: [0x47, 0x49, 0x46]) { return "image/gif" }
-        if data.starts(with: [0x52, 0x49, 0x46, 0x46]) { return "image/webp" }
-        return "application/octet-stream"
+        if data.count >= 12,
+           data.starts(with: [0x52, 0x49, 0x46, 0x46]),
+           data.dropFirst(8).starts(with: [0x57, 0x45, 0x42, 0x50]) {
+            return "image/webp"
+        }
+        if let prefix = String(data: data.prefix(512), encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased(),
+           prefix.hasPrefix("<svg") || (prefix.hasPrefix("<?xml") && prefix.contains("<svg")) {
+            return "image/svg+xml"
+        }
+        return nil
     }
 
     nonisolated static func assetResponse(for path: String) -> WebHTTPResponse {
@@ -318,7 +348,7 @@ enum WebManagementAPI {
             contentType: contentType,
             headers: [
                 "Cache-Control": "no-cache, must-revalidate",
-                "Content-Security-Policy": "default-src 'self'; img-src 'self' data: https:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+                "Content-Security-Policy": webContentSecurityPolicy
             ],
             body: data
         )
@@ -349,15 +379,24 @@ private struct WebModulePayload: Encodable {
     let sourceFormat: String
     let sourceFormatTitle: String
     let outputFileName: String
+    let publishedRelativePath: String
     let category: String
     let outputFolder: String
     let publishesStandalone: Bool
     let isEnabled: Bool
     let state: String
     let stateTitle: String
+    let createdAt: Date
     let lastUpdatedAt: Date?
+    let sourceCheckedAt: Date?
+    let contentHash: String?
+    let sourceETag: String?
+    let sourceLastModified: String?
+    let sourceContentHash: String?
+    let conversionEngineRevision: String?
     let lastError: String?
     let iconURL: String?
+    let customIconURL: String?
     let publishedURL: String?
     let advancedSummary: String?
     let hasOverrideConflict: Bool
@@ -429,7 +468,9 @@ private struct WebModuleMutation: Decodable {
     let sourceURL: String
     let sourceFormat: String?
     let category: String?
+    let iconURL: String?
     let outputFolder: String?
+    let outputFileName: String?
     let publishesStandalone: Bool?
     let isEnabled: Bool?
     let policy: String?
@@ -452,7 +493,9 @@ private struct WebModuleMutation: Decodable {
             draft.sourceFormat = format
         }
         if let category { draft.category = category }
+        if let iconURL { draft.iconURL = iconURL }
         if let outputFolder { draft.outputFolder = outputFolder }
+        if let outputFileName { draft.outputFileName = outputFileName }
         if let publishesStandalone { draft.publishesStandalone = publishesStandalone }
         if let isEnabled { draft.isEnabled = isEnabled }
         if let scriptHubOptions { draft.scriptHubOptions = scriptHubOptions }

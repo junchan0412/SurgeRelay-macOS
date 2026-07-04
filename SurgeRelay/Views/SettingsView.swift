@@ -49,10 +49,10 @@ struct SettingsView: View {
             }
         }
 
-        var width: CGFloat {
+        var controlWidth: CGFloat {
             switch self {
-            case .webManagement: 92
-            default: 64
+            case .webManagement: 94
+            default: 72
             }
         }
     }
@@ -64,11 +64,18 @@ struct SettingsView: View {
             selectedSettingsContent
         }
         .frame(minWidth: 560, idealWidth: 620, minHeight: 440, idealHeight: 500)
+        .background {
+            Color(nsColor: .windowBackgroundColor)
+                .ignoresSafeArea()
+        }
+        .background(SettingsWindowChromeConfigurator())
         .task {
             refreshInstallationDiagnostics()
             refreshLocalRootDiagnostics()
-            model.ensureGitHubTokenLoaded()
-            model.ensureWebAccessTokenForEditing()
+            if !AppRuntimeOptions.isUIQAMode {
+                model.ensureGitHubTokenLoaded()
+                model.ensureWebAccessTokenForEditing()
+            }
         }
         .onChange(of: model.settings.localModuleDirectory) { _, _ in
             refreshLocalRootDiagnostics()
@@ -96,31 +103,60 @@ struct SettingsView: View {
     }
 
     private var settingsHeader: some View {
-        ZStack {
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .ignoresSafeArea(edges: .top)
-
+        HStack {
+            Spacer(minLength: 0)
             settingsTabSelector
+            Spacer(minLength: 0)
         }
-        .frame(height: 56)
         .frame(maxWidth: .infinity)
+        .padding(.top, 18)
+        .padding(.bottom, 10)
     }
 
     private var settingsTabSelector: some View {
-        Picker("设置分类", selection: $selectedTab) {
+        HStack(spacing: 2) {
             ForEach(SettingsTab.allCases) { tab in
-                Text(tab.title)
-                    .tag(tab)
+                settingsTabButton(tab)
             }
         }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .controlSize(.large)
-        .frame(width: 450)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(4)
+        .frame(width: SettingsTabMetrics.selectorWidth, height: SettingsTabMetrics.selectorHeight)
+        .glassEffect(.regular, in: .rect(cornerRadius: 14))
+        .accessibilityLabel("设置分类")
+    }
+
+    private func settingsTabButton(_ tab: SettingsTab) -> some View {
+        let isSelected = selectedTab == tab
+        return Button {
+            withAnimation(.snappy(duration: 0.18)) {
+                selectedTab = tab
+            }
+        } label: {
+            ZStack {
+                Text(tab.title)
+                    .font(.callout.weight(isSelected ? .semibold : .medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                    .foregroundStyle(isSelected ? .primary : .secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            }
+            .frame(width: tab.controlWidth, height: SettingsTabMetrics.itemHeight)
+            .contentShape(.rect(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .background {
+            if isSelected {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(.regularMaterial)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(Color(nsColor: .separatorColor).opacity(0.22), lineWidth: 0.5)
+                    }
+                    .shadow(color: .black.opacity(0.08), radius: 4, y: 1)
+                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+            }
+        }
     }
 
     @ViewBuilder
@@ -142,95 +178,103 @@ struct SettingsView: View {
     private var generalSettings: some View {
         settingsForm {
             settingsSection("通用") {
-                HStack(alignment: .firstTextBaseline) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("配置储存目录")
-                        Text(model.configurationDirectoryPath)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .textSelection(.enabled)
-                            .lineLimit(2)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    Button("选择…") { chooseDirectory() }
+                SettingsControlRow("配置储存目录", icon: "folder") {
+                    pathSelectionControl(
+                        path: model.configurationDirectoryPath,
+                        chooseAction: chooseDirectory
+                    )
                 }
-                Toggle("使用总模块功能", isOn: Binding(
+                settingsToggleRow("使用总模块功能", icon: "square.stack.3d.up", isOn: Binding(
                     get: { model.settings.combinedModuleEnabled },
                     set: { model.setCombinedModuleEnabled($0) }
                 ))
                 if model.settings.combinedModuleEnabled {
-                    TextField("总模块文件名", text: combinedFileNameBinding)
+                    settingsTextFieldRow("总模块文件名", icon: "doc", text: combinedFileNameBinding, prompt: "Surge-Relay")
                 }
             }
 
             settingsSection("自动化") {
-                Picker("刷新间隔", selection: Binding(
-                    get: { model.settings.refreshIntervalMinutes },
-                    set: {
-                        model.settings.refreshIntervalMinutes = $0
-                        model.saveSettings()
-                        model.restartScheduler()
+                SettingsControlRow("刷新间隔", icon: "clock.arrow.circlepath") {
+                    Picker("刷新间隔", selection: Binding(
+                        get: { model.settings.refreshIntervalMinutes },
+                        set: {
+                            model.settings.refreshIntervalMinutes = $0
+                            model.saveSettings()
+                            model.restartScheduler()
+                        }
+                    )) {
+                        Text("手动").tag(0)
+                        Text("每 15 分钟").tag(15)
+                        Text("每小时").tag(60)
+                        Text("每 6 小时").tag(360)
+                        Text("每 12 小时").tag(720)
                     }
-                )) {
-                    Text("手动").tag(0)
-                    Text("每 15 分钟").tag(15)
-                    Text("每小时").tag(60)
-                    Text("每 6 小时").tag(360)
-                    Text("每 12 小时").tag(720)
+                    .labelsHidden()
+                    .frame(maxWidth: 220, alignment: .leading)
                 }
-                Toggle("登录时启动 Surge Relay", isOn: Binding(
+                settingsToggleRow("登录时启动", icon: "power", isOn: Binding(
                     get: { model.settings.launchAtLogin },
                     set: { model.setLaunchAtLogin($0) }
                 ))
-                Toggle("自动发布", isOn: Binding(
+                settingsToggleRow("自动发布", icon: "arrow.up.doc", isOn: Binding(
                     get: { model.settings.automaticallyPublish },
                     set: { model.settings.automaticallyPublish = $0; model.saveSettings() }
                 ))
             }
 
             settingsSection("Script-Hub") {
-                LabeledContent("版本") {
-                    Text(model.upstreamState.revision.map { String($0.prefix(7)) } ?? "—")
-                        .monospaced()
+                settingsInfoRow(
+                    "版本",
+                    value: model.upstreamState.revision.map { String($0.prefix(7)) } ?? "—",
+                    icon: "number",
+                    monospaced: true
+                )
+                settingsInfoRow(
+                    "固定来源",
+                    value: model.upstreamState.sourceDescription ?? "尚未验证",
+                    icon: "pin"
+                )
+                settingsInfoRow(
+                    "上游 revision",
+                    value: model.upstreamState.upstreamRevision.map { String($0.prefix(12)) } ?? "—",
+                    icon: "arrow.triangle.branch",
+                    monospaced: true
+                )
+                settingsInfoRow(
+                    "脚本 hash",
+                    value: model.upstreamState.scriptHashes.isEmpty ? "尚未记录" : "\(model.upstreamState.scriptHashes.count) 个脚本已记录",
+                    icon: "checklist"
+                )
+                settingsInfoRow(
+                    "上次检查",
+                    value: model.upstreamState.lastCheckedAt?.formatted(date: .abbreviated, time: .shortened) ?? "尚未检查",
+                    icon: "clock"
+                )
+                SettingsControlRow("上游模块", icon: "link") {
+                    TextField("上游模块", text: stringBinding(\.scriptHubModuleURL))
+                        .labelsHidden()
+                        .textFieldStyle(.roundedBorder)
                 }
-                LabeledContent("固定来源") {
-                    Text(model.upstreamState.sourceDescription ?? "尚未验证")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                }
-                LabeledContent("上游 revision") {
-                    Text(model.upstreamState.upstreamRevision.map { String($0.prefix(12)) } ?? "—")
-                        .monospaced()
-                        .foregroundStyle(.secondary)
-                }
-                LabeledContent("脚本 hash") {
-                    Text(model.upstreamState.scriptHashes.isEmpty ? "尚未记录" : "\(model.upstreamState.scriptHashes.count) 个脚本已记录")
-                        .foregroundStyle(.secondary)
-                }
-                LabeledContent("上次检查") {
-                    Text(model.upstreamState.lastCheckedAt?.formatted(date: .abbreviated, time: .shortened) ?? "尚未检查")
-                        .foregroundStyle(.secondary)
-                }
-                TextField("上游模块", text: stringBinding(\.scriptHubModuleURL))
-                Toggle("自动更新", isOn: Binding(
+                settingsToggleRow("自动更新", icon: "arrow.triangle.2.circlepath", isOn: Binding(
                     get: { model.settings.automaticallyUpdateScriptHub },
                     set: { model.settings.automaticallyUpdateScriptHub = $0; model.saveSettings() }
                 ))
-                HStack(spacing: 8) {
-                    Button("检查更新", systemImage: "arrow.clockwise") {
-                        Task {
-                            isCheckingUpdate = true
-                            await model.refreshScriptHub(showProgress: false)
-                            isCheckingUpdate = false
+                SettingsControlRow("操作", icon: "ellipsis.circle") {
+                    HStack(spacing: 8) {
+                        Button("检查更新", systemImage: "arrow.clockwise") {
+                            Task {
+                                isCheckingUpdate = true
+                                await model.refreshScriptHub(showProgress: false)
+                                isCheckingUpdate = false
+                            }
                         }
-                    }
-                    .disabled(isCheckingUpdate)
-                    if isCheckingUpdate {
-                        ProgressView().controlSize(.small)
-                        Text("正在检查…")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        .disabled(isCheckingUpdate)
+                        if isCheckingUpdate {
+                            ProgressView().controlSize(.small)
+                            Text("正在检查…")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
                 if let error = model.upstreamState.lastError {
@@ -245,27 +289,28 @@ struct SettingsView: View {
     private var publishingSettings: some View {
         settingsForm {
             settingsSection("存储位置") {
-                Picker("模块发布到", selection: storageModeBinding) {
-                    Text("本地").tag(StorageMode.local)
-                    Text("GitHub").tag(StorageMode.gitHub)
+                SettingsControlRow("模块发布到", icon: "shippingbox") {
+                    Picker("模块发布到", selection: storageModeBinding) {
+                        Text("本地").tag(StorageMode.local)
+                        Text("GitHub").tag(StorageMode.gitHub)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: 220)
                 }
-                .pickerStyle(.segmented)
 
                 if model.settings.storageMode == .local {
-                    HStack(alignment: .firstTextBaseline) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("本地模块根目录")
-                            Text(model.settings.localModuleDirectory)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .textSelection(.enabled)
-                                .lineLimit(2)
-                            Text(model.settings.combinedModuleEnabled ? "总模块保存在根目录；独立模块可选择根目录下的文件夹" : "独立模块可选择根目录下的文件夹")
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        Button("选择…") { chooseLocalModuleDirectory() }
+                    SettingsControlRow("本地根目录", icon: "folder") {
+                        pathSelectionControl(
+                            path: model.settings.localModuleDirectory,
+                            chooseAction: chooseLocalModuleDirectory
+                        )
+                    }
+                    SettingsInfoRow("文件规则", icon: "folder.badge.gearshape") {
+                        Text(model.settings.combinedModuleEnabled ? "总模块保存在根目录；独立模块可选择根目录下的文件夹。" : "独立模块可选择根目录下的文件夹。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     if let diagnostics = localRootDiagnostics {
                         localRootDiagnosticContent(diagnostics)
@@ -279,11 +324,11 @@ struct SettingsView: View {
                 }
 
                 if model.settings.storageMode == .gitHub {
-                    TextField("所有者", text: githubBinding(\.owner))
-                    TextField("仓库", text: githubBinding(\.repository))
-                    TextField("分支", text: githubBinding(\.branch))
-                    TextField("模块根目录", text: githubBinding(\.directory))
-                    LabeledContent("仓库类型") {
+                    settingsTextFieldRow("所有者", icon: "person", text: githubBinding(\.owner), prompt: "GitHub 用户或组织")
+                    settingsTextFieldRow("仓库", icon: "tray.full", text: githubBinding(\.repository), prompt: "Repository")
+                    settingsTextFieldRow("分支", icon: "arrow.triangle.branch", text: githubBinding(\.branch), prompt: "main")
+                    settingsTextFieldRow("模块根目录", icon: "folder", text: githubBinding(\.directory), prompt: "modules")
+                    SettingsInfoRow("仓库类型", icon: repositoryTypeIcon) {
                         switch model.settings.github.repositoryIsPrivate {
                         case .some(true): Label("私有", systemImage: "lock.fill")
                         case .some(false): Label("公开", systemImage: "globe")
@@ -295,7 +340,7 @@ struct SettingsView: View {
 
             if model.settings.storageMode == .gitHub, model.settings.github.repositoryIsPrivate == true {
                 settingsSection("Cloudflare Worker") {
-                    TextField("公共地址", text: githubBinding(\.publicBaseURL))
+                    settingsTextFieldRow("公共地址", icon: "network", text: githubBinding(\.publicBaseURL), prompt: "https://example.workers.dev")
                 }
             }
         }
@@ -304,29 +349,33 @@ struct SettingsView: View {
     private var credentialsSettings: some View {
         settingsForm {
             settingsSection("GitHub Token") {
-                SecureField("Token", text: Binding(
+                settingsSecureFieldRow("Token", icon: "key.fill", text: Binding(
                     get: { model.githubToken },
                     set: { model.githubToken = $0 }
                 ))
-                LabeledContent("保存状态") {
+                SettingsInfoRow("保存状态", icon: githubTokenStorageImage) {
                     Label(model.githubTokenStorageStatus.title, systemImage: githubTokenStorageImage)
                         .foregroundStyle(githubTokenStorageColor)
                 }
-                VStack(alignment: .leading, spacing: 6) {
-                    Label("Fine-grained token：Repository permissions 只需要 Contents 读写、Metadata 只读。", systemImage: "checkmark.shield")
-                    Label("Classic token：公开仓库可用 public_repo；私有仓库需要 repo。", systemImage: "lock")
-                    Label("不需要 admin、delete_repo、workflow 或组织管理权限。", systemImage: "exclamationmark.triangle")
+                SettingsInfoRow("权限范围", icon: "checkmark.shield") {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Label("Fine-grained token：Contents 读写、Metadata 只读。", systemImage: "checkmark.shield")
+                        Label("Classic token：公开仓库 public_repo；私有仓库 repo。", systemImage: "lock")
+                        Label("不需要 admin、delete_repo、workflow 或组织管理权限。", systemImage: "exclamationmark.triangle")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
-                HStack(spacing: 8) {
-                    Link("创建 Token", destination: URL(string: "https://github.com/settings/personal-access-tokens/new")!)
-                    Button("保存到钥匙串", systemImage: "key.fill") { model.saveGitHubToken() }
-                    Button("测试连接", systemImage: "network") { testGitHubConnection() }
-                        .disabled(model.githubToken.isEmpty || !model.settings.github.isConfigured || isTesting)
-                    if isTesting {
-                        ProgressView().controlSize(.small)
+                SettingsControlRow("操作", icon: "ellipsis.circle") {
+                    HStack(spacing: 8) {
+                        Link("创建 Token", destination: URL(string: "https://github.com/settings/personal-access-tokens/new")!)
+                        Button("保存到钥匙串", systemImage: "key.fill") { model.saveGitHubToken() }
+                        Button("测试连接", systemImage: "network") { testGitHubConnection() }
+                            .disabled(model.githubToken.isEmpty || !model.settings.github.isConfigured || isTesting)
+                        if isTesting {
+                            ProgressView().controlSize(.small)
+                        }
                     }
                 }
                 if !model.settings.github.isConfigured {
@@ -343,26 +392,30 @@ struct SettingsView: View {
             }
 
             settingsSection("Web 管理令牌") {
-                SecureField("令牌", text: Binding(
+                settingsSecureFieldRow("令牌", icon: "network.badge.shield.half.filled", text: Binding(
                     get: { model.webAccessToken },
                     set: { model.webAccessToken = $0 }
                 ))
-                LabeledContent("保存状态") {
+                SettingsInfoRow("保存状态", icon: webAccessTokenStorageImage) {
                     Label(model.webAccessTokenStorageStatus.title, systemImage: webAccessTokenStorageImage)
                         .foregroundStyle(webAccessTokenStorageColor)
                 }
-                Label("访问 Web 管理页面时使用；可自己填写，也可生成随机令牌。", systemImage: "network.badge.shield.half.filled")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-                HStack(spacing: 8) {
-                    Button("保存到钥匙串", systemImage: "key.fill") { model.saveWebAccessToken() }
-                    Button("生成新令牌", systemImage: "arrow.triangle.2.circlepath") { model.resetWebAccessToken() }
-                    Button("拷贝令牌", systemImage: "doc.on.doc") {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(model.webAccessToken, forType: .string)
+                SettingsInfoRow("用途", icon: "network.badge.shield.half.filled") {
+                    Text("访问 Web 管理页面时使用；可自己填写，也可生成随机令牌。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+                SettingsControlRow("操作", icon: "ellipsis.circle") {
+                    HStack(spacing: 8) {
+                        Button("保存到钥匙串", systemImage: "key.fill") { model.saveWebAccessToken() }
+                        Button("生成新令牌", systemImage: "arrow.triangle.2.circlepath") { model.resetWebAccessToken() }
+                        Button("拷贝令牌", systemImage: "doc.on.doc") {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(model.webAccessToken, forType: .string)
+                        }
+                        .disabled(model.webAccessToken.isEmpty)
                     }
-                    .disabled(model.webAccessToken.isEmpty)
                 }
             }
 
@@ -371,36 +424,43 @@ struct SettingsView: View {
             }
         }
         .onAppear {
-            model.ensureGitHubTokenLoaded()
-            model.ensureWebAccessTokenForEditing()
+            if !AppRuntimeOptions.isUIQAMode {
+                model.ensureGitHubTokenLoaded()
+                model.ensureWebAccessTokenForEditing()
+            }
         }
     }
 
     private var webManagementSettings: some View {
         settingsForm {
             settingsSection("服务") {
-                LabeledContent("服务状态") {
+                SettingsInfoRow("服务状态", icon: model.webServerState.systemImage) {
                     Label(model.webServerState.title, systemImage: model.webServerState.systemImage)
                         .foregroundStyle(webServerStateColor)
                         .textSelection(.enabled)
                 }
-                Toggle("启用 Web 管理", isOn: Binding(
+                settingsToggleRow("启用服务", icon: "network", isOn: Binding(
                     get: { model.settings.webServerEnabled },
                     set: {
                         model.settings.webServerEnabled = $0
                         model.applyWebServerSettings()
                     }
                 ))
-                TextField("端口", value: Binding(
-                    get: { model.settings.webServerPort },
-                    set: { model.settings.webServerPort = $0 }
-                ), format: .number.grouping(.never))
-                .onChange(of: model.settings.webServerPort) { _, _ in
-                    if model.settings.webServerEnabled {
-                        model.applyWebServerSettings()
+                SettingsControlRow("端口", icon: "number") {
+                    TextField("端口", value: Binding(
+                        get: { model.settings.webServerPort },
+                        set: { model.settings.webServerPort = $0 }
+                    ), format: .number.grouping(.never))
+                    .labelsHidden()
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 120, alignment: .leading)
+                    .onChange(of: model.settings.webServerPort) { _, _ in
+                        if model.settings.webServerEnabled {
+                            model.applyWebServerSettings()
+                        }
                     }
                 }
-                Toggle("允许局域网访问", isOn: Binding(
+                settingsToggleRow("局域网访问", icon: "network", isOn: Binding(
                     get: { model.settings.webServerAllowRemoteAccess },
                     set: {
                         model.settings.webServerAllowRemoteAccess = $0
@@ -409,7 +469,7 @@ struct SettingsView: View {
                 ))
                 .disabled(!model.settings.webServerEnabled)
                 if model.settings.webServerEnabled {
-                    LabeledContent("访问范围") {
+                    SettingsInfoRow("访问范围", icon: model.settings.webServerAllowRemoteAccess ? "network" : "desktopcomputer") {
                         Label(
                             model.webManagementAccessModeTitle,
                             systemImage: model.settings.webServerAllowRemoteAccess ? "network" : "desktopcomputer"
@@ -427,18 +487,22 @@ struct SettingsView: View {
 
             settingsSection("访问") {
                 if let displayURL = model.webManagementDisplayURL, let url = model.webManagementURL {
-                    LabeledContent(model.settings.webServerAllowRemoteAccess ? "局域网地址" : "本机地址") {
-                        Text(displayURL.absoluteString)
-                            .foregroundStyle(.secondary)
-                            .textSelection(.enabled)
-                    }
-                    HStack {
-                        Button("打开", systemImage: "safari") { NSWorkspace.shared.open(url) }
-                        Button("拷贝访问链接", systemImage: "doc.on.doc") {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(url.absoluteString, forType: .string)
+                    settingsInfoRow(
+                        model.settings.webServerAllowRemoteAccess ? "局域网地址" : "本机地址",
+                        value: displayURL.absoluteString,
+                        icon: "link",
+                        monospaced: true,
+                        copyValue: url.absoluteString
+                    )
+                    SettingsControlRow("操作", icon: "ellipsis.circle") {
+                        HStack {
+                            Button("打开", systemImage: "safari") { NSWorkspace.shared.open(url) }
+                            Button("拷贝访问链接", systemImage: "doc.on.doc") {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(url.absoluteString, forType: .string)
+                            }
+                            Button("二维码", systemImage: "qrcode") { showsWebQRCode = true }
                         }
-                        Button("二维码", systemImage: "qrcode") { showsWebQRCode = true }
                     }
                     if model.settings.webServerAllowRemoteAccess {
                         Label("局域网访问会暴露模块管理入口，请只在可信网络中启用。", systemImage: "lock.open.fill")
@@ -520,12 +584,13 @@ struct SettingsView: View {
             )
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 20) {
                     content()
                 }
                 .frame(width: contentWidth, alignment: .topLeading)
                 .padding(.horizontal, settingsHorizontalPadding)
-                .padding(.vertical, 20)
+                .padding(.top, 18)
+                .padding(.bottom, 24)
                 .frame(width: geometry.size.width, alignment: .top)
             }
             .scrollIndicators(.visible)
@@ -537,30 +602,142 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.headline)
-            VStack(alignment: .leading, spacing: 10) {
+                .padding(.leading, 2)
+            VStack(alignment: .leading, spacing: 11) {
                 content()
             }
-            .padding(14)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 13)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color(nsColor: .separatorColor).opacity(0.18), lineWidth: 0.5)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func settingsInfoRow(
+        _ title: String,
+        value: String,
+        icon: String,
+        monospaced: Bool = false,
+        copyValue: String? = nil
+    ) -> some View {
+        SettingsInfoRow(title, icon: icon) {
+            copyableSettingsValue(
+                value,
+                monospaced: monospaced,
+                copyValue: copyValue
+            )
+        }
+    }
+
+    private func pathSelectionControl(path: String, chooseAction: @escaping () -> Void) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                copyableSettingsValue(path, monospaced: true, copyValue: path)
+                Button("选择…", action: chooseAction)
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                copyableSettingsValue(path, monospaced: true, copyValue: path)
+                Button("选择…", action: chooseAction)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func copyableSettingsValue(
+        _ value: String,
+        monospaced: Bool = false,
+        copyValue: String? = nil
+    ) -> some View {
+        if let copyValue {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 8) {
+                    settingsValueText(value, monospaced: monospaced, fixedHorizontal: true)
+                    TextCopyButton(text: copyValue)
+                        .layoutPriority(1)
+                }
+                VStack(alignment: .leading, spacing: 7) {
+                    settingsValueText(value, monospaced: monospaced, fixedHorizontal: false)
+                    TextCopyButton(text: copyValue)
+                }
+            }
+        } else {
+            settingsValueText(value, monospaced: monospaced, fixedHorizontal: false)
+        }
+    }
+
+    private func settingsValueText(
+        _ value: String,
+        monospaced: Bool,
+        fixedHorizontal: Bool
+    ) -> some View {
+        Text(value)
+            .font(monospaced ? .system(.callout, design: .monospaced) : .callout)
+            .foregroundStyle(.secondary)
+            .textSelection(.enabled)
+            .fixedSize(horizontal: fixedHorizontal, vertical: true)
+            .frame(maxWidth: fixedHorizontal ? nil : .infinity, alignment: .leading)
+    }
+
+    private func settingsTextFieldRow(
+        _ title: String,
+        icon: String,
+        text: Binding<String>,
+        prompt: String? = nil
+    ) -> some View {
+        SettingsControlRow(title, icon: icon) {
+            if let prompt {
+                TextField(title, text: text, prompt: Text(prompt))
+                    .labelsHidden()
+                    .textFieldStyle(.roundedBorder)
+            } else {
+                TextField(title, text: text)
+                    .labelsHidden()
+                    .textFieldStyle(.roundedBorder)
+            }
+        }
+    }
+
+    private func settingsSecureFieldRow(
+        _ title: String,
+        icon: String,
+        text: Binding<String>
+    ) -> some View {
+        SettingsControlRow(title, icon: icon) {
+            SecureField(title, text: text)
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+        }
+    }
+
+    private func settingsToggleRow(
+        _ title: String,
+        icon: String,
+        isOn: Binding<Bool>
+    ) -> some View {
+        SettingsControlRow(title, icon: icon) {
+            Toggle(title, isOn: isOn)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
+        }
     }
 
     private var installationDiagnosticsContent: some View {
         Group {
             if let diagnostics = installationDiagnostics {
-                LabeledContent("版本") {
-                    Text("\(diagnostics.appVersion) (\(diagnostics.buildNumber))")
-                        .foregroundStyle(.secondary)
-                }
-                LabeledContent("App 位置") {
-                    Text(diagnostics.appPath)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                        .lineLimit(2)
-                }
+                settingsInfoRow("版本", value: "\(diagnostics.appVersion) (\(diagnostics.buildNumber))", icon: "app")
+                settingsInfoRow(
+                    "App 位置",
+                    value: diagnostics.appPath,
+                    icon: "folder",
+                    monospaced: true,
+                    copyValue: diagnostics.appPath
+                )
                 diagnosticLabel("签名", value: diagnostics.signatureStatus, systemImage: "signature")
                 diagnosticLabel("Gatekeeper", value: diagnostics.gatekeeperStatus, systemImage: "lock.shield")
                 diagnosticLabel("隔离属性", value: diagnostics.quarantineStatus, systemImage: "shield.lefthalf.filled")
@@ -588,7 +765,7 @@ struct SettingsView: View {
                         }
                     }
                 }
-                LabeledContent("自动检查更新") {
+                SettingsInfoRow("自动检查更新", icon: "magnifyingglass.circle") {
                     Label(
                         diagnostics.sparkleAutomaticChecksEnabled ? "开启" : "关闭",
                         systemImage: diagnostics.sparkleAutomaticChecksEnabled ? "checkmark.circle.fill" : "pause.circle"
@@ -596,13 +773,13 @@ struct SettingsView: View {
                     .foregroundStyle(diagnostics.sparkleAutomaticChecksEnabled ? .green : .secondary)
                 }
                 if let feedURL = diagnostics.sparkleFeedURL {
-                    LabeledContent("更新源") {
-                        Text(feedURL)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .textSelection(.enabled)
-                            .lineLimit(2)
-                    }
+                    settingsInfoRow(
+                        "更新源",
+                        value: feedURL,
+                        icon: "antenna.radiowaves.left.and.right",
+                        monospaced: true,
+                        copyValue: feedURL
+                    )
                 }
                 Label(diagnostics.updateRecommendation, systemImage: "shippingbox")
                     .font(.caption)
@@ -623,14 +800,15 @@ struct SettingsView: View {
     private var keychainDiagnosticsContent: some View {
         let credentials = model.credentialDiagnostics()
         return Group {
-            LabeledContent("服务") {
-                Text(credentials.keychainService)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-            }
-            LabeledContent("访问检查") {
-                VStack(alignment: .trailing, spacing: 2) {
+            settingsInfoRow(
+                "服务",
+                value: credentials.keychainService,
+                icon: "key.fill",
+                monospaced: true,
+                copyValue: credentials.keychainService
+            )
+            SettingsInfoRow("访问检查", icon: "checkmark.shield") {
+                VStack(alignment: .leading, spacing: 2) {
                     Label(credentials.keychainAccessStatus, systemImage: credentials.keychainAccessState.systemImage)
                         .foregroundStyle(keychainAccessProbeColor(credentials.keychainAccessState))
                     if let checkedAt = credentials.keychainAccessCheckedAt {
@@ -645,7 +823,7 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
             if let statusCode = credentials.keychainAccessStatusCode {
-                LabeledContent("错误码") {
+                SettingsInfoRow("错误码", icon: "number") {
                     Text("OSStatus \(statusCode)")
                         .font(.caption.monospaced())
                         .foregroundStyle(.secondary)
@@ -691,6 +869,14 @@ struct SettingsView: View {
         case .keychain: .green
         case .notChecked, .notConfigured: .secondary
         case .legacyConfigurationFallback, .memoryOnly, .unavailable: .orange
+        }
+    }
+
+    private var repositoryTypeIcon: String {
+        switch model.settings.github.repositoryIsPrivate {
+        case .some(true): "lock.fill"
+        case .some(false): "globe"
+        case nil: "questionmark.circle"
         }
     }
 
@@ -780,7 +966,7 @@ struct SettingsView: View {
     }
 
     private func diagnosticLabel(_ title: String, value: String, systemImage: String) -> some View {
-        LabeledContent(title) {
+        SettingsInfoRow(title, icon: systemImage) {
             Label(value, systemImage: systemImage)
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
@@ -789,20 +975,20 @@ struct SettingsView: View {
 
     private func localRootDiagnosticContent(_ diagnostics: LocalModuleRootDiagnosticSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            LabeledContent("根目录状态") {
+            SettingsInfoRow("根目录状态", icon: "folder") {
                 Label(diagnostics.status, systemImage: localRootDiagnosticImage(diagnostics))
                     .foregroundStyle(localRootDiagnosticColor(diagnostics))
                     .textSelection(.enabled)
             }
-            LabeledContent("写入权限") {
+            SettingsInfoRow("写入权限", icon: diagnostics.isWritable ? "pencil" : "lock.fill") {
                 Label(diagnostics.isWritable ? "可写" : "不可写", systemImage: diagnostics.isWritable ? "pencil" : "lock.fill")
                     .foregroundStyle(diagnostics.isWritable ? .green : .orange)
             }
-            LabeledContent("目录内容") {
-                Text("\(diagnostics.folderCount) 个文件夹 · \(diagnostics.moduleFileCount) 个 .sgmodule")
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-            }
+            settingsInfoRow(
+                "目录内容",
+                value: "\(diagnostics.folderCount) 个文件夹 · \(diagnostics.moduleFileCount) 个 .sgmodule",
+                icon: "shippingbox"
+            )
             if let error = diagnostics.error {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
@@ -838,8 +1024,8 @@ struct SettingsView: View {
         let storedInKeychain = status == CredentialStorageStatus.keychain.title
         let neutral = status == CredentialStorageStatus.notConfigured.title ||
             status == CredentialStorageStatus.notChecked.title
-        return LabeledContent(title) {
-            VStack(alignment: .trailing, spacing: 2) {
+        return SettingsInfoRow(title, icon: storedInKeychain ? "checkmark.circle.fill" : (neutral ? "questionmark.circle" : "exclamationmark.triangle.fill")) {
+            VStack(alignment: .leading, spacing: 2) {
                 Label(
                     status,
                     systemImage: storedInKeychain
@@ -928,5 +1114,84 @@ struct SettingsView: View {
         guard let output = filter.outputImage?.transformed(by: CGAffineTransform(scaleX: 10, y: 10)),
               let image = CIContext().createCGImage(output, from: output.extent) else { return nil }
         return NSImage(cgImage: image, size: NSSize(width: output.extent.width, height: output.extent.height))
+    }
+}
+
+private struct SettingsWindowChromeConfigurator: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        configureWhenReady(view)
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        configureWhenReady(nsView)
+    }
+
+    private func configureWhenReady(_ view: NSView) {
+        DispatchQueue.main.async {
+            guard let window = view.window else { return }
+            window.titleVisibility = .hidden
+            window.titlebarSeparatorStyle = .none
+        }
+    }
+}
+
+private enum SettingsTabMetrics {
+    static let selectorWidth: CGFloat = 406
+    static let selectorHeight: CGFloat = 40
+    static let itemHeight: CGFloat = 30
+}
+
+private struct SettingsInfoRow<Content: View>: View {
+    let title: String
+    let icon: String
+    private let content: () -> Content
+
+    init(_ title: String, icon: String, @ViewBuilder content: @escaping () -> Content) {
+        self.title = title
+        self.icon = icon
+        self.content = content
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: icon)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .frame(width: 20, alignment: .center)
+            Text(title)
+                .font(.callout.weight(.medium))
+                .foregroundStyle(.primary)
+                .frame(width: 108, alignment: .leading)
+            content()
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.vertical, 5)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color(nsColor: .separatorColor).opacity(0.14))
+                .frame(height: 0.5)
+                .padding(.leading, 30)
+        }
+    }
+}
+
+private struct SettingsControlRow<Content: View>: View {
+    let title: String
+    let icon: String
+    private let content: () -> Content
+
+    init(_ title: String, icon: String, @ViewBuilder content: @escaping () -> Content) {
+        self.title = title
+        self.icon = icon
+        self.content = content
+    }
+
+    var body: some View {
+        SettingsInfoRow(title, icon: icon) {
+            content()
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 }

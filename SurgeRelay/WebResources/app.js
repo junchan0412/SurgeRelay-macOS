@@ -18,6 +18,9 @@ const ui = {
   moduleDialog: document.querySelector('#module-dialog'),
   moduleDialogMessage: document.querySelector('#module-dialog-message'),
   moduleForm: document.querySelector('#module-form'),
+  iconURLPreview: document.querySelector('#icon-url-preview'),
+  outputPathPreview: document.querySelector('#output-path-preview'),
+  outputPathNote: document.querySelector('#output-path-note'),
   dialogTitle: document.querySelector('#dialog-title'),
   saveModule: document.querySelector('#save-module-button'),
   advancedMaster: document.querySelector('#advanced-master'),
@@ -143,15 +146,28 @@ ui.advancedOptions.addEventListener('click', event => {
 });
 ui.moduleForm.elements.sourceURL.addEventListener('input', () => {
   updateNativeModuleState();
+  updateOutputPathPreview();
   scheduleNameLookup();
 });
 ui.moduleForm.elements.sourceFormat.addEventListener('change', updateNativeModuleState);
 ui.moduleForm.elements.name.addEventListener('input', event => {
   manualNameEdited = event.target.value !== autoFilledName;
   if (!event.target.value) manualNameEdited = false;
+  updateOutputPathPreview();
 });
+ui.moduleForm.elements.outputFolder.addEventListener('change', updateOutputPathPreview);
+ui.moduleForm.elements.outputFileName.addEventListener('input', updateOutputPathPreview);
+ui.moduleForm.elements.iconURL.addEventListener('input', updateIconURLPreview);
+ui.moduleForm.elements.publishesStandalone.addEventListener('change', updateOutputPathPreview);
 document.querySelectorAll('.close-module-dialog').forEach(button => button.addEventListener('click', () => closeDialog(ui.moduleDialog)));
-ui.moduleDialog.addEventListener('click', event => { if (event.target === ui.moduleDialog) closeDialog(ui.moduleDialog); });
+ui.moduleDialog.addEventListener('click', async event => {
+  const copyButton = event.target.closest('[data-action="copy-output-path"]');
+  if (copyButton) {
+    await copyText(ui.outputPathPreview?.textContent || '', copyButton);
+    return;
+  }
+  if (event.target === ui.moduleDialog) closeDialog(ui.moduleDialog);
+});
 ui.moduleForm.addEventListener('submit', saveModule);
 ui.confirmCancel.addEventListener('click', () => resolveConfirmation(false));
 ui.confirmAccept.addEventListener('click', () => resolveConfirmation(true));
@@ -316,11 +332,23 @@ function patchLiveState(previous, next) {
 
   const previousList = [
     previous.combined?.isEnabled ? 'combined-on' : 'combined-off',
-    previous.modules.map(module => [module.id, module.name, module.sourceFormatTitle, module.iconURL, module.isEnabled, module.publishesStandalone].join('|')).join('\n')
+    previous.modules.map(module => [
+      module.id, module.name, module.sourceFormatTitle, module.outputFolder, module.publishedRelativePath,
+      module.iconURL, module.customIconURL, module.isEnabled, module.publishesStandalone,
+      module.state, module.stateTitle, module.lastUpdatedAt, module.sourceCheckedAt,
+      module.contentHash, module.sourceContentHash, module.sourceETag, module.sourceLastModified,
+      module.conversionEngineRevision
+    ].join('|')).join('\n')
   ].join('\n');
   const nextList = [
     next.combined?.isEnabled ? 'combined-on' : 'combined-off',
-    next.modules.map(module => [module.id, module.name, module.sourceFormatTitle, module.iconURL, module.isEnabled, module.publishesStandalone].join('|')).join('\n')
+    next.modules.map(module => [
+      module.id, module.name, module.sourceFormatTitle, module.outputFolder, module.publishedRelativePath,
+      module.iconURL, module.customIconURL, module.isEnabled, module.publishesStandalone,
+      module.state, module.stateTitle, module.lastUpdatedAt, module.sourceCheckedAt,
+      module.contentHash, module.sourceContentHash, module.sourceETag, module.sourceLastModified,
+      module.conversionEngineRevision
+    ].join('|')).join('\n')
   ].join('\n');
   if (previousList !== nextList) renderSidebar(); else patchSidebarLive();
 
@@ -334,9 +362,26 @@ function patchLiveState(previous, next) {
 
   const module = next.modules.find(item => item.id === selectedID);
   if (!module) return;
+  const previousModule = previous.modules.find(item => item.id === selectedID);
+  if (metadataRowPresenceChanged(previousModule, module)) {
+    renderDetail(false);
+    return;
+  }
+  patchDetailValue('更新状态', module.stateTitle);
   patchDetailValue('来源格式', module.sourceFormatTitle);
   if (next.combined.isEnabled) patchDetailValue('汇总订阅', next.combined.subscriptionURL || '等待发布配置');
+  patchDetailValue('创建时间', formatDate(module.createdAt, '—'));
   patchDetailValue('上次更新', formatDate(module.lastUpdatedAt, '从未更新'));
+  patchDetailValue('来源检查', formatDate(module.sourceCheckedAt, '尚未检查'));
+  patchDetailValue('内容 hash', module.contentHash ? module.contentHash.slice(0, 12) : '尚未生成');
+  patchDetailValue('转换引擎', module.conversionEngineRevision ? module.conversionEngineRevision.slice(0, 12) : '原生 Surge 模块');
+}
+
+function metadataRowPresenceChanged(previousModule, nextModule) {
+  if (!previousModule || !nextModule) return false;
+  return Boolean(previousModule.sourceContentHash) !== Boolean(nextModule.sourceContentHash) ||
+    Boolean(previousModule.sourceETag) !== Boolean(nextModule.sourceETag) ||
+    Boolean(previousModule.sourceLastModified) !== Boolean(nextModule.sourceLastModified);
 }
 
 function patchDetailValue(label, value) {
@@ -361,7 +406,12 @@ function patchSidebarLive() {
 function renderSidebar() {
   if (!state) return;
   const query = ui.search.value.trim().toLocaleLowerCase();
-  const modules = state.modules.filter(module => [module.name, module.sourceURL, module.sourceFormatTitle, module.outputFileName, module.category, module.outputFolder, module.publishesStandalone ? '独立模块' : '不发布独立模块'].join('\n').toLocaleLowerCase().includes(query));
+  const modules = state.modules.filter(module => [
+    module.name, module.sourceURL, module.sourceFormatTitle, module.outputFileName, module.publishedRelativePath,
+    module.category, module.outputFolder, module.iconURL, module.customIconURL,
+    module.sourceContentHash, module.sourceETag, module.sourceLastModified,
+    module.publishesStandalone ? '独立模块' : '不发布独立模块'
+  ].join('\n').toLocaleLowerCase().includes(query));
   ui.summaryRow.hidden = !state.combined.isEnabled;
   if (state.combined.isEnabled) ui.summarySubtitle.textContent = `${state.combined.enabledCount} 个来源 · 总模块订阅`;
   ui.summaryRow.classList.toggle('selected', state.combined.isEnabled && selectedID === 'combined');
@@ -370,14 +420,25 @@ function renderSidebar() {
 
 function moduleRow(module) {
   const icon = module.iconURL ? `<img src="${escapeAttribute(module.iconURL)}" alt="" loading="lazy">` : `<span class="symbol" data-symbol="shippingbox"></span>`;
+  const stateClass = `state-${module.state || 'never'}`;
+  const stateTitle = module.stateTitle || '状态未知';
   const toggle = state.combined.isEnabled
     ? `<label class="module-toggle" title="${module.isEnabled ? '从总模块中停用' : '包含在总模块中'}"><input type="checkbox" data-module-toggle="${module.id}" ${module.isEnabled ? 'checked' : ''} aria-label="包含 ${escapeAttribute(module.name)}"><span class="toggle-track" aria-hidden="true"></span></label>`
     : '';
   return `<div class="module-row ${selectedID === module.id ? 'selected' : ''} ${state.combined.isEnabled && !module.isEnabled ? 'disabled' : ''}" data-id="${module.id}" role="button" tabindex="0">
     <span class="module-icon ${module.iconURL ? '' : 'placeholder'}">${icon}</span>
-    <span class="module-copy"><strong>${escapeHTML(module.name)}</strong><small>${escapeHTML(module.sourceFormatTitle)}</small></span>
+    <span class="module-copy"><strong>${escapeHTML(module.name)}</strong><small>${escapeHTML(moduleSubtitle(module))}</small></span>
+    <span class="module-state-dot ${escapeAttribute(stateClass)}" title="${escapeAttribute(stateTitle)}"></span>
     ${toggle}
   </div>`;
+}
+
+function moduleSubtitle(module) {
+  const parts = [module.sourceFormatTitle || '模块'];
+  if (module.category) parts.push(module.category);
+  if (module.outputFolder) parts.push(folderTitle(module.outputFolder));
+  if (!module.publishesStandalone) parts.push('不发布独立模块');
+  return parts.join(' · ');
 }
 
 function renderActivity() {
@@ -489,7 +550,7 @@ function publishFileList(title, files, destructive = false) {
 
 function renderModuleDetail(module, animate = true) {
   if (detailTab === 'preview') {
-    setDetailHTML(detailToolbar(module) + previewShell(module.outputFileName, true), animate);
+    setDetailHTML(detailToolbar(module) + previewShell(module.publishedRelativePath || module.outputFileName, true), animate);
     loadPreview(`/api/modules/${module.id}/preview`, true);
     return;
   }
@@ -499,23 +560,47 @@ function renderModuleDetail(module, animate = true) {
   const errorNote = state.combined.isEnabled ? '如果该来源有缓存，总模块会继续沿用它上一次成功版本。' : '如果该来源有缓存，模块输出会继续沿用它上一次成功版本。';
   const error = module.lastError ? `<section class="form-section-view"><h3 class="section-heading">最近一次更新失败</h3><div class="group-box"><div class="detail-row action-row error-box"><strong>更新失败</strong><div>${escapeHTML(module.lastError)}</div><small>${escapeHTML(errorNote)}</small></div></div></section>` : '';
   const conflict = module.hasOverrideConflict ? `<section class="form-section-view"><h3 class="section-heading">本地编辑冲突</h3><div class="group-box"><div class="detail-row action-row error-box"><strong>上游内容已经变化</strong><div>当前仍在使用本地编辑。可在预览中比较内容后保留或恢复。</div><div><button class="button" data-action="accept-override">保留本地编辑</button><button class="button" data-action="tab-preview">前往预览</button></div></div></div></section>` : '';
-  const combinedRow = state.combined.isEnabled ? detailRow('square.stack.3d.up.fill', '汇总订阅', state.combined.subscriptionURL || '等待发布配置') : '';
+  const combinedSubscription = state.combined.subscriptionURL || '';
+  const combinedRow = state.combined.isEnabled ? detailRow('square.stack.3d.up.fill', '汇总订阅', combinedSubscription || '等待发布配置', false, combinedSubscription || null) : '';
+  const iconURL = module.customIconURL || module.iconURL;
+  const iconSource = module.customIconURL ? '自定义图标（仅展示）' : (module.iconURL ? '来源元数据（仅展示）' : '默认图标');
+  const iconAddressRow = iconURL ? detailRow('link', '图标地址', `<a href="${escapeAttribute(iconURL)}" target="_blank" rel="noreferrer">${escapeHTML(iconURL)}</a>`, true, iconURL) : '';
+  const sourceHashRow = module.sourceContentHash ? detailRow('curlybraces', '来源 hash', module.sourceContentHash.slice(0, 12), false, module.sourceContentHash) : '';
+  const sourceETagRow = module.sourceETag ? detailRow('tag', '来源 ETag', module.sourceETag, false, module.sourceETag) : '';
+  const sourceLastModifiedRow = module.sourceLastModified ? detailRow('clock', '来源修改时间', module.sourceLastModified) : '';
+  const outputPath = module.publishesStandalone ? (module.publishedRelativePath || module.outputFileName) : '';
   setDetailHTML(`${detailToolbar(module)}
     <section class="form-section-view"><h3 class="section-heading">模块信息</h3><div class="group-box">
-      ${detailRow('link', '原始地址', `<a href="${escapeAttribute(module.sourceURL)}" target="_blank" rel="noreferrer">${escapeHTML(module.sourceURL)}</a>`, true)}
+      ${detailRow('link', '原始地址', `<a href="${escapeAttribute(module.sourceURL)}" target="_blank" rel="noreferrer">${escapeHTML(module.sourceURL)}</a>`, true, module.sourceURL)}
       ${detailRow('doc.text', '来源格式', module.sourceFormatTitle)}
-      ${detailRow('shippingbox', '模块标签', module.category || '未设置')}
-      ${detailRow('externaldrive', '存放文件夹', folderTitle(module.outputFolder))}
+      ${detailRow('tag', '模块标签', module.category || '未设置')}
+      ${detailRow('folder', '存放文件夹', folderTitle(module.outputFolder))}
+      ${detailRow('doc.on.doc', '输出文件', outputPath || '未开启独立发布', false, outputPath || null)}
+      ${detailRow('info.circle', '图标来源', iconSource)}
+      ${iconAddressRow}
       ${detailRow('doc.text', '独立模块', module.publishesStandalone ? '发布' : '不发布')}
       ${combinedRow}
+      ${detailRow('checkmark', '更新状态', module.stateTitle)}
+      ${detailRow('clock', '创建时间', formatDate(module.createdAt, '—'))}
       ${detailRow('clock', '上次更新', formatDate(module.lastUpdatedAt, '从未更新'))}
+      ${detailRow('refresh', '来源检查', formatDate(module.sourceCheckedAt, '尚未检查'))}
+      ${detailRow('curlybraces', '内容 hash', module.contentHash ? module.contentHash.slice(0, 12) : '尚未生成', false, module.contentHash || null)}
+      ${sourceHashRow}
+      ${sourceETagRow}
+      ${sourceLastModifiedRow}
+      ${detailRow('gearshape', '转换引擎', module.conversionEngineRevision ? module.conversionEngineRevision.slice(0, 12) : '原生 Surge 模块', false, module.conversionEngineRevision || null)}
     </div></section>
     ${advanced}<div id="arguments-section"></div>${conflict}${published}${error}`, animate);
   loadArguments(module);
 }
 
-function detailRow(icon, label, value, raw = false) {
-  return `<div class="detail-row"><div class="detail-label"><span class="symbol" data-symbol="${icon}"></span><span>${escapeHTML(label)}</span></div><div class="detail-value">${raw ? value : escapeHTML(String(value ?? '—'))}</div></div>`;
+function detailRow(icon, label, value, raw = false, copyValue = null) {
+  const renderedValue = raw ? value : escapeHTML(String(value ?? '—'));
+  const copyButton = copyValue
+    ? `<button class="button detail-copy" data-action="copy" data-value="${escapeAttribute(copyValue)}"><span class="symbol" data-symbol="copy"></span>拷贝</button>`
+    : '';
+  const valueClass = copyValue ? 'detail-value detail-value-with-action' : 'detail-value';
+  return `<div class="detail-row"><div class="detail-label"><span class="symbol" data-symbol="${icon}"></span><span>${escapeHTML(label)}</span></div><div class="${valueClass}"><span class="detail-value-text">${renderedValue}</span>${copyButton}</div></div>`;
 }
 
 function previewShell(label, editable) {
@@ -649,6 +734,7 @@ function scheduleNameLookup() {
       if (sequence !== nameLookupSequence || form.sourceURL.value.trim() !== sourceURL || manualNameEdited) return;
       autoFilledName = payload.name || '';
       form.name.value = autoFilledName;
+      updateOutputPathPreview();
     } catch (_) {}
   }, 500);
 }
@@ -693,6 +779,134 @@ function populateOutputFolders(selected = '') {
     return a.localeCompare(b, 'zh-Hans-CN', { numeric: true });
   }).map(folder => `<option value="${escapeAttribute(folder)}">${escapeHTML(folderTitle(folder))}</option>`).join('');
   select.value = selected || '';
+}
+
+function updateOutputPathPreview() {
+  if (!ui.outputPathPreview) return;
+  const form = ui.moduleForm.elements;
+  const path = publishedRelativePathForDraft({
+    name: form.name.value,
+    sourceURL: form.sourceURL.value,
+    outputFolder: form.outputFolder.value,
+    outputFileName: form.outputFileName.value
+  });
+  ui.outputPathPreview.textContent = path;
+  const note = outputPathNotice(path, form.publishesStandalone.checked);
+  if (ui.outputPathNote) {
+    ui.outputPathNote.textContent = note?.message || '';
+    ui.outputPathNote.hidden = !note;
+    ui.outputPathNote.classList.toggle('warning', Boolean(note?.warning));
+  }
+}
+
+function updateIconURLPreview() {
+  const preview = ui.iconURLPreview;
+  const input = ui.moduleForm?.elements?.iconURL;
+  if (!preview || !input) return;
+  const value = input.value.trim();
+  const fallbackURL = preview.dataset.fallbackIconUrl || '';
+  const previewURL = value || fallbackURL;
+  preview.innerHTML = '';
+  preview.classList.toggle('placeholder', !previewURL);
+  preview.classList.remove('invalid');
+  preview.title = value || (fallbackURL ? '来源图标' : '默认图标');
+  if (value && !isValidHTTPURL(value)) {
+    preview.classList.add('invalid');
+    preview.innerHTML = '<span class="symbol" data-symbol="shippingbox"></span>';
+    return;
+  }
+  if (!previewURL) {
+    preview.innerHTML = '<span class="symbol" data-symbol="shippingbox"></span>';
+    return;
+  }
+  const image = document.createElement('img');
+  image.src = previewURL;
+  image.alt = '';
+  image.loading = 'lazy';
+  image.addEventListener('error', () => {
+    preview.classList.add('invalid');
+    preview.innerHTML = '<span class="symbol" data-symbol="exclamationmark.triangle"></span>';
+  }, { once: true });
+  preview.append(image);
+}
+
+function publishedRelativePathForDraft(draft) {
+  const folder = normalizeFolder(draft.outputFolder);
+  const fileName = normalizedOutputFileName(draft);
+  return [folder, fileName].filter(Boolean).join('/');
+}
+
+function outputPathNotice(path, publishesStandalone) {
+  if (!publishesStandalone) return { message: '未开启独立发布时，不会写出这个独立模块文件。', warning: false };
+  const normalizedPath = String(path || '').toLowerCase();
+  const combinedFile = sgmoduleName(state?.combined?.fileName || 'Surge Relay');
+  if (normalizedPath === combinedFile.toLowerCase()) {
+    return { message: '该路径与总模块文件冲突，保存时会自动加编号避免覆盖。', warning: true };
+  }
+  const owner = state?.modules?.find(module => module.id !== editingID && String(module.publishedRelativePath || '').toLowerCase() === normalizedPath);
+  if (owner) {
+    return { message: `该路径已被“${owner.name}”使用，保存时会自动加编号避免覆盖。`, warning: true };
+  }
+  return null;
+}
+
+function normalizedOutputFileName(draft) {
+  const sourceURL = String(draft.sourceURL || '');
+  const explicit = String(draft.outputFileName || '').trim();
+  const displayName = String(draft.name || '').trim();
+  const preferred = explicit || displayName || suggestedNameFromSource(sourceURL);
+  return isFileSource(sourceURL) ? existingSgmoduleName(preferred) : sgmoduleName(preferred);
+}
+
+function suggestedNameFromSource(sourceURL) {
+  try {
+    const url = new URL(sourceURL);
+    const last = decodeURIComponent(url.pathname.split('/').filter(Boolean).pop() || '');
+    return baseName(last);
+  } catch {
+    return '';
+  }
+}
+
+function normalizeFolder(value) {
+  return String(value || '')
+    .replaceAll('\\', '/')
+    .split('/')
+    .map(part => part.trim())
+    .filter(part => part && part !== '.' && part !== '..')
+    .join('/');
+}
+
+function isFileSource(sourceURL) {
+  try { return new URL(sourceURL).protocol === 'file:'; }
+  catch { return false; }
+}
+
+function sgmoduleName(value) {
+  const base = baseName(value);
+  return `${base || 'Untitled'}.sgmodule`;
+}
+
+function existingSgmoduleName(value) {
+  const base = existingFileBaseName(value);
+  return `${base || 'Untitled'}.sgmodule`;
+}
+
+function baseName(value) {
+  return String(value || '')
+    .trim()
+    .replace(/\.sgmodule$/i, '')
+    .replace(/[\/\\:*?"<>|]+/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/^[.\-\s]+|[.\-\s]+$/g, '');
+}
+
+function existingFileBaseName(value) {
+  const fileName = String(value || '').trim().replaceAll('\\', '/').split('/').pop() || '';
+  return fileName
+    .replace(/\.sgmodule$/i, '')
+    .replace(/[:*?"<>|]+/g, '-')
+    .replace(/^[.\s]+|[.\s]+$/g, '');
 }
 
 function handleListClick(event) {
@@ -812,7 +1026,11 @@ function openEditor(module = null) {
   const form = ui.moduleForm.elements;
   form.name.value = module?.name || '';
   form.category.value = module?.category || '';
+  ui.iconURLPreview.dataset.fallbackIconUrl = module && !module.customIconURL ? (module.iconURL || '') : '';
+  form.iconURL.value = module?.customIconURL || '';
+  updateIconURLPreview();
   populateOutputFolders(module?.outputFolder || '');
+  form.outputFileName.value = module?.outputFileName || '';
   autoFilledName = module?.name || '';
   manualNameEdited = Boolean(module);
   form.sourceURL.value = module?.sourceURL || '';
@@ -824,6 +1042,7 @@ function openEditor(module = null) {
   populateScriptHubOptions(module?.scriptHubOptions || scriptHubDefaults);
   setAdvancedExpanded(Boolean(module?.advancedSummary || hasAdvancedValues(module?.scriptHubOptions)));
   updateNativeModuleState();
+  updateOutputPathPreview();
   openDialog(ui.moduleDialog);
   const formContent = ui.moduleDialog.querySelector('.form-content');
   if (formContent) formContent.scrollTop = 0;
@@ -834,12 +1053,21 @@ async function saveModule(event) {
   event.preventDefault();
   const form = ui.moduleForm.elements;
   const existingModule = editingID ? state.modules.find(module => module.id === editingID) : null;
+  const iconURL = form.iconURL.value.trim();
+  if (iconURL && !isValidHTTPURL(iconURL)) {
+    ui.moduleDialogMessage.textContent = '图标 URL 仅支持完整的 HTTP 或 HTTPS 地址。';
+    ui.moduleDialogMessage.hidden = false;
+    form.iconURL.focus();
+    return;
+  }
   const payload = {
     name: form.name.value.trim(),
     sourceURL: form.sourceURL.value.trim(),
     sourceFormat: form.sourceFormat.value,
     category: form.category.value.trim(),
+    iconURL,
     outputFolder: form.outputFolder.value,
+    outputFileName: form.outputFileName.value.trim(),
     isEnabled: combinedEnabled() ? form.isEnabled.checked : (existingModule?.isEnabled ?? false),
     publishesStandalone: form.publishesStandalone.checked,
     scriptHubOptions: collectScriptHubOptions()
@@ -856,6 +1084,15 @@ async function saveModule(event) {
     ui.moduleDialogMessage.hidden = false;
   }
   finally { ui.saveModule.disabled = false; }
+}
+
+function isValidHTTPURL(value) {
+  try {
+    const url = new URL(value);
+    return (url.protocol === 'http:' || url.protocol === 'https:') && Boolean(url.hostname);
+  } catch {
+    return false;
+  }
 }
 
 async function updateAll() {

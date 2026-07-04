@@ -12,8 +12,8 @@
   <link rel="manifest" href="/manifest.webmanifest?v=1">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Surge Relay">
-  <link rel="stylesheet" href="/app.css?v=19">
-  <script src="/app.js?v=20" defer></script>
+  <link rel="stylesheet" href="/app.css?v=27">
+  <script src="/app.js?v=29" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -72,7 +72,10 @@
           <div class="editor-group">
             <label class="form-row"><span>显示名称</span><input name="name" type="text" required placeholder="例如：YouTube 去广告"></label>
             <label class="form-row"><span>模块标签</span><input name="category" type="text" placeholder="Surge category"></label>
+            <label class="form-row"><span>图标 URL</span><span class="field-with-note"><span class="icon-url-control"><span class="module-icon icon-url-preview placeholder" id="icon-url-preview"><span class="symbol" data-symbol="shippingbox"></span></span><input name="iconURL" type="url" placeholder="https://example.com/icon.png"></span><small class="field-note">留空时使用来源图标；自定义图标仅用于展示，支持完整 HTTP/HTTPS 地址。</small></span></label>
             <label class="form-row"><span>存放文件夹</span><select name="outputFolder"><option value="">根目录</option></select></label>
+            <label class="form-row"><span>输出文件名</span><input name="outputFileName" type="text" placeholder="留空时根据显示名称生成"></label>
+            <div class="form-row output-path-row"><span>输出路径</span><span class="output-path-value"><span><code id="output-path-preview">Untitled.sgmodule</code><small id="output-path-note" class="field-note output-path-note" hidden></small></span><button class="button output-path-copy" type="button" data-action="copy-output-path"><span class="symbol" data-symbol="copy"></span>拷贝</button></span></div>
             <label class="form-row switch-row"><span>包含在总模块中</span><input name="isEnabled" type="checkbox" role="switch"><span class="toggle-track" aria-hidden="true"></span></label>
             <label class="form-row switch-row"><span>发布为独立模块</span><input name="publishesStandalone" type="checkbox" role="switch" checked><span class="toggle-track" aria-hidden="true"></span></label>
           </div>

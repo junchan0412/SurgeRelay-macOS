@@ -3,6 +3,14 @@ import Foundation
 import Observation
 import Security
 
+enum AppRuntimeOptions {
+    static var isUIQAMode: Bool {
+        let processInfo = ProcessInfo.processInfo
+        return processInfo.environment["SURGE_RELAY_UI_QA"] == "1" ||
+            processInfo.arguments.contains("--surge-relay-ui-qa")
+    }
+}
+
 @MainActor
 @Observable
 final class AppModel {
@@ -72,6 +80,13 @@ final class AppModel {
 
     init() {
         var loadedSettings = PersistenceStore.loadSettings()
+        if AppRuntimeOptions.isUIQAMode {
+            let uiQAModuleDirectory = FileManager.default.temporaryDirectory
+                .appending(path: "SurgeRelayUIQA/Modules", directoryHint: .isDirectory)
+            try? FileManager.default.createDirectory(at: uiQAModuleDirectory, withIntermediateDirectories: true)
+            loadedSettings.storageMode = .local
+            loadedSettings.localModuleDirectory = uiQAModuleDirectory.path
+        }
         if loadedSettings.github.owner.isEmpty { loadedSettings.github.owner = "EEliberto" }
         if loadedSettings.github.repository.isEmpty { loadedSettings.github.repository = "Surge-Relay" }
         if loadedSettings.github.branch.isEmpty { loadedSettings.github.branch = "main" }
@@ -97,8 +112,10 @@ final class AppModel {
         selectedModuleID = loadedSettings.combinedModuleEnabled
             ? Self.combinedModuleSelectionID
             : loadedModules.first?.id
-        PersistenceStore.saveSettings(loadedSettings)
-        try? PersistenceStore.saveModules(loadedModules)
+        if !AppRuntimeOptions.isUIQAMode {
+            PersistenceStore.saveSettings(loadedSettings)
+            try? PersistenceStore.saveModules(loadedModules)
+        }
     }
 
     private static func loadGitHubToken(migratingLegacyToken legacyToken: String) -> GitHubTokenLoadResult {
@@ -253,6 +270,10 @@ final class AppModel {
     func start() {
         guard !hasStarted else { return }
         hasStarted = true
+        guard !AppRuntimeOptions.isUIQAMode else {
+            statusMessage = "UI QA 模式：自动任务已暂停"
+            return
+        }
         applyWebServerSettings(persist: false)
         restartScheduler()
         Task {
@@ -730,6 +751,9 @@ final class AppModel {
     func addModule(from draft: ModuleDraft) throws {
         if let message = draft.validationMessage { throw RelayError.invalidOutput(message) }
         let source = draft.sourceURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let category = draft.category.trimmingCharacters(in: .whitespacesAndNewlines)
+        let outputFolder = ModuleOutputFolder.normalized(draft.outputFolder)
+        let customIconURL = draft.normalizedCustomIconURL
         guard !modules.contains(where: { ModuleSourceIdentity.matches($0.sourceURL, source) }) else {
             throw RelayError.duplicateSourceURL
         }
@@ -738,16 +762,21 @@ final class AppModel {
             sourceURL: source,
             sourceFormat: draft.sourceFormat,
             outputFileName: uniqueOutputFileName(for: draft, source: source),
-            category: draft.category,
-            outputFolder: draft.outputFolder,
+            category: category,
+            outputFolder: outputFolder,
             publishesStandalone: draft.publishesStandalone,
             isEnabled: draft.isEnabled,
             scriptHubOptions: draft.scriptHubOptions,
+            iconURL: customIconURL,
+            customIconURL: customIconURL,
             detectedSourceFormat: detectedFormat(for: draft.sourceFormat, source: source)
         )
         registerLocalChange()
         modules.append(module)
         selectedModuleID = module.id
+        if let customIconURL, let url = URL(string: customIconURL) {
+            Task { try? await iconStore.cacheIcon(from: url, for: module.id, force: true) }
+        }
         try persistModules()
         statusMessage = "已添加 \(module.name)，即将自动更新"
         scheduleAutomaticUpdate()
@@ -760,6 +789,7 @@ final class AppModel {
         let source = draft.sourceURL.trimmingCharacters(in: .whitespacesAndNewlines)
         let category = draft.category.trimmingCharacters(in: .whitespacesAndNewlines)
         let outputFolder = ModuleOutputFolder.normalized(draft.outputFolder)
+        let customIconURL = draft.normalizedCustomIconURL
         guard !modules.contains(where: {
             $0.id != id && ModuleSourceIdentity.matches($0.sourceURL, source)
         }) else {
@@ -776,7 +806,8 @@ final class AppModel {
                 current.outputFolder != outputFolder ||
                 current.publishesStandalone != draft.publishesStandalone ||
                 current.isEnabled != draft.isEnabled ||
-                current.scriptHubOptions != draft.scriptHubOptions else {
+                current.scriptHubOptions != draft.scriptHubOptions ||
+                current.customIconURL != customIconURL else {
             statusMessage = "没有需要保存的更改"
             return
         }
@@ -784,6 +815,7 @@ final class AppModel {
         let sourceChanged = modules[index].sourceURL != source ||
             modules[index].sourceFormat != draft.sourceFormat ||
             modules[index].scriptHubOptions != draft.scriptHubOptions
+        let customIconChanged = modules[index].customIconURL != customIconURL
         let previousOutputFileName = modules[index].outputFileName
         modules[index].name = name
         modules[index].sourceURL = source
@@ -794,6 +826,7 @@ final class AppModel {
         modules[index].publishesStandalone = draft.publishesStandalone
         modules[index].isEnabled = draft.isEnabled
         modules[index].scriptHubOptions = draft.scriptHubOptions
+        modules[index].customIconURL = customIconURL
         modules[index].detectedSourceFormat = detectedSourceFormat
         if sourceChanged {
             modules[index].state = .never
@@ -804,9 +837,14 @@ final class AppModel {
             modules[index].sourceCheckedAt = nil
             modules[index].conversionEngineRevision = nil
         }
-        if sourceChanged {
-            modules[index].iconURL = nil
-            Task { try? await iconStore.removeIcon(for: id) }
+        if sourceChanged || customIconChanged {
+            if let customIconURL, let url = URL(string: customIconURL) {
+                modules[index].iconURL = customIconURL
+                Task { try? await iconStore.cacheIcon(from: url, for: id, force: true) }
+            } else {
+                modules[index].iconURL = nil
+                Task { try? await iconStore.removeIcon(for: id) }
+            }
         }
         _ = previousOutputFileName
         try persistModules()
@@ -817,6 +855,9 @@ final class AppModel {
             scheduleAutomaticUpdate()
         } else {
             Task { await rebuildCombinedFromCache() }
+        }
+        if customIconChanged, customIconURL == nil, !sourceChanged {
+            Task { await refreshModuleMetadataFromCache() }
         }
     }
 
@@ -1014,10 +1055,11 @@ final class AppModel {
                     in: effectiveContent,
                     relativeTo: module.sourceURL
                 )
-                module.iconURL = detectedIcon?.absoluteString
+                let preferredIcon = module.customIconURL.flatMap(URL.init(string:)) ?? detectedIcon
+                module.iconURL = preferredIcon?.absoluteString
                 module.detectedSourceFormat = detectedFormat(for: module.sourceFormat, source: module.sourceURL)
-                if let detectedIcon {
-                    try? await iconStore.cacheIcon(from: detectedIcon, for: module.id, force: true)
+                if let preferredIcon {
+                    try? await iconStore.cacheIcon(from: preferredIcon, for: module.id, force: true)
                 } else {
                     try? await iconStore.removeIcon(for: module.id)
                 }
@@ -1484,7 +1526,8 @@ final class AppModel {
                 changed = true
             }
             let detectedIcon = await processingWorker.iconURL(in: content, relativeTo: module.sourceURL)
-            let value = detectedIcon?.absoluteString
+            let preferredIcon = module.customIconURL.flatMap(URL.init(string:)) ?? detectedIcon
+            let value = preferredIcon?.absoluteString
             let iconChanged = module.iconURL != value
             if iconChanged {
                 module.iconURL = value
@@ -1496,8 +1539,8 @@ final class AppModel {
                 replace(module)
                 changed = true
             }
-            if let detectedIcon {
-                try? await iconStore.cacheIcon(from: detectedIcon, for: module.id, force: iconChanged)
+            if let preferredIcon {
+                try? await iconStore.cacheIcon(from: preferredIcon, for: module.id, force: iconChanged)
             } else {
                 try? await iconStore.removeIcon(for: module.id)
             }
@@ -2081,10 +2124,8 @@ final class AppModel {
     }
 
     private func uniqueOutputFileName(for draft: ModuleDraft, source: String, excluding excludedID: UUID? = nil) -> String {
-        let preferred = draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? FilenameSanitizer.suggestedName(from: source)
-            : draft.name
-        let normalized = FilenameSanitizer.sgmoduleName(from: preferred)
+        let preservesExistingFileName = URL(string: source)?.isFileURL == true
+        let normalized = draft.normalizedOutputFileName(for: source)
         let folder = ModuleOutputFolder.normalized(draft.outputFolder)
         let combined = ModuleOutputFolder.relativePath(
             fileName: settings.combinedModuleFileName,
@@ -2093,10 +2134,19 @@ final class AppModel {
         let unavailable = Set(modules.compactMap { module -> String? in
             module.id == excludedID ? nil : module.publishedRelativePath.lowercased()
         } + [combined])
-        let relativePath = ModuleOutputFolder.relativePath(fileName: normalized, folder: folder)
+        let relativePath = ModuleOutputFolder.relativePath(
+            fileName: normalized,
+            folder: folder,
+            preservesExistingFileName: preservesExistingFileName
+        )
         guard unavailable.contains(relativePath.lowercased()) else { return normalized }
 
-        return uniqueOutputFileName(preferredFileName: normalized, folder: folder, unavailable: unavailable)
+        return uniqueOutputFileName(
+            preferredFileName: normalized,
+            folder: folder,
+            unavailable: unavailable,
+            preservesExistingFileName: preservesExistingFileName
+        )
     }
 
     private func uniqueOutputFileName(

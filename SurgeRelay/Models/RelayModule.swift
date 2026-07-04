@@ -165,6 +165,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     var scriptHubOptions: ScriptHubOptions
     var argumentOverrides: [String: String]
     var iconURL: String?
+    var customIconURL: String?
     var detectedSourceFormat: ModuleSourceFormat?
     var createdAt: Date
     var lastUpdatedAt: Date?
@@ -192,6 +193,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         scriptHubOptions: ScriptHubOptions = ScriptHubOptions(),
         argumentOverrides: [String: String] = [:],
         iconURL: String? = nil,
+        customIconURL: String? = nil,
         detectedSourceFormat: ModuleSourceFormat? = nil,
         createdAt: Date = .now,
         lastUpdatedAt: Date? = nil,
@@ -218,6 +220,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         self.scriptHubOptions = scriptHubOptions
         self.argumentOverrides = argumentOverrides
         self.iconURL = iconURL
+        self.customIconURL = customIconURL
         self.detectedSourceFormat = detectedSourceFormat
         self.createdAt = createdAt
         self.lastUpdatedAt = lastUpdatedAt
@@ -234,7 +237,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, sourceURL, sourceFormat, outputFileName, category, outputFolder, publishesStandalone, isEnabled, scriptHubOptions, argumentOverrides, iconURL, detectedSourceFormat
+        case id, name, sourceURL, sourceFormat, outputFileName, category, outputFolder, publishesStandalone, isEnabled, scriptHubOptions, argumentOverrides, iconURL, customIconURL, detectedSourceFormat
         case createdAt, lastUpdatedAt, contentHash, sourceETag, sourceLastModified, sourceContentHash, sourceCheckedAt
         case conversionEngineRevision, overrideBaseHash, hasOverrideConflict, state, lastError
     }
@@ -258,6 +261,9 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         scriptHubOptions = try container.decodeIfPresent(ScriptHubOptions.self, forKey: .scriptHubOptions) ?? ScriptHubOptions()
         argumentOverrides = try container.decodeIfPresent([String: String].self, forKey: .argumentOverrides) ?? [:]
         iconURL = try container.decodeIfPresent(String.self, forKey: .iconURL)
+        customIconURL = try container.decodeIfPresent(String.self, forKey: .customIconURL)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if customIconURL?.isEmpty == true { customIconURL = nil }
         detectedSourceFormat = try container.decodeIfPresent(ModuleSourceFormat.self, forKey: .detectedSourceFormat)
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? .now
         lastUpdatedAt = try container.decodeIfPresent(Date.self, forKey: .lastUpdatedAt)
@@ -309,6 +315,7 @@ struct ModuleDraft: Sendable {
     var publishesStandalone = true
     var isEnabled = false
     var scriptHubOptions = ScriptHubOptions()
+    var iconURL = ""
 
     init() {}
 
@@ -322,10 +329,19 @@ struct ModuleDraft: Sendable {
         publishesStandalone = module.publishesStandalone
         isEnabled = module.isEnabled
         scriptHubOptions = module.scriptHubOptions
+        iconURL = module.customIconURL ?? ""
     }
 
     var validationMessage: String? {
         if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "请输入模块名称。" }
+        let trimmedIcon = iconURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedIcon.isEmpty {
+            guard let iconURL = URL(string: trimmedIcon),
+                  ["http", "https"].contains(iconURL.scheme?.lowercased()),
+                  iconURL.host?.isEmpty == false else {
+                return "图标 URL 仅支持 HTTP 或 HTTPS 地址。"
+            }
+        }
         guard let url = URL(string: sourceURL) else {
             return "请输入有效的 HTTP、HTTPS 或本地文件来源地址。"
         }
@@ -337,6 +353,70 @@ struct ModuleDraft: Sendable {
         }
         guard ["http", "https"].contains(url.scheme?.lowercased()) else {
             return "请输入有效的 HTTP、HTTPS 或本地文件来源地址。"
+        }
+        return nil
+    }
+
+    var normalizedCustomIconURL: String? {
+        let trimmed = iconURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    func normalizedOutputFileName(for source: String? = nil) -> String {
+        let sourceValue = source ?? sourceURL
+        let explicitOutput = outputFileName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let displayName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let preferred: String
+        if !explicitOutput.isEmpty {
+            preferred = explicitOutput
+        } else if !displayName.isEmpty {
+            preferred = displayName
+        } else {
+            preferred = FilenameSanitizer.suggestedName(from: sourceValue)
+        }
+        return URL(string: sourceValue)?.isFileURL == true
+            ? FilenameSanitizer.existingSgmoduleName(from: preferred)
+            : FilenameSanitizer.sgmoduleName(from: preferred)
+    }
+
+    func publishedRelativePath(for source: String? = nil) -> String {
+        let sourceValue = source ?? sourceURL
+        return ModuleOutputFolder.relativePath(
+            fileName: normalizedOutputFileName(for: sourceValue),
+            folder: outputFolder,
+            preservesExistingFileName: URL(string: sourceValue)?.isFileURL == true
+        )
+    }
+}
+
+struct ModuleOutputPathNotice: Equatable, Sendable {
+    let message: String
+    let isWarning: Bool
+}
+
+enum ModuleOutputPathInspector {
+    static func notice(
+        for relativePath: String,
+        publishesStandalone: Bool,
+        modules: [RelayModule],
+        editingModuleID: UUID?,
+        combinedFileName: String
+    ) -> ModuleOutputPathNotice? {
+        if !publishesStandalone {
+            return ModuleOutputPathNotice(message: "未开启独立发布时，不会写出这个独立模块文件。", isWarning: false)
+        }
+        let normalizedPath = relativePath.lowercased()
+        let combinedPath = ModuleOutputFolder.relativePath(
+            fileName: combinedFileName,
+            folder: ModuleOutputFolder.root
+        ).lowercased()
+        if normalizedPath == combinedPath {
+            return ModuleOutputPathNotice(message: "该路径与总模块文件冲突，保存时会自动加编号避免覆盖。", isWarning: true)
+        }
+        if let owner = modules.first(where: { module in
+            module.id != editingModuleID && module.publishedRelativePath.lowercased() == normalizedPath
+        }) {
+            return ModuleOutputPathNotice(message: "该路径已被“\(owner.name)”使用，保存时会自动加编号避免覆盖。", isWarning: true)
         }
         return nil
     }

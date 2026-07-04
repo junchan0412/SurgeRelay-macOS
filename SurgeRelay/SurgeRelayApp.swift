@@ -13,7 +13,9 @@ struct SurgeRelayApp: App {
             RootView()
                 .environment(model)
                 .task {
-                    SparkleUpdateController.shared.start()
+                    if !AppRuntimeOptions.isUIQAMode {
+                        SparkleUpdateController.shared.start()
+                    }
                     model.start()
                 }
                 .frame(minWidth: 700)

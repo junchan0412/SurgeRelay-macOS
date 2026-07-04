@@ -16,6 +16,7 @@
 		1E450138723C5564669C9B26 /* checkmark.svg in Resources */ = {isa = PBXBuildFile; fileRef = C9B8AF8AB1ACDCB66A0C8FC1 /* checkmark.svg */; };
 		1FA2C6388904F3E6F297741D /* shippingbox.svg in Resources */ = {isa = PBXBuildFile; fileRef = 462EAB132DEE9AF7DACDBFAF /* shippingbox.svg */; };
 		213164421A282A43B1A6C7CC /* curlybraces.svg in Resources */ = {isa = PBXBuildFile; fileRef = 1CD710EBAF038E0C7A825A49 /* curlybraces.svg */; };
+		238DD2E6688B4E48A6B1D84D /* folder.svg in Resources */ = {isa = PBXBuildFile; fileRef = 5A7D7F17FB694B798F91978E /* folder.svg */; };
 		27AF5D3F446A25299DC890B3 /* JavaScriptCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 13871D2C902AAF75BBD033C6 /* JavaScriptCore.framework */; };
 		280C7E38DAD9F18ED8090287 /* ModuleEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E43B99091BF5C4100CE1DA0E /* ModuleEditorView.swift */; };
 		285A582F1C5CC5AF92DF0E7B /* doc.text.svg in Resources */ = {isa = PBXBuildFile; fileRef = 891546F1DD330D7407BFA7E0 /* doc.text.svg */; };
@@ -38,6 +39,7 @@
 		59EAAF9E4B4CDDD06E5DBD4D /* square.stack.3d.up.svg in Resources */ = {isa = PBXBuildFile; fileRef = 761903E3269F5A4668A4A8D4 /* square.stack.3d.up.svg */; };
 		5AF93C7B4B5A23357E9A275C /* gearshape.svg in Resources */ = {isa = PBXBuildFile; fileRef = A2901CCA2355192276439C70 /* gearshape.svg */; };
 		5D69C3A5E942C4D39EDE3B59 /* copy.svg in Resources */ = {isa = PBXBuildFile; fileRef = 2C0AF53D1B32B43A5DF8DA88 /* copy.svg */; };
+		62E8C1BFFB984922B7271C2C /* tag.svg in Resources */ = {isa = PBXBuildFile; fileRef = E917DB77B3124A92B9CE9E8E /* tag.svg */; };
 		6C8F8E71624D2151BFA675ED /* ServiceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00DC6E63075F21C67B4B1EB /* ServiceModels.swift */; };
 		6FD484283175DC8133118FF1 /* ModuleMerger.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA24D7A4AEF1770EAB7A055B /* ModuleMerger.swift */; };
 		70666E3C2C7733E5D452753B /* doc.on.doc.svg in Resources */ = {isa = PBXBuildFile; fileRef = EC6EFB761A62FB63592DAC2B /* doc.on.doc.svg */; };
@@ -129,6 +131,7 @@
 		462EAB132DEE9AF7DACDBFAF /* shippingbox.svg */ = {isa = PBXFileReference; path = shippingbox.svg; sourceTree = "<group>"; };
 		4815BE1727EE44787C48CEDF /* lock.svg */ = {isa = PBXFileReference; path = lock.svg; sourceTree = "<group>"; };
 		51D9670C12C677CBC8D96FA4 /* WebManagementAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebManagementAPI.swift; sourceTree = "<group>"; };
+		5A7D7F17FB694B798F91978E /* folder.svg */ = {isa = PBXFileReference; path = folder.svg; sourceTree = "<group>"; };
 		68CAE903B934F05BC413A021 /* arrow.triangle.2.circlepath.svg */ = {isa = PBXFileReference; path = arrow.triangle.2.circlepath.svg; sourceTree = "<group>"; };
 		6A7724FAFE6C14EBFDD1C655 /* square.and.arrow.up.svg */ = {isa = PBXFileReference; path = square.and.arrow.up.svg; sourceTree = "<group>"; };
 		6B268CF5C62B9C6E918FB5EC /* chevron.right.svg */ = {isa = PBXFileReference; path = chevron.right.svg; sourceTree = "<group>"; };
@@ -168,6 +171,7 @@
 		DC3725B231582A357E2B8389 /* plus.svg */ = {isa = PBXFileReference; path = plus.svg; sourceTree = "<group>"; };
 		E07D52108B30F9447A500E3D /* Surge Relay.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = "Surge Relay.icon"; sourceTree = "<group>"; };
 		E1070DB686AADF6D51CF6CDB /* ModuleFileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleFileStore.swift; sourceTree = "<group>"; };
+		E917DB77B3124A92B9CE9E8E /* tag.svg */ = {isa = PBXFileReference; path = tag.svg; sourceTree = "<group>"; };
 		E2D475FA54044529E190A65A /* eye.slash.svg */ = {isa = PBXFileReference; path = eye.slash.svg; sourceTree = "<group>"; };
 		E43B99091BF5C4100CE1DA0E /* ModuleEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleEditorView.swift; sourceTree = "<group>"; };
 		E4E5FFE1709B66F33D1ADC16 /* arrow.uturn.backward.svg */ = {isa = PBXFileReference; path = arrow.uturn.backward.svg; sourceTree = "<group>"; };
@@ -301,6 +305,7 @@
 				7496D207B44583DDDFC0D4A0 /* externaldrive.svg */,
 				E2D475FA54044529E190A65A /* eye.slash.svg */,
 				882056C6C077004DCDC917F2 /* eye.svg */,
+				5A7D7F17FB694B798F91978E /* folder.svg */,
 				A2901CCA2355192276439C70 /* gearshape.svg */,
 				08307B73F3678EC5C4513D20 /* info.circle.svg */,
 				731CE87C29256B8601CA7096 /* line.3.horizontal.svg */,
@@ -317,6 +322,7 @@
 				6A7724FAFE6C14EBFDD1C655 /* square.and.arrow.up.svg */,
 				758AA38AD863D4A727917AA6 /* square.stack.3d.up.fill.svg */,
 				761903E3269F5A4668A4A8D4 /* square.stack.3d.up.svg */,
+				E917DB77B3124A92B9CE9E8E /* tag.svg */,
 				A7A808FEA57315B2DB8DDAAB /* trash.svg */,
 				AA85DBADFC5ABF89D579FB73 /* xmark.svg */,
 			);
@@ -469,6 +475,7 @@
 				1D2644240FD88147B10C23A0 /* externaldrive.svg in Resources */,
 				D79BEE1849884E73428DBC1B /* eye.slash.svg in Resources */,
 				A8F3D6A87774ABA071E95490 /* eye.svg in Resources */,
+				238DD2E6688B4E48A6B1D84D /* folder.svg in Resources */,
 				5AF93C7B4B5A23357E9A275C /* gearshape.svg in Resources */,
 				D0B34181889EA4D6F6C6B3A8 /* index.html in Resources */,
 				0FDE55022718929BBBC3FC59 /* info.circle.svg in Resources */,
@@ -487,6 +494,7 @@
 				48FC1EF603143DB831343D37 /* square.and.arrow.up.svg in Resources */,
 				82EC6B0942CD3C3B2C7A0351 /* square.stack.3d.up.fill.svg in Resources */,
 				59EAAF9E4B4CDDD06E5DBD4D /* square.stack.3d.up.svg in Resources */,
+				62E8C1BFFB984922B7271C2C /* tag.svg in Resources */,
 				BD7735DF69FE59DECD229AF2 /* trash.svg in Resources */,
 				B7752C3B9A95AA5DCEF3FBE3 /* xmark.svg in Resources */,
 			);
@@ -587,7 +595,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 49;
+				CURRENT_PROJECT_VERSION = 50;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -601,7 +609,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.3.0;
+				MARKETING_VERSION = 1.3.1;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -685,7 +693,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 49;
+				CURRENT_PROJECT_VERSION = 50;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -705,7 +713,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.3.0;
+				MARKETING_VERSION = 1.3.1;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

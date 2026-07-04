@@ -53,6 +53,29 @@ final class SurgeRelayTests: XCTestCase {
         ))
     }
 
+    func testModuleDraftValidatesCustomIconURL() {
+        var draft = ModuleDraft()
+        draft.name = "Icon"
+        draft.sourceURL = "https://example.com/icon.sgmodule"
+        draft.sourceFormat = .surge
+        draft.iconURL = "https://example.com/icon.png"
+        XCTAssertNil(draft.validationMessage)
+        XCTAssertEqual(draft.normalizedCustomIconURL, "https://example.com/icon.png")
+
+        draft.iconURL = "http://example.com/icon.png"
+        XCTAssertNil(draft.validationMessage)
+        XCTAssertEqual(draft.normalizedCustomIconURL, "http://example.com/icon.png")
+
+        draft.iconURL = "data:image/png;base64,abc"
+        XCTAssertEqual(draft.validationMessage, "图标 URL 仅支持 HTTP 或 HTTPS 地址。")
+
+        draft.iconURL = "https://"
+        XCTAssertEqual(draft.validationMessage, "图标 URL 仅支持 HTTP 或 HTTPS 地址。")
+
+        draft.sourceURL = URL(filePath: "/tmp/Icon.sgmodule").absoluteString
+        XCTAssertEqual(draft.validationMessage, "图标 URL 仅支持 HTTP 或 HTTPS 地址。")
+    }
+
     func testRelayModuleDefaultsDoNotJoinCombinedModule() throws {
         let module = RelayModule(
             name: "Default",
@@ -86,6 +109,81 @@ final class SurgeRelayTests: XCTestCase {
 
         XCTAssertEqual(module.outputFileName, "Local Demo.sgmodule")
         XCTAssertEqual(module.publishedRelativePath, "Local Modules/Local Demo.sgmodule")
+    }
+
+    func testModuleDraftPublishedPathPrefersExplicitOutputFileName() {
+        var draft = ModuleDraft()
+        draft.name = "Renamed Display"
+        draft.sourceURL = "https://example.com/source.sgmodule"
+        draft.outputFileName = "Stable Name.sgmodule"
+        draft.outputFolder = "Ads"
+
+        XCTAssertEqual(draft.normalizedOutputFileName(), "Stable-Name.sgmodule")
+        XCTAssertEqual(draft.publishedRelativePath(), "Ads/Stable-Name.sgmodule")
+
+        draft.outputFileName = ""
+        XCTAssertEqual(draft.normalizedOutputFileName(), "Renamed-Display.sgmodule")
+        XCTAssertEqual(draft.publishedRelativePath(), "Ads/Renamed-Display.sgmodule")
+    }
+
+    func testModuleDraftPublishedPathPreservesLocalFileNameSpacing() {
+        var draft = ModuleDraft()
+        draft.name = "Renamed Display"
+        draft.sourceURL = URL(filePath: "/tmp/Local Source.sgmodule").absoluteString
+        draft.outputFileName = "Stable Name.sgmodule"
+        draft.outputFolder = "Local Modules"
+
+        XCTAssertEqual(draft.normalizedOutputFileName(), "Stable Name.sgmodule")
+        XCTAssertEqual(draft.publishedRelativePath(), "Local Modules/Stable Name.sgmodule")
+    }
+
+    func testModuleOutputPathInspectorExplainsNonPublishingAndCollisions() {
+        let existingID = UUID()
+        let existing = RelayModule(
+            id: existingID,
+            name: "Existing",
+            sourceURL: "https://example.com/existing.sgmodule",
+            outputFileName: "Existing",
+            outputFolder: "Ads"
+        )
+
+        XCTAssertEqual(
+            ModuleOutputPathInspector.notice(
+                for: "Ads/New.sgmodule",
+                publishesStandalone: false,
+                modules: [existing],
+                editingModuleID: nil,
+                combinedFileName: "Surge Relay"
+            ),
+            ModuleOutputPathNotice(message: "未开启独立发布时，不会写出这个独立模块文件。", isWarning: false)
+        )
+        XCTAssertEqual(
+            ModuleOutputPathInspector.notice(
+                for: "Surge-Relay.sgmodule",
+                publishesStandalone: true,
+                modules: [existing],
+                editingModuleID: nil,
+                combinedFileName: "Surge Relay"
+            ),
+            ModuleOutputPathNotice(message: "该路径与总模块文件冲突，保存时会自动加编号避免覆盖。", isWarning: true)
+        )
+        XCTAssertEqual(
+            ModuleOutputPathInspector.notice(
+                for: "Ads/Existing.sgmodule",
+                publishesStandalone: true,
+                modules: [existing],
+                editingModuleID: nil,
+                combinedFileName: "Surge Relay"
+            ),
+            ModuleOutputPathNotice(message: "该路径已被“Existing”使用，保存时会自动加编号避免覆盖。", isWarning: true)
+        )
+        XCTAssertNil(ModuleOutputPathInspector.notice(
+            for: "Ads/Existing.sgmodule",
+            publishesStandalone: true,
+            modules: [existing],
+            editingModuleID: existingID,
+            combinedFileName: "Surge Relay"
+        ))
     }
 
     func testLocalRootFileSkipsOnlyLocalSelfExport() {
@@ -148,12 +246,59 @@ final class SurgeRelayTests: XCTestCase {
         )
     }
 
+    func testModuleSearchIndexIncludesDisplayedMetadata() {
+        let module = RelayModule(
+            name: "Video Enhancer",
+            sourceURL: "https://example.com/video.sgmodule",
+            sourceFormat: .surge,
+            outputFileName: "Video.sgmodule",
+            category: "Streaming",
+            outputFolder: "Media",
+            publishesStandalone: false,
+            iconURL: "https://example.com/source-icon.png",
+            customIconURL: "https://example.com/custom-icon.png",
+            state: .current
+        )
+
+        let text = ModuleSearchIndex.text(for: module, cachedContent: "DOMAIN-SUFFIX,example.com")
+
+        XCTAssertTrue(text.contains("streaming"))
+        XCTAssertTrue(text.contains("media"))
+        XCTAssertTrue(text.contains("不发布独立模块"))
+        XCTAssertTrue(text.contains("source-icon.png"))
+        XCTAssertTrue(text.contains("custom-icon.png"))
+        XCTAssertTrue(text.contains("domain-suffix"))
+        XCTAssertTrue(text.contains("已是最新"))
+    }
+
     func testWebErrorPayloadIncludesUserFacingMessage() throws {
         let response = WebHTTPResponse.error(status: 409, message: "该模块已经添加，不能重复添加。")
         let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: response.body) as? [String: String])
 
         XCTAssertEqual(response.status, 409)
         XCTAssertEqual(payload["message"], "该模块已经添加，不能重复添加。")
+    }
+
+    func testWebIconContentTypeDetectionOnlyAcceptsRecognizedImages() {
+        XCTAssertEqual(WebManagementAPI.imageContentType(Data([0x89, 0x50, 0x4E, 0x47, 0x0D])), "image/png")
+        XCTAssertEqual(WebManagementAPI.imageContentType(Data([0xFF, 0xD8, 0xFF, 0xE0])), "image/jpeg")
+        XCTAssertEqual(WebManagementAPI.imageContentType(Data("GIF89a".utf8)), "image/gif")
+        XCTAssertEqual(
+            WebManagementAPI.imageContentType(Data([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50])),
+            "image/webp"
+        )
+        XCTAssertEqual(WebManagementAPI.imageContentType(Data("<?xml version=\"1.0\"?><svg></svg>".utf8)), "image/svg+xml")
+        XCTAssertNil(WebManagementAPI.imageContentType(Data([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x41, 0x56, 0x45])))
+        XCTAssertNil(WebManagementAPI.imageContentType(Data("not an image".utf8)))
+    }
+
+    func testWebContentSecurityPolicyMatchesCustomIconValidation() {
+        let policy = WebManagementAPI.webContentSecurityPolicy
+
+        XCTAssertTrue(policy.contains("img-src"))
+        XCTAssertTrue(policy.contains("http:"))
+        XCTAssertTrue(policy.contains("https:"))
+        XCTAssertTrue(policy.contains("data:"))
     }
 
     func testWebServerRuntimeStateHasUserFacingAndDiagnosticValues() {
@@ -1307,6 +1452,7 @@ final class SurgeRelayTests: XCTestCase {
         object.removeValue(forKey: "scriptHubOptions")
         object.removeValue(forKey: "argumentOverrides")
         object.removeValue(forKey: "iconURL")
+        object.removeValue(forKey: "customIconURL")
         let legacyData = try JSONSerialization.data(withJSONObject: object)
         let decoded = try JSONDecoder().decode(RelayModule.self, from: legacyData)
 
@@ -1315,6 +1461,7 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertEqual(decoded.scriptHubOptions, ScriptHubOptions())
         XCTAssertTrue(decoded.argumentOverrides.isEmpty)
         XCTAssertNil(decoded.iconURL)
+        XCTAssertNil(decoded.customIconURL)
         XCTAssertEqual(decoded.category, "")
         XCTAssertEqual(decoded.outputFolder, "")
         XCTAssertTrue(decoded.publishesStandalone)
@@ -1426,6 +1573,21 @@ final class SurgeRelayTests: XCTestCase {
     func testModuleMetadataParserReadsCategory() {
         XCTAssertEqual(ModuleMetadataParser.category(in: "#!category = 'Ads'\n[General]"), "Ads")
         XCTAssertNil(ModuleMetadataParser.category(in: "#!name=Demo\n[General]"))
+    }
+
+    func testModuleMetadataParserRemovesIconWhenApplyingSurgeMetadata() {
+        let content = """
+        #!name=Demo
+        #!icon=https://example.com/source.png
+        [General]
+        loglevel = notify
+        """
+        let result = ModuleMetadataParser.applyingModuleMetadata(name: "Managed", category: "Ads", to: content)
+
+        XCTAssertTrue(result.contains("#!name=Managed"))
+        XCTAssertTrue(result.contains("#!category=Ads"))
+        XCTAssertFalse(result.localizedCaseInsensitiveContains("#!icon"))
+        XCTAssertFalse(result.contains("https://example.com/source.png"))
     }
 
     func testLocalModuleScannerDiscoversExistingModules() throws {
@@ -1552,6 +1714,36 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertTrue(result.content.contains("#!name=Managed"))
         XCTAssertTrue(result.content.contains("#!category=Imported"))
         XCTAssertTrue(result.content.contains("loglevel = notify"))
+    }
+
+    func testScriptHubClientDoesNotWriteIconMetadataToNativeSurgeOutput() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let file = root.appending(path: "Icon.sgmodule")
+        try Data("""
+        #!name=Original
+        #!icon=https://example.com/source-icon.png
+        [General]
+        loglevel = notify
+        """.utf8).write(to: file)
+        let module = RelayModule(
+            name: "Managed",
+            sourceURL: file.absoluteString,
+            sourceFormat: .surge,
+            outputFileName: "Icon",
+            category: "Imported",
+            customIconURL: "https://example.com/custom-icon.png"
+        )
+
+        let result = try await ScriptHubClient().convert(module: module)
+
+        XCTAssertTrue(result.content.contains("#!name=Managed"))
+        XCTAssertTrue(result.content.contains("#!category=Imported"))
+        XCTAssertFalse(result.content.localizedCaseInsensitiveContains("#!icon"))
+        XCTAssertFalse(result.content.contains("https://example.com/source-icon.png"))
+        XCTAssertFalse(result.content.contains("https://example.com/custom-icon.png"))
     }
 
     func testGitBlobHashMatchesGitHubContentSHA() {
