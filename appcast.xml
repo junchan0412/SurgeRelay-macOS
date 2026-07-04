@@ -3,6 +3,26 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.3.8</title>
+            <pubDate>Sat, 04 Jul 2026 22:43:20 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.8</link>
+            <sparkle:version>57</sparkle:version>
+            <sparkle:shortVersionString>1.3.8</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.3.8
+
+
+- 新增 `PROJECT_AUDIT_2026-07-04.md` 深度调研报告，记录当前架构、性能热点、UI/UX 评估、安全边界、测试覆盖和发布核对清单。
+- 模块模型正式区分“模块存放位置”和“转换前来源”：本地模块/GitHub 模块与本地 Surge 文件、远程 Quantumult X、远程 Loon、远程 Surge 模块不再混用同一个概念。
+- 添加和编辑模块界面补齐“模块存放”选择；Web 管理端同步展示“管理关系”、原始地址、来源记录和本地相对路径。
+- 本地扫描导入的远程来源本地模块会保留原本所在的本地相对路径，避免把转换前远程来源误当成发布目标路径。
+- 主窗口搜索内容索引改为搜索时懒加载，避免启动后立即读取并物化所有模块预览内容。
+- Web 管理列表 diff 改为集中维护的 signature，减少模块关系字段或错误状态变化后列表未刷新的风险。
+- 更新失败说明、GitHub 自动发布空集合保护和 Web 管理更新准入继续统一到桌面端与远程管理端。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.3.8/Surge-Relay-1.3.8.app.zip" length="9340016" type="application/zip" sparkle:edSignature="jyrl/7Eu69OARfVKcUa751GZntWiPr6njlHl8Kk57nwCuS+KjQ1O0t8zMCZy6CCEiYINFXWGWWOoTd6XEmTVAQ=="/>
+        </item>
+        <item>
             <title>1.3.7</title>
             <pubDate>Sat, 04 Jul 2026 21:41:31 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.7</link>

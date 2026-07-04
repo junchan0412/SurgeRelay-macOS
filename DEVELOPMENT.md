@@ -23,6 +23,13 @@ This document records the project conventions needed to maintain this fork.
 
 Both can be enabled at the same time. Local export and GitHub publishing share `RelayModule.publishedRelativePath`, so folder handling must stay destination-neutral. When adding code that generates publish files, pass a `PublishDestination` so local self-export protection does not accidentally remove files from the GitHub publish set.
 
+Keep these two axes separate:
+
+- `RelayModule.storageLocation`: where Surge Relay stores the converted module (`local` or `gitHub`).
+- `RelayModule.sourceOrigin`: where the pre-conversion source comes from (local Surge file, remote QX/Loon/Surge, or invalid).
+
+Do not infer storage from `sourceURL` after Script-Hub subscription metadata has been applied: a local file can restore a remote original URL while still being managed as a local module. For local modules, preserve `localStorageRelativePath` whenever it is known.
+
 Manual GitHub publishing has two paths:
 
 - publish all current outputs, with stale managed file deletion preview and confirmation
@@ -70,6 +77,12 @@ xcodebuild test \
 
 The active maintenance machine may print CoreSimulator version warnings even for macOS builds. Treat them as environmental warnings unless the command exits non-zero.
 
+## Performance Notes
+
+The module list should not eagerly read every converted preview at launch. `ModulesView` keeps metadata-only search available immediately and builds the heavier converted-content search index only after the user enters a search query. Preserve that lazy behavior when changing search or preview code.
+
+Web management list updates use `moduleListSignature(module)` in `WebResources/app.js` to decide whether a sidebar re-render is needed. When adding fields that affect list rows, search subtitles, icons, relationship labels, or failure state, update that signature in one place.
+
 ## Release
 
 Release builds require:
@@ -107,3 +120,4 @@ When changing behavior, update:
 - `README.md` for user-facing behavior
 - `CHANGELOG.md` for release notes
 - `DEVELOPMENT.md` when architecture, release, or safety invariants change
+- `PROJECT_AUDIT_2026-07-04.md` or a newer audit file when completing a broad optimization pass

@@ -156,6 +156,7 @@ ui.moduleForm.elements.name.addEventListener('input', event => {
   updateOutputPathPreview();
 });
 ui.moduleForm.elements.outputFolder.addEventListener('change', updateOutputPathPreview);
+ui.moduleForm.elements.storageLocation.addEventListener('change', updateOutputPathPreview);
 ui.moduleForm.elements.outputFileName.addEventListener('input', updateOutputPathPreview);
 ui.moduleForm.elements.iconURL.addEventListener('input', updateIconURLPreview);
 ui.moduleForm.elements.publishesStandalone.addEventListener('change', updateOutputPathPreview);
@@ -332,23 +333,11 @@ function patchLiveState(previous, next) {
 
   const previousList = [
     previous.combined?.isEnabled ? 'combined-on' : 'combined-off',
-    previous.modules.map(module => [
-      module.id, module.name, module.sourceFormatTitle, module.outputFolder, module.publishedRelativePath,
-      module.iconURL, module.customIconURL, module.isEnabled, module.publishesStandalone,
-      module.state, module.stateTitle, module.lastUpdatedAt, module.sourceCheckedAt,
-      module.contentHash, module.sourceContentHash, module.sourceETag, module.sourceLastModified,
-      module.conversionEngineRevision
-    ].join('|')).join('\n')
+    previous.modules.map(moduleListSignature).join('\n')
   ].join('\n');
   const nextList = [
     next.combined?.isEnabled ? 'combined-on' : 'combined-off',
-    next.modules.map(module => [
-      module.id, module.name, module.sourceFormatTitle, module.outputFolder, module.publishedRelativePath,
-      module.iconURL, module.customIconURL, module.isEnabled, module.publishesStandalone,
-      module.state, module.stateTitle, module.lastUpdatedAt, module.sourceCheckedAt,
-      module.contentHash, module.sourceContentHash, module.sourceETag, module.sourceLastModified,
-      module.conversionEngineRevision
-    ].join('|')).join('\n')
+    next.modules.map(moduleListSignature).join('\n')
   ].join('\n');
   if (previousList !== nextList) renderSidebar(); else patchSidebarLive();
 
@@ -367,7 +356,8 @@ function patchLiveState(previous, next) {
     renderDetail(false);
     return;
   }
-  patchDetailValue('更新状态', module.stateTitle);
+  patchDetailValue('更新状态', moduleStatusTitle(module));
+  patchDetailValue('转换前来源', module.sourceOriginTitle || module.sourceFormatTitle);
   patchDetailValue('来源格式', module.sourceFormatTitle);
   if (next.combined.isEnabled) patchDetailValue('汇总订阅', next.combined.subscriptionURL || '等待发布配置');
   patchDetailValue('创建时间', formatDate(module.createdAt, '—'));
@@ -377,11 +367,28 @@ function patchLiveState(previous, next) {
   patchDetailValue('转换引擎', module.conversionEngineRevision ? module.conversionEngineRevision.slice(0, 12) : '原生 Surge 模块');
 }
 
+function moduleListSignature(module) {
+  return [
+    module.id, module.name, module.sourceURL, module.effectiveOriginalSourceURL,
+    module.sourceFormatTitle, module.outputFolder, module.publishedRelativePath,
+    module.storageLocation, module.storageLocationTitle, module.sourceOriginTitle,
+    module.relationshipSummary, module.localStorageRelativePath,
+    module.iconURL, module.customIconURL, module.isEnabled, module.publishesStandalone,
+    module.state, module.stateTitle, module.lastError, module.lastUpdatedAt, module.sourceCheckedAt,
+    module.contentHash, module.sourceContentHash, module.sourceETag, module.sourceLastModified,
+    module.conversionEngineRevision
+  ].map(value => String(value ?? '')).join('\u{1f}');
+}
+
 function metadataRowPresenceChanged(previousModule, nextModule) {
   if (!previousModule || !nextModule) return false;
   return Boolean(previousModule.sourceContentHash) !== Boolean(nextModule.sourceContentHash) ||
     Boolean(previousModule.sourceETag) !== Boolean(nextModule.sourceETag) ||
-    Boolean(previousModule.sourceLastModified) !== Boolean(nextModule.sourceLastModified);
+    Boolean(previousModule.sourceLastModified) !== Boolean(nextModule.sourceLastModified) ||
+    previousModule.storageLocation !== nextModule.storageLocation ||
+    previousModule.sourceOriginTitle !== nextModule.sourceOriginTitle ||
+    previousModule.localStorageRelativePath !== nextModule.localStorageRelativePath ||
+    previousModule.lastError !== nextModule.lastError;
 }
 
 function patchDetailValue(label, value) {
@@ -407,9 +414,10 @@ function renderSidebar() {
   if (!state) return;
   const query = ui.search.value.trim().toLocaleLowerCase();
   const modules = state.modules.filter(module => [
-    module.name, module.sourceURL, module.sourceFormatTitle, module.outputFileName, module.publishedRelativePath,
-    module.category, module.outputFolder, module.iconURL, module.customIconURL,
-    module.sourceContentHash, module.sourceETag, module.sourceLastModified,
+    module.name, module.sourceURL, module.effectiveOriginalSourceURL, module.sourceFormatTitle,
+    module.sourceOriginTitle, module.storageLocationTitle, module.relationshipSummary,
+    module.outputFileName, module.publishedRelativePath, module.category, module.outputFolder, module.iconURL, module.customIconURL,
+    module.sourceContentHash, module.sourceETag, module.sourceLastModified, module.lastError,
     module.publishesStandalone ? '独立模块' : '不发布独立模块'
   ].join('\n').toLocaleLowerCase().includes(query));
   ui.summaryRow.hidden = !state.combined.isEnabled;
@@ -421,7 +429,7 @@ function renderSidebar() {
 function moduleRow(module) {
   const icon = module.iconURL ? `<img src="${escapeAttribute(module.iconURL)}" alt="" loading="lazy">` : `<span class="symbol" data-symbol="shippingbox"></span>`;
   const stateClass = `state-${module.state || 'never'}`;
-  const stateTitle = module.stateTitle || '状态未知';
+  const stateTitle = moduleStatusTitle(module);
   const toggle = state.combined.isEnabled
     ? `<label class="module-toggle" title="${module.isEnabled ? '从总模块中停用' : '包含在总模块中'}"><input type="checkbox" data-module-toggle="${module.id}" ${module.isEnabled ? 'checked' : ''} aria-label="包含 ${escapeAttribute(module.name)}"><span class="toggle-track" aria-hidden="true"></span></label>`
     : '';
@@ -434,11 +442,25 @@ function moduleRow(module) {
 }
 
 function moduleSubtitle(module) {
-  const parts = [module.sourceFormatTitle || '模块'];
+  const parts = module.state === 'failed' && failureSummary(module.lastError)
+    ? [`更新失败：${failureSummary(module.lastError)}`]
+    : [module.relationshipSummary || module.sourceFormatTitle || '模块'];
   if (module.category) parts.push(module.category);
   if (module.outputFolder) parts.push(folderTitle(module.outputFolder));
   if (!module.publishesStandalone) parts.push('不发布独立模块');
   return parts.join(' · ');
+}
+
+function moduleStatusTitle(module) {
+  const stateTitle = module.stateTitle || '状态未知';
+  const summary = module.state === 'failed' ? failureSummary(module.lastError) : '';
+  return summary ? `${stateTitle}：${summary}` : stateTitle;
+}
+
+function failureSummary(message, maxLength = 42) {
+  const firstLine = String(message || '').split(/\r?\n/)[0]?.replace(/\s+/g, ' ').trim() || '';
+  if (firstLine.length <= maxLength) return firstLine;
+  return `${firstLine.slice(0, Math.max(1, maxLength - 1))}…`;
 }
 
 function renderActivity() {
@@ -558,7 +580,8 @@ function renderModuleDetail(module, animate = true) {
   const publishedTitle = module.publishedURL?.includes('workers.dev') ? 'Cloudflare' : 'GitHub';
   const published = module.publishedURL ? `<section class="form-section-view"><h3 class="section-heading">${publishedTitle}</h3><div class="group-box"><div class="detail-row action-row"><div class="detail-value monospaced">${escapeHTML(module.publishedURL)}</div><div><button class="button" data-action="copy" data-value="${escapeAttribute(module.publishedURL)}"><span class="symbol" data-symbol="copy"></span>拷贝地址</button></div></div></div></section>` : '';
   const errorNote = state.combined.isEnabled ? '如果该来源有缓存，总模块会继续沿用它上一次成功版本。' : '如果该来源有缓存，模块输出会继续沿用它上一次成功版本。';
-  const error = module.lastError ? `<section class="form-section-view"><h3 class="section-heading">最近一次更新失败</h3><div class="group-box"><div class="detail-row action-row error-box"><strong>更新失败</strong><div>${escapeHTML(module.lastError)}</div><small>${escapeHTML(errorNote)}</small></div></div></section>` : '';
+  const errorBody = module.lastError ? escapeHTML(module.lastError).replace(/\n/g, '<br>') : '';
+  const error = module.lastError ? `<section class="form-section-view"><h3 class="section-heading">最近一次更新失败</h3><div class="group-box"><div class="detail-row action-row error-box"><strong>${escapeHTML(moduleStatusTitle(module))}</strong><div>${errorBody}</div><small>${escapeHTML(errorNote)}</small></div></div></section>` : '';
   const conflict = module.hasOverrideConflict ? `<section class="form-section-view"><h3 class="section-heading">本地编辑冲突</h3><div class="group-box"><div class="detail-row action-row error-box"><strong>上游内容已经变化</strong><div>当前仍在使用本地编辑。可在预览中比较内容后保留或恢复。</div><div><button class="button" data-action="accept-override">保留本地编辑</button><button class="button" data-action="tab-preview">前往预览</button></div></div></div></section>` : '';
   const combinedSubscription = state.combined.subscriptionURL || '';
   const combinedRow = state.combined.isEnabled ? detailRow('square.stack.3d.up.fill', '汇总订阅', combinedSubscription || '等待发布配置', false, combinedSubscription || null) : '';
@@ -569,18 +592,32 @@ function renderModuleDetail(module, animate = true) {
   const sourceETagRow = module.sourceETag ? detailRow('tag', '来源 ETag', module.sourceETag, false, module.sourceETag) : '';
   const sourceLastModifiedRow = module.sourceLastModified ? detailRow('clock', '来源修改时间', module.sourceLastModified) : '';
   const outputPath = module.publishesStandalone ? (module.publishedRelativePath || module.outputFileName) : '';
+  const sourceAddress = module.effectiveOriginalSourceURL || module.sourceURL || '';
+  const sourceAddressValue = /^https?:\/\//i.test(sourceAddress)
+    ? `<a href="${escapeAttribute(sourceAddress)}" target="_blank" rel="noreferrer">${escapeHTML(sourceAddress)}</a>`
+    : escapeHTML(sourceAddress);
+  const sourceRecordRow = module.sourceURL && module.sourceURL !== sourceAddress
+    ? detailRow('link', '来源记录', escapeHTML(module.sourceURL), true, module.sourceURL)
+    : '';
+  const localStorageRow = module.localStorageRelativePath
+    ? detailRow('folder', '本地相对路径', module.localStorageRelativePath, false, module.localStorageRelativePath)
+    : '';
   setDetailHTML(`${detailToolbar(module)}
-    <section class="form-section-view"><h3 class="section-heading">模块信息</h3><div class="group-box">
-      ${detailRow('link', '原始地址', `<a href="${escapeAttribute(module.sourceURL)}" target="_blank" rel="noreferrer">${escapeHTML(module.sourceURL)}</a>`, true, module.sourceURL)}
+    <section class="form-section-view"><h3 class="section-heading">管理关系</h3><div class="group-box">
+      ${detailRow(module.storageLocationIcon || 'folder', '模块存放', module.storageLocationTitle || 'GitHub 模块')}
+      ${detailRow(module.sourceOriginIcon || 'link', '转换前来源', module.sourceOriginTitle || module.sourceFormatTitle)}
+      ${detailRow('link', '原始地址', sourceAddressValue, true, sourceAddress)}
+      ${sourceRecordRow}
       ${detailRow('doc.text', '来源格式', module.sourceFormatTitle)}
       ${detailRow('tag', '模块标签', module.category || '未设置')}
       ${detailRow('folder', '存放文件夹', folderTitle(module.outputFolder))}
+      ${localStorageRow}
       ${detailRow('doc.on.doc', '输出文件', outputPath || '未开启独立发布', false, outputPath || null)}
       ${detailRow('info.circle', '图标来源', iconSource)}
       ${iconAddressRow}
       ${detailRow('doc.text', '独立模块', module.publishesStandalone ? '发布' : '不发布')}
       ${combinedRow}
-      ${detailRow('checkmark', '更新状态', module.stateTitle)}
+      ${detailRow('checkmark', '更新状态', moduleStatusTitle(module))}
       ${detailRow('clock', '创建时间', formatDate(module.createdAt, '—'))}
       ${detailRow('clock', '上次更新', formatDate(module.lastUpdatedAt, '从未更新'))}
       ${detailRow('refresh', '来源检查', formatDate(module.sourceCheckedAt, '尚未检查'))}
@@ -787,6 +824,7 @@ function updateOutputPathPreview() {
   const path = publishedRelativePathForDraft({
     name: form.name.value,
     sourceURL: form.sourceURL.value,
+    storageLocation: form.storageLocation?.value || 'gitHub',
     outputFolder: form.outputFolder.value,
     outputFileName: form.outputFileName.value
   });
@@ -855,7 +893,9 @@ function normalizedOutputFileName(draft) {
   const explicit = String(draft.outputFileName || '').trim();
   const displayName = String(draft.name || '').trim();
   const preferred = explicit || displayName || suggestedNameFromSource(sourceURL);
-  return isFileSource(sourceURL) ? existingSgmoduleName(preferred) : sgmoduleName(preferred);
+  return isFileSource(sourceURL) || draft.storageLocation === 'local'
+    ? existingSgmoduleName(preferred)
+    : sgmoduleName(preferred);
 }
 
 function suggestedNameFromSource(sourceURL) {
@@ -1035,6 +1075,7 @@ function openEditor(module = null) {
   manualNameEdited = Boolean(module);
   form.sourceURL.value = module?.sourceURL || '';
   form.sourceFormat.value = module?.sourceFormat || 'automatic';
+  form.storageLocation.value = module?.storageLocation || 'gitHub';
   const includeRow = form.isEnabled?.closest('.switch-row');
   if (includeRow) includeRow.hidden = !combinedEnabled();
   form.isEnabled.checked = module?.isEnabled ?? false;
@@ -1064,6 +1105,7 @@ async function saveModule(event) {
     name: form.name.value.trim(),
     sourceURL: form.sourceURL.value.trim(),
     sourceFormat: form.sourceFormat.value,
+    storageLocation: form.storageLocation.value,
     category: form.category.value.trim(),
     iconURL,
     outputFolder: form.outputFolder.value,

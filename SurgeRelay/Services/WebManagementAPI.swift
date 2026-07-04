@@ -179,9 +179,7 @@ enum WebManagementAPI {
         let newestUpdate = model.modules.compactMap(\.lastUpdatedAt).max()
         let combinedEnabled = model.settings.combinedModuleEnabled
         let enabledCount = combinedEnabled ? model.modules.filter(\.isEnabled).count : 0
-        let updateableCount = model.modules.filter {
-            (combinedEnabled && $0.isEnabled) || $0.publishesStandalone
-        }.count
+        let updateableCount = model.updateableModuleCount
         let updateAdmission = model.updateAdmission
         let progress: Double? = if model.synchronizationTotalCount > 0 {
             min(
@@ -209,12 +207,20 @@ enum WebManagementAPI {
                     id: module.id.uuidString.lowercased(),
                     name: module.name,
                     sourceURL: module.sourceURL,
+                    effectiveOriginalSourceURL: module.effectiveOriginalSourceURL,
                     sourceFormat: module.sourceFormat.rawValue,
                     sourceFormatTitle: module.sourceFormatDisplayTitle,
+                    sourceOriginTitle: module.sourceOrigin.title,
+                    sourceOriginIcon: module.sourceOrigin.systemImage,
                     outputFileName: module.outputFileName,
                     publishedRelativePath: module.publishedRelativePath,
                     category: module.category,
                     outputFolder: module.outputFolder,
+                    storageLocation: module.storageLocation.rawValue,
+                    storageLocationTitle: module.storageLocation.title,
+                    storageLocationIcon: module.storageLocation.systemImage,
+                    relationshipSummary: module.relationshipSummary,
+                    localStorageRelativePath: module.localStorageRelativePath,
                     publishesStandalone: module.publishesStandalone,
                     isEnabled: module.isEnabled,
                     state: module.state.rawValue,
@@ -376,12 +382,20 @@ private struct WebModulePayload: Encodable {
     let id: String
     let name: String
     let sourceURL: String
+    let effectiveOriginalSourceURL: String
     let sourceFormat: String
     let sourceFormatTitle: String
+    let sourceOriginTitle: String
+    let sourceOriginIcon: String
     let outputFileName: String
     let publishedRelativePath: String
     let category: String
     let outputFolder: String
+    let storageLocation: String
+    let storageLocationTitle: String
+    let storageLocationIcon: String
+    let relationshipSummary: String
+    let localStorageRelativePath: String?
     let publishesStandalone: Bool
     let isEnabled: Bool
     let state: String
@@ -467,6 +481,7 @@ private struct WebModuleMutation: Decodable {
     let name: String
     let sourceURL: String
     let sourceFormat: String?
+    let storageLocation: String?
     let category: String?
     let iconURL: String?
     let outputFolder: String?
@@ -491,6 +506,12 @@ private struct WebModuleMutation: Decodable {
                 throw WebAPIError.invalidFormat
             }
             draft.sourceFormat = format
+        }
+        if let storageLocation {
+            guard let location = ModuleStorageLocation(rawValue: storageLocation) else {
+                throw WebAPIError.invalidStorageLocation
+            }
+            draft.storageLocation = location
         }
         if let category { draft.category = category }
         if let iconURL { draft.iconURL = iconURL }
@@ -517,6 +538,7 @@ private enum WebAPIError: LocalizedError {
     case invalidBody
     case invalidArgument
     case invalidFormat
+    case invalidStorageLocation
     case invalidSourceURL
 
     var status: Int {
@@ -535,6 +557,7 @@ private enum WebAPIError: LocalizedError {
         case .invalidBody: "请求内容不是有效的 UTF-8 文本。"
         case .invalidArgument: "找不到这个模块参数。"
         case .invalidFormat: "来源格式无效。"
+        case .invalidStorageLocation: "模块存放位置无效。"
         case .invalidSourceURL: "来源地址无效。"
         }
     }

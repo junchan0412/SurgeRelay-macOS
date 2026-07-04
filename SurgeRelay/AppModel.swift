@@ -365,7 +365,7 @@ final class AppModel {
     var updateAdmission: UpdateAdmission {
         UpdateAdmission.allModules(
             activity: workActivity,
-            updateableModuleCount: modules.filter(shouldUpdateModule).count,
+            updateableModuleCount: updateableModuleCount,
             statusMessage: statusMessage
         )
     }
@@ -375,9 +375,13 @@ final class AppModel {
             module,
             moduleIsUpdateable: shouldUpdateModule(module),
             activity: workActivity,
-            updateableModuleCount: modules.filter(shouldUpdateModule).count,
+            updateableModuleCount: updateableModuleCount,
             statusMessage: statusMessage
         )
+    }
+
+    var updateableModuleCount: Int {
+        modules.filter(shouldUpdateModule).count
     }
 
     var canCancelCurrentWork: Bool {
@@ -651,6 +655,9 @@ final class AppModel {
                 outputFileName: outputFileName,
                 category: candidate.category,
                 outputFolder: outputFolder,
+                storageLocation: .local,
+                localStorageRelativePath: candidate.localStorageRelativePath,
+                preservesOutputFileName: true,
                 isEnabled: false,
                 scriptHubOptions: candidate.scriptHubOptions,
                 scriptHubSubscription: candidate.scriptHubSubscription,
@@ -818,16 +825,26 @@ final class AppModel {
         let category = draft.category.trimmingCharacters(in: .whitespacesAndNewlines)
         let outputFolder = ModuleOutputFolder.normalized(draft.outputFolder)
         let customIconURL = draft.normalizedCustomIconURL
-        guard !modules.contains(where: { ModuleSourceIdentity.matches($0.sourceURL, source) }) else {
+        guard !modules.contains(where: { ModuleSourceIdentity.matches($0.effectiveOriginalSourceURL, source) }) else {
             throw RelayError.duplicateSourceURL
         }
+        let outputFileName = uniqueOutputFileName(for: draft, source: source)
+        let localStorageRelativePath = try localStorageRelativePath(
+            storageLocation: draft.storageLocation,
+            source: source,
+            outputFileName: outputFileName,
+            outputFolder: outputFolder
+        )
         let module = RelayModule(
             name: draft.name.trimmingCharacters(in: .whitespacesAndNewlines),
             sourceURL: source,
             sourceFormat: draft.sourceFormat,
-            outputFileName: uniqueOutputFileName(for: draft, source: source),
+            outputFileName: outputFileName,
             category: category,
             outputFolder: outputFolder,
+            storageLocation: draft.storageLocation,
+            localStorageRelativePath: localStorageRelativePath,
+            preservesOutputFileName: draft.storageLocation == .local,
             publishesStandalone: draft.publishesStandalone,
             isEnabled: draft.isEnabled,
             scriptHubOptions: draft.scriptHubOptions,
@@ -855,12 +872,18 @@ final class AppModel {
         let outputFolder = ModuleOutputFolder.normalized(draft.outputFolder)
         let customIconURL = draft.normalizedCustomIconURL
         guard !modules.contains(where: {
-            $0.id != id && ModuleSourceIdentity.matches($0.sourceURL, source)
+            $0.id != id && ModuleSourceIdentity.matches($0.effectiveOriginalSourceURL, source)
         }) else {
             throw RelayError.duplicateSourceURL
         }
         let outputFileName = uniqueOutputFileName(for: draft, source: source, excluding: id)
         let detectedSourceFormat = detectedFormat(for: draft.sourceFormat, source: source)
+        let localStorageRelativePath = try localStorageRelativePath(
+            storageLocation: draft.storageLocation,
+            source: source,
+            outputFileName: outputFileName,
+            outputFolder: outputFolder
+        )
         let current = modules[index]
         guard current.name != name ||
                 current.sourceURL != source ||
@@ -868,6 +891,9 @@ final class AppModel {
                 current.outputFileName != outputFileName ||
                 current.category != category ||
                 current.outputFolder != outputFolder ||
+                current.storageLocation != draft.storageLocation ||
+                current.localStorageRelativePath != localStorageRelativePath ||
+                current.preservesOutputFileName != (draft.storageLocation == .local) ||
                 current.publishesStandalone != draft.publishesStandalone ||
                 current.isEnabled != draft.isEnabled ||
                 current.scriptHubOptions != draft.scriptHubOptions ||
@@ -887,6 +913,9 @@ final class AppModel {
         modules[index].outputFileName = outputFileName
         modules[index].category = category
         modules[index].outputFolder = outputFolder
+        modules[index].storageLocation = draft.storageLocation
+        modules[index].localStorageRelativePath = localStorageRelativePath
+        modules[index].preservesOutputFileName = draft.storageLocation == .local
         modules[index].publishesStandalone = draft.publishesStandalone
         modules[index].isEnabled = draft.isEnabled
         modules[index].scriptHubOptions = draft.scriptHubOptions
@@ -1224,15 +1253,23 @@ final class AppModel {
             guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
             if settings.publishToGitHub, settings.automaticallyPublish, settings.github.isConfigured,
                !ensureGitHubTokenLoaded(showStatusMessage: false).isEmpty {
-                if contentChanged {
-                    scheduleAutomaticPublish()
-                    statusMessage = failures == 0
-                        ? "模块输出已更新，等待发布"
-                        : "模块输出已更新；\(failures) 个来源沿用上次版本，等待发布"
+                if hasGitHubPublishableModuleSelection {
+                    if contentChanged {
+                        scheduleAutomaticPublish()
+                        statusMessage = failures == 0
+                            ? "模块输出已更新，等待发布"
+                            : "模块输出已更新；\(failures) 个来源沿用上次版本，等待发布"
+                    } else {
+                        statusMessage = failures == 0
+                            ? "所有模块内容均未变化，无需发布"
+                            : "模块内容未变化；\(failures) 个来源沿用上次版本，无需发布"
+                    }
                 } else {
-                    statusMessage = failures == 0
-                        ? "所有模块内容均未变化，无需发布"
-                        : "模块内容未变化；\(failures) 个来源沿用上次版本，无需发布"
+                    clearAutomaticPublishSchedule()
+                    statusMessage = automaticPublishSkippedStatus(
+                        contentChanged: contentChanged,
+                        failures: failures
+                    )
                 }
             } else if pendingPublishPreview?.destination == .local {
                 let count = pendingPublishPreview?.deletedFiles.count ?? 0
@@ -1281,10 +1318,7 @@ final class AppModel {
     private func scheduleAutomaticPublish() {
         guard settings.publishToGitHub, settings.automaticallyPublish, settings.github.isConfigured else { return }
         guard !ensureGitHubTokenLoaded(showStatusMessage: false).isEmpty else { return }
-        guard PublishCoordinator.hasPublishableModuleSelection(
-            modules: modules,
-            combinedModuleEnabled: settings.combinedModuleEnabled
-        ) else {
+        guard hasGitHubPublishableModuleSelection else {
             clearAutomaticPublishSchedule()
             return
         }
@@ -1311,7 +1345,7 @@ final class AppModel {
             }
             guard await self.hasGitHubPublishableFiles() else {
                 self.clearAutomaticPublishSchedule()
-                self.statusMessage = "没有启用发布的模块，已跳过 GitHub 自动发布"
+                self.statusMessage = "没有可发布的模块文件，已跳过 GitHub 自动发布"
                 return
             }
             self.clearAutomaticPublishSchedule()
@@ -1337,6 +1371,10 @@ final class AppModel {
                 self.recordGitHubPublish(report)
             } catch {
                 guard !self.isCurrentWorkCancellation(error) else { return }
+                if self.isNoFilesToPublish(error) {
+                    self.statusMessage = "没有可发布的模块文件，已跳过 GitHub 自动发布"
+                    return
+                }
                 self.presentedError = "GitHub 自动发布失败：\(error.localizedDescription)"
             }
         }
@@ -1428,6 +1466,10 @@ final class AppModel {
             recordGitHubPublish(report)
         } catch {
             if isCurrentWorkCancellation(error) { return }
+            if isNoFilesToPublish(error) {
+                statusMessage = "没有可发布的模块文件"
+                return
+            }
             presentedError = error.localizedDescription
         }
     }
@@ -1455,6 +1497,10 @@ final class AppModel {
             return true
         } catch {
             if isCurrentWorkCancellation(error) { return false }
+            if isNoFilesToPublish(error) {
+                statusMessage = "所选模块没有可发布的独立输出"
+                return false
+            }
             presentedError = error.localizedDescription
             return false
         }
@@ -1478,6 +1524,10 @@ final class AppModel {
                 : "GitHub 内容没有变化"
         } catch {
             if isCurrentWorkCancellation(error) { return }
+            if isNoFilesToPublish(error) {
+                statusMessage = "没有可发布的模块文件，已跳过 GitHub 发布预览"
+                return
+            }
             presentedError = error.localizedDescription
         }
     }
@@ -1516,6 +1566,11 @@ final class AppModel {
             }
         } catch {
             if isCurrentWorkCancellation(error) { return }
+            if isNoFilesToPublish(error) {
+                pendingPublishPreview = nil
+                statusMessage = "没有可发布的模块文件"
+                return
+            }
             presentedError = error.localizedDescription
         }
     }
@@ -1528,6 +1583,7 @@ final class AppModel {
     private func githubPublishPreview() async throws -> PublishPreview {
         try checkCurrentWorkCancellation()
         try Task.checkCancellation()
+        guard hasGitHubPublishableModuleSelection else { throw RelayError.noFilesToPublish }
         let token = ensureGitHubTokenLoaded(showStatusMessage: false)
         guard !token.isEmpty else { throw RelayError.githubTokenMissing }
         let isPrivate = try await githubClient.test(settings: settings.github, token: token)
@@ -1541,6 +1597,7 @@ final class AppModel {
         try checkCurrentWorkCancellation()
         let files = try await currentPublishedFiles(combinedData: data, includeAssets: true, destination: .gitHub)
         try checkCurrentWorkCancellation()
+        guard !files.isEmpty else { throw RelayError.noFilesToPublish }
         let currentPaths = files.map(\.name)
         let repositoryKey = githubPublishRepositoryKey(settings.github)
         let stalePaths = settings.githubPublishedRepositoryKey == repositoryKey
@@ -1564,6 +1621,7 @@ final class AppModel {
     private func publishAllInternal(allowDeleting: Bool = true) async throws -> PublishReport {
         try checkCurrentWorkCancellation()
         try Task.checkCancellation()
+        guard hasGitHubPublishableModuleSelection else { throw RelayError.noFilesToPublish }
         let token = ensureGitHubTokenLoaded(showStatusMessage: false)
         guard !token.isEmpty else { throw RelayError.githubTokenMissing }
         let isPrivate = try await githubClient.test(settings: settings.github, token: token)
@@ -1577,6 +1635,7 @@ final class AppModel {
         try checkCurrentWorkCancellation()
         let files = try await currentPublishedFiles(combinedData: data, includeAssets: true, destination: .gitHub)
         try checkCurrentWorkCancellation()
+        guard !files.isEmpty else { throw RelayError.noFilesToPublish }
         let currentPaths = files.map(\.name)
         let repositoryKey = githubPublishRepositoryKey(settings.github)
         let staleCandidates = settings.githubPublishedRepositoryKey == repositoryKey
@@ -2133,6 +2192,12 @@ final class AppModel {
                     id: $0.id,
                     name: $0.name,
                     sourceURL: redactedSourceURL($0.sourceURL),
+                    effectiveOriginalSourceURL: redactedSourceURL($0.effectiveOriginalSourceURL),
+                    storageLocation: $0.storageLocation.rawValue,
+                    storageLocationTitle: $0.storageLocation.title,
+                    sourceOriginTitle: $0.sourceOrigin.title,
+                    relationshipSummary: $0.relationshipSummary,
+                    localStorageRelativePath: $0.localStorageRelativePath,
                     enabled: $0.isEnabled,
                     state: $0.state.rawValue,
                     lastUpdatedAt: $0.lastUpdatedAt,
@@ -2281,6 +2346,29 @@ final class AppModel {
         )
     }
 
+    private var hasGitHubPublishableModuleSelection: Bool {
+        PublishCoordinator.hasPublishableModuleSelection(
+            modules: modules,
+            combinedModuleEnabled: settings.combinedModuleEnabled
+        )
+    }
+
+    private func automaticPublishSkippedStatus(contentChanged: Bool, failures: Int) -> String {
+        let failureSuffix = failures > 0 ? "；\(failures) 个来源沿用上次成功版本" : ""
+        if contentChanged {
+            return "模块输出已更新\(failureSuffix)；没有开启发布的模块，已跳过 GitHub 自动发布"
+        }
+        return "模块内容未变化\(failureSuffix)；没有开启发布的模块，无需 GitHub 自动发布"
+    }
+
+    private func isNoFilesToPublish(_ error: any Error) -> Bool {
+        guard let relayError = error as? RelayError,
+              case .noFilesToPublish = relayError else {
+            return false
+        }
+        return true
+    }
+
     private func hasGitHubPublishableFiles() async -> Bool {
         if settings.combinedModuleEnabled,
            modules.contains(where: \.isEnabled),
@@ -2337,6 +2425,27 @@ final class AppModel {
         return components.string ?? value
     }
 
+    private func localStorageRelativePath(
+        storageLocation: ModuleStorageLocation,
+        source: String,
+        outputFileName: String,
+        outputFolder: String
+    ) throws -> String? {
+        guard storageLocation == .local else { return nil }
+        let rootPath = settings.localModuleDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !rootPath.isEmpty else {
+            throw RelayError.invalidOutput("请先设置本地模块根目录，或将模块存放位置改为 GitHub。")
+        }
+        if let relativePath = Self.localSourceRelativePath(for: source, rootDirectoryPath: rootPath) {
+            return relativePath
+        }
+        return ModuleOutputFolder.relativePath(
+            fileName: outputFileName,
+            folder: outputFolder,
+            preservesExistingFileName: true
+        )
+    }
+
     private func detectedFormat(for format: ModuleSourceFormat, source: String) -> ModuleSourceFormat? {
         guard format == .automatic, let url = URL(string: source) else { return nil }
         return format.resolvedFormat(for: url)
@@ -2356,7 +2465,7 @@ final class AppModel {
         let relativePath = ModuleOutputFolder.relativePath(
             fileName: normalized,
             folder: folder,
-            preservesExistingFileName: preservesExistingFileName
+            preservesExistingFileName: draft.storageLocation == .local || preservesExistingFileName
         )
         guard unavailable.contains(relativePath.lowercased()) else { return normalized }
 
@@ -2364,7 +2473,7 @@ final class AppModel {
             preferredFileName: normalized,
             folder: folder,
             unavailable: unavailable,
-            preservesExistingFileName: preservesExistingFileName
+            preservesExistingFileName: draft.storageLocation == .local || preservesExistingFileName
         )
     }
 
@@ -2412,11 +2521,21 @@ final class AppModel {
         return modules.map { value in
             var module = value
             module.outputFolder = ModuleOutputFolder.normalized(module.outputFolder)
+            if module.storageLocation == .local {
+                if module.localStorageRelativePath == nil {
+                    module.localStorageRelativePath = Self.localSourceRelativePath(
+                        for: module.sourceURL,
+                        rootDirectoryPath: localModuleDirectory
+                    ) ?? module.publishedRelativePath
+                }
+                module.preservesOutputFileName = true
+            }
             let localSourceFileName = Self.localSourceFileName(
                 for: module.sourceURL,
                 rootDirectoryPath: localModuleDirectory
             )
-            let preservesExistingFileName = URL(string: module.sourceURL)?.isFileURL == true
+            let preservesExistingFileName = module.preservesOutputFileName ||
+                URL(string: module.sourceURL)?.isFileURL == true
             let preferredValue = localSourceFileName
                 ?? (module.outputFileName.isEmpty ? module.name : module.outputFileName)
             let preferred = preservesExistingFileName
@@ -2453,13 +2572,23 @@ final class AppModel {
         localModuleDirectory: String
     ) -> Bool {
         guard isLocalExport,
-              let sourceRelativePath = localSourceRelativePath(
-                for: module.sourceURL,
+              let sourceRelativePath = localStorageRelativePath(
+                for: module,
                 rootDirectoryPath: localModuleDirectory
               ) else {
             return false
         }
         return sourceRelativePath.lowercased() == module.publishedRelativePath.lowercased()
+    }
+
+    nonisolated private static func localStorageRelativePath(
+        for module: RelayModule,
+        rootDirectoryPath: String
+    ) -> String? {
+        if module.storageLocation == .local, let relativePath = module.localStorageRelativePath {
+            return ModuleOutputFolder.normalized(relativePath)
+        }
+        return localSourceRelativePath(for: module.sourceURL, rootDirectoryPath: rootDirectoryPath)
     }
 
     private static func localSourceFileName(for sourceURL: String, rootDirectoryPath: String) -> String? {
@@ -2517,6 +2646,7 @@ enum LocalModuleFolderScanner {
 
 struct LocalModuleScanCandidate: Identifiable, Hashable, Sendable {
     var relativePath: String
+    var localStorageRelativePath: String
     var sourceURL: String
     var sourceFormat: ModuleSourceFormat
     var name: String
@@ -2528,6 +2658,17 @@ struct LocalModuleScanCandidate: Identifiable, Hashable, Sendable {
     var sourceContentHash: String?
 
     var id: String { relativePath }
+
+    var sourceOrigin: ModuleSourceOrigin {
+        guard let url = URL(string: sourceURL) else { return .invalid }
+        if url.isFileURL { return .localSurgeFile }
+        guard ["http", "https"].contains(url.scheme?.lowercased()) else { return .invalid }
+        return .remote(sourceFormat.resolvedFormat(for: url))
+    }
+
+    var relationshipSummary: String {
+        "\(ModuleStorageLocation.local.title) · \(sourceOrigin.title)"
+    }
 }
 
 struct LocalModuleScanSkippedFile: Identifiable, Hashable, Sendable {
@@ -2578,8 +2719,9 @@ enum LocalModuleScanner {
             fileName: combinedFileName,
             folder: ModuleOutputFolder.root
         ).lowercased()
-        var existingSources = Set(existingModules.map { ModuleSourceIdentity.canonicalValue(for: $0.sourceURL) })
+        var existingSources = Set(existingModules.map { ModuleSourceIdentity.canonicalValue(for: $0.effectiveOriginalSourceURL) })
         var existingPaths = Set(existingModules.map { $0.publishedRelativePath.lowercased() })
+        existingPaths.formUnion(existingModules.compactMap { $0.localStorageRelativePath?.lowercased() })
         existingPaths.formUnion(publishedFilePaths.map { ModuleOutputFolder.normalized($0).lowercased() })
         existingPaths.insert(combined)
 
@@ -2681,6 +2823,7 @@ enum LocalModuleScanner {
             let sourceContentHash = subscription == nil ? data.sha256String : nil
             values.append(LocalModuleScanCandidate(
                 relativePath: normalizedRelativePath,
+                localStorageRelativePath: normalizedRelativePath,
                 sourceURL: sourceURL,
                 sourceFormat: sourceFormat,
                 name: ModuleMetadataParser.displayName(in: content) ?? fallbackName,

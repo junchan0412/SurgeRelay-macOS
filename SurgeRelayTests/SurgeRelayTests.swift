@@ -305,6 +305,34 @@ final class SurgeRelayTests: XCTestCase {
         ))
     }
 
+    func testLocalRemoteBackedModuleSkipsLocalSelfExport() {
+        let module = RelayModule(
+            name: "Remote Backed Local",
+            sourceURL: "https://raw.githubusercontent.com/example/repo/main/qx.conf",
+            sourceFormat: .quantumultX,
+            outputFileName: "Remote Backed.sgmodule",
+            outputFolder: "Converted",
+            storageLocation: .local,
+            localStorageRelativePath: "Converted/Remote Backed.sgmodule",
+            preservesOutputFileName: true,
+            publishesStandalone: true
+        )
+
+        XCTAssertEqual(module.storageLocation, .local)
+        XCTAssertEqual(module.sourceOrigin, .remote(.quantumultX))
+        XCTAssertEqual(module.publishedRelativePath, "Converted/Remote Backed.sgmodule")
+        XCTAssertTrue(AppModel.shouldSkipStandaloneLocalExport(
+            module,
+            isLocalExport: true,
+            localModuleDirectory: "/Users/example/Surge"
+        ))
+        XCTAssertFalse(AppModel.shouldSkipStandaloneLocalExport(
+            module,
+            isLocalExport: false,
+            localModuleDirectory: "/Users/example/Surge"
+        ))
+    }
+
     func testLocalModuleScannerRestoresScriptHubOriginalSource() throws {
         let root = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
@@ -328,7 +356,10 @@ final class SurgeRelayTests: XCTestCase {
         let candidate = try XCTUnwrap(report.candidates.first)
 
         XCTAssertEqual(candidate.sourceURL, "https://raw.githubusercontent.com/example/repo/main/QuantumultX/demo.conf")
+        XCTAssertEqual(candidate.localStorageRelativePath, "Converted/Demo.sgmodule")
         XCTAssertEqual(candidate.sourceFormat, .quantumultX)
+        XCTAssertEqual(candidate.sourceOrigin, .remote(.quantumultX))
+        XCTAssertEqual(candidate.relationshipSummary, "本地模块 · 远程 Quantumult X")
         XCTAssertEqual(candidate.category, "#工具")
         XCTAssertEqual(candidate.outputFolder, "Converted")
         XCTAssertNil(candidate.sourceContentHash)
@@ -452,6 +483,32 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertTrue(text.contains("custom-icon.png"))
         XCTAssertTrue(text.contains("domain-suffix"))
         XCTAssertTrue(text.contains("已是最新"))
+    }
+
+    func testRelayModuleSeparatesStorageLocationFromSourceOrigin() {
+        let githubModule = RelayModule(
+            name: "GitHub Remote",
+            sourceURL: "https://example.com/loon/plugin.plugin",
+            sourceFormat: .loon,
+            outputFileName: "Plugin Demo",
+            storageLocation: .gitHub
+        )
+        let localModule = RelayModule(
+            name: "Local Remote",
+            sourceURL: "https://example.com/qx/rewrite.conf",
+            sourceFormat: .quantumultX,
+            outputFileName: "Rewrite Demo.sgmodule",
+            storageLocation: .local,
+            localStorageRelativePath: "Rewrite Demo.sgmodule"
+        )
+
+        XCTAssertEqual(githubModule.storageLocation, .gitHub)
+        XCTAssertEqual(githubModule.sourceOrigin, .remote(.loon))
+        XCTAssertEqual(githubModule.publishedRelativePath, "Plugin-Demo.sgmodule")
+        XCTAssertEqual(localModule.storageLocation, .local)
+        XCTAssertEqual(localModule.sourceOrigin, .remote(.quantumultX))
+        XCTAssertEqual(localModule.publishedRelativePath, "Rewrite Demo.sgmodule")
+        XCTAssertEqual(localModule.relationshipSummary, "本地模块 · 远程 Quantumult X")
     }
 
     func testWebErrorPayloadIncludesUserFacingMessage() throws {

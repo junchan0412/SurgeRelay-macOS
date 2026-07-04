@@ -77,6 +77,11 @@ struct ModuleEditorView: View {
             }
             .scrollIndicators(.visible)
             .task {
+                if module == nil,
+                   !model.settings.publishToGitHub,
+                   model.settings.publishToLocal {
+                    draft.storageLocation = .local
+                }
                 await model.refreshModuleOutputFolders()
             }
             .onChange(of: draft.sourceURL) { _, newValue in
@@ -117,11 +122,35 @@ struct ModuleEditorView: View {
     }
 
     private var editorPreviewSubtitle: String {
-        var parts = [draft.sourceFormat.title]
+        var parts = [draft.storageLocation.title, draftSourceOrigin.title]
         let category = draft.category.trimmingCharacters(in: .whitespacesAndNewlines)
         if !category.isEmpty { parts.append(category) }
         if !draft.publishesStandalone { parts.append("不发布独立模块") }
         return parts.joined(separator: " · ")
+    }
+
+    private var draftSourceOrigin: ModuleSourceOrigin {
+        guard let url = URL(string: draft.sourceURL), !draft.sourceURL.isEmpty else {
+            return .invalid
+        }
+        if url.isFileURL { return .localSurgeFile }
+        guard ["http", "https"].contains(url.scheme?.lowercased()) else { return .invalid }
+        return .remote(draft.sourceFormat.resolvedFormat(for: url))
+    }
+
+    private var relationshipHint: String {
+        switch (draft.storageLocation, draftSourceOrigin) {
+        case (.local, .localSurgeFile):
+            "纯本地模块：直接管理本地根目录中的 Surge .sgmodule。"
+        case (.local, .remote):
+            "本地模块，转换前来源是远程地址：会在本地根目录保留模块文件，并可从原始远程地址更新。"
+        case (.gitHub, .remote):
+            "GitHub 模块：转换结果按所选路径发布到 GitHub 模块目录。"
+        case (.gitHub, .localSurgeFile):
+            "GitHub 模块，转换前来源是本地 Surge 文件：适合把本地文件整理后发布到 GitHub。"
+        case (_, .invalid):
+            "先填写来源地址后，会显示清晰的存放位置与转换前来源关系。"
+        }
     }
 
     private var previewPublishedRelativePath: String {
@@ -189,6 +218,15 @@ struct ModuleEditorView: View {
     private var basicInfoSection: some View {
         editorSection("基本信息") {
             editorTextFieldRow("显示名称", icon: "textformat", text: $draft.name, prompt: "例如：YouTube 去广告")
+            EditorControlRow("模块存放", icon: draft.storageLocation.systemImage) {
+                storageLocationPicker
+            }
+            EditorInfoRow("关系", icon: draftSourceOrigin.systemImage) {
+                Text(relationshipHint)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             editorTextFieldRow("模块标签", icon: "tag", text: $draft.category, prompt: "Surge category，例如：广告过滤")
             EditorControlRow("存放文件夹", icon: "folder") {
                 folderPicker
@@ -270,9 +308,9 @@ struct ModuleEditorView: View {
     }
 
     private var sourceSection: some View {
-        editorSection("来源") {
+        editorSection("转换前来源") {
             editorTextFieldRow(
-                "原始地址",
+                "来源地址",
                 icon: "link",
                 text: $draft.sourceURL,
                 prompt: "https://example.com/module.plugin 或 file:///.../Demo.sgmodule"
@@ -344,6 +382,18 @@ struct ModuleEditorView: View {
             }
             .help("新建存放文件夹")
         }
+    }
+
+    private var storageLocationPicker: some View {
+        Picker("模块存放", selection: $draft.storageLocation) {
+            ForEach(ModuleStorageLocation.allCases) { location in
+                Label(location.title, systemImage: location.systemImage)
+                    .tag(location)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .frame(maxWidth: 260, alignment: .leading)
     }
 
     private func editorTextFieldRow(

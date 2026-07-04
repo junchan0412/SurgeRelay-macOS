@@ -136,6 +136,73 @@ enum ModuleSourceFormat: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
+enum ModuleStorageLocation: String, Codable, CaseIterable, Identifiable, Sendable {
+    case local
+    case gitHub
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .local: "本地模块"
+        case .gitHub: "GitHub 模块"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .local: "储存在本地模块根目录"
+        case .gitHub: "储存在 GitHub 模块目录"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .local: "folder"
+        case .gitHub: "cloud"
+        }
+    }
+}
+
+enum ModuleSourceOrigin: Equatable, Sendable {
+    case localSurgeFile
+    case remote(ModuleSourceFormat)
+    case invalid
+
+    var title: String {
+        switch self {
+        case .localSurgeFile:
+            "本地 Surge 模块"
+        case .remote(let format):
+            switch format {
+            case .automatic:
+                "远程来源"
+            case .quantumultX:
+                "远程 Quantumult X"
+            case .loon:
+                "远程 Loon"
+            case .surge:
+                "远程 Surge 模块"
+            }
+        case .invalid:
+            "缺少有效来源"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .localSurgeFile: "doc"
+        case .remote: "link"
+        case .invalid: "exclamationmark.triangle"
+        }
+    }
+
+    var isRemote: Bool {
+        if case .remote = self { return true }
+        return false
+    }
+}
+
 enum ModuleUpdateState: String, Codable, Sendable {
     case never
     case updating
@@ -160,6 +227,9 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     var outputFileName: String
     var category: String
     var outputFolder: String
+    var storageLocation: ModuleStorageLocation
+    var localStorageRelativePath: String?
+    var preservesOutputFileName: Bool
     var publishesStandalone: Bool
     var isEnabled: Bool
     var scriptHubOptions: ScriptHubOptions
@@ -189,6 +259,9 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         outputFileName: String,
         category: String = "",
         outputFolder: String = ModuleOutputFolder.root,
+        storageLocation: ModuleStorageLocation? = nil,
+        localStorageRelativePath: String? = nil,
+        preservesOutputFileName: Bool? = nil,
         publishesStandalone: Bool = true,
         isEnabled: Bool = false,
         scriptHubOptions: ScriptHubOptions = ScriptHubOptions(),
@@ -210,13 +283,23 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         state: ModuleUpdateState = .never,
         lastError: String? = nil
     ) {
+        let inferredStorageLocation = storageLocation
+            ?? (URL(string: sourceURL)?.isFileURL == true ? .local : .gitHub)
+        let shouldPreserveOutputFileName = preservesOutputFileName
+            ?? (inferredStorageLocation == .local || URL(string: sourceURL)?.isFileURL == true)
         self.id = id
         self.name = name
         self.sourceURL = sourceURL
         self.sourceFormat = sourceFormat
-        self.outputFileName = Self.normalizedOutputFileName(outputFileName, sourceURL: sourceURL)
+        self.outputFileName = Self.normalizedOutputFileName(
+            outputFileName,
+            preservesExistingFileName: shouldPreserveOutputFileName
+        )
         self.category = category.trimmingCharacters(in: .whitespacesAndNewlines)
         self.outputFolder = ModuleOutputFolder.normalized(outputFolder)
+        self.storageLocation = inferredStorageLocation
+        self.localStorageRelativePath = Self.normalizedOptionalRelativePath(localStorageRelativePath)
+        self.preservesOutputFileName = shouldPreserveOutputFileName
         self.publishesStandalone = publishesStandalone
         self.isEnabled = isEnabled
         self.scriptHubOptions = scriptHubOptions
@@ -240,7 +323,9 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, sourceURL, sourceFormat, outputFileName, category, outputFolder, publishesStandalone, isEnabled, scriptHubOptions, argumentOverrides, iconURL, customIconURL, scriptHubSubscription, detectedSourceFormat
+        case id, name, sourceURL, sourceFormat, outputFileName, category, outputFolder
+        case storageLocation, localStorageRelativePath, preservesOutputFileName
+        case publishesStandalone, isEnabled, scriptHubOptions, argumentOverrides, iconURL, customIconURL, scriptHubSubscription, detectedSourceFormat
         case createdAt, lastUpdatedAt, contentHash, sourceETag, sourceLastModified, sourceContentHash, sourceCheckedAt
         case conversionEngineRevision, overrideBaseHash, hasOverrideConflict, state, lastError
     }
@@ -251,9 +336,19 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         name = try container.decode(String.self, forKey: .name)
         sourceURL = try container.decode(String.self, forKey: .sourceURL)
         sourceFormat = try container.decodeIfPresent(ModuleSourceFormat.self, forKey: .sourceFormat) ?? .automatic
+        storageLocation = try container.decodeIfPresent(ModuleStorageLocation.self, forKey: .storageLocation)
+            ?? (URL(string: sourceURL)?.isFileURL == true ? .local : .gitHub)
+        localStorageRelativePath = Self.normalizedOptionalRelativePath(
+            try container.decodeIfPresent(String.self, forKey: .localStorageRelativePath)
+        )
+        preservesOutputFileName = try container.decodeIfPresent(Bool.self, forKey: .preservesOutputFileName)
+            ?? (storageLocation == .local || URL(string: sourceURL)?.isFileURL == true)
         let decodedOutputFileName = try container.decodeIfPresent(String.self, forKey: .outputFileName)
             ?? FilenameSanitizer.suggestedName(from: sourceURL)
-        outputFileName = Self.normalizedOutputFileName(decodedOutputFileName, sourceURL: sourceURL)
+        outputFileName = Self.normalizedOutputFileName(
+            decodedOutputFileName,
+            preservesExistingFileName: preservesOutputFileName
+        )
         category = try container.decodeIfPresent(String.self, forKey: .category)?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         outputFolder = ModuleOutputFolder.normalized(
@@ -290,6 +385,18 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         return "自动识别（\(resolved.shortTitle)）"
     }
 
+    var sourceOrigin: ModuleSourceOrigin {
+        guard let url = URL(string: effectiveOriginalSourceURL) else { return .invalid }
+        if url.isFileURL { return .localSurgeFile }
+        guard ["http", "https"].contains(url.scheme?.lowercased()) else { return .invalid }
+        let resolved = detectedSourceFormat ?? sourceFormat.resolvedFormat(for: url)
+        return .remote(resolved)
+    }
+
+    var relationshipSummary: String {
+        "\(storageLocation.title) · \(sourceOrigin.title)"
+    }
+
     var effectiveOriginalSourceURL: String {
         scriptHubSubscription?.originalURL ?? sourceURL
     }
@@ -313,6 +420,10 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         if sourceWasFile || sourceWasScriptHub {
             if sourceURL != subscription.originalURL {
                 sourceURL = subscription.originalURL
+                if sourceWasFile {
+                    storageLocation = .local
+                    preservesOutputFileName = true
+                }
                 sourceETag = nil
                 sourceLastModified = nil
                 sourceContentHash = nil
@@ -345,18 +456,20 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         ModuleOutputFolder.relativePath(
             fileName: outputFileName,
             folder: outputFolder,
-            preservesExistingFileName: Self.preservesExistingFileName(for: sourceURL)
+            preservesExistingFileName: preservesOutputFileName
         )
     }
 
-    private static func normalizedOutputFileName(_ value: String, sourceURL: String) -> String {
-        preservesExistingFileName(for: sourceURL)
+    private static func normalizedOutputFileName(_ value: String, preservesExistingFileName: Bool) -> String {
+        preservesExistingFileName
             ? FilenameSanitizer.existingSgmoduleName(from: value)
             : FilenameSanitizer.sgmoduleName(from: value)
     }
 
-    private static func preservesExistingFileName(for sourceURL: String) -> Bool {
-        URL(string: sourceURL)?.isFileURL == true
+    private static func normalizedOptionalRelativePath(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let normalized = ModuleOutputFolder.normalized(value)
+        return normalized.isEmpty ? nil : normalized
     }
 }
 
@@ -367,6 +480,7 @@ struct ModuleDraft: Sendable {
     var outputFileName = ""
     var category = ""
     var outputFolder = ModuleOutputFolder.root
+    var storageLocation: ModuleStorageLocation = .gitHub
     var publishesStandalone = true
     var isEnabled = false
     var scriptHubOptions = ScriptHubOptions()
@@ -381,6 +495,7 @@ struct ModuleDraft: Sendable {
         outputFileName = module.outputFileName
         category = module.category
         outputFolder = module.outputFolder
+        storageLocation = module.storageLocation
         publishesStandalone = module.publishesStandalone
         isEnabled = module.isEnabled
         scriptHubOptions = module.scriptHubOptions
@@ -430,6 +545,7 @@ struct ModuleDraft: Sendable {
             preferred = FilenameSanitizer.suggestedName(from: sourceValue)
         }
         return URL(string: sourceValue)?.isFileURL == true
+            || storageLocation == .local
             ? FilenameSanitizer.existingSgmoduleName(from: preferred)
             : FilenameSanitizer.sgmoduleName(from: preferred)
     }
@@ -439,7 +555,7 @@ struct ModuleDraft: Sendable {
         return ModuleOutputFolder.relativePath(
             fileName: normalizedOutputFileName(for: sourceValue),
             folder: outputFolder,
-            preservesExistingFileName: URL(string: sourceValue)?.isFileURL == true
+            preservesExistingFileName: URL(string: sourceValue)?.isFileURL == true || storageLocation == .local
         )
     }
 }

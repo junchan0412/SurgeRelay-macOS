@@ -12,6 +12,10 @@ enum ModuleSearchIndex {
             module.category,
             module.outputFolder,
             ModuleOutputFolder.displayTitle(for: module.outputFolder),
+            module.storageLocation.title,
+            module.storageLocation.detail,
+            module.sourceOrigin.title,
+            module.relationshipSummary,
             module.publishesStandalone ? "独立模块" : "不发布独立模块",
             module.state.title,
         ]
@@ -80,8 +84,12 @@ struct ModulesView: View {
         return nil
     }
 
+    private var normalizedSearchText: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
     private var filteredModules: [RelayModule] {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let query = normalizedSearchText
         guard !query.isEmpty else { return model.modules }
         return model.modules.filter { searchableText(for: $0).contains(query) }
     }
@@ -96,38 +104,30 @@ struct ModulesView: View {
                 modules: values.filter { $0.state == .failed || $0.hasOverrideConflict }
             ),
             SidebarModuleSection(
-                id: "remote",
-                title: "可更新",
-                systemImage: "arrow.triangle.2.circlepath",
-                modules: values.filter { module in
-                    module.state != .failed && !module.hasOverrideConflict && hasRemoteSource(module)
-                }
-            ),
-            SidebarModuleSection(
                 id: "local",
-                title: "本地来源",
+                title: "本地模块",
                 systemImage: "folder",
                 modules: values.filter { module in
-                    module.state != .failed && !module.hasOverrideConflict && hasLocalSource(module)
+                    module.state != .failed && !module.hasOverrideConflict && module.storageLocation == .local && module.sourceOrigin != .invalid
                 }
             ),
             SidebarModuleSection(
-                id: "missing",
-                title: "缺少有效来源",
+                id: "github",
+                title: "GitHub 模块",
+                systemImage: "cloud",
+                modules: values.filter { module in
+                    module.state != .failed && !module.hasOverrideConflict && module.storageLocation == .gitHub && module.sourceOrigin != .invalid
+                }
+            ),
+            SidebarModuleSection(
+                id: "uncategorized",
+                title: "未分类",
                 systemImage: "link.badge.plus",
                 modules: values.filter { module in
-                    module.state != .failed && !module.hasOverrideConflict && !hasRemoteSource(module) && !hasLocalSource(module)
+                    module.state != .failed && !module.hasOverrideConflict && module.sourceOrigin == .invalid
                 }
             )
         ].filter { !$0.modules.isEmpty }
-    }
-
-    private func hasRemoteSource(_ module: RelayModule) -> Bool {
-        module.hasRemoteOriginalSource
-    }
-
-    private func hasLocalSource(_ module: RelayModule) -> Bool {
-        !module.hasRemoteOriginalSource && URL(string: module.sourceURL)?.isFileURL == true
     }
 
     private func searchableText(for module: RelayModule) -> String {
@@ -135,16 +135,26 @@ struct ModulesView: View {
     }
 
     private var contentIndexToken: String {
-        model.modules.map { "\($0.id.uuidString)\($0.contentHash ?? "")" }.joined()
+        guard !normalizedSearchText.isEmpty else { return "idle" }
+        return "active|" + model.modules
+            .map { "\($0.id.uuidString):\($0.contentHash ?? "")" }
+            .joined(separator: "|")
     }
 
     private func rebuildContentIndex() async {
+        guard !normalizedSearchText.isEmpty else {
+            if !contentIndex.isEmpty { contentIndex.removeAll() }
+            return
+        }
         var index: [UUID: String] = [:]
         for module in model.modules {
+            guard !Task.isCancelled else { return }
             if let content = try? await model.previewContent(for: module) {
                 index[module.id] = content.lowercased()
             }
+            await Task.yield()
         }
+        guard !Task.isCancelled else { return }
         contentIndex = index
     }
 
@@ -1040,6 +1050,14 @@ private struct LocalModuleImportPreviewView: View {
         selectedCandidates.contains { $0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 
+    private var pureLocalCandidateCount: Int {
+        candidates.filter { $0.sourceOrigin == .localSurgeFile }.count
+    }
+
+    private var remoteBackedLocalCandidateCount: Int {
+        candidates.filter { $0.sourceOrigin.isRemote }.count
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 6) {
@@ -1132,6 +1150,12 @@ private struct LocalModuleImportPreviewView: View {
     @ViewBuilder
     private var summaryPills: some View {
         importPill("\(candidates.count) 个可导入", systemImage: "doc.text")
+        if pureLocalCandidateCount > 0 {
+            importPill("\(pureLocalCandidateCount) 个纯本地", systemImage: "doc")
+        }
+        if remoteBackedLocalCandidateCount > 0 {
+            importPill("\(remoteBackedLocalCandidateCount) 个远程来源", systemImage: "link")
+        }
         importPill("\(selectedCandidates.count) 个已选择", systemImage: "checkmark.circle")
         if !skippedFiles.isEmpty {
             importPill("\(skippedFiles.count) 个跳过", systemImage: "exclamationmark.triangle", isWarning: true)
@@ -1182,7 +1206,7 @@ private struct LocalModuleImportPreviewView: View {
                         .font(.headline)
                         .foregroundStyle(isSelected ? .primary : .secondary)
                         .lineLimit(1)
-                    Text(candidate.relativePath)
+                    Text("\(candidate.relationshipSummary) · \(candidate.relativePath)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -1190,6 +1214,16 @@ private struct LocalModuleImportPreviewView: View {
                 }
 
                 Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
+                    GridRow {
+                        Text("来源")
+                            .foregroundStyle(.secondary)
+                        Text(candidate.sourceURL.removingPercentEncoding ?? candidate.sourceURL)
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .truncationMode(.middle)
+                            .textSelection(.enabled)
+                    }
                     GridRow {
                         Text("名称")
                             .foregroundStyle(.secondary)
@@ -1352,7 +1386,7 @@ private struct ModuleRow: View {
     }
 
     private var subtitle: String {
-        var parts = [module.sourceFormatDisplayTitle]
+        var parts = [module.storageLocation.title, module.sourceOrigin.title]
         if !module.category.isEmpty { parts.append(module.category) }
         let folder = ModuleOutputFolder.normalized(module.outputFolder)
         if folder != ModuleOutputFolder.root {
@@ -1427,7 +1461,12 @@ private struct ModuleDetailView: View {
     }
 
     private var sourceAndOutputSection: some View {
-        detailSection("来源与输出") {
+        detailSection("管理关系") {
+            detailRow("模块存放", value: module.storageLocation.detail, icon: module.storageLocation.systemImage)
+            detailRow("转换前来源", value: module.sourceOrigin.title, icon: module.sourceOrigin.systemImage)
+            if let localStoragePath {
+                detailRow("本地相对路径", value: localStoragePath, icon: "folder", monospaced: true, copyValue: localStoragePath)
+            }
             detailRow("原始地址", value: sourceAddressDisplay, icon: "link", monospaced: true, copyValue: sourceAddressCopyValue)
             detailRow("来源格式", value: module.sourceFormatDisplayTitle, icon: "doc.text")
             if let subscription = module.scriptHubSubscription {
@@ -1607,6 +1646,11 @@ private struct ModuleDetailView: View {
             .path
     }
 
+    private var localStoragePath: String? {
+        guard module.storageLocation == .local else { return nil }
+        return module.localStorageRelativePath ?? module.publishedRelativePath
+    }
+
     private var iconSourceDescription: String {
         if module.customIconURL != nil {
             return "自定义图标（仅展示）"
@@ -1654,7 +1698,8 @@ private struct ModuleDetailView: View {
 
     private var metadataPills: [ModuleDetailMetadataPill] {
         var pills = [
-            ModuleDetailMetadataPill(title: module.sourceFormatDisplayTitle, systemImage: "doc.text")
+            ModuleDetailMetadataPill(title: module.storageLocation.title, systemImage: module.storageLocation.systemImage),
+            ModuleDetailMetadataPill(title: module.sourceOrigin.title, systemImage: module.sourceOrigin.systemImage)
         ]
         if !module.category.isEmpty {
             pills.append(ModuleDetailMetadataPill(title: module.category, systemImage: "tag"))
