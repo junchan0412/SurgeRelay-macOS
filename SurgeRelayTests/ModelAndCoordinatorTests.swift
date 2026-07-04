@@ -397,6 +397,8 @@ final class ModelAndCoordinatorTests: XCTestCase {
         XCTAssertTrue(message.contains("原始链接返回 404"))
         XCTAssertTrue(message.contains("Not Found"))
         XCTAssertTrue(message.contains("https://raw.githubusercontent.com/example/repo/main/Missing.sgmodule"))
+        XCTAssertTrue(message.contains("仓库是否公开"))
+        XCTAssertTrue(message.contains("访问权限"))
         XCTAssertFalse(message.contains("token=secret"))
         let summary = UpdateFailureFormatter.summary(from: message, maxLength: 10)
         XCTAssertTrue(summary.hasPrefix("原始链接返回"))

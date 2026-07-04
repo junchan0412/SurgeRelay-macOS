@@ -405,6 +405,7 @@ assert.ok(
     detail.innerHTML.indexOf('最近一次更新失败') < detail.innerHTML.indexOf('管理关系'),
   'module detail should expose failure reason before management details'
 );
+assert.match(detail.innerHTML, /复制错误/, 'module detail should provide a copy action for failure reasons');
 assert.match(detail.innerHTML, /原始地址/, 'module detail should expose original source address');
 assert.equal(refresh.disabled, false, 'refresh button should stay enabled when update admission allows it');
 

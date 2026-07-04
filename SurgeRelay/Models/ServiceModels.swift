@@ -1122,7 +1122,7 @@ enum UpdateFailureFormatter {
         let statusText = httpStatusText(status)
         let base = switch status {
         case 404:
-            "原始链接返回 \(statusText)\(target)，请检查文件是否已删除、改名，或分支/路径是否变化。"
+            "原始链接返回 \(statusText)\(target)，请检查文件是否已删除、改名、分支/路径是否变化，或仓库是否公开且当前链接有访问权限。"
         case 401:
             "原始链接返回 \(statusText)\(target)，请检查是否需要登录、Token 或访问权限。"
         case 403:
