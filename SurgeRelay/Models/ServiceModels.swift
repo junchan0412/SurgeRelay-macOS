@@ -60,6 +60,45 @@ struct PublishPreview: Identifiable, Equatable, Sendable {
     }
 }
 
+struct ModuleCollectionSummary: Equatable, Sendable {
+    var totalCount = 0
+    var enabledCount = 0
+    var standaloneCount = 0
+    var failedCount = 0
+    var overrideConflictCount = 0
+    var updateableCount = 0
+    var latestUpdatedAt: Date?
+
+    var attentionCount: Int {
+        failedCount + overrideConflictCount
+    }
+
+    var hasFailures: Bool {
+        failedCount > 0
+    }
+
+    init(
+        modules: [RelayModule],
+        isUpdateable: (RelayModule) -> Bool
+    ) {
+        for module in modules {
+            totalCount += 1
+            if module.isEnabled { enabledCount += 1 }
+            if module.publishesStandalone { standaloneCount += 1 }
+            if module.state == .failed { failedCount += 1 }
+            if module.hasOverrideConflict { overrideConflictCount += 1 }
+            if isUpdateable(module) { updateableCount += 1 }
+            if let lastUpdatedAt = module.lastUpdatedAt {
+                if let currentLatest = latestUpdatedAt {
+                    if lastUpdatedAt > currentLatest { latestUpdatedAt = lastUpdatedAt }
+                } else {
+                    latestUpdatedAt = lastUpdatedAt
+                }
+            }
+        }
+    }
+}
+
 enum ReleaseUpdateChannel {
     static let latestReleaseURL = URL(string: "https://github.com/junchan0412/SurgeRelay-macOS/releases/latest")!
 }
@@ -892,6 +931,30 @@ enum UpdateCoordinator {
     }
 }
 
+struct PublishPlan: Equatable, Sendable {
+    var standaloneModules: [RelayModule]
+    var combinedModuleIDs: Set<UUID>
+
+    var includesCombined: Bool {
+        !combinedModuleIDs.isEmpty
+    }
+
+    var assetModuleIDs: Set<UUID> {
+        Set(standaloneModules.map(\.id)).union(combinedModuleIDs)
+    }
+
+    var hasPublishableModuleSelection: Bool {
+        !standaloneModules.isEmpty || includesCombined
+    }
+
+    var scopeTitle: String {
+        if includesCombined {
+            return standaloneModules.isEmpty ? "总模块" : "总模块与独立模块"
+        }
+        return "独立模块"
+    }
+}
+
 enum PublishCoordinator {
     static func repositoryKey(_ settings: GitHubSettings) -> String {
         [
@@ -907,25 +970,43 @@ enum PublishCoordinator {
         report.retriedAfterConflict ? "远端分支已更新并重新同步；" : ""
     }
 
+    static func plan(
+        modules: [RelayModule],
+        combinedModuleEnabled: Bool
+    ) -> PublishPlan {
+        PublishPlan(
+            standaloneModules: modules.filter(\.publishesStandalone),
+            combinedModuleIDs: combinedModuleEnabled
+                ? Set(modules.filter(\.isEnabled).map(\.id))
+                : []
+        )
+    }
+
+    static func selectedPlan(
+        modules: [RelayModule],
+        moduleIDs: Set<UUID>
+    ) -> PublishPlan {
+        PublishPlan(
+            standaloneModules: modules.filter { moduleIDs.contains($0.id) && $0.publishesStandalone },
+            combinedModuleIDs: []
+        )
+    }
+
     static func publishableModuleIDs(
         modules: [RelayModule],
         combinedModuleEnabled: Bool
     ) -> Set<UUID> {
-        Set(modules.compactMap { module in
-            if module.publishesStandalone { return module.id }
-            if combinedModuleEnabled, module.isEnabled { return module.id }
-            return nil
-        })
+        plan(modules: modules, combinedModuleEnabled: combinedModuleEnabled).assetModuleIDs
     }
 
     static func hasPublishableModuleSelection(
         modules: [RelayModule],
         combinedModuleEnabled: Bool
     ) -> Bool {
-        !publishableModuleIDs(
+        plan(
             modules: modules,
             combinedModuleEnabled: combinedModuleEnabled
-        ).isEmpty
+        ).hasPublishableModuleSelection
     }
 }
 

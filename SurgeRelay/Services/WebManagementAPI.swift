@@ -176,10 +176,8 @@ enum WebManagementAPI {
     }
 
     private static func statePayload(model: AppModel) -> WebStatePayload {
-        let newestUpdate = model.modules.compactMap(\.lastUpdatedAt).max()
+        let summary = model.moduleSummary
         let combinedEnabled = model.settings.combinedModuleEnabled
-        let enabledCount = combinedEnabled ? model.modules.filter(\.isEnabled).count : 0
-        let updateableCount = model.updateableModuleCount
         let updateAdmission = model.updateAdmission
         let progress: Double? = if model.synchronizationTotalCount > 0 {
             min(
@@ -194,9 +192,9 @@ enum WebManagementAPI {
                 name: "Surge Relay 汇总",
                 isEnabled: combinedEnabled,
                 fileName: FilenameSanitizer.sgmoduleName(from: model.settings.combinedModuleFileName),
-                sourceCount: model.modules.count,
-                enabledCount: enabledCount,
-                lastUpdatedAt: newestUpdate,
+                sourceCount: summary.totalCount,
+                enabledCount: combinedEnabled ? summary.enabledCount : 0,
+                lastUpdatedAt: summary.latestUpdatedAt,
                 subscriptionURL: combinedEnabled
                     ? model.combinedRawURL?.absoluteString ?? model.combinedLocalFileURL?.absoluteString
                     : nil
@@ -262,7 +260,7 @@ enum WebManagementAPI {
                 cancellationRequested: model.workCancellationRequested,
                 canStartUpdate: updateAdmission.isAccepted,
                 updateBlockedReason: updateAdmission.blockedReason,
-                enabledModuleCount: updateableCount,
+                enabledModuleCount: summary.updateableCount,
                 automaticPublishScheduledAt: model.automaticPublishScheduledAt,
                 automaticPublishRunsAt: model.automaticPublishRunsAt,
                 latestGitHubPublish: model.latestGitHubPublish,

@@ -35,7 +35,11 @@ Manual GitHub publishing has two paths:
 - publish all current outputs, with stale managed file deletion preview and confirmation
 - publish selected standalone modules only, with no stale deletion and with the selected modules' generated assets included
 
+All publishable module selection should flow through `PublishPlan` / `PublishCoordinator`. Do not recalculate publishable IDs ad hoc in UI, Web API, or `AppModel`: the same plan owns standalone modules, combined-module contributors, generated asset IDs, scope labels, and the "nothing to publish" decision.
+
 Keep the selected publish path conservative: it should merge new paths into the known GitHub publish list but must not prune paths that belong to unselected modules.
+
+Shared module counts should flow through `ModuleCollectionSummary`. Main window status, menu bar text, Web management state, and diagnostics should not independently reimplement enabled, standalone, failed, latest-update, or updateable counts unless they need the actual module objects.
 
 ## Existing Module Safety
 

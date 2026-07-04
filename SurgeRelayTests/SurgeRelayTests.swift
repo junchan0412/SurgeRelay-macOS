@@ -414,6 +414,51 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertTrue(message.contains("转换阶段同时失败"))
     }
 
+    func testModuleCollectionSummaryCountsDerivedStateInOnePlace() {
+        let olderDate = Date(timeIntervalSince1970: 1_000)
+        let newerDate = Date(timeIntervalSince1970: 2_000)
+        var failed = RelayModule(
+            name: "Failed",
+            sourceURL: "https://example.com/failed.sgmodule",
+            outputFileName: "Failed",
+            publishesStandalone: true,
+            isEnabled: true
+        )
+        failed.state = .failed
+        failed.lastUpdatedAt = olderDate
+
+        var conflicted = RelayModule(
+            name: "Conflicted",
+            sourceURL: "file:///Users/example/Surge/Conflicted.sgmodule",
+            outputFileName: "Conflicted",
+            publishesStandalone: false,
+            isEnabled: true
+        )
+        conflicted.hasOverrideConflict = true
+        conflicted.lastUpdatedAt = newerDate
+
+        let ignored = RelayModule(
+            name: "Ignored",
+            sourceURL: "https://example.com/ignored.sgmodule",
+            outputFileName: "Ignored",
+            publishesStandalone: false,
+            isEnabled: false
+        )
+
+        let summary = ModuleCollectionSummary(modules: [failed, conflicted, ignored]) { module in
+            module.sourceURL.hasPrefix("https://")
+        }
+
+        XCTAssertEqual(summary.totalCount, 3)
+        XCTAssertEqual(summary.enabledCount, 2)
+        XCTAssertEqual(summary.standaloneCount, 1)
+        XCTAssertEqual(summary.failedCount, 1)
+        XCTAssertEqual(summary.overrideConflictCount, 1)
+        XCTAssertEqual(summary.attentionCount, 2)
+        XCTAssertEqual(summary.updateableCount, 2)
+        XCTAssertEqual(summary.latestUpdatedAt, newerDate)
+    }
+
     func testPublishCoordinatorRequiresAtLeastOnePublishableModule() {
         let standalone = RelayModule(
             id: UUID(),
@@ -447,6 +492,15 @@ final class SurgeRelayTests: XCTestCase {
             ),
             Set([standalone.id, combinedOnly.id])
         )
+        let combinedPlan = PublishCoordinator.plan(
+            modules: [standalone, combinedOnly, ignored],
+            combinedModuleEnabled: true
+        )
+        XCTAssertEqual(combinedPlan.standaloneModules.map(\.id), [standalone.id])
+        XCTAssertEqual(combinedPlan.combinedModuleIDs, Set([combinedOnly.id]))
+        XCTAssertEqual(combinedPlan.assetModuleIDs, Set([standalone.id, combinedOnly.id]))
+        XCTAssertEqual(combinedPlan.scopeTitle, "总模块与独立模块")
+
         XCTAssertEqual(
             PublishCoordinator.publishableModuleIDs(
                 modules: [standalone, combinedOnly, ignored],
@@ -454,10 +508,55 @@ final class SurgeRelayTests: XCTestCase {
             ),
             Set([standalone.id])
         )
+        let standalonePlan = PublishCoordinator.plan(
+            modules: [standalone, combinedOnly, ignored],
+            combinedModuleEnabled: false
+        )
+        XCTAssertEqual(standalonePlan.standaloneModules.map(\.id), [standalone.id])
+        XCTAssertTrue(standalonePlan.combinedModuleIDs.isEmpty)
+        XCTAssertEqual(standalonePlan.assetModuleIDs, Set([standalone.id]))
+        XCTAssertEqual(standalonePlan.scopeTitle, "独立模块")
+
         XCTAssertFalse(PublishCoordinator.hasPublishableModuleSelection(
             modules: [ignored],
             combinedModuleEnabled: true
         ))
+    }
+
+    func testSelectedPublishPlanIgnoresNonStandaloneModules() {
+        let standalone = RelayModule(
+            id: UUID(),
+            name: "Standalone",
+            sourceURL: "https://example.com/standalone.sgmodule",
+            outputFileName: "Standalone",
+            publishesStandalone: true,
+            isEnabled: false
+        )
+        let combinedOnly = RelayModule(
+            id: UUID(),
+            name: "Combined",
+            sourceURL: "https://example.com/combined.sgmodule",
+            outputFileName: "Combined",
+            publishesStandalone: false,
+            isEnabled: true
+        )
+
+        let plan = PublishCoordinator.selectedPlan(
+            modules: [standalone, combinedOnly],
+            moduleIDs: [standalone.id, combinedOnly.id]
+        )
+
+        XCTAssertEqual(plan.standaloneModules.map(\.id), [standalone.id])
+        XCTAssertTrue(plan.combinedModuleIDs.isEmpty)
+        XCTAssertEqual(plan.assetModuleIDs, Set([standalone.id]))
+        XCTAssertTrue(plan.hasPublishableModuleSelection)
+
+        let emptyPlan = PublishCoordinator.selectedPlan(
+            modules: [standalone, combinedOnly],
+            moduleIDs: [combinedOnly.id]
+        )
+        XCTAssertFalse(emptyPlan.hasPublishableModuleSelection)
+        XCTAssertTrue(emptyPlan.assetModuleIDs.isEmpty)
     }
 
     func testModuleSearchIndexIncludesDisplayedMetadata() {

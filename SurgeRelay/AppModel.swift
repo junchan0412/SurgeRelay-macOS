@@ -380,8 +380,12 @@ final class AppModel {
         )
     }
 
+    var moduleSummary: ModuleCollectionSummary {
+        ModuleCollectionSummary(modules: modules, isUpdateable: shouldUpdateModule)
+    }
+
     var updateableModuleCount: Int {
-        modules.filter(shouldUpdateModule).count
+        moduleSummary.updateableCount
     }
 
     var canCancelCurrentWork: Bool {
@@ -1662,6 +1666,8 @@ final class AppModel {
     private func publishSelectedModulesInternal(moduleIDs: Set<UUID>) async throws -> PublishReport {
         try checkCurrentWorkCancellation()
         try Task.checkCancellation()
+        let plan = PublishCoordinator.selectedPlan(modules: modules, moduleIDs: moduleIDs)
+        guard plan.hasPublishableModuleSelection else { throw RelayError.noFilesToPublish }
         let token = ensureGitHubTokenLoaded(showStatusMessage: false)
         guard !token.isEmpty else { throw RelayError.githubTokenMissing }
         let isPrivate = try await githubClient.test(settings: settings.github, token: token)
@@ -1671,10 +1677,8 @@ final class AppModel {
             settings.github.repositoryIsPrivate = isPrivate
             saveSettings()
         }
-        let files = try await selectedPublishedFiles(moduleIDs: moduleIDs)
-        guard !files.isEmpty else {
-            throw RelayError.invalidOutput("所选模块没有可发布的独立输出。")
-        }
+        let files = try await selectedPublishedFiles(plan: plan)
+        guard !files.isEmpty else { throw RelayError.noFilesToPublish }
         let currentPaths = files.map(\.name)
         try enterNonCancellableWorkPhase(
             statusMessage: "正在提交所选模块，已进入不可取消阶段…"
@@ -1768,14 +1772,15 @@ final class AppModel {
         includeAssets: Bool,
         destination: PublishDestination
     ) async throws -> [PublishFile] {
+        let plan = githubPublishPlan
         var files: [PublishFile] = []
-        if settings.combinedModuleEnabled, let combinedData {
+        if plan.includesCombined, let combinedData {
             files.append(PublishFile(
                 name: FilenameSanitizer.sgmoduleName(from: settings.combinedModuleFileName),
                 data: combinedData
             ))
         }
-        for module in modules where module.publishesStandalone {
+        for module in plan.standaloneModules {
             try checkCurrentWorkCancellation()
             try Task.checkCancellation()
             if Self.shouldSkipStandaloneLocalExport(
@@ -1796,18 +1801,14 @@ final class AppModel {
         }
         if includeAssets {
             try checkCurrentWorkCancellation()
-            let assetModuleIDs = PublishCoordinator.publishableModuleIDs(
-                modules: modules,
-                combinedModuleEnabled: settings.combinedModuleEnabled
-            )
-            files.append(contentsOf: try await fileStore.generatedAssetFiles(for: assetModuleIDs))
+            files.append(contentsOf: try await fileStore.generatedAssetFiles(for: plan.assetModuleIDs))
         }
         return files
     }
 
-    private func selectedPublishedFiles(moduleIDs: Set<UUID>) async throws -> [PublishFile] {
+    private func selectedPublishedFiles(plan: PublishPlan) async throws -> [PublishFile] {
         var files: [PublishFile] = []
-        for module in modules where moduleIDs.contains(module.id) && module.publishesStandalone {
+        for module in plan.standaloneModules {
             try checkCurrentWorkCancellation()
             try Task.checkCancellation()
             guard let content = try? await fileStore.readComponent(id: module.id) else { continue }
@@ -1820,7 +1821,7 @@ final class AppModel {
             files.append(PublishFile(name: module.publishedRelativePath, data: Data(namedContent.utf8)))
         }
         try checkCurrentWorkCancellation()
-        files.append(contentsOf: try await fileStore.generatedAssetFiles(for: moduleIDs))
+        files.append(contentsOf: try await fileStore.generatedAssetFiles(for: plan.assetModuleIDs))
         return files
     }
 
@@ -1881,11 +1882,7 @@ final class AppModel {
     }
 
     private func githubPublishSuccessMessage(_ report: PublishReport) -> String {
-        let scope = if settings.combinedModuleEnabled {
-            modules.contains(where: \.publishesStandalone) ? "总模块与独立模块" : "总模块"
-        } else {
-            "独立模块"
-        }
+        let scope = githubPublishPlan.scopeTitle
         return "\(githubPublishRetryPrefix(report))\(scope)已发布到 GitHub（\(report.changedFileCount) 个文件变更）"
     }
 
@@ -2347,7 +2344,11 @@ final class AppModel {
     }
 
     private var hasGitHubPublishableModuleSelection: Bool {
-        PublishCoordinator.hasPublishableModuleSelection(
+        githubPublishPlan.hasPublishableModuleSelection
+    }
+
+    private var githubPublishPlan: PublishPlan {
+        PublishCoordinator.plan(
             modules: modules,
             combinedModuleEnabled: settings.combinedModuleEnabled
         )

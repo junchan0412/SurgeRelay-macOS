@@ -265,7 +265,7 @@ struct ModulesView: View {
     }
 
     private var latestUpdateText: String {
-        guard let date = model.modules.compactMap(\.lastUpdatedAt).max() else { return "尚未更新" }
+        guard let date = model.moduleSummary.latestUpdatedAt else { return "尚未更新" }
         return date.formatted(date: .abbreviated, time: .shortened)
     }
 
@@ -715,7 +715,7 @@ private struct CombinedModuleRow: View {
                 Text("Surge Relay 汇总")
                     .fontWeight(.semibold)
                     .lineLimit(1)
-                Text("\(model.modules.filter(\.isEnabled).count) 个来源 · 总模块订阅")
+                Text("\(model.moduleSummary.enabledCount) 个来源 · 总模块订阅")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -733,20 +733,8 @@ private struct CombinedModuleRow: View {
 private struct CombinedModuleDetailView: View {
     @Environment(AppModel.self) private var model
 
-    private var includedModules: [RelayModule] {
-        model.modules.filter(\.isEnabled)
-    }
-
-    private var standaloneModules: [RelayModule] {
-        model.modules.filter(\.publishesStandalone)
-    }
-
-    private var failedModules: [RelayModule] {
-        model.modules.filter { $0.state == .failed }
-    }
-
-    private var latestUpdateAt: Date? {
-        model.modules.compactMap(\.lastUpdatedAt).max()
+    private var summary: ModuleCollectionSummary {
+        model.moduleSummary
     }
 
     var body: some View {
@@ -795,23 +783,23 @@ private struct CombinedModuleDetailView: View {
 
     @ViewBuilder
     private var summaryPills: some View {
-        metadataPill("\(includedModules.count) 个来源", systemImage: "shippingbox")
+        metadataPill("\(summary.enabledCount) 个来源", systemImage: "shippingbox")
         if model.settings.publishToLocal {
             metadataPill("本地发布", systemImage: "folder")
         }
         if model.settings.publishToGitHub {
             metadataPill("GitHub 发布", systemImage: "cloud")
         }
-        if !failedModules.isEmpty {
-            metadataPill("\(failedModules.count) 个失败", systemImage: "exclamationmark.triangle", isWarning: true)
+        if summary.hasFailures {
+            metadataPill("\(summary.failedCount) 个失败", systemImage: "exclamationmark.triangle", isWarning: true)
         }
     }
 
     private var contentSection: some View {
         detailSection("汇总内容") {
-            detailRow("包含来源", value: "\(includedModules.count) / \(model.modules.count)", icon: "shippingbox")
-            detailRow("独立模块", value: "\(standaloneModules.count) 个同时单独发布", icon: "doc.badge.gearshape")
-            detailRow("最新更新", value: latestUpdateAt?.formatted(date: .long, time: .standard) ?? "尚未更新", icon: "clock")
+            detailRow("包含来源", value: "\(summary.enabledCount) / \(summary.totalCount)", icon: "shippingbox")
+            detailRow("独立模块", value: "\(summary.standaloneCount) 个同时单独发布", icon: "doc.badge.gearshape")
+            detailRow("最新更新", value: summary.latestUpdatedAt?.formatted(date: .long, time: .standard) ?? "尚未更新", icon: "clock")
             detailRow(
                 "总模块文件",
                 value: FilenameSanitizer.sgmoduleName(from: model.settings.combinedModuleFileName),
@@ -1607,8 +1595,12 @@ private struct ModuleDetailView: View {
         if let error = module.lastError {
             detailSection("最近一次更新失败") {
                 VStack(alignment: .leading, spacing: 8) {
-                    Label("更新失败", systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
+                    HStack(alignment: .center, spacing: 8) {
+                        Label("更新失败", systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.red)
+                        Spacer(minLength: 0)
+                        TextCopyButton(text: error, title: "复制错误")
+                    }
                     Text(error).textSelection(.enabled)
                     Text(failureCacheNote)
                         .font(.caption)

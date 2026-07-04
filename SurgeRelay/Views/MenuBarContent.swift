@@ -67,15 +67,16 @@ struct MenuBarContent: View {
     }
 
     private var latestUpdateText: String {
-        guard let date = model.modules.compactMap(\.lastUpdatedAt).max() else { return "尚未更新" }
+        guard let date = model.moduleSummary.latestUpdatedAt else { return "尚未更新" }
         return date.formatted(date: .abbreviated, time: .shortened)
     }
 
     private var moduleScopeText: String {
+        let summary = model.moduleSummary
         if model.settings.combinedModuleEnabled {
-            return "包含来源：\(model.modules.filter(\.isEnabled).count) / \(model.modules.count)"
+            return "包含来源：\(summary.enabledCount) / \(summary.totalCount)"
         }
-        return "独立模块：\(model.modules.filter(\.publishesStandalone).count) / \(model.modules.count)"
+        return "独立模块：\(summary.standaloneCount) / \(summary.totalCount)"
     }
 
     private var workingText: String {
