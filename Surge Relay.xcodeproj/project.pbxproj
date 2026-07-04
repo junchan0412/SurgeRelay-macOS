@@ -49,6 +49,7 @@
 		35E6F708192A3B4C5D6E7F80 /* PublishPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45E6F708192A3B4C5D6E7F80 /* PublishPlannerTests.swift */; };
 		36F708192A3B4C5D6E7F8091 /* ScriptHubTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46F708192A3B4C5D6E7F8091 /* ScriptHubTests.swift */; };
 		37A1B2C3D4E5F60718293A4B /* SecurityDiagnosticsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47A1B2C3D4E5F60718293A4B /* SecurityDiagnosticsTests.swift */; };
+		38B2C3D4E5F60718293A4B5C /* ModuleRefreshPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48B2C3D4E5F60718293A4B5C /* ModuleRefreshPlannerTests.swift */; };
 		384BEBC6E1F8C9A0A53FB0FC /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B29AA0AD818A5D7F67A7471 /* AppModel.swift */; };
 		3AD6E2D26CD706ED52770AB6 /* pencil.svg in Resources */ = {isa = PBXBuildFile; fileRef = ECD3028AB58163BBA459EC8A /* pencil.svg */; };
 		3EE4F5BD7D273B859D69002E /* ScriptHubClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 254A83429BCA625706A87254 /* ScriptHubClient.swift */; };
@@ -184,6 +185,7 @@
 		45E6F708192A3B4C5D6E7F80 /* PublishPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishPlannerTests.swift; sourceTree = "<group>"; };
 		46F708192A3B4C5D6E7F8091 /* ScriptHubTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptHubTests.swift; sourceTree = "<group>"; };
 		47A1B2C3D4E5F60718293A4B /* SecurityDiagnosticsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityDiagnosticsTests.swift; sourceTree = "<group>"; };
+		48B2C3D4E5F60718293A4B5C /* ModuleRefreshPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleRefreshPlannerTests.swift; sourceTree = "<group>"; };
 		430221E70D9636CAEFD900C5 /* link.svg */ = {isa = PBXFileReference; path = link.svg; sourceTree = "<group>"; };
 		4F7E6D5C4B3A291807F6E5D4 /* GitHubTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubTestSupport.swift; sourceTree = "<group>"; };
 		462EAB132DEE9AF7DACDBFAF /* shippingbox.svg */ = {isa = PBXFileReference; path = shippingbox.svg; sourceTree = "<group>"; };
@@ -469,6 +471,7 @@
 				44D5E6F708192A3B4C5D6E7F /* LocalFileStoreTests.swift */,
 				3F4A5B6C7D8E9F0011223344 /* ModelAndCoordinatorTests.swift */,
 				41B2C3D4E5F60718293A4B5C /* ModulePlanningTests.swift */,
+				48B2C3D4E5F60718293A4B5C /* ModuleRefreshPlannerTests.swift */,
 				45E6F708192A3B4C5D6E7F80 /* PublishPlannerTests.swift */,
 				46F708192A3B4C5D6E7F8091 /* ScriptHubTests.swift */,
 				47A1B2C3D4E5F60718293A4B /* SecurityDiagnosticsTests.swift */,
@@ -661,6 +664,7 @@
 				34D5E6F708192A3B4C5D6E7F /* LocalFileStoreTests.swift in Sources */,
 				2F4A5B6C7D8E9F0011223344 /* ModelAndCoordinatorTests.swift in Sources */,
 				31B2C3D4E5F60718293A4B5C /* ModulePlanningTests.swift in Sources */,
+				38B2C3D4E5F60718293A4B5C /* ModuleRefreshPlannerTests.swift in Sources */,
 				35E6F708192A3B4C5D6E7F80 /* PublishPlannerTests.swift in Sources */,
 				36F708192A3B4C5D6E7F8091 /* ScriptHubTests.swift in Sources */,
 				37A1B2C3D4E5F60718293A4B /* SecurityDiagnosticsTests.swift in Sources */,
