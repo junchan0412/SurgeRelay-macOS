@@ -52,6 +52,7 @@ const webMarkup = window.SurgeRelayWebMarkup;
 if (!webMarkup) throw new Error('web-markup.js must load before app.js');
 const {
   detailRow,
+  copyableValueSection,
   previewShell,
   latestPublishSection,
   argumentMarkup,
@@ -377,7 +378,7 @@ function renderCombinedDetail(animate = true) {
     loadPreview('/api/combined/preview', false);
     return;
   }
-  const subscription = combined.subscriptionURL ? `<div class="form-section-view"><h3 class="section-heading">总模块订阅地址</h3><div class="group-box"><div class="detail-row action-row"><div class="detail-value monospaced">${escapeHTML(combined.subscriptionURL)}</div><div><button class="button" data-action="copy" data-value="${escapeAttribute(combined.subscriptionURL)}"><span class="symbol" data-symbol="copy"></span>拷贝地址</button></div></div></div></div>` : '';
+  const subscription = copyableValueSection('总模块订阅地址', combined.subscriptionURL);
   const latestPublish = latestPublishSection(state.activity?.latestGitHubPublish);
   setDetailHTML(`${detailToolbar()}
     <section class="form-section-view"><h3 class="section-heading">汇总模块</h3><div class="group-box">
@@ -395,7 +396,7 @@ function renderModuleDetail(module, animate = true) {
   }
   const advanced = module.advancedSummary ? `<section class="form-section-view"><h3 class="section-heading">高级设置</h3><div class="group-box"><div class="detail-row"><div class="detail-label"><span class="symbol" data-symbol="slider.horizontal.3"></span><span>已应用</span></div><div class="detail-value advanced-summary">${escapeHTML(module.advancedSummary)}</div></div></div></section>` : '';
   const publishedTitle = module.publishedURL?.includes('workers.dev') ? 'Cloudflare' : 'GitHub';
-  const published = module.publishedURL ? `<section class="form-section-view"><h3 class="section-heading">${publishedTitle}</h3><div class="group-box"><div class="detail-row action-row"><div class="detail-value monospaced">${escapeHTML(module.publishedURL)}</div><div><button class="button" data-action="copy" data-value="${escapeAttribute(module.publishedURL)}"><span class="symbol" data-symbol="copy"></span>拷贝地址</button></div></div></div></section>` : '';
+  const published = copyableValueSection(publishedTitle, module.publishedURL);
   const errorNote = state.combined.isEnabled ? '如果该来源有缓存，总模块会继续沿用它上一次成功版本。' : '如果该来源有缓存，模块输出会继续沿用它上一次成功版本。';
   const errorBody = module.lastError ? escapeHTML(module.lastError).replace(/\n/g, '<br>') : '';
   const errorActions = module.lastError ? `<div><button class="button" data-action="copy" data-value="${escapeAttribute(module.lastError)}"><span class="symbol" data-symbol="copy"></span>复制错误</button></div>` : '';

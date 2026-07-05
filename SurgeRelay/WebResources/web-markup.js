@@ -13,6 +13,11 @@
     return `<div class="detail-row"><div class="detail-label"><span class="symbol" data-symbol="${escapeAttribute(icon)}"></span><span>${escapeHTML(label)}</span></div><div class="${valueClass}"><span class="detail-value-text">${renderedValue}</span>${copyButton}</div></div>`;
   }
 
+  function copyableValueSection(title, value, buttonLabel = '拷贝地址') {
+    if (!value) return '';
+    return `<section class="form-section-view"><h3 class="section-heading">${escapeHTML(title)}</h3><div class="group-box"><div class="detail-row action-row"><div class="detail-value monospaced">${escapeHTML(value)}</div><div><button class="button" data-action="copy" data-value="${escapeAttribute(value)}"><span class="symbol" data-symbol="copy"></span>${escapeHTML(buttonLabel)}</button></div></div></div></section>`;
+  }
+
   function previewShell(label, editable) {
     return `<section class="preview-shell"><div class="preview-toolbar"><span class="preview-label">${escapeHTML(label)}</span><button class="button" data-action="copy-preview"><span class="symbol" data-symbol="doc.on.doc"></span>拷贝全部</button>${editable ? `<button class="button" data-action="restore-preview"><span class="symbol" data-symbol="arrow.uturn.backward"></span>恢复</button><button class="button primary" data-action="save-preview" disabled>写入</button>` : ''}</div>${editable ? '<textarea class="code-editor" id="code-editor" spellcheck="false" aria-label="模块内容">正在载入…</textarea>' : '<pre class="code-view" id="code-view">正在载入…</pre>'}</section>`;
   }
@@ -64,6 +69,7 @@
 
   global.SurgeRelayWebMarkup = {
     detailRow,
+    copyableValueSection,
     previewShell,
     publishFileList,
     latestPublishSection,

@@ -39,6 +39,11 @@ assert.doesNotMatch(
   /function (moduleSubtitle|moduleStatusTitle|failureSummary|folderTitle|publishedRelativePathForDraft|outputPathNotice|normalizedOutputFileName|suggestedNameFromSource|normalizeFolder|isFileSource|sgmoduleName|existingSgmoduleName|baseName|existingFileBaseName)\(/,
   'app.js should call web-logic helpers directly instead of re-declaring wrappers'
 );
+assert.doesNotMatch(
+  appSource,
+  /detail-value monospaced">\$\{escapeHTML\((combined\.subscriptionURL|module\.publishedURL)\)\}/,
+  'app.js should use web-markup for copyable URL sections'
+);
 
 assert.equal(
   logic.publishedRelativePathForDraft({
@@ -235,6 +240,10 @@ assert.match(format.highlightCode('[General]\nkey = https://example.com/1'), /co
 assert.match(format.highlightCode('[General]\nkey = https://example.com/1'), /code-url/);
 assert.match(markup.detailRow('link', '原始地址', '<unsafe>'), /&lt;unsafe&gt;/);
 assert.match(markup.detailRow('link', '原始地址', '<a>ok</a>', true, 'https://example.com?a=1&b=2'), /data-value="https:\/\/example.com\?a=1&amp;b=2"/);
+assert.equal(markup.copyableValueSection('GitHub', ''), '');
+assert.match(markup.copyableValueSection('GitHub <地址>', 'https://example.com?a=1&b=2', '复制 <URL>'), /GitHub &lt;地址&gt;/);
+assert.match(markup.copyableValueSection('GitHub <地址>', 'https://example.com?a=1&b=2', '复制 <URL>'), /data-value="https:\/\/example.com\?a=1&amp;b=2"/);
+assert.match(markup.copyableValueSection('GitHub <地址>', 'https://example.com?a=1&b=2', '复制 <URL>'), /复制 &lt;URL&gt;/);
 assert.match(markup.previewShell('Demo <Module>', true), /Demo &lt;Module&gt;/);
 assert.match(markup.previewShell('Demo', true), /textarea/);
 assert.match(markup.argumentMarkup({ key: 'enabled<', value: 'true', defaultValue: 'false' }), /enabled&lt;/);
