@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将安装、钥匙串、本地根目录和诊断报告 payload 模型从 `ServiceModels.swift` 拆入 `DiagnosticModels.swift`，继续压缩共享模型杂项文件。
 - 将 Web 管理模块列表 diff 签名改为 JSON 化字段数组，避免字段内容包含分隔符时误判为无需重绘。
 - 将 Web 管理静态资源响应、CSP 和图标内容类型识别从 `WebManagementAPI.swift` 拆入 `WebManagementAssets.swift`。
 - 将 Web 管理状态 payload、请求 mutation 和 API 错误模型从 `WebManagementAPI.swift` 拆入 `WebManagementModels.swift`，让 API 文件更专注于路由与 AppModel 调用。

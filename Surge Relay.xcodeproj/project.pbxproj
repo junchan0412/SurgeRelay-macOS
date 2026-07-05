@@ -21,6 +21,7 @@
 		25A25A25A25A25A25A25A25 /* AutomaticPublishPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = C25C25C25C25C25C25C25C25 /* AutomaticPublishPlanner.swift */; };
 		B7B7B7B7B7B7B7B7B7B7B7B7 /* UpdateCompletionStatusPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7C7C7C7C7C7C7C7C7C7C7C7 /* UpdateCompletionStatusPlanner.swift */; };
 		A14A14A14A14A14A14A14A14 /* WebManagementAssets.swift in Sources */ = {isa = PBXBuildFile; fileRef = B14B14B14B14B14B14B14B14 /* WebManagementAssets.swift */; };
+		A15A15A15A15A15A15A15A15 /* DiagnosticModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B15B15B15B15B15B15B15B15 /* DiagnosticModels.swift */; };
 		B8B8B8B8B8B8B8B8B8B8B8B8 /* WebManagementHTTP.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8C8C8C8C8C8C8C8C8C8C8C8 /* WebManagementHTTP.swift */; };
 		A13A13A13A13A13A13A13A13 /* WebManagementModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B13B13B13B13B13B13B13B13 /* WebManagementModels.swift */; };
 		B9B9B9B9B9B9B9B9B9B9B9B9 /* SettingsComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9C9C9C9C9C9C9C9C9C9C9C9 /* SettingsComponents.swift */; };
@@ -199,6 +200,7 @@
 		4815BE1727EE44787C48CEDF /* lock.svg */ = {isa = PBXFileReference; path = lock.svg; sourceTree = "<group>"; };
 		51D9670C12C677CBC8D96FA4 /* WebManagementAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebManagementAPI.swift; sourceTree = "<group>"; };
 		B14B14B14B14B14B14B14B14 /* WebManagementAssets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebManagementAssets.swift; sourceTree = "<group>"; };
+		B15B15B15B15B15B15B15B15 /* DiagnosticModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticModels.swift; sourceTree = "<group>"; };
 		B13B13B13B13B13B13B13B13 /* WebManagementModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebManagementModels.swift; sourceTree = "<group>"; };
 		5A7D7F17FB694B798F91978E /* folder.svg */ = {isa = PBXFileReference; path = folder.svg; sourceTree = "<group>"; };
 		68CAE903B934F05BC413A021 /* arrow.triangle.2.circlepath.svg */ = {isa = PBXFileReference; path = arrow.triangle.2.circlepath.svg; sourceTree = "<group>"; };
@@ -414,6 +416,7 @@
 			isa = PBXGroup;
 			children = (
 				EDC7CEA42FDCD13847E9AC0F /* AppSettings.swift */,
+				B15B15B15B15B15B15B15B15 /* DiagnosticModels.swift */,
 				0EE985DC3F8F9E3172A8D062 /* RelayModule.swift */,
 				0527CB5F1032EC43E9673F5D /* ScriptHubOptions.swift */,
 				A00DC6E63075F21C67B4B1EB /* ServiceModels.swift */,
@@ -753,6 +756,7 @@
 				B8555D3D9FEACB351D53EBC9 /* ScriptHubOptions.swift in Sources */,
 				8DA26E8693FBA37A8D155709 /* ScriptHubUpstreamService.swift in Sources */,
 				6C8F8E71624D2151BFA675ED /* ServiceModels.swift in Sources */,
+				A15A15A15A15A15A15A15A15 /* DiagnosticModels.swift in Sources */,
 				1AECEBD32D966A1910B3A007 /* SettingsView.swift in Sources */,
 				D596D087CB06F13BD28D7510 /* SurgeRelayApp.swift in Sources */,
 				A12A12A12A12A12A12A12A12 /* WorkActivity.swift in Sources */,
