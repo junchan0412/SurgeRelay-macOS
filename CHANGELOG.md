@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将 AppModel 的总模块缓存重建、本地发布写入、旧输出清理和共享发布文件装配拆入 `AppModel+PublishedOutput.swift`，让 `AppModel+Publishing.swift` 专注于手动 GitHub 发布流程。
 - 将 AppModel 的本地模块扫描/导入协调拆入 `AppModel+LocalModules.swift`，将模块输出文件夹菜单与 GitHub 目录刷新拆入 `AppModel+ModuleOutputFolders.swift`，让 `AppModel+Modules.swift` 更专注于模块增删改和预览编辑。
 - 将设置窗口的安装状态、最近更新、崩溃报告和诊断导出页面拆入 `SettingsDiagnosticsView.swift`，让 `SettingsView.swift` 只保留页签壳层、凭据预加载和 Web 管理二维码 sheet。
 - 将桌面模块编辑器的基本信息、图标、发布、来源和转换区块拆入 `ModuleEditorSections.swift`，让 `ModuleEditorView.swift` 更集中于草稿状态、自动命名、文件夹创建和保存流程。

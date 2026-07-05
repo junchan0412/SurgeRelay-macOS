@@ -17,6 +17,7 @@
 		D107D107D107D107D107D107 /* AppModel+LocalModules.swift in Sources */ = {isa = PBXBuildFile; fileRef = E107E107E107E107E107E107 /* AppModel+LocalModules.swift */; };
 		D108D108D108D108D108D108 /* AppModel+ModuleOutputFolders.swift in Sources */ = {isa = PBXBuildFile; fileRef = E108E108E108E108E108E108 /* AppModel+ModuleOutputFolders.swift */; };
 		D103D103D103D103D103D103 /* AppModel+Modules.swift in Sources */ = {isa = PBXBuildFile; fileRef = E103E103E103E103E103E103 /* AppModel+Modules.swift */; };
+		D109D109D109D109D109D109 /* AppModel+PublishedOutput.swift in Sources */ = {isa = PBXBuildFile; fileRef = E109E109E109E109E109E109 /* AppModel+PublishedOutput.swift */; };
 		D0E0D0E0D0E0D0E0D0E0D0E0 /* AppModel+PreviewAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0E0E0E0E0E0E0E0E0E0E0E0 /* AppModel+PreviewAccess.swift */; };
 		D102D102D102D102D102D102 /* AppModel+Publishing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E102E102E102E102E102E102 /* AppModel+Publishing.swift */; };
 		D0F0D0F0D0F0D0F0D0F0D0F0 /* AppModel+Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0F0E0F0E0F0E0F0E0F0E0F0 /* AppModel+Settings.swift */; };
@@ -243,6 +244,7 @@
 		E107E107E107E107E107E107 /* AppModel+LocalModules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+LocalModules.swift"; sourceTree = "<group>"; };
 		E108E108E108E108E108E108 /* AppModel+ModuleOutputFolders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+ModuleOutputFolders.swift"; sourceTree = "<group>"; };
 		E103E103E103E103E103E103 /* AppModel+Modules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Modules.swift"; sourceTree = "<group>"; };
+		E109E109E109E109E109E109 /* AppModel+PublishedOutput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+PublishedOutput.swift"; sourceTree = "<group>"; };
 		E0E0E0E0E0E0E0E0E0E0E0E0 /* AppModel+PreviewAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+PreviewAccess.swift"; sourceTree = "<group>"; };
 		E102E102E102E102E102E102 /* AppModel+Publishing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Publishing.swift"; sourceTree = "<group>"; };
 		E0F0E0F0E0F0E0F0E0F0E0F0 /* AppModel+Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Settings.swift"; sourceTree = "<group>"; };
@@ -449,6 +451,7 @@
 				E0D0E0D0E0D0E0D0E0D0E0D0 /* AppModel+ModuleState.swift */,
 				E108E108E108E108E108E108 /* AppModel+ModuleOutputFolders.swift */,
 				E103E103E103E103E103E103 /* AppModel+Modules.swift */,
+				E109E109E109E109E109E109 /* AppModel+PublishedOutput.swift */,
 				E0E0E0E0E0E0E0E0E0E0E0E0 /* AppModel+PreviewAccess.swift */,
 				E102E102E102E102E102E102 /* AppModel+Publishing.swift */,
 				E0F0E0F0E0F0E0F0E0F0E0F0 /* AppModel+Settings.swift */,
@@ -923,6 +926,7 @@
 				D0D0D0D0D0D0D0D0D0D0D0D0 /* AppModel+ModuleState.swift in Sources */,
 				D108D108D108D108D108D108 /* AppModel+ModuleOutputFolders.swift in Sources */,
 				D103D103D103D103D103D103 /* AppModel+Modules.swift in Sources */,
+				D109D109D109D109D109D109 /* AppModel+PublishedOutput.swift in Sources */,
 				D0E0D0E0D0E0D0E0D0E0D0E0 /* AppModel+PreviewAccess.swift in Sources */,
 				D102D102D102D102D102D102 /* AppModel+Publishing.swift in Sources */,
 				D0F0D0F0D0F0D0F0D0F0D0F0 /* AppModel+Settings.swift in Sources */,
