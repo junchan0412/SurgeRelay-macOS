@@ -18,6 +18,24 @@
     ].map(value => String(value ?? '')).join('\u{1f}');
   }
 
+  function sidebarListSignature(snapshot) {
+    return [
+      snapshot?.combined?.isEnabled ? 'combined-on' : 'combined-off',
+      (snapshot?.modules || []).map(moduleListSignature).join('\n')
+    ].join('\n');
+  }
+
+  function metadataRowPresenceChanged(previousModule, nextModule) {
+    if (!previousModule || !nextModule) return false;
+    return Boolean(previousModule.sourceContentHash) !== Boolean(nextModule.sourceContentHash) ||
+      Boolean(previousModule.sourceETag) !== Boolean(nextModule.sourceETag) ||
+      Boolean(previousModule.sourceLastModified) !== Boolean(nextModule.sourceLastModified) ||
+      previousModule.storageLocation !== nextModule.storageLocation ||
+      previousModule.sourceOriginTitle !== nextModule.sourceOriginTitle ||
+      previousModule.localStorageRelativePath !== nextModule.localStorageRelativePath ||
+      previousModule.lastError !== nextModule.lastError;
+  }
+
   function moduleSubtitle(module) {
     const parts = module.state === 'failed' && failureSummary(module.lastError)
       ? [`更新失败：${failureSummary(module.lastError)}`]
@@ -186,6 +204,8 @@
   global.SurgeRelayWebLogic = {
     failureSummary,
     moduleListSignature,
+    sidebarListSignature,
+    metadataRowPresenceChanged,
     moduleSubtitle,
     moduleStatusTitle,
     moduleSearchText,

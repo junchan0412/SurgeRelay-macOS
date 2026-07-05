@@ -219,14 +219,8 @@ function patchLiveState(previous, next) {
     return;
   }
 
-  const previousList = [
-    previous.combined?.isEnabled ? 'combined-on' : 'combined-off',
-    previous.modules.map(moduleListSignature).join('\n')
-  ].join('\n');
-  const nextList = [
-    next.combined?.isEnabled ? 'combined-on' : 'combined-off',
-    next.modules.map(moduleListSignature).join('\n')
-  ].join('\n');
+  const previousList = webLogic.sidebarListSignature(previous);
+  const nextList = webLogic.sidebarListSignature(next);
   if (previousList !== nextList) renderSidebar(); else patchSidebarLive();
 
   if (detailTab !== 'info') return;
@@ -240,7 +234,7 @@ function patchLiveState(previous, next) {
   const module = next.modules.find(item => item.id === selectedID);
   if (!module) return;
   const previousModule = previous.modules.find(item => item.id === selectedID);
-  if (metadataRowPresenceChanged(previousModule, module)) {
+  if (webLogic.metadataRowPresenceChanged(previousModule, module)) {
     renderDetail(false);
     return;
   }
@@ -253,21 +247,6 @@ function patchLiveState(previous, next) {
   patchDetailValue('来源检查', formatDate(module.sourceCheckedAt, '尚未检查'));
   patchDetailValue('内容 hash', module.contentHash ? module.contentHash.slice(0, 12) : '尚未生成');
   patchDetailValue('转换引擎', module.conversionEngineRevision ? module.conversionEngineRevision.slice(0, 12) : '原生 Surge 模块');
-}
-
-function moduleListSignature(module) {
-  return webLogic.moduleListSignature(module);
-}
-
-function metadataRowPresenceChanged(previousModule, nextModule) {
-  if (!previousModule || !nextModule) return false;
-  return Boolean(previousModule.sourceContentHash) !== Boolean(nextModule.sourceContentHash) ||
-    Boolean(previousModule.sourceETag) !== Boolean(nextModule.sourceETag) ||
-    Boolean(previousModule.sourceLastModified) !== Boolean(nextModule.sourceLastModified) ||
-    previousModule.storageLocation !== nextModule.storageLocation ||
-    previousModule.sourceOriginTitle !== nextModule.sourceOriginTitle ||
-    previousModule.localStorageRelativePath !== nextModule.localStorageRelativePath ||
-    previousModule.lastError !== nextModule.lastError;
 }
 
 function patchDetailValue(label, value) {

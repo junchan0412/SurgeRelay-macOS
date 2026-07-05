@@ -117,6 +117,29 @@ assert.notEqual(
   logic.moduleListSignature(signatureBase),
   logic.moduleListSignature({ ...signatureBase, lastError: '原始链接返回 404' })
 );
+assert.notEqual(
+  logic.sidebarListSignature({ combined: { isEnabled: false }, modules: [signatureBase] }),
+  logic.sidebarListSignature({ combined: { isEnabled: true }, modules: [signatureBase] })
+);
+assert.notEqual(
+  logic.sidebarListSignature({ combined: { isEnabled: false }, modules: [signatureBase] }),
+  logic.sidebarListSignature({
+    combined: { isEnabled: false },
+    modules: [{ ...signatureBase, relationshipSummary: '本地模块 · 远程 Surge 模块' }]
+  })
+);
+assert.equal(
+  logic.metadataRowPresenceChanged(signatureBase, { ...signatureBase, lastUpdatedAt: '2026-07-05T12:00:00Z' }),
+  false
+);
+assert.equal(
+  logic.metadataRowPresenceChanged(signatureBase, { ...signatureBase, sourceETag: '' }),
+  true
+);
+assert.equal(
+  logic.metadataRowPresenceChanged(signatureBase, { ...signatureBase, localStorageRelativePath: 'Folder/Demo.sgmodule' }),
+  true
+);
 
 assert.equal(
   logic.moduleMatchesSearch({

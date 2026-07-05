@@ -121,7 +121,7 @@ Web management Script-Hub advanced option defaults and group schema live in `Web
 
 Web management formatting helpers live in `WebResources/web-format.js`. Keep HTML escaping, attribute escaping, date/time formatting, and module preview syntax highlighting there so `app.js` stays focused on API calls, state changes, event handling, and DOM composition.
 
-Web management list logic lives in `WebResources/web-logic.js`. Keep module list signatures, search text, failure summaries, failure-filter state, filtered sidebar modules, and empty-state text there so live updates and sidebar rendering share the same tested rules.
+Web management list logic lives in `WebResources/web-logic.js`. Keep module list signatures, sidebar snapshot signatures, detail metadata row presence checks, search text, failure summaries, failure-filter state, filtered sidebar modules, and empty-state text there so live updates and sidebar rendering share the same tested rules.
 
 Web management markup helpers live in `WebResources/web-markup.js`. Keep reusable HTML fragments such as detail rows, preview shells, argument controls, advanced option rows, latest-publish sections, and publish-file lists there; `app.js` should compose those fragments with live state instead of owning their escaping details.
 
@@ -162,7 +162,7 @@ The active maintenance machine may print CoreSimulator version warnings even for
 
 The module list should not eagerly read every converted preview at launch. `ModulesView` keeps metadata-only search available immediately and builds the heavier converted-content search index only after the user enters a search query. Preserve that lazy behavior when changing search or preview code.
 
-Web management list updates use `moduleListSignature(module)` from `WebResources/web-logic.js` to decide whether a sidebar re-render is needed. When adding fields that affect list rows, search subtitles, icons, relationship labels, or failure state, update that signature in one place and run `node script/test_web_resources.mjs`.
+Web management list updates use `sidebarListSignature(snapshot)` from `WebResources/web-logic.js` to decide whether a sidebar re-render is needed. When adding fields that affect list rows, search subtitles, icons, relationship labels, or failure state, update that signature path in one place and run `node script/test_web_resources.mjs`. Detail metadata rows use `metadataRowPresenceChanged(previous, next)` from the same file to decide when patching is not enough and a full detail render is required.
 
 `script/test_web_dom_resources.mjs` provides a dependency-free DOM harness for the Web management shell. Keep it focused on behavior that depends on the real `index.html` structure and `app.js` startup path: required nodes, initial state rendering, detail sections, update admission controls, and editor output-path preview behavior.
 
