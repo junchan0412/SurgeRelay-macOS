@@ -20,6 +20,7 @@
 		D103D103D103D103D103D103 /* AppModel+Modules.swift in Sources */ = {isa = PBXBuildFile; fileRef = E103E103E103E103E103E103 /* AppModel+Modules.swift */; };
 		D109D109D109D109D109D109 /* AppModel+PublishedOutput.swift in Sources */ = {isa = PBXBuildFile; fileRef = E109E109E109E109E109E109 /* AppModel+PublishedOutput.swift */; };
 		D0E0D0E0D0E0D0E0D0E0D0E0 /* AppModel+PreviewAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0E0E0E0E0E0E0E0E0E0E0E0 /* AppModel+PreviewAccess.swift */; };
+		D112D112D112D112D112D112 /* AppModel+PreviewEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E112E112E112E112E112E112 /* AppModel+PreviewEditing.swift */; };
 		D102D102D102D102D102D102 /* AppModel+Publishing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E102E102E102E102E102E102 /* AppModel+Publishing.swift */; };
 		D111D111D111D111D111D111 /* AppModel+ScriptHub.swift in Sources */ = {isa = PBXBuildFile; fileRef = E111E111E111E111E111E111 /* AppModel+ScriptHub.swift */; };
 		D0F0D0F0D0F0D0F0D0F0D0F0 /* AppModel+Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0F0E0F0E0F0E0F0E0F0E0F0 /* AppModel+Settings.swift */; };
@@ -262,6 +263,7 @@
 		E103E103E103E103E103E103 /* AppModel+Modules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Modules.swift"; sourceTree = "<group>"; };
 		E109E109E109E109E109E109 /* AppModel+PublishedOutput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+PublishedOutput.swift"; sourceTree = "<group>"; };
 		E0E0E0E0E0E0E0E0E0E0E0E0 /* AppModel+PreviewAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+PreviewAccess.swift"; sourceTree = "<group>"; };
+		E112E112E112E112E112E112 /* AppModel+PreviewEditing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+PreviewEditing.swift"; sourceTree = "<group>"; };
 		E102E102E102E102E102E102 /* AppModel+Publishing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Publishing.swift"; sourceTree = "<group>"; };
 		E111E111E111E111E111E111 /* AppModel+ScriptHub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+ScriptHub.swift"; sourceTree = "<group>"; };
 		E0F0E0F0E0F0E0F0E0F0E0F0 /* AppModel+Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Settings.swift"; sourceTree = "<group>"; };
@@ -484,6 +486,7 @@
 				E103E103E103E103E103E103 /* AppModel+Modules.swift */,
 				E109E109E109E109E109E109 /* AppModel+PublishedOutput.swift */,
 				E0E0E0E0E0E0E0E0E0E0E0E0 /* AppModel+PreviewAccess.swift */,
+				E112E112E112E112E112E112 /* AppModel+PreviewEditing.swift */,
 				E102E102E102E102E102E102 /* AppModel+Publishing.swift */,
 				E111E111E111E111E111E111 /* AppModel+ScriptHub.swift */,
 				E0F0E0F0E0F0E0F0E0F0E0F0 /* AppModel+Settings.swift */,
@@ -975,6 +978,7 @@
 				D103D103D103D103D103D103 /* AppModel+Modules.swift in Sources */,
 				D109D109D109D109D109D109 /* AppModel+PublishedOutput.swift in Sources */,
 				D0E0D0E0D0E0D0E0D0E0D0E0 /* AppModel+PreviewAccess.swift in Sources */,
+				D112D112D112D112D112D112 /* AppModel+PreviewEditing.swift in Sources */,
 				D102D102D102D102D102D102 /* AppModel+Publishing.swift in Sources */,
 				D111D111D111D111D111D111 /* AppModel+ScriptHub.swift in Sources */,
 				D0F0D0F0D0F0D0F0D0F0D0F0 /* AppModel+Settings.swift in Sources */,
