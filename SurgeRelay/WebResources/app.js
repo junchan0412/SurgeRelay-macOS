@@ -470,20 +470,17 @@ function selectItem(id, pushHistory = true) {
   selectedID = id; detailTab = 'info'; ui.body.classList.add('has-selection');
   resetHorizontalScroll();
   if (pushHistory) {
-    history.pushState({ surgeRelay: true, view: 'detail', module: id, cameFromList }, '', webState.urlWithModule(location, id));
+    const entry = webState.detailHistoryEntry(location, id, cameFromList);
+    history.pushState(entry.state, '', entry.url);
   }
   renderSidebar(); renderDetail(false);
 }
 
 function initializeHistoryState() {
-  const module = webState.moduleIDFromLocation(location);
-  if (history.state?.surgeRelay) return;
-  if (module) {
-    history.replaceState({ surgeRelay: true, view: 'list', module: null }, '', webState.urlWithoutModule(location));
-    history.pushState({ surgeRelay: true, view: 'detail', module, cameFromList: true }, '', webState.urlWithModule(location, module));
-  } else {
-    history.replaceState({ surgeRelay: true, view: 'list', module: null }, '', location.href);
-  }
+  const transition = webState.initialHistoryTransition(location, history.state);
+  if (!transition) return;
+  history.replaceState(transition.replace.state, '', transition.replace.url);
+  if (transition.push) history.pushState(transition.push.state, '', transition.push.url);
 }
 
 function showModuleList(replaceHistory = false) {
@@ -491,24 +488,27 @@ function showModuleList(replaceHistory = false) {
   detailTab = 'info';
   ui.body.classList.remove('has-selection');
   resetHorizontalScroll();
-  if (replaceHistory) history.replaceState({ surgeRelay: true, view: 'list', module: null }, '', webState.urlWithoutModule(location));
+  if (replaceHistory) {
+    const entry = webState.listHistoryEntry(location);
+    history.replaceState(entry.state, '', entry.url);
+  }
   renderSidebar();
   renderDetail(false);
 }
 
 function navigateBackToList() {
   if (!mobileLayout.matches) return;
-  if (history.state?.surgeRelay && history.state?.cameFromList) history.back();
+  if (webState.mobileBackAction(history.state) === 'back') history.back();
   else showModuleList(true);
 }
 
 function handleHistoryNavigation(event) {
-  const module = webState.moduleIDFromLocation(location);
-  if (mobileLayout.matches && (!module || event.state?.view === 'list')) {
+  const target = webState.historyNavigationTarget(location, event.state, mobileLayout.matches, fallbackSelection());
+  if (target.action === 'show-list') {
     showModuleList(false);
     return;
   }
-  selectItem(module || fallbackSelection(), false);
+  selectItem(target.moduleID, false);
 }
 
 function openEditor(module = null) {

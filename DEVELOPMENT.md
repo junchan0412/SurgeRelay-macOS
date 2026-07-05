@@ -137,7 +137,7 @@ Web management markup helpers live in `WebResources/web-markup.js`. Keep reusabl
 
 Web management API/session helpers live in `WebResources/web-api.js`. Keep URL token extraction, session bootstrap, request headers, JSON body handling, same-origin credentials, error payload parsing, and 401 token retry there; `app.js` should call the client instead of directly owning fetch/session details.
 
-Web management state/navigation helpers live in `WebResources/web-state.js`. Keep initial module selection, mobile history URLs, fallback selection, and EventSource reconnect/polling behavior there; `app.js` should coordinate rendering through those helpers instead of duplicating route or live-state subscription logic.
+Web management state/navigation helpers live in `WebResources/web-state.js`. Keep initial module selection, mobile history URLs, history entry construction, mobile back/popstate decisions, fallback selection, and EventSource reconnect/polling behavior there; `app.js` should coordinate rendering through those helpers instead of duplicating route or live-state subscription logic.
 
 Web management editor UI helpers live in `WebResources/web-editor.js`. Keep module editor DOM state, add/edit form population, save-field collection, advanced option disclosure animation, Script-Hub option collection/backfill, output folder menu hydration, output path preview binding, native Surge source visibility, icon URL preview rendering, and remote source name auto-fill scheduling there; `app.js` should wire events and API calls instead of owning those editor details.
 

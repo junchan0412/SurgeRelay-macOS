@@ -73,6 +73,11 @@ assert.doesNotMatch(
 );
 assert.doesNotMatch(
   appSource,
+  /history\.(pushState|replaceState)\(\{\s*surgeRelay/,
+  'app.js should use web-state helpers to construct history entries'
+);
+assert.doesNotMatch(
+  appSource,
   /detail-value monospaced">\$\{escapeHTML\((combined\.subscriptionURL|module\.publishedURL)\)\}/,
   'app.js should use web-markup for copyable URL sections'
 );
@@ -667,6 +672,47 @@ assert.doesNotMatch(
 assert.match(
   String(stateHelpers.urlWithModule({ href: 'https://relay.example.test/?token=redacted' }, 'module-2')),
   /module=module-2/
+);
+const initialHistoryWithModule = stateHelpers.initialHistoryTransition({
+  href: 'https://relay.example.test/?module=module-1&token=redacted'
+}, null);
+assert.equal(initialHistoryWithModule.replace.state.view, 'list');
+assert.equal(initialHistoryWithModule.replace.state.module, null);
+assert.doesNotMatch(String(initialHistoryWithModule.replace.url), /module=/);
+assert.equal(initialHistoryWithModule.push.state.view, 'detail');
+assert.equal(initialHistoryWithModule.push.state.module, 'module-1');
+assert.equal(initialHistoryWithModule.push.state.cameFromList, true);
+assert.match(String(initialHistoryWithModule.push.url), /module=module-1/);
+assert.equal(
+  stateHelpers.initialHistoryTransition({ href: 'https://relay.example.test/' }, { surgeRelay: true }),
+  null
+);
+const initialHistoryWithoutModule = stateHelpers.initialHistoryTransition({
+  href: 'https://relay.example.test/?token=redacted'
+}, null);
+assert.equal(initialHistoryWithoutModule.replace.state.view, 'list');
+assert.equal(initialHistoryWithoutModule.push, null);
+assert.match(String(initialHistoryWithoutModule.replace.url), /token=redacted/);
+const detailHistoryEntry = stateHelpers.detailHistoryEntry({ href: 'https://relay.example.test/' }, 'module-2', true);
+assert.equal(detailHistoryEntry.state.view, 'detail');
+assert.equal(detailHistoryEntry.state.cameFromList, true);
+assert.match(String(detailHistoryEntry.url), /module=module-2/);
+const listHistoryEntry = stateHelpers.listHistoryEntry({ href: 'https://relay.example.test/?module=module-2' });
+assert.equal(listHistoryEntry.state.view, 'list');
+assert.doesNotMatch(String(listHistoryEntry.url), /module=/);
+assert.equal(stateHelpers.mobileBackAction({ surgeRelay: true, cameFromList: true }), 'back');
+assert.equal(stateHelpers.mobileBackAction({ surgeRelay: true, cameFromList: false }), 'show-list');
+assert.deepEqual(
+  JSON.parse(JSON.stringify(stateHelpers.historyNavigationTarget({ href: 'https://relay.example.test/' }, { view: 'list' }, true, 'module-1'))),
+  { action: 'show-list', moduleID: null }
+);
+assert.deepEqual(
+  JSON.parse(JSON.stringify(stateHelpers.historyNavigationTarget({ href: 'https://relay.example.test/?module=module-2' }, { view: 'detail' }, true, 'module-1'))),
+  { action: 'select', moduleID: 'module-2' }
+);
+assert.deepEqual(
+  JSON.parse(JSON.stringify(stateHelpers.historyNavigationTarget({ href: 'https://relay.example.test/' }, { view: 'list' }, false, 'module-1'))),
+  { action: 'select', moduleID: 'module-1' }
 );
 
 let eventSource = null;

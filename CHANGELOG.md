@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将 Web 管理初始 history、详情页 history、列表 history 和移动端 popstate 判定抽入 `web-state.js`，减少 `app.js` 对导航 URL/state 细节的直接维护。
 - 将 Web 管理添加/编辑模块表单的字段回填与保存字段收集收进 `web-editor.js`，让 `app.js` 只负责打开对话框、调用 API 和处理反馈，并补充 DOM 保存路径测试。
 - 将主窗口侧边栏 toolbar 的添加、更新、发布、多选和本地扫描按钮拆入 `ModuleSidebarToolbarContent.swift`，让 `ModulesView.swift` 只负责挂载 toolbar 与传递状态/动作。
 - 将主窗口详情/预览切换、详情 toolbar 和设置入口拆入 `ModuleDetailPaneView.swift`，让 `ModulesView.swift` 更专注于 split-view shell、搜索索引、侧边栏 toolbar 与 sheet 路由。

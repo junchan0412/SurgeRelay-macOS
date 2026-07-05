@@ -61,6 +61,56 @@
     return url;
   }
 
+  function initialHistoryTransition(locationRef = global.location, historyState = null) {
+    if (historyState?.surgeRelay) return null;
+    const moduleID = moduleIDFromLocation(locationRef);
+    if (moduleID) {
+      return {
+        replace: {
+          state: { surgeRelay: true, view: 'list', module: null },
+          url: urlWithoutModule(locationRef)
+        },
+        push: {
+          state: { surgeRelay: true, view: 'detail', module: moduleID, cameFromList: true },
+          url: urlWithModule(locationRef, moduleID)
+        }
+      };
+    }
+    return {
+      replace: {
+        state: { surgeRelay: true, view: 'list', module: null },
+        url: locationRef?.href || ''
+      },
+      push: null
+    };
+  }
+
+  function detailHistoryEntry(locationRef = global.location, moduleID = '', cameFromList = false) {
+    return {
+      state: { surgeRelay: true, view: 'detail', module: moduleID, cameFromList: Boolean(cameFromList) },
+      url: urlWithModule(locationRef, moduleID)
+    };
+  }
+
+  function listHistoryEntry(locationRef = global.location) {
+    return {
+      state: { surgeRelay: true, view: 'list', module: null },
+      url: urlWithoutModule(locationRef)
+    };
+  }
+
+  function mobileBackAction(historyState = null) {
+    return historyState?.surgeRelay && historyState?.cameFromList ? 'back' : 'show-list';
+  }
+
+  function historyNavigationTarget(locationRef = global.location, eventState = null, isMobile = false, fallbackID = null) {
+    const moduleID = moduleIDFromLocation(locationRef);
+    if (isMobile && (!moduleID || eventState?.view === 'list')) {
+      return { action: 'show-list', moduleID: null };
+    }
+    return { action: 'select', moduleID: moduleID || fallbackID || null };
+  }
+
   function createStateEventController(dependencies = {}) {
     const EventSourceImpl = dependencies.EventSource || global.EventSource;
     const documentRef = dependencies.document || global.document;
@@ -127,6 +177,11 @@
     moduleIDFromLocation,
     urlWithModule,
     urlWithoutModule,
+    initialHistoryTransition,
+    detailHistoryEntry,
+    listHistoryEntry,
+    mobileBackAction,
+    historyNavigationTarget,
     createStateEventController
   };
 })(globalThis);
