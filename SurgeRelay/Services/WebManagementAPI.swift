@@ -6,7 +6,7 @@ enum WebManagementAPI {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.withoutEscapingSlashes]
-        guard let data = try? encoder.encode(statePayload(model: model)) else { return "{}" }
+        guard let data = try? encoder.encode(WebManagementStateBuilder.payload(model: model)) else { return "{}" }
         return String(data: data, encoding: .utf8) ?? "{}"
     }
 
@@ -26,7 +26,7 @@ enum WebManagementAPI {
                     ]
                 )
             case ("GET", "/api/state"):
-                return .json(statePayload(model: model))
+                return .json(WebManagementStateBuilder.payload(model: model))
             case ("POST", "/api/update-all"):
                 let admission = model.updateAdmission
                 guard admission.isAccepted else {
@@ -171,100 +171,6 @@ enum WebManagementAPI {
         default:
             throw WebAPIError.methodNotAllowed
         }
-    }
-
-    private static func statePayload(model: AppModel) -> WebStatePayload {
-        let summary = model.moduleSummary
-        let combinedEnabled = model.settings.combinedModuleEnabled
-        let updateAdmission = model.updateAdmission
-        let progress: Double? = if model.synchronizationTotalCount > 0 {
-            min(
-                max(Double(model.synchronizationCompletedCount) / Double(model.synchronizationTotalCount), 0),
-                1
-            )
-        } else {
-            nil
-        }
-        return WebStatePayload(
-            combined: WebCombinedPayload(
-                name: "Surge Relay 汇总",
-                isEnabled: combinedEnabled,
-                fileName: FilenameSanitizer.sgmoduleName(from: model.settings.combinedModuleFileName),
-                sourceCount: summary.totalCount,
-                enabledCount: combinedEnabled ? summary.enabledCount : 0,
-                lastUpdatedAt: summary.latestUpdatedAt,
-                subscriptionURL: combinedEnabled
-                    ? model.combinedRawURL?.absoluteString ?? model.combinedLocalFileURL?.absoluteString
-                    : nil
-            ),
-            moduleOutputFolders: model.moduleOutputFolderOptions(),
-            modules: model.modules.map { module in
-                WebModulePayload(
-                    id: module.id.uuidString.lowercased(),
-                    name: module.name,
-                    sourceURL: module.sourceURL,
-                    effectiveOriginalSourceURL: module.effectiveOriginalSourceURL,
-                    sourceFormat: module.sourceFormat.rawValue,
-                    sourceFormatTitle: module.sourceFormatDisplayTitle,
-                    sourceOriginTitle: module.sourceOrigin.title,
-                    sourceOriginIcon: module.sourceOrigin.systemImage,
-                    outputFileName: module.outputFileName,
-                    publishedRelativePath: module.publishedRelativePath,
-                    category: module.category,
-                    outputFolder: module.outputFolder,
-                    storageLocation: module.storageLocation.rawValue,
-                    storageLocationTitle: module.storageLocation.title,
-                    storageLocationIcon: module.storageLocation.systemImage,
-                    relationshipSummary: module.relationshipSummary,
-                    localStorageRelativePath: module.localStorageRelativePath,
-                    publishesStandalone: module.publishesStandalone,
-                    isEnabled: module.isEnabled,
-                    state: module.state.rawValue,
-                    stateTitle: module.state.title,
-                    createdAt: module.createdAt,
-                    lastUpdatedAt: module.lastUpdatedAt,
-                    sourceCheckedAt: module.sourceCheckedAt,
-                    contentHash: module.contentHash,
-                    sourceETag: module.sourceETag,
-                    sourceLastModified: module.sourceLastModified,
-                    sourceContentHash: module.sourceContentHash,
-                    conversionEngineRevision: module.conversionEngineRevision,
-                    lastError: module.lastError,
-                    iconURL: WebManagementAssets.iconURL(for: module),
-                    customIconURL: module.customIconURL,
-                    publishedURL: model.rawURL(for: module)?.absoluteString,
-                    advancedSummary: module.scriptHubOptions.configuredSummary,
-                    hasOverrideConflict: module.hasOverrideConflict,
-                    scriptHubOptions: module.scriptHubOptions,
-                    policy: module.scriptHubOptions.policy,
-                    includeKeywords: module.scriptHubOptions.includeKeywords,
-                    excludeKeywords: module.scriptHubOptions.excludeKeywords,
-                    mitmAdd: module.scriptHubOptions.mitmAdd,
-                    mitmRemove: module.scriptHubOptions.mitmRemove,
-                    noResolve: module.scriptHubOptions.noResolve,
-                    enableJQ: module.scriptHubOptions.enableJQ
-                )
-            },
-            activity: WebActivityPayload(
-                isWorking: model.isWorking,
-                kind: model.workActivity.kind.rawValue,
-                title: model.workActivity.isActive ? model.workActivity.title : nil,
-                status: model.statusMessage,
-                progress: progress,
-                currentModuleID: model.synchronizingModuleID?.uuidString.lowercased(),
-                startedAt: model.workActivity.startedAt,
-                blocksUpdates: model.workActivity.blocksUpdates,
-                canCancel: model.workActivity.canCancel,
-                cancellationRequested: model.workCancellationRequested,
-                canStartUpdate: updateAdmission.isAccepted,
-                updateBlockedReason: updateAdmission.blockedReason,
-                enabledModuleCount: summary.updateableCount,
-                automaticPublishScheduledAt: model.automaticPublishScheduledAt,
-                automaticPublishRunsAt: model.automaticPublishRunsAt,
-                latestGitHubPublish: model.latestGitHubPublish,
-                error: model.presentedError
-            )
-        )
     }
 
 }

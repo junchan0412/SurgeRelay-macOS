@@ -41,6 +41,7 @@
 		A10A10A10A10A10A10A10A10 /* WebAuthenticationThrottle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10B10B10B10B10B10B10B10 /* WebAuthenticationThrottle.swift */; };
 		B8B8B8B8B8B8B8B8B8B8B8B8 /* WebManagementHTTP.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8C8C8C8C8C8C8C8C8C8C8C8 /* WebManagementHTTP.swift */; };
 		A13A13A13A13A13A13A13A13 /* WebManagementModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B13B13B13B13B13B13B13B13 /* WebManagementModels.swift */; };
+		A25A25A25A25A25A25A25A25 /* WebManagementStateBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B25B25B25B25B25B25B25B25 /* WebManagementStateBuilder.swift */; };
 		B9B9B9B9B9B9B9B9B9B9B9B9 /* SettingsComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9C9C9C9C9C9C9C9C9C9C9C9 /* SettingsComponents.swift */; };
 		D10D10D10D10D10D10D10D10 /* DiagnosticReportBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10E10E10E10E10E10E10E10 /* DiagnosticReportBuilder.swift */; };
 		D20D20D20D20D20D20D20D20 /* ModulePreviewContentProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20E20E20E20E20E20E20E20 /* ModulePreviewContentProvider.swift */; };
@@ -71,6 +72,7 @@
 		307EBCC9173DAEC6727856BD /* ModuleMetadataParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BEEA07D7884F801CEDBF10E /* ModuleMetadataParser.swift */; };
 		30817299C54FAD6356760AD8 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDC7CEA42FDCD13847E9AC0F /* AppSettings.swift */; };
 		31A2B3C4D5E6F708192A3B4C /* WebManagementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41A2B3C4D5E6F708192A3B4C /* WebManagementTests.swift */; };
+		31C2D3E4F5061728394A5B6C /* WebManagementStateBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41C2D3E4F5061728394A5B6C /* WebManagementStateBuilderTests.swift */; };
 		31B2C3D4E5F60718293A4B5C /* ModulePlanningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41B2C3D4E5F60718293A4B5C /* ModulePlanningTests.swift */; };
 		3A6E1A2B3C4D5E6F708192A3 /* ModuleOrderingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6E1A2B3C4D5E6F708192A3 /* ModuleOrderingTests.swift */; };
 		3A5E1A2B3C4D5E6F708192A3 /* ModuleSearchIndexTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A5E1A2B3C4D5E6F708192A3 /* ModuleSearchIndexTests.swift */; };
@@ -242,6 +244,7 @@
 		6D8A9B0C1D2E3F4051627384 /* DiagnosticReportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticReportTests.swift; sourceTree = "<group>"; };
 		41447934F9FEEEA0E8C36B5C /* ScriptHubAdvancedOptionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptHubAdvancedOptionsView.swift; sourceTree = "<group>"; };
 		41A2B3C4D5E6F708192A3B4C /* WebManagementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebManagementTests.swift; sourceTree = "<group>"; };
+		41C2D3E4F5061728394A5B6C /* WebManagementStateBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebManagementStateBuilderTests.swift; sourceTree = "<group>"; };
 		41B2C3D4E5F60718293A4B5C /* ModulePlanningTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModulePlanningTests.swift; sourceTree = "<group>"; };
 		4A6E1A2B3C4D5E6F708192A3 /* ModuleOrderingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleOrderingTests.swift; sourceTree = "<group>"; };
 		4A5E1A2B3C4D5E6F708192A3 /* ModuleSearchIndexTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleSearchIndexTests.swift; sourceTree = "<group>"; };
@@ -279,6 +282,7 @@
 		B20B20B20B20B20B20B20B20 /* ModuleOutputPath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleOutputPath.swift; sourceTree = "<group>"; };
 		B21B21B21B21B21B21B21B21 /* ModulePreviewViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModulePreviewViews.swift; sourceTree = "<group>"; };
 		B13B13B13B13B13B13B13B13 /* WebManagementModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebManagementModels.swift; sourceTree = "<group>"; };
+		B25B25B25B25B25B25B25B25 /* WebManagementStateBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebManagementStateBuilder.swift; sourceTree = "<group>"; };
 		5A7D7F17FB694B798F91978E /* folder.svg */ = {isa = PBXFileReference; path = folder.svg; sourceTree = "<group>"; };
 		68CAE903B934F05BC413A021 /* arrow.triangle.2.circlepath.svg */ = {isa = PBXFileReference; path = arrow.triangle.2.circlepath.svg; sourceTree = "<group>"; };
 		6A7724FAFE6C14EBFDD1C655 /* square.and.arrow.up.svg */ = {isa = PBXFileReference; path = square.and.arrow.up.svg; sourceTree = "<group>"; };
@@ -498,6 +502,7 @@
 				C8C8C8C8C8C8C8C8C8C8C8C8 /* WebManagementHTTP.swift */,
 				51D9670C12C677CBC8D96FA4 /* WebManagementAPI.swift */,
 				B13B13B13B13B13B13B13B13 /* WebManagementModels.swift */,
+				B25B25B25B25B25B25B25B25 /* WebManagementStateBuilder.swift */,
 				B09B09B09B09B09B09B09B09 /* WebRequestSecurity.swift */,
 				33932BCF1BFE460CA55DF088 /* WebManagementServer.swift */,
 			);
@@ -632,6 +637,7 @@
 				4D7A8B9C0D1E2F3041526374 /* UpdateCompletionStatusPlannerTests.swift */,
 				6F8A9B0C1D2E3F4051627384 /* UpdateFailureTests.swift */,
 				41A2B3C4D5E6F708192A3B4C /* WebManagementTests.swift */,
+				41C2D3E4F5061728394A5B6C /* WebManagementStateBuilderTests.swift */,
 				4B6F2A3C4D5E6F708192A3B4 /* WorkActivityTests.swift */,
 			);
 			path = SurgeRelayTests;
@@ -846,6 +852,7 @@
 				3D7A8B9C0D1E2F3041526374 /* UpdateCompletionStatusPlannerTests.swift in Sources */,
 				5F8A9B0C1D2E3F4051627384 /* UpdateFailureTests.swift in Sources */,
 				31A2B3C4D5E6F708192A3B4C /* WebManagementTests.swift in Sources */,
+				31C2D3E4F5061728394A5B6C /* WebManagementStateBuilderTests.swift in Sources */,
 				3B6F2A3C4D5E6F708192A3B4 /* WorkActivityTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -945,6 +952,7 @@
 				D99D99D99D99D99D99D99D99 /* WebManagementController.swift in Sources */,
 				4B5E934EB9AC34C451301F50 /* WebManagementAPI.swift in Sources */,
 				A13A13A13A13A13A13A13A13 /* WebManagementModels.swift in Sources */,
+				A25A25A25A25A25A25A25A25 /* WebManagementStateBuilder.swift in Sources */,
 				540136DA3B34EAD959E5B5F7 /* WebManagementServer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

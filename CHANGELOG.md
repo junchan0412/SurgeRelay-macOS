@@ -3,6 +3,7 @@
 ## Unreleased
 
 - 将本地模块导入成功后的 Script-Hub 订阅元数据恢复、来源格式归一化、content hash 和状态写回收进 `LocalModuleImportPlanner`，让 AppModel 只负责转换与缓存写入。
+- 将 Web 管理状态 payload 构建抽入 `WebManagementStateBuilder`，让 `WebManagementAPI` 聚焦路由处理，并补充总模块、活动进度和模块字段映射测试。
 - 将模块 ID 重排校验收进 `ModuleOrdering`，并把模块移动/重排测试拆入 `ModuleOrderingTests.swift`，让 AppModel 只应用已验证的排序结果。
 - 将更新失败后沿用缓存、缺缓存阻止总模块覆盖、失败历史记录和缺缓存弹窗文案收进 `UpdateFailurePlanner`，让 `AppModel+Updates` 只保留缓存读取与输出重建编排。
 - 将来源未变化且缓存可复用时的 revision 写回、状态恢复和历史文案收进 `ModuleMetadataRefreshPlanner`，减少 `AppModel+Updates` 的更新循环分支。
