@@ -30,6 +30,15 @@ enum LocalPublishedFileCompletion: Equatable, Sendable {
     case requiresCleanup(preview: PublishPreview, statusMessage: String)
 }
 
+struct LocalPublishedCleanupConfirmationPlan: Equatable, Sendable {
+    var targetDirectory: String
+    var obsoleteRelativePaths: [String]
+    var knownManagedRelativePaths: [String]
+    var persistedRootDirectory: String
+    var persistedFilePaths: [String]
+    var statusMessage: String
+}
+
 enum LocalPublishedFilesPlanner {
     static func plan(
         files: [PublishFile],
@@ -70,5 +79,24 @@ enum LocalPublishedFilesPlanner {
         previousPublishedPaths: [String]
     ) -> [String] {
         previousRootDirectory == preview.targetDescription ? previousPublishedPaths : []
+    }
+
+    static func confirmedCleanupPlan(
+        preview: PublishPreview,
+        previousRootDirectory: String?,
+        previousPublishedPaths: [String]
+    ) -> LocalPublishedCleanupConfirmationPlan {
+        LocalPublishedCleanupConfirmationPlan(
+            targetDirectory: preview.targetDescription,
+            obsoleteRelativePaths: preview.deletedFiles,
+            knownManagedRelativePaths: knownManagedPathsForConfirmedCleanup(
+                preview: preview,
+                previousRootDirectory: previousRootDirectory,
+                previousPublishedPaths: previousPublishedPaths
+            ),
+            persistedRootDirectory: preview.targetDescription,
+            persistedFilePaths: preview.activeFiles,
+            statusMessage: "已清理 \(preview.deletedFiles.count) 个本地旧文件"
+        )
     }
 }

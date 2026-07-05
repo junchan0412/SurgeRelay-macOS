@@ -180,21 +180,22 @@ extension AppModel {
                 try enterNonCancellableWorkPhase(
                     statusMessage: "正在清理本地旧文件，已进入不可取消阶段…"
                 )
+                let plan = LocalPublishedFilesPlanner.confirmedCleanupPlan(
+                    preview: preview,
+                    previousRootDirectory: settings.localPublishedRootDirectory,
+                    previousPublishedPaths: settings.localPublishedFilePaths
+                )
                 _ = try await fileStore.exportPublishedFiles(
                     [],
-                    toRootDirectory: preview.targetDescription,
-                    removingObsoleteRelativePaths: preview.deletedFiles,
-                    knownManagedRelativePaths: LocalPublishedFilesPlanner.knownManagedPathsForConfirmedCleanup(
-                        preview: preview,
-                        previousRootDirectory: settings.localPublishedRootDirectory,
-                        previousPublishedPaths: settings.localPublishedFilePaths
-                    )
+                    toRootDirectory: plan.targetDirectory,
+                    removingObsoleteRelativePaths: plan.obsoleteRelativePaths,
+                    knownManagedRelativePaths: plan.knownManagedRelativePaths
                 )
-                settings.localPublishedRootDirectory = preview.targetDescription
-                settings.localPublishedFilePaths = preview.activeFiles
+                settings.localPublishedRootDirectory = plan.persistedRootDirectory
+                settings.localPublishedFilePaths = plan.persistedFilePaths
                 pendingPublishPreview = nil
                 saveSettings()
-                statusMessage = "已清理 \(preview.deletedFiles.count) 个本地旧文件"
+                statusMessage = plan.statusMessage
             }
         } catch {
             if isCurrentWorkCancellation(error) { return }

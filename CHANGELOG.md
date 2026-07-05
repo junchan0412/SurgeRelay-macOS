@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将本地发布确认清理后的受管理路径、设置写回和状态文案规划收进 `LocalPublishedFilesPlanner`，减少 AppModel 对本地文件安全边界的内联判断。
 - 将预览内容保存、恢复和本地编辑冲突接受的状态规划抽入 `ModulePreviewEditPlanner`，让 AppModel 只执行缓存写入、持久化和输出重建。
 - 将本地模块导入成功后的 Script-Hub 订阅元数据恢复、来源格式归一化、content hash 和状态写回收进 `LocalModuleImportPlanner`，让 AppModel 只负责转换与缓存写入。
 - 明确 GitHub 自动发布运行前只要求任一独立模块存在缓存输出，并补充混合缓存场景测试，避免部分模块缺缓存时误跳过自动发布。

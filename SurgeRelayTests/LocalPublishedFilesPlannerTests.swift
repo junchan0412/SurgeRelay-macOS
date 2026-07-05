@@ -85,4 +85,34 @@ final class LocalPublishedFilesPlannerTests: XCTestCase {
             ).isEmpty
         )
     }
+
+    func testLocalPublishedFilesPlannerBuildsConfirmedCleanupPlan() {
+        let preview = PublishPreview(
+            destination: .local,
+            targetDescription: "/Users/example/Surge",
+            activeFiles: ["A.sgmodule", "Folder/B.sgmodule"],
+            changedFiles: [],
+            deletedFiles: ["Old.sgmodule", "Folder/Removed.sgmodule"]
+        )
+
+        let plan = LocalPublishedFilesPlanner.confirmedCleanupPlan(
+            preview: preview,
+            previousRootDirectory: "/Users/example/Surge",
+            previousPublishedPaths: ["A.sgmodule", "Old.sgmodule", "Folder/Removed.sgmodule"]
+        )
+
+        XCTAssertEqual(plan.targetDirectory, "/Users/example/Surge")
+        XCTAssertEqual(plan.obsoleteRelativePaths, ["Old.sgmodule", "Folder/Removed.sgmodule"])
+        XCTAssertEqual(plan.knownManagedRelativePaths, ["A.sgmodule", "Old.sgmodule", "Folder/Removed.sgmodule"])
+        XCTAssertEqual(plan.persistedRootDirectory, "/Users/example/Surge")
+        XCTAssertEqual(plan.persistedFilePaths, ["A.sgmodule", "Folder/B.sgmodule"])
+        XCTAssertEqual(plan.statusMessage, "已清理 2 个本地旧文件")
+
+        let movedRootPlan = LocalPublishedFilesPlanner.confirmedCleanupPlan(
+            preview: preview,
+            previousRootDirectory: "/Users/example/Other",
+            previousPublishedPaths: ["A.sgmodule", "Old.sgmodule"]
+        )
+        XCTAssertTrue(movedRootPlan.knownManagedRelativePaths.isEmpty)
+    }
 }
