@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将更新协调、Web 管理访问地址和配置目录迁移逻辑从 `ServiceModels.swift` 拆入独立服务文件，进一步压缩共享模型杂项。
 - 将发布计划、发布准入和本地源路径解析从 `ServiceModels.swift` 拆入 `PublishCoordinator.swift`，让共享模型文件继续保留小型跨服务值类型。
 - 将更新失败原因文案格式化从 `ServiceModels.swift` 拆入 `UpdateFailureFormatter.swift`，与更新失败补查规划保持同一服务边界。
 - 将安装、钥匙串、本地根目录和诊断报告 payload 模型从 `ServiceModels.swift` 拆入 `DiagnosticModels.swift`，继续压缩共享模型杂项文件。
