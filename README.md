@@ -184,10 +184,10 @@ EXPECT_ADHOC_SIGNATURE=0 \
 EXPECTED_CODESIGN_AUTHORITY="Surge Relay Self-Signed Code Signing" \
 ./script/verify_github_release_assets.sh \
   --repo junchan0412/SurgeRelay-macOS \
-  --tag v1.3.8
+  --tag v1.3.9
 ```
 
-本轮深度调研和优化路线图见 [PROJECT_AUDIT_2026-07-04.md](./PROJECT_AUDIT_2026-07-04.md)。
+本轮深度调研和优化路线图见 [PROJECT_AUDIT_2026-07-04.md](./PROJECT_AUDIT_2026-07-04.md)。当前已完成工作、待完成工作和发布核对入口见 [DEVELOPMENT_STATUS.md](./DEVELOPMENT_STATUS.md)。
 
 ## 开源协议
 

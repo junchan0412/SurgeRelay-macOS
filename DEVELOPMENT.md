@@ -1,6 +1,7 @@
 # Surge Relay Development Guide
 
 This document records the project conventions needed to maintain this fork.
+For the current completed-work summary, pending-work list, and release checklist, see `DEVELOPMENT_STATUS.md`.
 
 ## Project Shape
 
@@ -145,6 +146,8 @@ Web management markup helpers live in `WebResources/web-markup.js`. Keep reusabl
 
 Web management sidebar rendering lives in `WebResources/web-sidebar.js`. Keep failure-filter state application, summary-row updates, module-list rendering, and sidebar live patching there; `app.js` should route state changes to the sidebar controller instead of owning list DOM details.
 
+Web management activity rendering lives in `WebResources/web-activity.js`. Keep update status text, refresh-button admission state, cancel button state, progress bar state, and latest-update text there; `app.js` should route state changes to the activity controller instead of owning activity DOM details.
+
 Web management API/session helpers live in `WebResources/web-api.js`. Keep URL token extraction, session bootstrap, request headers, JSON body handling, same-origin credentials, error payload parsing, and 401 token retry there; `app.js` should call the client instead of directly owning fetch/session details.
 
 Web management state/navigation helpers live in `WebResources/web-state.js`. Keep initial module selection, mobile history URLs, history entry construction, mobile back/popstate decisions, fallback selection, and EventSource reconnect/polling behavior there; `app.js` should coordinate rendering through those helpers instead of duplicating route or live-state subscription logic.
@@ -185,6 +188,7 @@ node --check SurgeRelay/WebResources/web-options.js
 node --check SurgeRelay/WebResources/web-format.js
 node --check SurgeRelay/WebResources/web-markup.js
 node --check SurgeRelay/WebResources/web-sidebar.js
+node --check SurgeRelay/WebResources/web-activity.js
 node --check SurgeRelay/WebResources/web-api.js
 node --check SurgeRelay/WebResources/web-state.js
 node --check SurgeRelay/WebResources/web-editor.js

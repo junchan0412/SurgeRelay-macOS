@@ -7,6 +7,7 @@ const optionsSource = readFileSync(new URL('../SurgeRelay/WebResources/web-optio
 const formatSource = readFileSync(new URL('../SurgeRelay/WebResources/web-format.js', import.meta.url), 'utf8');
 const markupSource = readFileSync(new URL('../SurgeRelay/WebResources/web-markup.js', import.meta.url), 'utf8');
 const sidebarSource = readFileSync(new URL('../SurgeRelay/WebResources/web-sidebar.js', import.meta.url), 'utf8');
+const activitySource = readFileSync(new URL('../SurgeRelay/WebResources/web-activity.js', import.meta.url), 'utf8');
 const apiSource = readFileSync(new URL('../SurgeRelay/WebResources/web-api.js', import.meta.url), 'utf8');
 const stateSource = readFileSync(new URL('../SurgeRelay/WebResources/web-state.js', import.meta.url), 'utf8');
 const editorSource = readFileSync(new URL('../SurgeRelay/WebResources/web-editor.js', import.meta.url), 'utf8');
@@ -19,6 +20,7 @@ vm.runInContext(optionsSource, context, { filename: 'web-options.js' });
 vm.runInContext(formatSource, context, { filename: 'web-format.js' });
 vm.runInContext(markupSource, context, { filename: 'web-markup.js' });
 vm.runInContext(sidebarSource, context, { filename: 'web-sidebar.js' });
+vm.runInContext(activitySource, context, { filename: 'web-activity.js' });
 vm.runInContext(apiSource, context, { filename: 'web-api.js' });
 vm.runInContext(stateSource, context, { filename: 'web-state.js' });
 vm.runInContext(editorSource, context, { filename: 'web-editor.js' });
@@ -35,6 +37,8 @@ const markup = context.SurgeRelayWebMarkup;
 assert.ok(markup, 'web markup should install a global testable API');
 const sidebarHelpers = context.SurgeRelayWebSidebar;
 assert.ok(sidebarHelpers, 'web sidebar should install a global testable API');
+const activityHelpers = context.SurgeRelayWebActivity;
+assert.ok(activityHelpers, 'web activity should install a global testable API');
 const api = context.SurgeRelayWebAPI;
 assert.ok(api, 'web api should install a global testable API');
 const stateHelpers = context.SurgeRelayWebState;
@@ -89,6 +93,11 @@ assert.doesNotMatch(
   appSource,
   /function (renderSidebar|patchSidebarLive)\(/,
   'app.js should use web-sidebar for sidebar rendering and live patching'
+);
+assert.doesNotMatch(
+  appSource,
+  /function renderActivity\(/,
+  'app.js should use web-activity for update activity rendering'
 );
 
 const sidebarLabel = { textContent: '' };
@@ -166,6 +175,70 @@ sidebarState = {
 sidebarController.patchLive();
 assert.equal(sidebarToggle.checked, true);
 assert.equal(sidebarRow.classList.disabled, false);
+
+const activityCancelLabel = { textContent: '' };
+const activityUI = {
+  status: { textContent: '' },
+  refresh: {
+    disabled: false,
+    title: '',
+    attrs: {},
+    setAttribute(name, value) { this.attrs[name] = value; }
+  },
+  percent: { textContent: '' },
+  progressTrack: { hidden: true },
+  progressFill: { style: { width: '' } },
+  cancelActivity: {
+    hidden: true,
+    disabled: false,
+    querySelector: () => activityCancelLabel
+  },
+  latestUpdate: { textContent: '' }
+};
+let activityState = {
+  combined: { lastUpdatedAt: '2026-07-05T12:34:00Z' },
+  activity: {
+    title: '更新模块',
+    status: '正在更新',
+    isWorking: true,
+    progress: 0.42,
+    canCancel: true,
+    kind: 'updatingModules',
+    canStartUpdate: false,
+    updateBlockedReason: '正在执行任务'
+  }
+};
+const activityController = activityHelpers.createActivityController({
+  ui: activityUI,
+  getState: () => activityState
+});
+activityController.render();
+assert.match(activityUI.status.textContent, /更新模块/);
+assert.equal(activityUI.refresh.disabled, true);
+assert.equal(activityUI.refresh.attrs['aria-label'], '无法更新：正在执行任务');
+assert.equal(activityUI.cancelActivity.hidden, false);
+assert.equal(activityUI.cancelActivity.disabled, false);
+assert.equal(activityCancelLabel.textContent, '取消');
+assert.equal(activityUI.percent.textContent, '42%');
+assert.equal(activityUI.progressTrack.hidden, false);
+assert.equal(activityUI.progressFill.style.width, '42%');
+assert.match(activityUI.latestUpdate.textContent, /2026/);
+activityState = {
+  combined: { lastUpdatedAt: null },
+  activity: {
+    title: '',
+    status: '准备就绪',
+    kind: 'idle',
+    isWorking: false,
+    canStartUpdate: true
+  }
+};
+activityController.render();
+assert.equal(activityUI.refresh.disabled, false);
+assert.equal(activityUI.cancelActivity.hidden, true);
+assert.equal(activityUI.percent.textContent, '');
+assert.equal(activityUI.progressTrack.hidden, true);
+assert.equal(activityUI.latestUpdate.textContent, '尚未更新');
 
 assert.equal(
   logic.publishedRelativePathForDraft({
@@ -1198,6 +1271,7 @@ const optionsScriptIndex = indexHTML.indexOf('/web-options.js');
 const formatScriptIndex = indexHTML.indexOf('/web-format.js');
 const markupScriptIndex = indexHTML.indexOf('/web-markup.js');
 const sidebarScriptIndex = indexHTML.indexOf('/web-sidebar.js');
+const activityScriptIndex = indexHTML.indexOf('/web-activity.js');
 const apiScriptIndex = indexHTML.indexOf('/web-api.js');
 const stateScriptIndex = indexHTML.indexOf('/web-state.js');
 const editorScriptIndex = indexHTML.indexOf('/web-editor.js');
@@ -1209,7 +1283,8 @@ assert.ok(optionsScriptIndex > logicScriptIndex, 'web-options.js must load after
 assert.ok(formatScriptIndex > optionsScriptIndex, 'web-format.js must load after web-options.js');
 assert.ok(markupScriptIndex > formatScriptIndex, 'web-markup.js must load after web-format.js');
 assert.ok(sidebarScriptIndex > markupScriptIndex, 'web-sidebar.js must load after web-markup.js');
-assert.ok(apiScriptIndex > sidebarScriptIndex, 'web-api.js must load after web-sidebar.js');
+assert.ok(activityScriptIndex > sidebarScriptIndex, 'web-activity.js must load after web-sidebar.js');
+assert.ok(apiScriptIndex > activityScriptIndex, 'web-api.js must load after web-activity.js');
 assert.ok(stateScriptIndex > apiScriptIndex, 'web-state.js must load after web-api.js');
 assert.ok(editorScriptIndex > stateScriptIndex, 'web-editor.js must load after web-state.js');
 assert.ok(feedbackScriptIndex > editorScriptIndex, 'web-feedback.js must load after web-editor.js');

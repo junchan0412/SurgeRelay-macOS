@@ -46,7 +46,7 @@ const { scriptHubDefaults, advancedGroups } = webOptions;
 
 const webFormat = window.SurgeRelayWebFormat;
 if (!webFormat) throw new Error('web-format.js must load before app.js');
-const { formatDate, formatTime, highlightCode } = webFormat;
+const { formatDate, highlightCode } = webFormat;
 
 const webMarkup = window.SurgeRelayWebMarkup;
 if (!webMarkup) throw new Error('web-markup.js must load before app.js');
@@ -59,6 +59,9 @@ const {
 
 const webSidebar = window.SurgeRelayWebSidebar;
 if (!webSidebar) throw new Error('web-sidebar.js must load before app.js');
+
+const webActivity = window.SurgeRelayWebActivity;
+if (!webActivity) throw new Error('web-activity.js must load before app.js');
 
 const webAPI = window.SurgeRelayWebAPI;
 if (!webAPI) throw new Error('web-api.js must load before app.js');
@@ -130,6 +133,10 @@ const sidebarController = webSidebar.createSidebarController({
   getSelectedID: () => selectedID,
   getFailuresOnly: () => showFailuresOnly,
   setFailuresOnly: value => { showFailuresOnly = Boolean(value); }
+});
+const activityController = webActivity.createActivityController({
+  ui,
+  getState: () => state
 });
 const stateEventController = webState.createStateEventController({
   EventSource: window.EventSource,
@@ -229,11 +236,11 @@ function applyState(next, initial = false, renderCurrentDetail = false) {
     ui.body.classList.toggle('has-selection', Boolean(selectedID));
     if (initial || renderCurrentDetail || selectionChanged) {
       sidebarController.render();
-      renderActivity();
+      activityController.render();
       renderDetail(false);
     } else {
       patchLiveState(previous, next);
-      renderActivity();
+      activityController.render();
     }
 }
 
@@ -296,30 +303,6 @@ function patchDetailValue(label, value) {
     .find(item => item.querySelector('.detail-label span:last-child')?.textContent === label);
   const target = row?.querySelector('.detail-value');
   if (target && target.textContent !== value) target.textContent = value;
-}
-
-function renderActivity() {
-  if (!state) return;
-  const activity = webLogic.activityPresentation(state.activity, {
-    formatAutomaticPublish: formatTime
-  });
-  ui.status.textContent = activity.statusText;
-  ui.refresh.disabled = activity.refreshDisabled;
-  ui.refresh.title = activity.refreshTitle;
-  ui.refresh.setAttribute('aria-label', activity.refreshAriaLabel);
-  ui.cancelActivity.hidden = !activity.showCancel;
-  ui.cancelActivity.disabled = !activity.canCancel;
-  ui.cancelActivity.querySelector('span:last-child').textContent = activity.cancelLabel;
-  if (activity.progressVisible) {
-    ui.percent.textContent = `${activity.progressPercent}%`;
-    ui.progressTrack.hidden = false;
-    ui.progressFill.style.width = activity.progressWidth;
-  } else {
-    ui.percent.textContent = '';
-    ui.progressTrack.hidden = true;
-    ui.progressFill.style.width = activity.progressWidth;
-  }
-  ui.latestUpdate.textContent = formatDate(state.combined.lastUpdatedAt, '尚未更新');
 }
 
 function renderDetail(animate = true) {

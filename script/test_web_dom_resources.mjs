@@ -9,6 +9,7 @@ const optionsSource = readFileSync(new URL('SurgeRelay/WebResources/web-options.
 const formatSource = readFileSync(new URL('SurgeRelay/WebResources/web-format.js', root), 'utf8');
 const markupSource = readFileSync(new URL('SurgeRelay/WebResources/web-markup.js', root), 'utf8');
 const sidebarSource = readFileSync(new URL('SurgeRelay/WebResources/web-sidebar.js', root), 'utf8');
+const activitySource = readFileSync(new URL('SurgeRelay/WebResources/web-activity.js', root), 'utf8');
 const apiSource = readFileSync(new URL('SurgeRelay/WebResources/web-api.js', root), 'utf8');
 const stateSource = readFileSync(new URL('SurgeRelay/WebResources/web-state.js', root), 'utf8');
 const editorSource = readFileSync(new URL('SurgeRelay/WebResources/web-editor.js', root), 'utf8');
@@ -441,6 +442,7 @@ vm.runInContext(optionsSource, context, { filename: 'web-options.js' });
 vm.runInContext(formatSource, context, { filename: 'web-format.js' });
 vm.runInContext(markupSource, context, { filename: 'web-markup.js' });
 vm.runInContext(sidebarSource, context, { filename: 'web-sidebar.js' });
+vm.runInContext(activitySource, context, { filename: 'web-activity.js' });
 vm.runInContext(apiSource, context, { filename: 'web-api.js' });
 vm.runInContext(stateSource, context, { filename: 'web-state.js' });
 vm.runInContext(editorSource, context, { filename: 'web-editor.js' });

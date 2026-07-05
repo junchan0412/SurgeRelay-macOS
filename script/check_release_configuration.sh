@@ -137,6 +137,7 @@ for resource in \
   "$ROOT_DIR/SurgeRelay/WebResources/web-format.js" \
   "$ROOT_DIR/SurgeRelay/WebResources/web-markup.js" \
   "$ROOT_DIR/SurgeRelay/WebResources/web-sidebar.js" \
+  "$ROOT_DIR/SurgeRelay/WebResources/web-activity.js" \
   "$ROOT_DIR/SurgeRelay/WebResources/web-api.js" \
   "$ROOT_DIR/SurgeRelay/WebResources/web-state.js" \
   "$ROOT_DIR/SurgeRelay/WebResources/web-editor.js" \
