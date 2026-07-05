@@ -181,62 +181,38 @@ struct ModuleEditorView: View {
     }
 
     private var editorPreviewCard: some View {
-        HStack(alignment: .center, spacing: 14) {
-            DraftModuleIconPreview(
-                url: displayedIconPreviewURL,
-                size: 54,
-                isInvalid: customIconInputIsInvalid
-            )
-            VStack(alignment: .leading, spacing: 7) {
-                Text(editorPreviewTitle)
-                    .font(.title3.weight(.semibold))
-                    .lineLimit(2)
-                Text(editorPreviewSubtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                Text(previewPublishedRelativePath)
-                    .font(.caption2.monospaced())
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-                    .textSelection(.enabled)
-                Label(iconSourceTitle, systemImage: customIconInputIsInvalid ? "exclamationmark.triangle" : "photo")
-                    .font(.caption)
-                    .foregroundStyle(customIconInputIsInvalid ? .orange : .secondary)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.22), lineWidth: 0.5)
-        }
+        ModuleEditorPreviewCard(
+            title: editorPreviewTitle,
+            subtitle: editorPreviewSubtitle,
+            publishedRelativePath: previewPublishedRelativePath,
+            iconURL: displayedIconPreviewURL,
+            iconIsInvalid: customIconInputIsInvalid,
+            iconSourceTitle: iconSourceTitle
+        )
     }
 
     private var basicInfoSection: some View {
-        editorSection("基本信息") {
-            editorTextFieldRow("显示名称", icon: "textformat", text: $draft.name, prompt: "例如：YouTube 去广告")
-            EditorControlRow("模块存放", icon: draft.storageLocation.systemImage) {
+        ModuleEditorSection("基本信息") {
+            ModuleEditorTextFieldRow(title: "显示名称", icon: "textformat", text: $draft.name, prompt: "例如：YouTube 去广告")
+            ModuleEditorControlRow("模块存放", icon: draft.storageLocation.systemImage) {
                 storageLocationPicker
             }
-            EditorInfoRow("关系", icon: draftSourceOrigin.systemImage) {
+            ModuleEditorInfoRow("关系", icon: draftSourceOrigin.systemImage) {
                 Text(relationshipHint)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            editorTextFieldRow("模块标签", icon: "tag", text: $draft.category, prompt: "Surge category，例如：广告过滤")
-            EditorControlRow("存放文件夹", icon: "folder") {
+            ModuleEditorTextFieldRow(title: "模块标签", icon: "tag", text: $draft.category, prompt: "Surge category，例如：广告过滤")
+            ModuleEditorControlRow("存放文件夹", icon: "folder") {
                 folderPicker
             }
         }
     }
 
     private var iconSection: some View {
-        editorSection("图标") {
-            EditorControlRow("图标 URL", icon: "photo") {
+        ModuleEditorSection("图标") {
+            ModuleEditorControlRow("图标 URL", icon: "photo") {
                 HStack(spacing: 8) {
                     TextField("图标 URL", text: $draft.iconURL, prompt: Text("https://example.com/icon.png"))
                         .labelsHidden()
@@ -258,7 +234,7 @@ struct ModuleEditorView: View {
                     )
                 }
             }
-            EditorInfoRow(customIconInputIsInvalid ? "检查" : "兼容性", icon: customIconInputIsInvalid ? "exclamationmark.triangle" : "info.circle") {
+            ModuleEditorInfoRow(customIconInputIsInvalid ? "检查" : "兼容性", icon: customIconInputIsInvalid ? "exclamationmark.triangle" : "info.circle") {
                 Text(iconURLHint)
                     .font(.caption)
                     .foregroundStyle(customIconInputIsInvalid ? .orange : .secondary)
@@ -269,53 +245,30 @@ struct ModuleEditorView: View {
     }
 
     private var publishingSection: some View {
-        editorSection("发布") {
+        ModuleEditorSection("发布") {
             if model.settings.combinedModuleEnabled {
-                editorToggleRow("包含在总模块中", icon: "square.stack.3d.up", isOn: $draft.isEnabled)
+                ModuleEditorToggleRow(title: "包含在总模块中", icon: "square.stack.3d.up", isOn: $draft.isEnabled)
             }
-            editorToggleRow("发布为独立模块", icon: "doc.badge.gearshape", isOn: $draft.publishesStandalone)
-            editorTextFieldRow("输出文件名", icon: "doc", text: $draft.outputFileName, prompt: "留空时根据显示名称生成")
-            EditorInfoRow("输出路径", icon: "folder") {
-                VStack(alignment: .leading, spacing: 6) {
-                    ViewThatFits(in: .horizontal) {
-                        HStack(alignment: .top, spacing: 8) {
-                            outputPathText(fixedHorizontal: true)
-                            TextCopyButton(text: previewPublishedRelativePath)
-                                .layoutPriority(1)
-                        }
-                        VStack(alignment: .leading, spacing: 8) {
-                            outputPathText(fixedHorizontal: false)
-                            TextCopyButton(text: previewPublishedRelativePath)
-                        }
-                    }
-                    if let outputPathNotice {
-                        Label(outputPathNotice.message, systemImage: outputPathNotice.isWarning ? "exclamationmark.triangle" : "info.circle")
-                            .font(.caption)
-                            .foregroundStyle(outputPathNotice.isWarning ? .orange : .secondary)
-                    }
-                }
+            ModuleEditorToggleRow(title: "发布为独立模块", icon: "doc.badge.gearshape", isOn: $draft.publishesStandalone)
+            ModuleEditorTextFieldRow(title: "输出文件名", icon: "doc", text: $draft.outputFileName, prompt: "留空时根据显示名称生成")
+            ModuleEditorInfoRow("输出路径", icon: "folder") {
+                ModuleEditorOutputPathRow(
+                    relativePath: previewPublishedRelativePath,
+                    notice: outputPathNotice
+                )
             }
         }
     }
 
-    private func outputPathText(fixedHorizontal: Bool) -> some View {
-        Text(previewPublishedRelativePath)
-            .font(.system(.caption, design: .monospaced))
-            .foregroundStyle(.secondary)
-            .textSelection(.enabled)
-            .fixedSize(horizontal: fixedHorizontal, vertical: true)
-            .frame(maxWidth: fixedHorizontal ? nil : .infinity, alignment: .leading)
-    }
-
     private var sourceSection: some View {
-        editorSection("转换前来源") {
-            editorTextFieldRow(
-                "来源地址",
+        ModuleEditorSection("转换前来源") {
+            ModuleEditorTextFieldRow(
+                title: "来源地址",
                 icon: "link",
                 text: $draft.sourceURL,
                 prompt: "https://example.com/module.plugin 或 file:///.../Demo.sgmodule"
             )
-            EditorControlRow("来源格式", icon: "doc.text") {
+            ModuleEditorControlRow("来源格式", icon: "doc.text") {
                 Picker("来源格式", selection: $draft.sourceFormat) {
                     ForEach(ModuleSourceFormat.allCases) { format in
                         Text(format.title).tag(format)
@@ -328,7 +281,7 @@ struct ModuleEditorView: View {
     }
 
     private var advancedEditorSection: some View {
-        editorSection("转换") {
+        ModuleEditorSection("转换") {
             Button {
                 withAnimation(.snappy) { isAdvancedExpanded.toggle() }
             } label: {
@@ -363,79 +316,18 @@ struct ModuleEditorView: View {
     }
 
     private var folderPicker: some View {
-        HStack(spacing: 8) {
-            Picker("", selection: Binding(
-                get: { ModuleOutputFolder.normalized(draft.outputFolder) },
-                set: { draft.outputFolder = $0 }
-            )) {
-                ForEach(model.moduleOutputFolderOptions(preserving: draft.outputFolder), id: \.self) { folder in
-                    Text(ModuleOutputFolder.displayTitle(for: folder)).tag(folder)
-                }
-            }
-            .labelsHidden()
-
-            Button {
+        ModuleEditorFolderPicker(
+            outputFolder: $draft.outputFolder,
+            folders: model.moduleOutputFolderOptions(preserving: draft.outputFolder),
+            onCreateFolder: {
                 newFolderName = ""
                 showsNewFolderDialog = true
-            } label: {
-                Image(systemName: "folder.badge.plus")
             }
-            .help("新建存放文件夹")
-        }
+        )
     }
 
     private var storageLocationPicker: some View {
-        Picker("模块存放", selection: $draft.storageLocation) {
-            ForEach(ModuleStorageLocation.allCases) { location in
-                Label(location.title, systemImage: location.systemImage)
-                    .tag(location)
-            }
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .frame(maxWidth: 260, alignment: .leading)
-    }
-
-    private func editorTextFieldRow(
-        _ title: String,
-        icon: String,
-        text: Binding<String>,
-        prompt: String
-    ) -> some View {
-        EditorControlRow(title, icon: icon) {
-            TextField(title, text: text, prompt: Text(prompt))
-                .labelsHidden()
-                .textFieldStyle(.roundedBorder)
-        }
-    }
-
-    private func editorToggleRow(_ title: String, icon: String, isOn: Binding<Bool>) -> some View {
-        EditorControlRow(title, icon: icon) {
-            Toggle(title, isOn: isOn)
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .controlSize(.small)
-        }
-    }
-
-    private func editorSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 9) {
-            Text(title)
-                .font(.headline)
-                .padding(.leading, 2)
-            VStack(alignment: .leading, spacing: 11) {
-                content()
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 13)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(Color(nsColor: .separatorColor).opacity(0.18), lineWidth: 0.5)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        ModuleEditorStorageLocationPicker(storageLocation: $draft.storageLocation)
     }
 
     /// Auto-fills the name from the module's own `#!name=` metadata (Surge / Loon)
@@ -486,120 +378,5 @@ struct ModuleEditorView: View {
         } catch {
             localError = error.localizedDescription
         }
-    }
-}
-
-private struct EditorInfoRow<Content: View>: View {
-    let title: String
-    let icon: String
-    private let content: () -> Content
-
-    init(_ title: String, icon: String, @ViewBuilder content: @escaping () -> Content) {
-        self.title = title
-        self.icon = icon
-        self.content = content
-    }
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: icon)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .frame(width: 20, alignment: .center)
-            Text(title)
-                .font(.callout.weight(.medium))
-                .frame(width: 108, alignment: .leading)
-            content()
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(.vertical, 5)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(Color(nsColor: .separatorColor).opacity(0.14))
-                .frame(height: 0.5)
-                .padding(.leading, 30)
-        }
-    }
-}
-
-private struct EditorControlRow<Content: View>: View {
-    let title: String
-    let icon: String
-    private let content: () -> Content
-
-    init(_ title: String, icon: String, @ViewBuilder content: @escaping () -> Content) {
-        self.title = title
-        self.icon = icon
-        self.content = content
-    }
-
-    var body: some View {
-        EditorInfoRow(title, icon: icon) {
-            content()
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-}
-
-private struct DraftModuleIconPreview: View {
-    let url: URL?
-    let size: CGFloat
-    var isInvalid = false
-
-    var body: some View {
-        Group {
-            if let url {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .empty:
-                        previewContainer(
-                            placeholder.overlay { ProgressView().controlSize(.mini) },
-                            isWarning: isInvalid
-                        )
-                    case let .success(image):
-                        previewContainer(image.resizable().scaledToFill(), isWarning: isInvalid)
-                    case .failure:
-                        previewContainer(warningPlaceholder, isWarning: true)
-                    @unknown default:
-                        previewContainer(placeholder, isWarning: isInvalid)
-                    }
-                }
-            } else {
-                previewContainer(placeholder, isWarning: isInvalid)
-            }
-        }
-        .accessibilityHidden(true)
-    }
-
-    private func previewContainer<Content: View>(_ content: Content, isWarning: Bool) -> some View {
-        content
-        .frame(width: size, height: size)
-        .background(.quaternary.opacity(0.35), in: iconShape)
-        .clipShape(iconShape)
-        .overlay {
-            iconShape
-                .strokeBorder(
-                    isWarning ? Color.orange.opacity(0.72) : Color(nsColor: .separatorColor).opacity(0.45),
-                    lineWidth: isWarning ? 1 : 0.5
-                )
-        }
-    }
-
-    private var placeholder: some View {
-        Image(systemName: isInvalid ? "exclamationmark.triangle" : "photo")
-            .font(.system(size: size * 0.45))
-            .foregroundStyle(isInvalid ? .orange : .secondary)
-            .frame(width: size, height: size)
-    }
-
-    private var warningPlaceholder: some View {
-        Image(systemName: "exclamationmark.triangle")
-            .font(.system(size: size * 0.45))
-            .foregroundStyle(.orange)
-            .frame(width: size, height: size)
-    }
-
-    private var iconShape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: size * ModuleIconView.cornerRadiusRatio, style: .continuous)
     }
 }

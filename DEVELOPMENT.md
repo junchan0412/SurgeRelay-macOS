@@ -141,6 +141,8 @@ Diagnostic payloads and snapshots live in `Models/DiagnosticModels.swift`. Keep 
 
 GitHub Release metadata, install guidance, checksum validation state, and version comparison live in `Models/GitHubReleaseModels.swift`. The GitHub latest-release API call and sha256 sidecar downloads live in `Services/GitHubReleaseClient.swift`; `Views/CheckForUpdatesView.swift` should remain UI-only apart from SwiftUI presentation adapters.
 
+Module editor presentation primitives live in `Views/ModuleEditorComponents.swift`. Keep the preview card, section chrome, editor rows, output path row, output-folder picker, storage-location picker, and draft icon preview there; `Views/ModuleEditorView.swift` should own draft state, derived editor hints, source auto-fill, folder creation, and save/cancel flow.
+
 ## Build And Test
 
 `ModelAndCoordinatorTests.swift` owns pure model/coordinator coverage, including source metadata restoration, source identity, published address resolution, and summary counts. `UpdateFailureTests.swift` owns update failure formatting and original-source probe planning. `DiagnosticReportTests.swift` owns diagnostic report snapshots and secret redaction. `ModulePreviewContentProviderTests.swift` owns preview content recovery and cache-miss behavior. `CredentialTokenCoordinatorTests.swift` owns GitHub/Web token migration, storage fallback, and generated token behavior. `WorkActivityTests.swift` owns task activity state and update-admission rules.
