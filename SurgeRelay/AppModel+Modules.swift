@@ -328,28 +328,26 @@ extension AppModel {
 
     func setModuleArgument(moduleID: UUID, key: String, value: String, defaultValue: String) {
         guard let index = modules.firstIndex(where: { $0.id == moduleID }) else { return }
-        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        let stored = modules[index].argumentOverrides[key]
-        let nextStored: String? = normalized == defaultValue ? nil : normalized
-        guard stored != nextStored else { return }
+        guard let plan = ModuleArgumentPlanner.setOverride(
+            module: modules[index],
+            key: key,
+            value: value,
+            defaultValue: defaultValue
+        ) else { return }
         registerLocalChange()
-        if let nextStored {
-            modules[index].argumentOverrides[key] = nextStored
-        } else {
-            modules[index].argumentOverrides.removeValue(forKey: key)
-        }
+        modules[index].argumentOverrides = plan.overrides
         try? persistModules()
-        statusMessage = "已更新 \(modules[index].name) 的模块参数"
+        statusMessage = plan.statusMessage
         Task { await rebuildCombinedFromCache() }
     }
 
     func resetModuleArguments(moduleID: UUID) {
         guard let index = modules.firstIndex(where: { $0.id == moduleID }),
-              !modules[index].argumentOverrides.isEmpty else { return }
+              let plan = ModuleArgumentPlanner.resetOverrides(module: modules[index]) else { return }
         registerLocalChange()
-        modules[index].argumentOverrides.removeAll()
+        modules[index].argumentOverrides = plan.overrides
         try? persistModules()
-        statusMessage = "已恢复 \(modules[index].name) 的默认参数"
+        statusMessage = plan.statusMessage
         Task { await rebuildCombinedFromCache() }
     }
 

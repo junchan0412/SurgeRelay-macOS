@@ -128,6 +128,7 @@
 		92C92C92C92C92C92C92C92C /* LocalModuleScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B92B92B92B92B92B92B92B92 /* LocalModuleScanner.swift */; };
 		92D92D92D92D92D92D92D92D /* LocalModuleImportPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B93B93B93B93B93B93B93B93 /* LocalModuleImportPlanner.swift */; };
 		92E92E92E92E92E92E92E92E /* LocalPublishedFilesPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B95B95B95B95B95B95B95B95 /* LocalPublishedFilesPlanner.swift */; };
+		D61D61D61D61D61D61D61D61 /* ModuleArgumentPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E61E61E61E61E61E61E61E61 /* ModuleArgumentPlanner.swift */; };
 		94D94D94D94D94D94D94D94D /* ModuleSearchIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = B94B94B94B94B94B94B94B94 /* ModuleSearchIndex.swift */; };
 		A92A92A92A92A92A92A92A92 /* ModuleSidebarSectionPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B82B82B82B82B82B82B82B82 /* ModuleSidebarSectionPlanner.swift */; };
 		920AB497FDE7DA286892FFB9 /* arrow.clockwise.svg in Resources */ = {isa = PBXBuildFile; fileRef = 1205EFC09D3CF22EAF9A2F9B /* arrow.clockwise.svg */; };
@@ -339,6 +340,7 @@
 		E50E50E50E50E50E50E50E50 /* CredentialTokenCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialTokenCoordinator.swift; sourceTree = "<group>"; };
 		E97E97E97E97E97E97E97E97 /* ConfigurationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationManager.swift; sourceTree = "<group>"; };
 		E60E60E60E60E60E60E60E60 /* ModuleDraftPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleDraftPlanner.swift; sourceTree = "<group>"; };
+		E61E61E61E61E61E61E61E61 /* ModuleArgumentPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleArgumentPlanner.swift; sourceTree = "<group>"; };
 		E70E70E70E70E70E70E70E70 /* ModuleOutputFolderCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleOutputFolderCatalog.swift; sourceTree = "<group>"; };
 		E98E98E98E98E98E98E98E98 /* UpdateCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateCoordinator.swift; sourceTree = "<group>"; };
 		E80E80E80E80E80E80E80E80 /* UpdateFailurePlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateFailurePlanner.swift; sourceTree = "<group>"; };
@@ -469,6 +471,7 @@
 				E1070DB686AADF6D51CF6CDB /* ModuleFileStore.swift */,
 				0C15061B43CE01B2548616E5 /* ModuleIconStore.swift */,
 				E60E60E60E60E60E60E60E60 /* ModuleDraftPlanner.swift */,
+				E61E61E61E61E61E61E61E61 /* ModuleArgumentPlanner.swift */,
 				E30E30E30E30E30E30E30E30 /* ModuleNamingPlanner.swift */,
 				E70E70E70E70E70E70E70E70 /* ModuleOutputFolderCatalog.swift */,
 				E20E20E20E20E20E20E20E20 /* ModulePreviewContentProvider.swift */,
@@ -892,6 +895,7 @@
 				72BFC19A86A6433A42A41F75 /* ModuleFileStore.swift in Sources */,
 				B46911120F2F5BB4C736DCDE /* ModuleIconStore.swift in Sources */,
 				D60D60D60D60D60D60D60D60 /* ModuleDraftPlanner.swift in Sources */,
+				D61D61D61D61D61D61D61D61 /* ModuleArgumentPlanner.swift in Sources */,
 				D30D30D30D30D30D30D30D30 /* ModuleNamingPlanner.swift in Sources */,
 				D70D70D70D70D70D70D70D70 /* ModuleOutputFolderCatalog.swift in Sources */,
 				D20D20D20D20D20D20D20D20 /* ModulePreviewContentProvider.swift in Sources */,

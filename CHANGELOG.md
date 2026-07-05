@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将模块参数覆盖值的保存、清空和重置文案规划抽入 `ModuleArgumentPlanner`，减少 AppModel 中的参数存储规则分支。
 - 将本地发布写入后的持久化/清理确认决策收进 `LocalPublishedFilesPlanner`，让 AppModel 只执行本地发布完成结果。
 - 将 Web 管理 API 鉴权、同源校验和 session cookie 规则抽入 `WebRequestSecurity.swift`，继续收敛 `WebManagementHTTP.swift` 的职责。
 - 将 Web 管理认证失败限流抽入 `WebAuthenticationThrottle.swift`，让 `WebManagementHTTP.swift` 聚焦 HTTP 请求、响应、解析和安全头类型。

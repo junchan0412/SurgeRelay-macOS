@@ -249,6 +249,50 @@ final class ModulePlanningTests: XCTestCase {
         XCTAssertEqual(normalized[1].outputFileName, "Surge-Relay-2.sgmodule")
     }
 
+    func testModuleArgumentPlannerStoresOverridesAndClearsDefaults() throws {
+        var module = RelayModule(
+            name: "Arguments",
+            sourceURL: "https://example.com/arguments.sgmodule",
+            outputFileName: "Arguments",
+            argumentOverrides: ["Mode": "strict", "Region": "US"]
+        )
+
+        let update = try XCTUnwrap(ModuleArgumentPlanner.setOverride(
+            module: module,
+            key: "Mode",
+            value: " relaxed ",
+            defaultValue: "auto"
+        ))
+        XCTAssertEqual(update.overrides["Mode"], "relaxed")
+        XCTAssertEqual(update.overrides["Region"], "US")
+        XCTAssertEqual(update.statusMessage, "已更新 Arguments 的模块参数")
+
+        module.argumentOverrides = update.overrides
+        XCTAssertNil(ModuleArgumentPlanner.setOverride(
+            module: module,
+            key: "Mode",
+            value: " relaxed ",
+            defaultValue: "auto"
+        ))
+
+        let clearDefault = try XCTUnwrap(ModuleArgumentPlanner.setOverride(
+            module: module,
+            key: "Mode",
+            value: " auto ",
+            defaultValue: "auto"
+        ))
+        XCTAssertNil(clearDefault.overrides["Mode"])
+        XCTAssertEqual(clearDefault.overrides["Region"], "US")
+
+        module.argumentOverrides = clearDefault.overrides
+        let reset = try XCTUnwrap(ModuleArgumentPlanner.resetOverrides(module: module))
+        XCTAssertTrue(reset.overrides.isEmpty)
+        XCTAssertEqual(reset.statusMessage, "已恢复 Arguments 的默认参数")
+
+        module.argumentOverrides.removeAll()
+        XCTAssertNil(ModuleArgumentPlanner.resetOverrides(module: module))
+    }
+
     func testModuleSidebarSectionPlannerGroupsVisibleModules() {
         let failed = RelayModule(
             name: "Failed",
