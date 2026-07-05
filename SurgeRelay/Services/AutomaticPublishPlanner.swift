@@ -92,7 +92,7 @@ enum AutomaticPublishPlanner {
         return "模块内容未变化\(failureSuffix)；没有开启独立发布的模块，无需 GitHub 自动发布"
     }
 
-    static func hasCachedStandaloneOutput(
+    static func hasAnyCachedStandaloneOutput(
         plan: PublishPlan,
         componentExists: @Sendable (UUID) async -> Bool
     ) async -> Bool {

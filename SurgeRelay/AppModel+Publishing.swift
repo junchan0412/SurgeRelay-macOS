@@ -31,7 +31,7 @@ extension AppModel {
             let runAdmission = AutomaticPublishPlanner.runAdmission(
                 context: self.automaticPublishContext(),
                 plan: self.githubPublishPlan,
-                hasCachedStandaloneOutput: await self.hasGitHubAutomaticPublishableFiles()
+                hasCachedStandaloneOutput: await self.hasAnyCachedGitHubStandaloneOutput()
             )
             guard runAdmission.isAccepted else {
                 self.applyAutomaticPublishAdmission(runAdmission)
@@ -517,8 +517,8 @@ extension AppModel {
         }
     }
 
-    private func hasGitHubAutomaticPublishableFiles() async -> Bool {
-        await AutomaticPublishPlanner.hasCachedStandaloneOutput(
+    private func hasAnyCachedGitHubStandaloneOutput() async -> Bool {
+        await AutomaticPublishPlanner.hasAnyCachedStandaloneOutput(
             plan: githubPublishPlan
         ) { [fileStore] id in
             await fileStore.hasComponent(id: id)

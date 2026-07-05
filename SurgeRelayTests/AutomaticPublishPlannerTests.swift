@@ -181,7 +181,7 @@ final class AutomaticPublishPlannerTests: XCTestCase {
         )
     }
 
-    func testAutomaticPublishPlannerChecksStandaloneCachedOutput() async {
+    func testAutomaticPublishPlannerChecksAnyStandaloneCachedOutput() async {
         let standaloneID = UUID()
         let standalone = RelayModule(
             id: standaloneID,
@@ -190,31 +190,50 @@ final class AutomaticPublishPlannerTests: XCTestCase {
             outputFileName: "Standalone",
             publishesStandalone: true
         )
+        let secondStandaloneID = UUID()
+        let secondStandalone = RelayModule(
+            id: secondStandaloneID,
+            name: "Second Standalone",
+            sourceURL: "https://example.com/second.sgmodule",
+            outputFileName: "Second",
+            publishesStandalone: true
+        )
         let combinedOnlyID = UUID()
         let plan = PublishPlan(
             standaloneModules: [standalone],
             combinedModuleIDs: [combinedOnlyID]
         )
 
-        let hasStandaloneOutput = await AutomaticPublishPlanner.hasCachedStandaloneOutput(
+        let hasStandaloneOutput = await AutomaticPublishPlanner.hasAnyCachedStandaloneOutput(
             plan: plan
         ) { id in
             id == standaloneID
         }
         XCTAssertTrue(hasStandaloneOutput)
 
+        let mixedCachePlan = PublishPlan(
+            standaloneModules: [standalone, secondStandalone],
+            combinedModuleIDs: [combinedOnlyID]
+        )
+        let oneStandaloneOutputIsEnough = await AutomaticPublishPlanner.hasAnyCachedStandaloneOutput(
+            plan: mixedCachePlan
+        ) { id in
+            id == secondStandaloneID
+        }
+        XCTAssertTrue(oneStandaloneOutputIsEnough)
+
         let onlyCombinedPlan = PublishPlan(
             standaloneModules: [],
             combinedModuleIDs: [combinedOnlyID]
         )
-        let combinedOutputDoesNotCount = await AutomaticPublishPlanner.hasCachedStandaloneOutput(
+        let combinedOutputDoesNotCount = await AutomaticPublishPlanner.hasAnyCachedStandaloneOutput(
             plan: onlyCombinedPlan
         ) { _ in
             true
         }
         XCTAssertFalse(combinedOutputDoesNotCount)
 
-        let missingStandaloneOutput = await AutomaticPublishPlanner.hasCachedStandaloneOutput(
+        let missingStandaloneOutput = await AutomaticPublishPlanner.hasAnyCachedStandaloneOutput(
             plan: plan
         ) { _ in
             false
