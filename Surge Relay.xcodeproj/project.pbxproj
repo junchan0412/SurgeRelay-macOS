@@ -35,6 +35,7 @@
 		D80D80D80D80D80D80D80D80 /* UpdateFailurePlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80E80E80E80E80E80E80E80 /* UpdateFailurePlanner.swift */; };
 		D81D81D81D81D81D81D81D81 /* UpdateFailureFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E81E81E81E81E81E81E81E81 /* UpdateFailureFormatter.swift */; };
 		D90D90D90D90D90D90D90D90 /* GitHubPublishPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90E90E90E90E90E90E90E90 /* GitHubPublishPlanner.swift */; };
+		D93D93D93D93D93D93D93D93 /* PublishCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E93E93E93E93E93E93E93E93 /* PublishCoordinator.swift */; };
 		D91D91D91D91D91D91D91D91 /* ModuleRefreshPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E91E91E91E91E91E91E91E91 /* ModuleRefreshPlanner.swift */; };
 		D92D92D92D92D92D92D92D92 /* ModuleMetadataRefreshPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E92E92E92E92E92E92E92E92 /* ModuleMetadataRefreshPlanner.swift */; };
 		280C7E38DAD9F18ED8090287 /* ModuleEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E43B99091BF5C4100CE1DA0E /* ModuleEditorView.swift */; };
@@ -265,6 +266,7 @@
 		E80E80E80E80E80E80E80E80 /* UpdateFailurePlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateFailurePlanner.swift; sourceTree = "<group>"; };
 		E81E81E81E81E81E81E81E81 /* UpdateFailureFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateFailureFormatter.swift; sourceTree = "<group>"; };
 		E90E90E90E90E90E90E90E90 /* GitHubPublishPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubPublishPlanner.swift; sourceTree = "<group>"; };
+		E93E93E93E93E93E93E93E93 /* PublishCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishCoordinator.swift; sourceTree = "<group>"; };
 		E91E91E91E91E91E91E91E91 /* ModuleRefreshPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleRefreshPlanner.swift; sourceTree = "<group>"; };
 		E92E92E92E92E92E92E92E92 /* ModuleMetadataRefreshPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleMetadataRefreshPlanner.swift; sourceTree = "<group>"; };
 		BDD7A6C8082510469A2FA843 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
@@ -380,6 +382,7 @@
 				DA24D7A4AEF1770EAB7A055B /* ModuleMerger.swift */,
 				D905BBAE1F590AB7B3F224FE /* PersistenceStore.swift */,
 				E40E40E40E40E40E40E40E40 /* PublishedAddressResolver.swift */,
+				E93E93E93E93E93E93E93E93 /* PublishCoordinator.swift */,
 				B33B33B33B33B33B33B33B33 /* PublishFileAssembler.swift */,
 				254A83429BCA625706A87254 /* ScriptHubClient.swift */,
 				098EA18AE40BB22B02102431 /* ScriptHubUpstreamService.swift */,
@@ -764,6 +767,7 @@
 				D596D087CB06F13BD28D7510 /* SurgeRelayApp.swift in Sources */,
 				A12A12A12A12A12A12A12A12 /* WorkActivity.swift in Sources */,
 				D90D90D90D90D90D90D90D90 /* GitHubPublishPlanner.swift in Sources */,
+				D93D93D93D93D93D93D93D93 /* PublishCoordinator.swift in Sources */,
 				D81D81D81D81D81D81D81D81 /* UpdateFailureFormatter.swift in Sources */,
 				D80D80D80D80D80D80D80D80 /* UpdateFailurePlanner.swift in Sources */,
 				A14A14A14A14A14A14A14A14 /* WebManagementAssets.swift in Sources */,

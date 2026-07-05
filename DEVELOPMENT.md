@@ -11,7 +11,7 @@ This document records the project conventions needed to maintain this fork.
 - Persistent settings: `SurgeRelay/Models/AppSettings.swift`
 - Module model: `SurgeRelay/Models/RelayModule.swift`
 - Conversion path: `SurgeRelay/Services/ScriptHubClient.swift`
-- Local/GitHub publishing: `SurgeRelay/AppModel.swift`, `SurgeRelay/Services/ModuleFileStore.swift`, `SurgeRelay/Services/GitHubClient.swift`
+- Local/GitHub publishing: `SurgeRelay/AppModel.swift`, `SurgeRelay/Services/PublishCoordinator.swift`, `SurgeRelay/Services/PublishFileAssembler.swift`, `SurgeRelay/Services/ModuleFileStore.swift`, `SurgeRelay/Services/GitHubClient.swift`
 - Diagnostics export: `SurgeRelay/Services/DiagnosticReportBuilder.swift`
 - Module metadata parsing: `SurgeRelay/Utilities/ModuleMetadataParser.swift`
 
@@ -28,7 +28,7 @@ Keep `ModulesView.swift` focused on the split-view shell, search/index coordinat
 
 ## Model Boundaries
 
-Keep `ServiceModels.swift` for small cross-service value types that do not have a clearer owner. Work/task state and update-admission rules belong in `WorkActivity.swift`; persistent settings belong in `AppSettings.swift`; module identity, source/storage relationships, and draft construction belong in `RelayModule.swift`.
+Keep `ServiceModels.swift` for small cross-service value types that do not have a clearer owner. Publishing coordination belongs in `PublishCoordinator.swift`; work/task state and update-admission rules belong in `WorkActivity.swift`; persistent settings belong in `AppSettings.swift`; module identity, source/storage relationships, and draft construction belong in `RelayModule.swift`.
 
 ## Publishing Model
 

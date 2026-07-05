@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将发布计划、发布准入和本地源路径解析从 `ServiceModels.swift` 拆入 `PublishCoordinator.swift`，让共享模型文件继续保留小型跨服务值类型。
 - 将更新失败原因文案格式化从 `ServiceModels.swift` 拆入 `UpdateFailureFormatter.swift`，与更新失败补查规划保持同一服务边界。
 - 将安装、钥匙串、本地根目录和诊断报告 payload 模型从 `ServiceModels.swift` 拆入 `DiagnosticModels.swift`，继续压缩共享模型杂项文件。
 - 将 Web 管理模块列表 diff 签名改为 JSON 化字段数组，避免字段内容包含分隔符时误判为无需重绘。
