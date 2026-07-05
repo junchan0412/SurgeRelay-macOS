@@ -33,6 +33,7 @@
 		D60D60D60D60D60D60D60D60 /* ModuleDraftPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E60E60E60E60E60E60E60E60 /* ModuleDraftPlanner.swift */; };
 		D70D70D70D70D70D70D70D70 /* ModuleOutputFolderCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70E70E70E70E70E70E70E70 /* ModuleOutputFolderCatalog.swift */; };
 		D80D80D80D80D80D80D80D80 /* UpdateFailurePlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80E80E80E80E80E80E80E80 /* UpdateFailurePlanner.swift */; };
+		D81D81D81D81D81D81D81D81 /* UpdateFailureFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E81E81E81E81E81E81E81E81 /* UpdateFailureFormatter.swift */; };
 		D90D90D90D90D90D90D90D90 /* GitHubPublishPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90E90E90E90E90E90E90E90 /* GitHubPublishPlanner.swift */; };
 		D91D91D91D91D91D91D91D91 /* ModuleRefreshPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E91E91E91E91E91E91E91E91 /* ModuleRefreshPlanner.swift */; };
 		D92D92D92D92D92D92D92D92 /* ModuleMetadataRefreshPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E92E92E92E92E92E92E92E92 /* ModuleMetadataRefreshPlanner.swift */; };
@@ -262,6 +263,7 @@
 		E60E60E60E60E60E60E60E60 /* ModuleDraftPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleDraftPlanner.swift; sourceTree = "<group>"; };
 		E70E70E70E70E70E70E70E70 /* ModuleOutputFolderCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleOutputFolderCatalog.swift; sourceTree = "<group>"; };
 		E80E80E80E80E80E80E80E80 /* UpdateFailurePlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateFailurePlanner.swift; sourceTree = "<group>"; };
+		E81E81E81E81E81E81E81E81 /* UpdateFailureFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateFailureFormatter.swift; sourceTree = "<group>"; };
 		E90E90E90E90E90E90E90E90 /* GitHubPublishPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubPublishPlanner.swift; sourceTree = "<group>"; };
 		E91E91E91E91E91E91E91E91 /* ModuleRefreshPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleRefreshPlanner.swift; sourceTree = "<group>"; };
 		E92E92E92E92E92E92E92E92 /* ModuleMetadataRefreshPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleMetadataRefreshPlanner.swift; sourceTree = "<group>"; };
@@ -382,6 +384,7 @@
 				254A83429BCA625706A87254 /* ScriptHubClient.swift */,
 				098EA18AE40BB22B02102431 /* ScriptHubUpstreamService.swift */,
 				C7C7C7C7C7C7C7C7C7C7C7C7 /* UpdateCompletionStatusPlanner.swift */,
+				E81E81E81E81E81E81E81E81 /* UpdateFailureFormatter.swift */,
 				E80E80E80E80E80E80E80E80 /* UpdateFailurePlanner.swift */,
 				B14B14B14B14B14B14B14B14 /* WebManagementAssets.swift */,
 				C8C8C8C8C8C8C8C8C8C8C8C8 /* WebManagementHTTP.swift */,
@@ -761,6 +764,7 @@
 				D596D087CB06F13BD28D7510 /* SurgeRelayApp.swift in Sources */,
 				A12A12A12A12A12A12A12A12 /* WorkActivity.swift in Sources */,
 				D90D90D90D90D90D90D90D90 /* GitHubPublishPlanner.swift in Sources */,
+				D81D81D81D81D81D81D81D81 /* UpdateFailureFormatter.swift in Sources */,
 				D80D80D80D80D80D80D80D80 /* UpdateFailurePlanner.swift in Sources */,
 				A14A14A14A14A14A14A14A14 /* WebManagementAssets.swift in Sources */,
 				4B5E934EB9AC34C451301F50 /* WebManagementAPI.swift in Sources */,
