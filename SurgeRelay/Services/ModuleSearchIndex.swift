@@ -1,8 +1,32 @@
 import Foundation
 
+struct ModuleSearchContentIndexState: Equatable, Sendable {
+    var contentIndex: [UUID: String] = [:]
+    var contentIndexCacheKeys: [UUID: String] = [:]
+
+    static let empty = ModuleSearchContentIndexState()
+}
+
+struct ModuleSearchContentLoadPlan: Sendable {
+    var retainedState: ModuleSearchContentIndexState
+    var modulesToLoad: [RelayModule]
+
+    var isIdle: Bool {
+        retainedState == .empty && modulesToLoad.isEmpty
+    }
+}
+
 enum ModuleSearchIndex {
     static func normalizedQuery(_ text: String) -> String {
         text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    static func contentIndexToken(for modules: [RelayModule], query: String) -> String {
+        let query = normalizedQuery(query)
+        guard !query.isEmpty else { return "idle" }
+        return "active|\(query)|" + modules
+            .map { "\($0.id.uuidString):\($0.contentHash ?? "")" }
+            .joined(separator: "|")
     }
 
     static func contentCacheKey(for module: RelayModule) -> String {
@@ -69,5 +93,37 @@ enum ModuleSearchIndex {
         guard !query.isEmpty else { return false }
         guard cachedContent == nil else { return false }
         return !metadataText(for: module).contains(query)
+    }
+
+    static func contentLoadPlan(
+        modules: [RelayModule],
+        query: String,
+        state: ModuleSearchContentIndexState
+    ) -> ModuleSearchContentLoadPlan {
+        let query = normalizedQuery(query)
+        guard !query.isEmpty else {
+            return ModuleSearchContentLoadPlan(retainedState: .empty, modulesToLoad: [])
+        }
+        var retainedState = ModuleSearchContentIndexState()
+        var modulesToLoad: [RelayModule] = []
+        for module in modules {
+            let cacheKey = contentCacheKey(for: module)
+            let cachedContent = cachedContent(
+                for: module,
+                contentIndex: state.contentIndex,
+                contentIndexCacheKeys: state.contentIndexCacheKeys
+            )
+            if let cachedContent {
+                retainedState.contentIndex[module.id] = cachedContent
+                retainedState.contentIndexCacheKeys[module.id] = cacheKey
+            }
+            if shouldLoadContent(for: module, query: query, cachedContent: cachedContent) {
+                modulesToLoad.append(module)
+            }
+        }
+        return ModuleSearchContentLoadPlan(
+            retainedState: retainedState,
+            modulesToLoad: modulesToLoad
+        )
     }
 }

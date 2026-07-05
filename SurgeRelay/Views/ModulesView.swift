@@ -7,8 +7,7 @@ struct ModulesView: View {
     @State private var editorRoute: ModuleEditorRoute?
     @State private var deleteCandidate: RelayModule?
     @State private var detailTab: DetailTab = .info
-    @State private var contentIndex: [UUID: String] = [:]
-    @State private var contentIndexCacheKeys: [UUID: String] = [:]
+    @State private var contentIndexState = ModuleSearchContentIndexState()
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var isScanningLocalModules = false
     @State private var showsLocalImportPreview = false
@@ -56,54 +55,41 @@ struct ModulesView: View {
             for: module,
             cachedContent: ModuleSearchIndex.cachedContent(
                 for: module,
-                contentIndex: contentIndex,
-                contentIndexCacheKeys: contentIndexCacheKeys
+                contentIndex: contentIndexState.contentIndex,
+                contentIndexCacheKeys: contentIndexState.contentIndexCacheKeys
             )
         )
     }
 
     private var contentIndexToken: String {
-        let query = normalizedSearchText
-        guard !query.isEmpty else { return "idle" }
-        return "active|\(query)|" + model.modules
-            .map { "\($0.id.uuidString):\($0.contentHash ?? "")" }
-            .joined(separator: "|")
+        ModuleSearchIndex.contentIndexToken(
+            for: model.modules,
+            query: normalizedSearchText
+        )
     }
 
     private func rebuildContentIndex() async {
-        let query = normalizedSearchText
-        guard !query.isEmpty else {
-            if !contentIndex.isEmpty { contentIndex.removeAll() }
-            if !contentIndexCacheKeys.isEmpty { contentIndexCacheKeys.removeAll() }
+        let plan = ModuleSearchIndex.contentLoadPlan(
+            modules: model.modules,
+            query: normalizedSearchText,
+            state: contentIndexState
+        )
+        guard !plan.isIdle else {
+            if contentIndexState != .empty { contentIndexState = .empty }
             return
         }
-        var index: [UUID: String] = [:]
-        var cacheKeys: [UUID: String] = [:]
-        for module in model.modules {
+        var nextState = plan.retainedState
+        for module in plan.modulesToLoad {
             guard !Task.isCancelled else { return }
             let cacheKey = ModuleSearchIndex.contentCacheKey(for: module)
-            let cachedContent = ModuleSearchIndex.cachedContent(
-                for: module,
-                contentIndex: contentIndex,
-                contentIndexCacheKeys: contentIndexCacheKeys
-            )
-            if let cachedContent {
-                index[module.id] = cachedContent
-                cacheKeys[module.id] = cacheKey
-            }
-            guard ModuleSearchIndex.shouldLoadContent(for: module, query: query, cachedContent: cachedContent) else {
-                await Task.yield()
-                continue
-            }
             if let content = try? await model.previewContent(for: module) {
-                index[module.id] = content.lowercased()
-                cacheKeys[module.id] = cacheKey
+                nextState.contentIndex[module.id] = content.lowercased()
+                nextState.contentIndexCacheKeys[module.id] = cacheKey
             }
             await Task.yield()
         }
         guard !Task.isCancelled else { return }
-        contentIndex = index
-        contentIndexCacheKeys = cacheKeys
+        contentIndexState = nextState
     }
 
     var body: some View {
