@@ -37,6 +37,7 @@
 		A16A16A16A16A16A16A16A16 /* GitHubReleaseModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B16B16B16B16B16B16B16B16 /* GitHubReleaseModels.swift */; };
 		A17A17A17A17A17A17A17A17 /* GitHubReleaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B17B17B17B17B17B17B17B17 /* GitHubReleaseClient.swift */; };
 		A18A18A18A18A18A18A18A18 /* ModuleEditorComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = B18B18B18B18B18B18B18B18 /* ModuleEditorComponents.swift */; };
+		A28A28A28A28A28A28A28A28 /* ModuleEditorSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = B28B28B28B28B28B28B28B28 /* ModuleEditorSections.swift */; };
 		A19A19A19A19A19A19A19A19 /* ModuleDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = B19B19B19B19B19B19B19B19 /* ModuleDraft.swift */; };
 		A20A20A20A20A20A20A20A20 /* ModuleOutputPath.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20B20B20B20B20B20B20B20 /* ModuleOutputPath.swift */; };
 		A21A21A21A21A21A21A21A21 /* ModulePreviewViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B21B21B21B21B21B21B21B21 /* ModulePreviewViews.swift */; };
@@ -292,6 +293,7 @@
 		B16B16B16B16B16B16B16B16 /* GitHubReleaseModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubReleaseModels.swift; sourceTree = "<group>"; };
 		B17B17B17B17B17B17B17B17 /* GitHubReleaseClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubReleaseClient.swift; sourceTree = "<group>"; };
 		B18B18B18B18B18B18B18B18 /* ModuleEditorComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleEditorComponents.swift; sourceTree = "<group>"; };
+		B28B28B28B28B28B28B28B28 /* ModuleEditorSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleEditorSections.swift; sourceTree = "<group>"; };
 		B19B19B19B19B19B19B19B19 /* ModuleDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleDraft.swift; sourceTree = "<group>"; };
 		B20B20B20B20B20B20B20B20 /* ModuleOutputPath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleOutputPath.swift; sourceTree = "<group>"; };
 		B21B21B21B21B21B21B21B21 /* ModulePreviewViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModulePreviewViews.swift; sourceTree = "<group>"; };
@@ -464,6 +466,7 @@
 				B81B81B81B81B81B81B81B81 /* ModuleDetailSummaryHeader.swift */,
 				B55B55B55B55B55B55B55B55 /* ModuleDetailView.swift */,
 				B18B18B18B18B18B18B18B18 /* ModuleEditorComponents.swift */,
+				B28B28B28B28B28B28B28B28 /* ModuleEditorSections.swift */,
 				E43B99091BF5C4100CE1DA0E /* ModuleEditorView.swift */,
 				E105E105E105E105E105E105 /* ModuleCodeTextView.swift */,
 				B21B21B21B21B21B21B21B21 /* ModulePreviewViews.swift */,
@@ -946,6 +949,7 @@
 				A26A26A26A26A26A26A26A26 /* ModuleDetailPaneView.swift in Sources */,
 				A55A55A55A55A55A55A55A55 /* ModuleDetailView.swift in Sources */,
 				A18A18A18A18A18A18A18A18 /* ModuleEditorComponents.swift in Sources */,
+				A28A28A28A28A28A28A28A28 /* ModuleEditorSections.swift in Sources */,
 				280C7E38DAD9F18ED8090287 /* ModuleEditorView.swift in Sources */,
 				72BFC19A86A6433A42A41F75 /* ModuleFileStore.swift in Sources */,
 				B46911120F2F5BB4C736DCDE /* ModuleIconStore.swift in Sources */,

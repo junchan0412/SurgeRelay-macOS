@@ -155,7 +155,7 @@ GitHub Release metadata, install guidance, checksum validation state, and versio
 
 GitHub publish networking lives in `Services/GitHubClient.swift`. Keep API request/response DTOs in `Services/GitHubAPIModels.swift`, and keep repository path normalization, output-folder discovery, duplicate-path validation, and commit-message construction in `Services/GitHubRepositoryPath.swift` so GitHub directory-root behavior stays testable without a network client.
 
-Module editor presentation primitives live in `Views/ModuleEditorComponents.swift`. Keep the preview card, section chrome, editor rows, output path row, output-folder picker, storage-location picker, and draft icon preview there; `Services/ModuleEditorSourceNameLookup.swift` owns remote source name auto-fill fetching and parsing; `Views/ModuleEditorView.swift` should own draft state, derived editor hints, source auto-fill debounce/write-back, folder creation, and save/cancel flow.
+Module editor presentation primitives live in `Views/ModuleEditorComponents.swift`. Keep the preview card, section chrome, editor rows, output path row, output-folder picker, storage-location picker, and draft icon preview there. Composed editor form sections live in `Views/ModuleEditorSections.swift`; keep the basic information, icon, publishing, source, and conversion sections there. `Services/ModuleEditorSourceNameLookup.swift` owns remote source name auto-fill fetching and parsing; `Views/ModuleEditorView.swift` should own draft state, derived editor hints, source auto-fill debounce/write-back, folder creation, and save/cancel flow.
 
 ## Build And Test
 

@@ -192,142 +192,57 @@ struct ModuleEditorView: View {
     }
 
     private var basicInfoSection: some View {
-        ModuleEditorSection("基本信息") {
-            ModuleEditorTextFieldRow(title: "显示名称", icon: "textformat", text: $draft.name, prompt: "例如：YouTube 去广告")
-            ModuleEditorControlRow("模块存放", icon: draft.storageLocation.systemImage) {
-                storageLocationPicker
-            }
-            ModuleEditorInfoRow("关系", icon: draftSourceOrigin.systemImage) {
-                Text(relationshipHint)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            ModuleEditorTextFieldRow(title: "模块标签", icon: "tag", text: $draft.category, prompt: "Surge category，例如：广告过滤")
-            ModuleEditorControlRow("存放文件夹", icon: "folder") {
-                folderPicker
-            }
-        }
-    }
-
-    private var iconSection: some View {
-        ModuleEditorSection("图标") {
-            ModuleEditorControlRow("图标 URL", icon: "photo") {
-                HStack(spacing: 8) {
-                    TextField("图标 URL", text: $draft.iconURL, prompt: Text("https://example.com/icon.png"))
-                        .labelsHidden()
-                        .textFieldStyle(.roundedBorder)
-                    if hasCustomIconInput {
-                        Button {
-                            draft.iconURL = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.tertiary)
-                        .help("清空自定义图标")
-                    }
-                    DraftModuleIconPreview(
-                        url: displayedIconPreviewURL,
-                        size: 30,
-                        isInvalid: customIconInputIsInvalid
-                    )
-                }
-            }
-            ModuleEditorInfoRow(customIconInputIsInvalid ? "检查" : "兼容性", icon: customIconInputIsInvalid ? "exclamationmark.triangle" : "info.circle") {
-                Text(iconURLHint)
-                    .font(.caption)
-                    .foregroundStyle(customIconInputIsInvalid ? .orange : .secondary)
-                    .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    private var publishingSection: some View {
-        ModuleEditorSection("发布") {
-            if model.settings.combinedModuleEnabled {
-                ModuleEditorToggleRow(title: "包含在总模块中", icon: "square.stack.3d.up", isOn: $draft.isEnabled)
-            }
-            ModuleEditorToggleRow(title: "发布为独立模块", icon: "doc.badge.gearshape", isOn: $draft.publishesStandalone)
-            ModuleEditorTextFieldRow(title: "输出文件名", icon: "doc", text: $draft.outputFileName, prompt: "留空时根据显示名称生成")
-            ModuleEditorInfoRow("输出路径", icon: "folder") {
-                ModuleEditorOutputPathRow(
-                    relativePath: previewPublishedRelativePath,
-                    notice: outputPathNotice
-                )
-            }
-        }
-    }
-
-    private var sourceSection: some View {
-        ModuleEditorSection("转换前来源") {
-            ModuleEditorTextFieldRow(
-                title: "来源地址",
-                icon: "link",
-                text: $draft.sourceURL,
-                prompt: "https://example.com/module.plugin 或 file:///.../Demo.sgmodule"
-            )
-            ModuleEditorControlRow("来源格式", icon: "doc.text") {
-                Picker("来源格式", selection: $draft.sourceFormat) {
-                    ForEach(ModuleSourceFormat.allCases) { format in
-                        Text(format.title).tag(format)
-                    }
-                }
-                .labelsHidden()
-                .frame(maxWidth: 220, alignment: .leading)
-            }
-        }
-    }
-
-    private var advancedEditorSection: some View {
-        ModuleEditorSection("转换") {
-            Button {
-                withAnimation(.snappy) { isAdvancedExpanded.toggle() }
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "chevron.right")
-                        .font(.caption.bold())
-                        .rotationEffect(.degrees(isAdvancedExpanded ? 90 : 0))
-                    Text("高级")
-                    Spacer()
-                }
-                .contentShape(.rect)
-            }
-            .buttonStyle(.plain)
-
-            if isAdvancedExpanded {
-                if isNativeSurgeModule {
-                    Label(
-                        "该地址是 Surge 模块，将直接参与合并，不经过 Script-Hub；高级转换选项不会应用。",
-                        systemImage: "arrow.triangle.branch"
-                    )
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 8)
-                } else {
-                    ScriptHubAdvancedOptionsView(options: $draft.scriptHubOptions)
-                }
-            }
-            Text("Loon 与 Quantumult X 来源可在这里使用 Script-Hub 原有的转换控制。")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private var folderPicker: some View {
-        ModuleEditorFolderPicker(
+        ModuleEditorBasicInfoSection(
+            name: $draft.name,
+            storageLocation: $draft.storageLocation,
+            category: $draft.category,
             outputFolder: $draft.outputFolder,
+            sourceOrigin: draftSourceOrigin,
+            relationshipHint: relationshipHint,
             folders: model.moduleOutputFolderOptions(preserving: draft.outputFolder),
-            onCreateFolder: {
-                newFolderName = ""
-                showsNewFolderDialog = true
-            }
+            onCreateFolder: presentNewFolderDialog
         )
     }
 
-    private var storageLocationPicker: some View {
-        ModuleEditorStorageLocationPicker(storageLocation: $draft.storageLocation)
+    private var iconSection: some View {
+        ModuleEditorIconSection(
+            iconURL: $draft.iconURL,
+            displayedIconPreviewURL: displayedIconPreviewURL,
+            hasCustomIconInput: hasCustomIconInput,
+            customIconInputIsInvalid: customIconInputIsInvalid,
+            iconURLHint: iconURLHint
+        )
+    }
+
+    private var publishingSection: some View {
+        ModuleEditorPublishingSection(
+            isEnabled: $draft.isEnabled,
+            publishesStandalone: $draft.publishesStandalone,
+            outputFileName: $draft.outputFileName,
+            combinedModuleEnabled: model.settings.combinedModuleEnabled,
+            publishedRelativePath: previewPublishedRelativePath,
+            outputPathNotice: outputPathNotice
+        )
+    }
+
+    private var sourceSection: some View {
+        ModuleEditorSourceSection(
+            sourceURL: $draft.sourceURL,
+            sourceFormat: $draft.sourceFormat
+        )
+    }
+
+    private var advancedEditorSection: some View {
+        ModuleEditorConversionSection(
+            isAdvancedExpanded: $isAdvancedExpanded,
+            scriptHubOptions: $draft.scriptHubOptions,
+            isNativeSurgeModule: isNativeSurgeModule
+        )
+    }
+
+    private func presentNewFolderDialog() {
+        newFolderName = ""
+        showsNewFolderDialog = true
     }
 
     private func autofillName(from urlString: String) {
