@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D104D104D104D104D104D104 /* AppModel+AutomaticPublishing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E104E104E104E104E104E104 /* AppModel+AutomaticPublishing.swift */; };
 		D0A0D0A0D0A0D0A0D0A0D0A0 /* AppModel+WebManagement.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0A0E0A0E0A0E0A0E0A0E0A0 /* AppModel+WebManagement.swift */; };
 		D0B0D0B0D0B0D0B0D0B0D0B0 /* AppModel+Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0B0E0B0E0B0E0B0E0B0E0B0 /* AppModel+Diagnostics.swift */; };
 		D0C0D0C0D0C0D0C0D0C0D0C0 /* AppModel+Credentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0C0E0C0E0C0E0C0E0C0E0C0 /* AppModel+Credentials.swift */; };
@@ -226,6 +227,7 @@
 		280D9149CE1820E1AE5F19C9 /* Surge RelayTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Surge RelayTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		2968E247012225719D2FF9D5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		2B29AA0AD818A5D7F67A7471 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		E104E104E104E104E104E104 /* AppModel+AutomaticPublishing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+AutomaticPublishing.swift"; sourceTree = "<group>"; };
 		E0A0E0A0E0A0E0A0E0A0E0A0 /* AppModel+WebManagement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+WebManagement.swift"; sourceTree = "<group>"; };
 		E0B0E0B0E0B0E0B0E0B0E0B0 /* AppModel+Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Diagnostics.swift"; sourceTree = "<group>"; };
 		E0C0E0C0E0C0E0C0E0C0E0C0 /* AppModel+Credentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Credentials.swift"; sourceTree = "<group>"; };
@@ -424,6 +426,7 @@
 				25432D20905F79D6AE1E1480 /* Views */,
 				322455D9E3C9EDC10D774E9F /* WebResources */,
 				2B29AA0AD818A5D7F67A7471 /* AppModel.swift */,
+				E104E104E104E104E104E104 /* AppModel+AutomaticPublishing.swift */,
 				E0C0E0C0E0C0E0C0E0C0E0C0 /* AppModel+Credentials.swift */,
 				E0B0E0B0E0B0E0B0E0B0E0B0 /* AppModel+Diagnostics.swift */,
 				E0D0E0D0E0D0E0D0E0D0E0D0 /* AppModel+ModuleState.swift */,
@@ -889,6 +892,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				384BEBC6E1F8C9A0A53FB0FC /* AppModel.swift in Sources */,
+				D104D104D104D104D104D104 /* AppModel+AutomaticPublishing.swift in Sources */,
 				D0C0D0C0D0C0D0C0D0C0D0C0 /* AppModel+Credentials.swift in Sources */,
 				D0B0D0B0D0B0D0B0D0B0D0B0 /* AppModel+Diagnostics.swift in Sources */,
 				D0D0D0D0D0D0D0D0D0D0D0D0 /* AppModel+ModuleState.swift in Sources */,

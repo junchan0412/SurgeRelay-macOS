@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将 GitHub 自动发布调度、取消和运行前准入执行拆入 `AppModel+AutomaticPublishing.swift`，让 `AppModel+Publishing.swift` 更专注于手动发布、预览和发布文件装配。
 - 将主窗口搜索内容索引的缓存保留、失效和预览加载规划收进 `ModuleSearchIndex`，让 `ModulesView` 只负责执行懒加载读取。
 - 将 GitHub 发布准备阶段的空选择、空文件和路径计划判断收进 `GitHubPublishPlanner`，减少 `AppModel+Publishing` 的内联发布准入逻辑。
 - 将 Web 管理 HTTP/响应头与请求安全/限流测试拆入专属测试文件，继续缩小 `WebManagementTests.swift` 的职责范围。

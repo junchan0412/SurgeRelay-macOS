@@ -7,11 +7,11 @@ This document records the project conventions needed to maintain this fork.
 - Xcode project: `Surge Relay.xcodeproj`
 - App target: `Surge Relay`
 - Test target: `Surge RelayTests`
-- Main state owner: `SurgeRelay/AppModel.swift`; credentials live in `SurgeRelay/AppModel+Credentials.swift`, diagnostics live in `SurgeRelay/AppModel+Diagnostics.swift`, module derived state lives in `SurgeRelay/AppModel+ModuleState.swift`, module mutation/import/editing lives in `SurgeRelay/AppModel+Modules.swift`, preview/address read access lives in `SurgeRelay/AppModel+PreviewAccess.swift`, publishing orchestration lives in `SurgeRelay/AppModel+Publishing.swift`, settings forwarding lives in `SurgeRelay/AppModel+Settings.swift`, update and Script-Hub refresh orchestration lives in `SurgeRelay/AppModel+Updates.swift`, and Web-management token/server wiring lives in `SurgeRelay/AppModel+WebManagement.swift`
+- Main state owner: `SurgeRelay/AppModel.swift`; automatic publish scheduling lives in `SurgeRelay/AppModel+AutomaticPublishing.swift`, credentials live in `SurgeRelay/AppModel+Credentials.swift`, diagnostics live in `SurgeRelay/AppModel+Diagnostics.swift`, module derived state lives in `SurgeRelay/AppModel+ModuleState.swift`, module mutation/import/editing lives in `SurgeRelay/AppModel+Modules.swift`, preview/address read access lives in `SurgeRelay/AppModel+PreviewAccess.swift`, manual publish orchestration lives in `SurgeRelay/AppModel+Publishing.swift`, settings forwarding lives in `SurgeRelay/AppModel+Settings.swift`, update and Script-Hub refresh orchestration lives in `SurgeRelay/AppModel+Updates.swift`, and Web-management token/server wiring lives in `SurgeRelay/AppModel+WebManagement.swift`
 - Persistent settings: `SurgeRelay/Models/AppSettings.swift`
 - Module model: `SurgeRelay/Models/RelayModule.swift`
 - Conversion path: `SurgeRelay/Services/ScriptHubClient.swift`
-- Local/GitHub publishing: `SurgeRelay/AppModel.swift`, `SurgeRelay/Services/PublishCoordinator.swift`, `SurgeRelay/Services/PublishFileAssembler.swift`, `SurgeRelay/Services/ModuleFileStore.swift`, `SurgeRelay/Services/GitHubClient.swift`
+- Local/GitHub publishing: `SurgeRelay/AppModel+Publishing.swift`, `SurgeRelay/AppModel+AutomaticPublishing.swift`, `SurgeRelay/Services/PublishCoordinator.swift`, `SurgeRelay/Services/PublishFileAssembler.swift`, `SurgeRelay/Services/ModuleFileStore.swift`, `SurgeRelay/Services/GitHubClient.swift`
 - Diagnostics export: `SurgeRelay/Services/DiagnosticReportBuilder.swift`
 - Module metadata parsing: `SurgeRelay/Utilities/ModuleMetadataParser.swift`
 
@@ -53,7 +53,7 @@ Manual GitHub publishing has two paths:
 
 All publishable module selection should flow through `PublishPlan` / `PublishCoordinator`. Do not recalculate publishable IDs ad hoc in UI, Web API, or `AppModel`: the same plan owns standalone modules, combined-module contributors, generated asset IDs, scope labels, and the "nothing to publish" decision.
 
-Automatic GitHub publish readiness belongs in `AutomaticPublishPlanner`. Keep the settings/token/standalone-module/cache-output admission checks there so update completion, delayed scheduling, and scheduled execution do not drift into different skip rules.
+Automatic GitHub publish readiness belongs in `AutomaticPublishPlanner`. Keep the settings/token/standalone-module/cache-output admission checks there so update completion, delayed scheduling, and scheduled execution do not drift into different skip rules. `AppModel+AutomaticPublishing.swift` owns only queue/cancel/run orchestration; keep manual preview/publish and published-file assembly in `AppModel+Publishing.swift`.
 
 Keep the selected publish path conservative: it should merge new paths into the known GitHub publish list but must not prune paths that belong to unselected modules.
 
