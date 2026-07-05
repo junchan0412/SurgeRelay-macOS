@@ -9,7 +9,12 @@
     const documentRef = dependencies.document || global.document;
     const windowRef = dependencies.window || global;
     const setTimeoutImpl = dependencies.setTimeout || global.setTimeout;
+    const clearTimeoutImpl = dependencies.clearTimeout || global.clearTimeout || (() => {});
     const mobileLayout = dependencies.mobileLayout || { matches: false };
+    let nameLookupTimer = null;
+    let nameLookupSequence = 0;
+    let autoFilledName = '';
+    let manualNameEdited = false;
 
     if (!logic) throw new Error('web-logic.js must load before web-editor.js');
     if (!markup) throw new Error('web-markup.js must load before web-editor.js');
@@ -180,6 +185,42 @@
       preview.append(image);
     }
 
+    function resetNameLookup(initialName = '', isManual = false) {
+      clearTimeoutImpl(nameLookupTimer);
+      nameLookupTimer = null;
+      nameLookupSequence += 1;
+      autoFilledName = String(initialName || '');
+      manualNameEdited = Boolean(isManual);
+      return { autoFilledName, manualNameEdited };
+    }
+
+    function handleNameInput(value) {
+      manualNameEdited = String(value || '') !== autoFilledName;
+      if (!value) manualNameEdited = false;
+      return manualNameEdited;
+    }
+
+    function scheduleNameLookup(context = {}) {
+      clearTimeoutImpl(nameLookupTimer);
+      const api = context.api;
+      const updateOutputPathPreview = context.updateOutputPathPreview || (() => {});
+      const delay = context.delay ?? 500;
+      const form = formElements();
+      const sourceURL = String(form.sourceURL?.value || '').trim();
+      if (!/^https?:\/\//i.test(sourceURL) || manualNameEdited || typeof api !== 'function') return false;
+      const sequence = ++nameLookupSequence;
+      nameLookupTimer = setTimeoutImpl(async () => {
+        try {
+          const payload = await api('/api/source/name', { method: 'POST', json: { url: sourceURL } });
+          if (sequence !== nameLookupSequence || String(form.sourceURL?.value || '').trim() !== sourceURL || manualNameEdited) return;
+          autoFilledName = payload.name || '';
+          if (form.name) form.name.value = autoFilledName;
+          updateOutputPathPreview();
+        } catch (_) {}
+      }, delay);
+      return true;
+    }
+
     return {
       installAdvancedOptions,
       setAdvancedExpanded,
@@ -191,7 +232,16 @@
       hasAdvancedValues,
       populateOutputFolders,
       updateOutputPathPreview,
-      updateIconURLPreview
+      updateIconURLPreview,
+      resetNameLookup,
+      handleNameInput,
+      scheduleNameLookup,
+      get autoFilledName() {
+        return autoFilledName;
+      },
+      get manualNameEdited() {
+        return manualNameEdited;
+      }
     };
   }
 

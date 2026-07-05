@@ -85,10 +85,6 @@ let selectedID = null;
 let detailTab = 'info';
 let editingID = null;
 let showFailuresOnly = false;
-let nameLookupTimer = null;
-let nameLookupSequence = 0;
-let autoFilledName = '';
-let manualNameEdited = false;
 const mobileLayout = window.matchMedia('(max-width: 700px)');
 const moduleEditor = webEditor.createModuleEditorController({
   ui,
@@ -99,7 +95,8 @@ const moduleEditor = webEditor.createModuleEditorController({
   document,
   window,
   mobileLayout,
-  setTimeout: window.setTimeout.bind(window)
+  setTimeout: window.setTimeout.bind(window),
+  clearTimeout: window.clearTimeout.bind(window)
 });
 const feedback = webFeedback.createFeedbackController({
   ui,
@@ -160,12 +157,11 @@ ui.advancedOptions.addEventListener('click', event => {
 ui.moduleForm.elements.sourceURL.addEventListener('input', () => {
   moduleEditor.updateNativeModuleState();
   updateOutputPathPreview();
-  scheduleNameLookup();
+  moduleEditor.scheduleNameLookup({ api, updateOutputPathPreview });
 });
 ui.moduleForm.elements.sourceFormat.addEventListener('change', moduleEditor.updateNativeModuleState);
 ui.moduleForm.elements.name.addEventListener('input', event => {
-  manualNameEdited = event.target.value !== autoFilledName;
-  if (!event.target.value) manualNameEdited = false;
+  moduleEditor.handleNameInput(event.target.value);
   updateOutputPathPreview();
 });
 ui.moduleForm.elements.outputFolder.addEventListener('change', updateOutputPathPreview);
@@ -412,23 +408,6 @@ async function loadArguments(module) {
   } catch (_) {}
 }
 
-function scheduleNameLookup() {
-  clearTimeout(nameLookupTimer);
-  const form = ui.moduleForm.elements;
-  const sourceURL = form.sourceURL.value.trim();
-  if (!/^https?:\/\//i.test(sourceURL) || manualNameEdited) return;
-  const sequence = ++nameLookupSequence;
-  nameLookupTimer = setTimeout(async () => {
-    try {
-      const payload = await api('/api/source/name', { method: 'POST', json: { url: sourceURL } });
-      if (sequence !== nameLookupSequence || form.sourceURL.value.trim() !== sourceURL || manualNameEdited) return;
-      autoFilledName = payload.name || '';
-      form.name.value = autoFilledName;
-      updateOutputPathPreview();
-    } catch (_) {}
-  }, 500);
-}
-
 function updateOutputPathPreview() {
   moduleEditor.updateOutputPathPreview({ state, editingID });
 }
@@ -533,9 +512,8 @@ function handleHistoryNavigation(event) {
 }
 
 function openEditor(module = null) {
-  clearTimeout(nameLookupTimer);
-  nameLookupSequence += 1;
   editingID = module?.id || null;
+  moduleEditor.resetNameLookup(module?.name || '', Boolean(module));
   ui.moduleDialogMessage.hidden = true;
   ui.moduleDialogMessage.textContent = '';
   ui.dialogTitle.textContent = module ? '编辑模块' : '添加模块';
@@ -548,8 +526,6 @@ function openEditor(module = null) {
   moduleEditor.updateIconURLPreview();
   moduleEditor.populateOutputFolders(module?.outputFolder || '', state?.moduleOutputFolders || []);
   form.outputFileName.value = module?.outputFileName || '';
-  autoFilledName = module?.name || '';
-  manualNameEdited = Boolean(module);
   form.sourceURL.value = module?.sourceURL || '';
   form.sourceFormat.value = module?.sourceFormat || 'automatic';
   form.storageLocation.value = module?.storageLocation || 'gitHub';

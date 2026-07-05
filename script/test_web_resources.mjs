@@ -53,7 +53,7 @@ assert.doesNotMatch(
 );
 assert.doesNotMatch(
   appSource,
-  /function (setAdvancedExpanded|animateAdvancedResize|animateOptionGroup|collectScriptHubOptions|populateScriptHubOptions|hasAdvancedValues|populateOutputFolders|updateIconURLPreview)\(/,
+  /function (setAdvancedExpanded|animateAdvancedResize|animateOptionGroup|collectScriptHubOptions|populateScriptHubOptions|hasAdvancedValues|populateOutputFolders|updateIconURLPreview|scheduleNameLookup)\(/,
   'app.js should use web-editor helpers for editor UI details'
 );
 assert.doesNotMatch(
@@ -776,6 +776,8 @@ const editorUI = {
   }
 };
 const createdElements = [];
+const editorTimers = [];
+const clearedEditorTimers = [];
 const editorController = editorHelpers.createModuleEditorController({
   ui: editorUI,
   logic,
@@ -793,7 +795,13 @@ const editorController = editorHelpers.createModuleEditorController({
     }
   },
   window: { matchMedia: () => ({ matches: false }) },
-  mobileLayout: { matches: false }
+  mobileLayout: { matches: false },
+  setTimeout: (handler, delay) => {
+    const timer = { handler, delay };
+    editorTimers.push(timer);
+    return editorTimers.length;
+  },
+  clearTimeout: timer => clearedEditorTimers.push(timer)
 });
 editorController.installAdvancedOptions();
 assert.match(editorUI.advancedOptions.innerHTML, /advanced-intro/);
@@ -844,6 +852,49 @@ editorFormElements.iconURL.value = 'https://example.com/icon.png';
 editorController.updateIconURLPreview();
 assert.equal(createdElements.at(-1).tagName, 'img');
 assert.equal(createdElements.at(-1).src, 'https://example.com/icon.png');
+let nameLookupUpdates = 0;
+const nameLookupRequests = [];
+editorController.resetNameLookup('', false);
+editorFormElements.name.value = '';
+editorFormElements.sourceURL.value = 'https://example.com/named.plugin';
+assert.equal(editorController.scheduleNameLookup({
+  api: async (path, options) => {
+    nameLookupRequests.push({ path, options });
+    return { name: 'Auto Name' };
+  },
+  updateOutputPathPreview: () => { nameLookupUpdates += 1; },
+  delay: 7
+}), true);
+assert.equal(editorTimers.at(-1).delay, 7);
+await editorTimers.at(-1).handler();
+assert.equal(nameLookupRequests[0].path, '/api/source/name');
+assert.equal(nameLookupRequests[0].options.json.url, 'https://example.com/named.plugin');
+assert.equal(editorFormElements.name.value, 'Auto Name');
+assert.equal(editorController.autoFilledName, 'Auto Name');
+assert.equal(nameLookupUpdates, 1);
+assert.equal(editorController.handleNameInput('Manual Name'), true);
+assert.equal(editorController.manualNameEdited, true);
+assert.equal(editorController.scheduleNameLookup({
+  api: async () => { throw new Error('manual names should not be overwritten'); },
+  updateOutputPathPreview: () => {},
+  delay: 1
+}), false);
+assert.equal(editorController.handleNameInput(''), false);
+editorController.resetNameLookup('', false);
+editorFormElements.name.value = '';
+editorFormElements.sourceURL.value = 'https://example.com/stale.plugin';
+let staleUpdated = false;
+assert.equal(editorController.scheduleNameLookup({
+  api: async () => ({ name: 'Stale Name' }),
+  updateOutputPathPreview: () => { staleUpdated = true; },
+  delay: 9
+}), true);
+editorFormElements.sourceURL.value = 'https://example.com/new.plugin';
+await editorTimers.at(-1).handler();
+assert.equal(editorFormElements.name.value, '');
+assert.equal(staleUpdated, false);
+assert.equal(editorController.resetNameLookup('Existing Name', true).manualNameEdited, true);
+assert.ok(clearedEditorTimers.length >= 1);
 
 const feedbackTimers = [];
 const clearedTimers = [];
