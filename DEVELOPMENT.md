@@ -69,7 +69,7 @@ Shared module counts should flow through `ModuleCollectionSummary`. Main window 
 
 Update failure message formatting lives in `Services/UpdateFailureFormatter.swift`. If an original source returns 404/401/403/429, times out, fails DNS, or fails TLS validation, store that reason on the module and in update history; aggregate alerts that block combined-module replacement should include the same reason rather than only the module name.
 
-Update failure source-check decisions belong in `UpdateFailurePlanner`. Keep "should probe the original source after a generic conversion failure", latest-module source selection for error text, and missing-cache detail formatting there. `AppModel` should perform only the actual `SourceRevisionService` check and then apply the returned message.
+Update failure source-check and outcome decisions belong in `UpdateFailurePlanner`. Keep "should probe the original source after a generic conversion failure", latest-module source selection for error text, cached-after-failure history, missing-cache combined-module blockage, and missing-cache detail formatting there. `AppModel` should perform only the actual `SourceRevisionService` check, cache reads, and output rebuild, then apply the returned messages/history plans.
 
 Update completion status and automatic-publish scheduling decisions belong in `UpdateCompletionStatusPlanner`. Keep the choice between queueing GitHub automatic publish, clearing an impossible automatic-publish schedule, showing local cleanup confirmation, and reporting a plain refreshed output there. `AppModel` should only execute the returned schedule action and assign the returned status message.
 

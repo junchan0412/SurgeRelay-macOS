@@ -116,4 +116,85 @@ final class UpdateFailureTests: XCTestCase {
             "- Demo：第一行\n  第二行"
         )
     }
+
+    func testUpdateFailurePlannerBuildsCachedFailureOutcome() {
+        let moduleID = UUID()
+        let module = RelayModule(
+            id: moduleID,
+            name: "Cached",
+            sourceURL: "https://example.com/cached.conf",
+            sourceFormat: .quantumultX,
+            outputFileName: "Cached"
+        )
+
+        let plan = UpdateFailurePlanner.cachedFailureOutcome(
+            module: module,
+            failureMessage: "原始链接返回 404",
+            duration: 1.25,
+            contributesToCombined: true
+        )
+
+        XCTAssertTrue(plan.shouldUseCachedContentInCombined)
+        XCTAssertNil(plan.missingCacheModuleName)
+        XCTAssertNil(plan.missingCacheDetail)
+        XCTAssertEqual(plan.historyEntry.moduleID, moduleID)
+        XCTAssertEqual(plan.historyEntry.moduleName, "Cached")
+        XCTAssertEqual(plan.historyEntry.outcome, .cachedAfterFailure)
+        XCTAssertEqual(plan.historyEntry.duration, 1.25)
+        XCTAssertEqual(plan.historyEntry.message, "原始链接返回 404")
+        XCTAssertTrue(plan.historyEntry.usedCache)
+    }
+
+    func testUpdateFailurePlannerBuildsMissingCacheOutcomeOnlyForCombinedContributors() {
+        let module = RelayModule(
+            name: "Missing",
+            sourceURL: "https://example.com/missing.conf",
+            sourceFormat: .quantumultX,
+            outputFileName: "Missing"
+        )
+
+        let contributingPlan = UpdateFailurePlanner.missingCacheFailureOutcome(
+            module: module,
+            failureMessage: "第一行\n第二行",
+            duration: 2.5,
+            contributesToCombined: true
+        )
+
+        XCTAssertFalse(contributingPlan.shouldUseCachedContentInCombined)
+        XCTAssertEqual(contributingPlan.missingCacheModuleName, "Missing")
+        XCTAssertEqual(contributingPlan.missingCacheDetail, "- Missing：第一行\n  第二行")
+        XCTAssertEqual(contributingPlan.historyEntry.outcome, .failed)
+        XCTAssertEqual(contributingPlan.historyEntry.duration, 2.5)
+        XCTAssertEqual(contributingPlan.historyEntry.message, "第一行\n第二行")
+        XCTAssertFalse(contributingPlan.historyEntry.usedCache)
+
+        let standaloneOnlyPlan = UpdateFailurePlanner.missingCacheFailureOutcome(
+            module: module,
+            failureMessage: "失败",
+            duration: 0.5,
+            contributesToCombined: false
+        )
+
+        XCTAssertNil(standaloneOnlyPlan.missingCacheModuleName)
+        XCTAssertNil(standaloneOnlyPlan.missingCacheDetail)
+        XCTAssertEqual(standaloneOnlyPlan.historyEntry.outcome, .failed)
+    }
+
+    func testUpdateFailurePlannerBuildsMissingCacheBlockage() throws {
+        XCTAssertNil(UpdateFailurePlanner.missingCacheBlockage(moduleNames: [], details: []))
+
+        let blockage = try XCTUnwrap(UpdateFailurePlanner.missingCacheBlockage(
+            moduleNames: ["A", "B"],
+            details: ["- A：404", "- B：DNS"]
+        ))
+
+        XCTAssertEqual(blockage.statusMessage, "无法重建总模块：A、B 尚无可用缓存")
+        XCTAssertEqual(blockage.presentedError, "以下来源首次转换失败，因此没有覆盖当前总模块：\n- A：404\n- B：DNS")
+
+        let fallback = try XCTUnwrap(UpdateFailurePlanner.missingCacheBlockage(
+            moduleNames: ["A"],
+            details: []
+        ))
+        XCTAssertEqual(fallback.presentedError, "以下来源首次转换失败，因此没有覆盖当前总模块：\nA")
+    }
 }

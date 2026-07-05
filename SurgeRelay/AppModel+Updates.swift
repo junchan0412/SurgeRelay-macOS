@@ -187,32 +187,30 @@ extension AppModel {
                         cached,
                         overrides: current.argumentOverrides
                     )
-                    if shouldContributeToCombined(current) {
+                    let failurePlan = UpdateFailurePlanner.cachedFailureOutcome(
+                        module: module,
+                        failureMessage: failureMessage,
+                        duration: Date.now.timeIntervalSince(startedAt),
+                        contributesToCombined: shouldContributeToCombined(current)
+                    )
+                    if failurePlan.shouldUseCachedContentInCombined {
                         components.append((current, materialized))
                     }
-                    newHistory.append(UpdateHistoryEntry(
-                        moduleID: module.id,
-                        moduleName: module.name,
-                        outcome: .cachedAfterFailure,
-                        duration: Date.now.timeIntervalSince(startedAt),
-                        message: failureMessage,
-                        usedCache: true
-                    ))
+                    newHistory.append(failurePlan.historyEntry)
                 } else {
-                    if shouldContributeToCombined(module) {
-                        missingCache.append(module.name)
-                        missingCacheDetails.append(UpdateFailurePlanner.missingCacheFailureDetail(
-                            moduleName: module.name,
-                            failureMessage: failureMessage
-                        ))
-                    }
-                    newHistory.append(UpdateHistoryEntry(
-                        moduleID: module.id,
-                        moduleName: module.name,
-                        outcome: .failed,
+                    let failurePlan = UpdateFailurePlanner.missingCacheFailureOutcome(
+                        module: module,
+                        failureMessage: failureMessage,
                         duration: Date.now.timeIntervalSince(startedAt),
-                        message: failureMessage
-                    ))
+                        contributesToCombined: shouldContributeToCombined(module)
+                    )
+                    if let moduleName = failurePlan.missingCacheModuleName {
+                        missingCache.append(moduleName)
+                    }
+                    if let detail = failurePlan.missingCacheDetail {
+                        missingCacheDetails.append(detail)
+                    }
+                    newHistory.append(failurePlan.historyEntry)
                 }
             }
             synchronizationCompletedCount += 1
@@ -223,10 +221,12 @@ extension AppModel {
 
         guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
 
-        guard missingCache.isEmpty else {
-            statusMessage = "无法重建总模块：\(missingCache.joined(separator: "、")) 尚无可用缓存"
-            let details = missingCacheDetails.isEmpty ? missingCache.joined(separator: "\n") : missingCacheDetails.joined(separator: "\n")
-            presentedError = "以下来源首次转换失败，因此没有覆盖当前总模块：\n\(details)"
+        if let blockage = UpdateFailurePlanner.missingCacheBlockage(
+            moduleNames: missingCache,
+            details: missingCacheDetails
+        ) {
+            statusMessage = blockage.statusMessage
+            presentedError = blockage.presentedError
             return
         }
 
