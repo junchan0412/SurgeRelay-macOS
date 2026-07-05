@@ -23,6 +23,39 @@ final class ModulePlanningTests: XCTestCase {
         XCTAssertEqual(module.publishedRelativePath, "Local Modules/Local Demo.sgmodule")
     }
 
+    func testModuleEditorSourceNameLookupUsesRemoteMetadata() async {
+        let name = await ModuleEditorSourceNameLookup.autofillName(
+            from: " https://example.com/Remote.plugin "
+        ) { request in
+            XCTAssertEqual(request.url?.absoluteString, "https://example.com/Remote.plugin")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "User-Agent"), "Surge Relay")
+            return Data("#!name=Remote Module\n[Script]\n".utf8)
+        }
+
+        XCTAssertEqual(name, "Remote Module")
+    }
+
+    func testModuleEditorSourceNameLookupFallsBackToURLNameWhenMetadataIsMissing() async {
+        let name = await ModuleEditorSourceNameLookup.autofillName(
+            from: "https://example.com/folder/remote-module.conf"
+        ) { _ in
+            Data("[rewrite_local]\n".utf8)
+        }
+
+        XCTAssertEqual(name, "remote module")
+    }
+
+    func testModuleEditorSourceNameLookupSkipsNonRemoteSources() async {
+        let localURL = URL(filePath: "/tmp/Local Module.sgmodule").absoluteString
+        let name = await ModuleEditorSourceNameLookup.autofillName(from: localURL) { _ in
+            XCTFail("Local file URLs should not be fetched for name lookup.")
+            return Data()
+        }
+
+        XCTAssertNil(name)
+        XCTAssertNil(ModuleEditorSourceNameLookup.remoteURL(from: "ftp://example.com/demo.sgmodule"))
+    }
+
     func testModuleOutputPathInspectorExplainsNonPublishingAndCollisions() {
         let existingID = UUID()
         let existing = RelayModule(

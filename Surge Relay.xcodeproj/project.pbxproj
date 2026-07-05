@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D106D106D106D106D106D106 /* ModuleEditorSourceNameLookup.swift in Sources */ = {isa = PBXBuildFile; fileRef = E106E106E106E106E106E106 /* ModuleEditorSourceNameLookup.swift */; };
 		D105D105D105D105D105D105 /* ModuleCodeTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E105E105E105E105E105E105 /* ModuleCodeTextView.swift */; };
 		D104D104D104D104D104D104 /* AppModel+AutomaticPublishing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E104E104E104E104E104E104 /* AppModel+AutomaticPublishing.swift */; };
 		D0A0D0A0D0A0D0A0D0A0D0A0 /* AppModel+WebManagement.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0A0E0A0E0A0E0A0E0A0E0A0 /* AppModel+WebManagement.swift */; };
@@ -359,6 +360,7 @@
 		E10E10E10E10E10E10E10E10 /* DiagnosticReportBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticReportBuilder.swift; sourceTree = "<group>"; };
 		E20E20E20E20E20E20E20E20 /* ModulePreviewContentProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModulePreviewContentProvider.swift; sourceTree = "<group>"; };
 		E21E21E21E21E21E21E21E21 /* ModulePreviewEditPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModulePreviewEditPlanner.swift; sourceTree = "<group>"; };
+		E106E106E106E106E106E106 /* ModuleEditorSourceNameLookup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleEditorSourceNameLookup.swift; sourceTree = "<group>"; };
 		E30E30E30E30E30E30E30E30 /* ModuleNamingPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleNamingPlanner.swift; sourceTree = "<group>"; };
 		E40E40E40E40E40E40E40E40 /* PublishedAddressResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishedAddressResolver.swift; sourceTree = "<group>"; };
 		E50E50E50E50E50E50E50E50 /* CredentialTokenCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialTokenCoordinator.swift; sourceTree = "<group>"; };
@@ -498,6 +500,7 @@
 				0C15061B43CE01B2548616E5 /* ModuleIconStore.swift */,
 				E60E60E60E60E60E60E60E60 /* ModuleDraftPlanner.swift */,
 				E61E61E61E61E61E61E61E61 /* ModuleArgumentPlanner.swift */,
+				E106E106E106E106E106E106 /* ModuleEditorSourceNameLookup.swift */,
 				E30E30E30E30E30E30E30E30 /* ModuleNamingPlanner.swift */,
 				E70E70E70E70E70E70E70E70 /* ModuleOutputFolderCatalog.swift */,
 				E20E20E20E20E20E20E20E20 /* ModulePreviewContentProvider.swift */,
@@ -941,6 +944,7 @@
 				B46911120F2F5BB4C736DCDE /* ModuleIconStore.swift in Sources */,
 				D60D60D60D60D60D60D60D60 /* ModuleDraftPlanner.swift in Sources */,
 				D61D61D61D61D61D61D61D61 /* ModuleArgumentPlanner.swift in Sources */,
+				D106D106D106D106D106D106 /* ModuleEditorSourceNameLookup.swift in Sources */,
 				D30D30D30D30D30D30D30D30 /* ModuleNamingPlanner.swift in Sources */,
 				D70D70D70D70D70D70D70D70 /* ModuleOutputFolderCatalog.swift in Sources */,
 				D20D20D20D20D20D20D20D20 /* ModulePreviewContentProvider.swift in Sources */,

@@ -330,29 +330,14 @@ struct ModuleEditorView: View {
         ModuleEditorStorageLocationPicker(storageLocation: $draft.storageLocation)
     }
 
-    /// Auto-fills the name from the module's own `#!name=` metadata (Surge / Loon)
-    /// by fetching the source; falls back to a name derived from the URL when the
-    /// module has no embedded name (e.g. most Quantumult X rewrites). Debounced and
-    /// only runs while the name field is still empty.
     private func autofillName(from urlString: String) {
         nameLookup?.cancel()
         guard draft.name.isEmpty else { return }
-        let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let url = URL(string: trimmed),
-              ["http", "https"].contains(url.scheme?.lowercased()) else { return }
-        let fallback = FilenameSanitizer.suggestedName(from: trimmed)
-            .replacingOccurrences(of: "-", with: " ")
+        guard ModuleEditorSourceNameLookup.remoteURL(from: urlString) != nil else { return }
         nameLookup = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(500))
             guard !Task.isCancelled, draft.name.isEmpty else { return }
-            var request = URLRequest(url: url)
-            request.setValue("Surge Relay", forHTTPHeaderField: "User-Agent")
-            var resolved = fallback
-            if let (data, _) = try? await URLSession.shared.data(for: request),
-               let content = String(data: data, encoding: .utf8),
-               let name = ModuleMetadataParser.displayName(in: content) {
-                resolved = name
-            }
+            guard let resolved = await ModuleEditorSourceNameLookup.autofillName(from: urlString) else { return }
             guard !Task.isCancelled, draft.name.isEmpty else { return }
             draft.name = resolved
         }
