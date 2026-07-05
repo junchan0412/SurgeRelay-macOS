@@ -238,7 +238,7 @@ function patchLiveState(previous, next) {
     renderDetail(false);
     return;
   }
-  patchDetailValue('更新状态', moduleStatusTitle(module));
+  patchDetailValue('更新状态', webLogic.moduleStatusTitle(module));
   patchDetailValue('转换前来源', module.sourceOriginTitle || module.sourceFormatTitle);
   patchDetailValue('来源格式', module.sourceFormatTitle);
   if (next.combined.isEnabled) patchDetailValue('汇总订阅', next.combined.subscriptionURL || '等待发布配置');
@@ -292,28 +292,16 @@ function renderSidebar() {
 function moduleRow(module) {
   const icon = module.iconURL ? `<img src="${escapeAttribute(module.iconURL)}" alt="" loading="lazy">` : `<span class="symbol" data-symbol="shippingbox"></span>`;
   const stateClass = `state-${module.state || 'never'}`;
-  const stateTitle = moduleStatusTitle(module);
+  const stateTitle = webLogic.moduleStatusTitle(module);
   const toggle = state.combined.isEnabled
     ? `<label class="module-toggle" title="${module.isEnabled ? '从总模块中停用' : '包含在总模块中'}"><input type="checkbox" data-module-toggle="${module.id}" ${module.isEnabled ? 'checked' : ''} aria-label="包含 ${escapeAttribute(module.name)}"><span class="toggle-track" aria-hidden="true"></span></label>`
     : '';
   return `<div class="module-row ${selectedID === module.id ? 'selected' : ''} ${state.combined.isEnabled && !module.isEnabled ? 'disabled' : ''}" data-id="${module.id}" role="button" tabindex="0">
     <span class="module-icon ${module.iconURL ? '' : 'placeholder'}">${icon}</span>
-    <span class="module-copy"><strong>${escapeHTML(module.name)}</strong><small>${escapeHTML(moduleSubtitle(module))}</small></span>
+    <span class="module-copy"><strong>${escapeHTML(module.name)}</strong><small>${escapeHTML(webLogic.moduleSubtitle(module))}</small></span>
     <span class="module-state-dot ${escapeAttribute(stateClass)}" title="${escapeAttribute(stateTitle)}"></span>
     ${toggle}
   </div>`;
-}
-
-function moduleSubtitle(module) {
-  return webLogic.moduleSubtitle(module);
-}
-
-function moduleStatusTitle(module) {
-  return webLogic.moduleStatusTitle(module);
-}
-
-function failureSummary(message, maxLength = 42) {
-  return webLogic.failureSummary(message, maxLength);
 }
 
 function renderActivity() {
@@ -411,7 +399,7 @@ function renderModuleDetail(module, animate = true) {
   const errorNote = state.combined.isEnabled ? '如果该来源有缓存，总模块会继续沿用它上一次成功版本。' : '如果该来源有缓存，模块输出会继续沿用它上一次成功版本。';
   const errorBody = module.lastError ? escapeHTML(module.lastError).replace(/\n/g, '<br>') : '';
   const errorActions = module.lastError ? `<div><button class="button" data-action="copy" data-value="${escapeAttribute(module.lastError)}"><span class="symbol" data-symbol="copy"></span>复制错误</button></div>` : '';
-  const error = module.lastError ? `<section class="form-section-view"><h3 class="section-heading">最近一次更新失败</h3><div class="group-box"><div class="detail-row action-row error-box"><strong>${escapeHTML(moduleStatusTitle(module))}</strong><div>${errorBody}</div><small>${escapeHTML(errorNote)}</small>${errorActions}</div></div></section>` : '';
+  const error = module.lastError ? `<section class="form-section-view"><h3 class="section-heading">最近一次更新失败</h3><div class="group-box"><div class="detail-row action-row error-box"><strong>${escapeHTML(webLogic.moduleStatusTitle(module))}</strong><div>${errorBody}</div><small>${escapeHTML(errorNote)}</small>${errorActions}</div></div></section>` : '';
   const conflict = module.hasOverrideConflict ? `<section class="form-section-view"><h3 class="section-heading">本地编辑冲突</h3><div class="group-box"><div class="detail-row action-row error-box"><strong>上游内容已经变化</strong><div>当前仍在使用本地编辑。可在预览中比较内容后保留或恢复。</div><div><button class="button" data-action="accept-override">保留本地编辑</button><button class="button" data-action="tab-preview">前往预览</button></div></div></div></section>` : '';
   const combinedSubscription = state.combined.subscriptionURL || '';
   const combinedRow = state.combined.isEnabled ? detailRow('square.stack.3d.up.fill', '汇总订阅', combinedSubscription || '等待发布配置', false, combinedSubscription || null) : '';
@@ -448,7 +436,7 @@ function renderModuleDetail(module, animate = true) {
       ${iconAddressRow}
       ${detailRow('doc.text', '独立模块', module.publishesStandalone ? '发布' : '不发布')}
       ${combinedRow}
-      ${detailRow('checkmark', '更新状态', moduleStatusTitle(module))}
+      ${detailRow('checkmark', '更新状态', webLogic.moduleStatusTitle(module))}
       ${detailRow('clock', '创建时间', formatDate(module.createdAt, '—'))}
       ${detailRow('clock', '上次更新', formatDate(module.lastUpdatedAt, '从未更新'))}
       ${detailRow('refresh', '来源检查', formatDate(module.sourceCheckedAt, '尚未检查'))}

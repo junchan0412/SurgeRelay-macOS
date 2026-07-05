@@ -121,7 +121,7 @@ Web management Script-Hub advanced option defaults and group schema live in `Web
 
 Web management formatting helpers live in `WebResources/web-format.js`. Keep HTML escaping, attribute escaping, date/time formatting, and module preview syntax highlighting there so `app.js` stays focused on API calls, state changes, event handling, and DOM composition.
 
-Web management list and output-path logic lives in `WebResources/web-logic.js`. Keep module list signatures, sidebar snapshot signatures, detail metadata row presence checks, search text, failure summaries, failure-filter state, filtered sidebar modules, empty-state text, folder titles, draft output path previews, and output path collision notices there so live updates, sidebar rendering, and editor previews share the same tested rules.
+Web management list and output-path logic lives in `WebResources/web-logic.js`. Keep module list signatures, sidebar snapshot signatures, detail metadata row presence checks, search text, state titles, sidebar subtitles, failure summaries, failure-filter state, filtered sidebar modules, empty-state text, folder titles, draft output path previews, and output path collision notices there so live updates, sidebar rendering, detail status rows, and editor previews share the same tested rules.
 
 Web management markup helpers live in `WebResources/web-markup.js`. Keep reusable HTML fragments such as detail rows, preview shells, argument controls, advanced option rows, latest-publish sections, and publish-file lists there; `app.js` should compose those fragments with live state instead of owning their escaping details.
 

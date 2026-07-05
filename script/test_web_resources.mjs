@@ -36,8 +36,8 @@ assert.ok(
 );
 assert.doesNotMatch(
   appSource,
-  /function (folderTitle|publishedRelativePathForDraft|outputPathNotice|normalizedOutputFileName|suggestedNameFromSource|normalizeFolder|isFileSource|sgmoduleName|existingSgmoduleName|baseName|existingFileBaseName)\(/,
-  'app.js should call web-logic output helpers directly instead of re-declaring wrappers'
+  /function (moduleSubtitle|moduleStatusTitle|failureSummary|folderTitle|publishedRelativePathForDraft|outputPathNotice|normalizedOutputFileName|suggestedNameFromSource|normalizeFolder|isFileSource|sgmoduleName|existingSgmoduleName|baseName|existingFileBaseName)\(/,
+  'app.js should call web-logic helpers directly instead of re-declaring wrappers'
 );
 
 assert.equal(
