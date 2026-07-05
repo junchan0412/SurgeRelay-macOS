@@ -1374,19 +1374,28 @@ final class AppModel {
         statusMessage = "已取消发布预览"
     }
 
-    private func githubPublishPreview() async throws -> PublishPreview {
-        try checkCurrentWorkCancellation()
-        try Task.checkCancellation()
-        guard hasGitHubPublishableModuleSelection else { throw RelayError.noFilesToPublish }
+    private func githubPublishTokenAndRefreshRepositoryPrivacy() async throws -> String {
         let token = ensureGitHubTokenLoaded(showStatusMessage: false)
         guard !token.isEmpty else { throw RelayError.githubTokenMissing }
         let isPrivate = try await githubClient.test(settings: settings.github, token: token)
         try checkCurrentWorkCancellation()
         try Task.checkCancellation()
-        if settings.github.repositoryIsPrivate != isPrivate {
-            settings.github.repositoryIsPrivate = isPrivate
+        let privacyUpdate = GitHubPublishPlanner.repositoryPrivacyUpdate(
+            currentValue: settings.github.repositoryIsPrivate,
+            detectedValue: isPrivate
+        )
+        if privacyUpdate.shouldPersist {
+            settings.github.repositoryIsPrivate = privacyUpdate.repositoryIsPrivate
             saveSettings()
         }
+        return token
+    }
+
+    private func githubPublishPreview() async throws -> PublishPreview {
+        try checkCurrentWorkCancellation()
+        try Task.checkCancellation()
+        guard hasGitHubPublishableModuleSelection else { throw RelayError.noFilesToPublish }
+        let token = try await githubPublishTokenAndRefreshRepositoryPrivacy()
         let data = settings.combinedModuleEnabled ? try await fileStore.readCombined() : nil
         try checkCurrentWorkCancellation()
         let files = try await currentPublishedFiles(combinedData: data, includeAssets: true, destination: .gitHub)
@@ -1415,15 +1424,7 @@ final class AppModel {
         try checkCurrentWorkCancellation()
         try Task.checkCancellation()
         guard hasGitHubPublishableModuleSelection else { throw RelayError.noFilesToPublish }
-        let token = ensureGitHubTokenLoaded(showStatusMessage: false)
-        guard !token.isEmpty else { throw RelayError.githubTokenMissing }
-        let isPrivate = try await githubClient.test(settings: settings.github, token: token)
-        try checkCurrentWorkCancellation()
-        try Task.checkCancellation()
-        if settings.github.repositoryIsPrivate != isPrivate {
-            settings.github.repositoryIsPrivate = isPrivate
-            saveSettings()
-        }
+        let token = try await githubPublishTokenAndRefreshRepositoryPrivacy()
         let data = settings.combinedModuleEnabled ? try await fileStore.readCombined() : nil
         try checkCurrentWorkCancellation()
         let files = try await currentPublishedFiles(combinedData: data, includeAssets: true, destination: .gitHub)
@@ -1458,15 +1459,7 @@ final class AppModel {
         try Task.checkCancellation()
         let plan = PublishCoordinator.selectedPlan(modules: modules, moduleIDs: moduleIDs)
         guard plan.hasPublishableModuleSelection else { throw RelayError.noFilesToPublish }
-        let token = ensureGitHubTokenLoaded(showStatusMessage: false)
-        guard !token.isEmpty else { throw RelayError.githubTokenMissing }
-        let isPrivate = try await githubClient.test(settings: settings.github, token: token)
-        try checkCurrentWorkCancellation()
-        try Task.checkCancellation()
-        if settings.github.repositoryIsPrivate != isPrivate {
-            settings.github.repositoryIsPrivate = isPrivate
-            saveSettings()
-        }
+        let token = try await githubPublishTokenAndRefreshRepositoryPrivacy()
         let files = try await selectedPublishedFiles(plan: plan)
         guard !files.isEmpty else { throw RelayError.noFilesToPublish }
         let currentPaths = files.map(\.name)

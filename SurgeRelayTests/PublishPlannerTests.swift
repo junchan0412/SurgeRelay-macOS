@@ -140,6 +140,25 @@ final class PublishPlannerTests: XCTestCase {
         XCTAssertTrue(movedRepositoryPlan.stalePaths.isEmpty)
     }
 
+    func testGitHubPublishPlannerBuildsRepositoryPrivacyUpdateDecision() {
+        XCTAssertEqual(
+            GitHubPublishPlanner.repositoryPrivacyUpdate(currentValue: nil, detectedValue: true),
+            GitHubRepositoryPrivacyUpdate(repositoryIsPrivate: true, shouldPersist: true)
+        )
+        XCTAssertEqual(
+            GitHubPublishPlanner.repositoryPrivacyUpdate(currentValue: false, detectedValue: true),
+            GitHubRepositoryPrivacyUpdate(repositoryIsPrivate: true, shouldPersist: true)
+        )
+        XCTAssertEqual(
+            GitHubPublishPlanner.repositoryPrivacyUpdate(currentValue: true, detectedValue: true),
+            GitHubRepositoryPrivacyUpdate(repositoryIsPrivate: true, shouldPersist: false)
+        )
+        XCTAssertEqual(
+            GitHubPublishPlanner.repositoryPrivacyUpdate(currentValue: false, detectedValue: false),
+            GitHubRepositoryPrivacyUpdate(repositoryIsPrivate: false, shouldPersist: false)
+        )
+    }
+
     func testGitHubPublishPlannerBuildsPreviewAndTargetDescription() {
         var settings = GitHubSettings()
         settings.owner = "someone"

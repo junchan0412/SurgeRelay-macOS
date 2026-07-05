@@ -11,7 +11,22 @@ struct GitHubPublishedPathUpdate: Equatable, Sendable {
     var publishedPaths: [String]
 }
 
+struct GitHubRepositoryPrivacyUpdate: Equatable, Sendable {
+    var repositoryIsPrivate: Bool
+    var shouldPersist: Bool
+}
+
 enum GitHubPublishPlanner {
+    static func repositoryPrivacyUpdate(
+        currentValue: Bool?,
+        detectedValue: Bool
+    ) -> GitHubRepositoryPrivacyUpdate {
+        GitHubRepositoryPrivacyUpdate(
+            repositoryIsPrivate: detectedValue,
+            shouldPersist: currentValue != detectedValue
+        )
+    }
+
     static func targetDescription(settings: GitHubSettings) -> String {
         let repository = "\(settings.owner)/\(settings.repository)@\(settings.branch)"
         let directory = settings.directory.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
