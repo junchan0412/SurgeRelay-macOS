@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将总模块贡献模块列表集中到 `ModuleRefreshPlanner`，让总模块预览、缓存重建和发布计划共享同一套启用/关闭规则。
 - 将主窗口侧边栏“需要处理 / 本地 / GitHub / 未分类”分组规则抽入 `ModuleSidebarSectionPlanner`，减少 `ModulesView` 的重复筛选逻辑并补充回归测试。
 - 将 GitHub 自动发布的删除确认/无变化状态文案并入 `GitHubPublishPlanner`，并将本地模块扫描与导入状态文案收敛到 `LocalModuleImportPlanner`。
 - 将 GitHub 发布全部、发布所选模块和发布预览的空发布/无变化状态文案集中到 `GitHubPublishPlanner`，减少发布入口硬编码分叉并补充回归测试。

@@ -365,8 +365,10 @@ struct CombinedPreviewPane: View {
     @State private var errorMessage: String?
 
     private var enabledModules: [RelayModule] {
-        guard model.settings.combinedModuleEnabled else { return [] }
-        return model.modules.filter(\.isEnabled)
+        ModuleRefreshPlanner.combinedContributorModules(
+            in: model.modules,
+            combinedModuleEnabled: model.settings.combinedModuleEnabled
+        )
     }
 
     private var reloadToken: String {

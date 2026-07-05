@@ -980,9 +980,10 @@ enum PublishCoordinator {
     ) -> PublishPlan {
         PublishPlan(
             standaloneModules: modules.filter(\.publishesStandalone),
-            combinedModuleIDs: combinedModuleEnabled
-                ? Set(modules.filter(\.isEnabled).map(\.id))
-                : []
+            combinedModuleIDs: Set(ModuleRefreshPlanner.combinedContributorModules(
+                in: modules,
+                combinedModuleEnabled: combinedModuleEnabled
+            ).map(\.id))
         )
     }
 

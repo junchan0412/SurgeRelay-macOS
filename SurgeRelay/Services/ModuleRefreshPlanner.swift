@@ -8,6 +8,15 @@ enum ModuleRefreshPlanner {
         combinedModuleEnabled && module.isEnabled
     }
 
+    static func combinedContributorModules(
+        in modules: [RelayModule],
+        combinedModuleEnabled: Bool
+    ) -> [RelayModule] {
+        modules.filter {
+            contributesToCombined($0, combinedModuleEnabled: combinedModuleEnabled)
+        }
+    }
+
     static func isUpdateable(
         _ module: RelayModule,
         combinedModuleEnabled: Bool

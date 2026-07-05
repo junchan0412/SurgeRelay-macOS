@@ -807,7 +807,10 @@ final class AppModel {
             statusMessage = admission.message
             return
         }
-        let updateModules = modules.filter(shouldUpdateModule)
+        let updateModules = ModuleRefreshPlanner.updateableModules(
+            in: modules,
+            combinedModuleEnabled: settings.combinedModuleEnabled
+        )
         cancelAutomaticPublishSchedule()
         let updateGeneration = localChangeGeneration
         beginWork(.updatingModules)
@@ -1487,7 +1490,10 @@ final class AppModel {
 
     private func rebuildCombinedFromCache() async {
         let rebuildGeneration = localChangeGeneration
-        let enabled = settings.combinedModuleEnabled ? modules.filter(\.isEnabled) : []
+        let enabled = ModuleRefreshPlanner.combinedContributorModules(
+            in: modules,
+            combinedModuleEnabled: settings.combinedModuleEnabled
+        )
         guard !enabled.isEmpty else {
             try? await fileStore.removeCombined()
             try? await publishCurrentFiles(combinedData: nil, includeAssets: false)

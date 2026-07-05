@@ -38,6 +38,18 @@ final class ModuleRefreshPlannerTests: XCTestCase {
         XCTAssertFalse(ModuleRefreshPlanner.isUpdateable(localCombinedOnly, combinedModuleEnabled: false))
         XCTAssertFalse(ModuleRefreshPlanner.isUpdateable(localIgnored, combinedModuleEnabled: true))
 
+        XCTAssertEqual(
+            ModuleRefreshPlanner.combinedContributorModules(
+                in: [remoteDisabled, localCombinedOnly, localStandalone, localIgnored],
+                combinedModuleEnabled: true
+            ).map(\.name),
+            ["Local Combined"]
+        )
+        XCTAssertTrue(ModuleRefreshPlanner.combinedContributorModules(
+            in: [remoteDisabled, localCombinedOnly, localStandalone, localIgnored],
+            combinedModuleEnabled: false
+        ).isEmpty)
+
         let updateableNames = ModuleRefreshPlanner.updateableModules(
             in: [remoteDisabled, localCombinedOnly, localStandalone, localIgnored],
             combinedModuleEnabled: true

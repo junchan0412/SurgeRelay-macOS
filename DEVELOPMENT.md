@@ -77,7 +77,7 @@ Module output naming belongs in `ModuleNamingPlanner`. Keep output-file uniquene
 
 Cached module metadata refresh belongs in `ModuleMetadataRefreshPlanner`. Keep restored Script-Hub subscription metadata, override base-hash initialization, preferred icon selection, icon-cache refresh decisions, and detected source-format updates there. AppModel should read cached files and apply the returned module/icon plan.
 
-Module refresh eligibility belongs in `ModuleRefreshPlanner`. Keep "contributes to combined module", "is updateable", updateable module filtering, and launch-time refresh decisions there so AppModel, summary counts, and startup refresh behavior stay aligned. Cover those rules in `ModuleRefreshPlannerTests.swift` instead of growing `ModelAndCoordinatorTests.swift`.
+Module refresh eligibility belongs in `ModuleRefreshPlanner`. Keep "contributes to combined module", combined contributor filtering, "is updateable", updateable module filtering, and launch-time refresh decisions there so AppModel, previews, publish planning, summary counts, and startup refresh behavior stay aligned. Cover those rules in `ModuleRefreshPlannerTests.swift` instead of growing `ModelAndCoordinatorTests.swift`.
 
 Add/edit draft planning belongs in `ModuleDraftPlanner`. Keep draft validation, duplicate effective-source checks, add-module construction, edit change detection, source revision state clearing, custom-icon planning, and local storage relative-path decisions there. `AppModel` should apply the returned add/update plan, then handle persistence, icon cache side effects, and update scheduling.
 
