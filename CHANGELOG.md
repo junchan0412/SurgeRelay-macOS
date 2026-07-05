@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将 Web 管理认证失败限流抽入 `WebAuthenticationThrottle.swift`，让 `WebManagementHTTP.swift` 聚焦 HTTP 请求、响应、解析和安全头类型。
 - 将 GitHub 发布预览与正式发布共享同一套发布准备流程，减少 token、总模块数据、发布文件和旧路径计划的重复组装逻辑。
 - 将 Web 管理添加模块时的远程来源名称自动查询、防竞态序列和手动改名保护收进 `web-editor.js`，让 `app.js` 不再持有编辑器内部命名状态。
 - 将 Web 管理模块/总模块预览加载、可编辑预览 dirty 状态、保存和恢复操作抽入 `web-preview.js`，减少 `app.js` 对预览状态的直接持有。
