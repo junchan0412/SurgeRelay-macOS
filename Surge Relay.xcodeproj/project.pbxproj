@@ -183,6 +183,7 @@
 		A1243C2BA470C33854288294 /* web-editor.js in Resources */ = {isa = PBXBuildFile; fileRef = FCAEC697C414F11A0F8E2D11 /* web-editor.js */; };
 		A1343C2BA470C33854288294 /* web-feedback.js in Resources */ = {isa = PBXBuildFile; fileRef = FCBEC697C414F11A0F8E2D11 /* web-feedback.js */; };
 		A1443C2BA470C33854288294 /* web-preview.js in Resources */ = {isa = PBXBuildFile; fileRef = FCCEC697C414F11A0F8E2D11 /* web-preview.js */; };
+		A1543C2BA470C33854288294 /* web-sidebar.js in Resources */ = {isa = PBXBuildFile; fileRef = FCDEC697C414F11A0F8E2D11 /* web-sidebar.js */; };
 		A11A11A11A11A11A11A11A11 /* CombinedModuleViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B11B11B11B11B11B11B11B11 /* CombinedModuleViews.swift */; };
 		A22A22A22A22A22A22A22A22 /* DetailInfoViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22B22B22B22B22B22B22B22 /* DetailInfoViews.swift */; };
 		A33A33A33A33A33A33A33A33 /* PublishFileAssembler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B33B33B33B33B33B33B33 /* PublishFileAssembler.swift */; };
@@ -453,6 +454,7 @@
 		FC5EC697C414F11A0F8E2D11 /* web-options.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "web-options.js"; sourceTree = "<group>"; };
 		FC6EC697C414F11A0F8E2D11 /* web-format.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "web-format.js"; sourceTree = "<group>"; };
 		FC7EC697C414F11A0F8E2D11 /* web-markup.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "web-markup.js"; sourceTree = "<group>"; };
+		FCDEC697C414F11A0F8E2D11 /* web-sidebar.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "web-sidebar.js"; sourceTree = "<group>"; };
 		FC8EC697C414F11A0F8E2D11 /* web-api.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "web-api.js"; sourceTree = "<group>"; };
 		FC9EC697C414F11A0F8E2D11 /* web-state.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "web-state.js"; sourceTree = "<group>"; };
 		FCAEC697C414F11A0F8E2D11 /* web-editor.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "web-editor.js"; sourceTree = "<group>"; };
@@ -615,6 +617,7 @@
 				FC5EC697C414F11A0F8E2D11 /* web-options.js */,
 				FC6EC697C414F11A0F8E2D11 /* web-format.js */,
 				FC7EC697C414F11A0F8E2D11 /* web-markup.js */,
+				FCDEC697C414F11A0F8E2D11 /* web-sidebar.js */,
 				FC8EC697C414F11A0F8E2D11 /* web-api.js */,
 				FC9EC697C414F11A0F8E2D11 /* web-state.js */,
 				FCAEC697C414F11A0F8E2D11 /* web-editor.js */,
@@ -914,6 +917,7 @@
 				A0743C2BA470C33854288294 /* web-options.js in Resources */,
 				A0843C2BA470C33854288294 /* web-format.js in Resources */,
 				A0943C2BA470C33854288294 /* web-markup.js in Resources */,
+				A1543C2BA470C33854288294 /* web-sidebar.js in Resources */,
 				A1043C2BA470C33854288294 /* web-api.js in Resources */,
 				A1143C2BA470C33854288294 /* web-state.js in Resources */,
 				A1243C2BA470C33854288294 /* web-editor.js in Resources */,

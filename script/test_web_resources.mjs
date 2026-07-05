@@ -6,6 +6,7 @@ const logicSource = readFileSync(new URL('../SurgeRelay/WebResources/web-logic.j
 const optionsSource = readFileSync(new URL('../SurgeRelay/WebResources/web-options.js', import.meta.url), 'utf8');
 const formatSource = readFileSync(new URL('../SurgeRelay/WebResources/web-format.js', import.meta.url), 'utf8');
 const markupSource = readFileSync(new URL('../SurgeRelay/WebResources/web-markup.js', import.meta.url), 'utf8');
+const sidebarSource = readFileSync(new URL('../SurgeRelay/WebResources/web-sidebar.js', import.meta.url), 'utf8');
 const apiSource = readFileSync(new URL('../SurgeRelay/WebResources/web-api.js', import.meta.url), 'utf8');
 const stateSource = readFileSync(new URL('../SurgeRelay/WebResources/web-state.js', import.meta.url), 'utf8');
 const editorSource = readFileSync(new URL('../SurgeRelay/WebResources/web-editor.js', import.meta.url), 'utf8');
@@ -17,6 +18,7 @@ vm.runInContext(logicSource, context, { filename: 'web-logic.js' });
 vm.runInContext(optionsSource, context, { filename: 'web-options.js' });
 vm.runInContext(formatSource, context, { filename: 'web-format.js' });
 vm.runInContext(markupSource, context, { filename: 'web-markup.js' });
+vm.runInContext(sidebarSource, context, { filename: 'web-sidebar.js' });
 vm.runInContext(apiSource, context, { filename: 'web-api.js' });
 vm.runInContext(stateSource, context, { filename: 'web-state.js' });
 vm.runInContext(editorSource, context, { filename: 'web-editor.js' });
@@ -31,6 +33,8 @@ const format = context.SurgeRelayWebFormat;
 assert.ok(format, 'web format should install a global testable API');
 const markup = context.SurgeRelayWebMarkup;
 assert.ok(markup, 'web markup should install a global testable API');
+const sidebarHelpers = context.SurgeRelayWebSidebar;
+assert.ok(sidebarHelpers, 'web sidebar should install a global testable API');
 const api = context.SurgeRelayWebAPI;
 assert.ok(api, 'web api should install a global testable API');
 const stateHelpers = context.SurgeRelayWebState;
@@ -81,6 +85,87 @@ assert.doesNotMatch(
   /detail-value monospaced">\$\{escapeHTML\((combined\.subscriptionURL|module\.publishedURL)\)\}/,
   'app.js should use web-markup for copyable URL sections'
 );
+assert.doesNotMatch(
+  appSource,
+  /function (renderSidebar|patchSidebarLive)\(/,
+  'app.js should use web-sidebar for sidebar rendering and live patching'
+);
+
+const sidebarLabel = { textContent: '' };
+const sidebarToggle = { checked: false };
+const sidebarRow = {
+  classList: {
+    disabled: null,
+    toggle(name, value) {
+      if (name === 'disabled') this.disabled = value;
+    }
+  },
+  querySelector(selector) {
+    return selector === '[data-module-toggle]' ? sidebarToggle : null;
+  }
+};
+const sidebarUI = {
+  search: { value: '' },
+  filterRow: { hidden: true },
+  failureFilter: {
+    hidden: true,
+    attrs: {},
+    setAttribute(name, value) { this.attrs[name] = value; },
+    querySelector: () => sidebarLabel
+  },
+  summaryRow: {
+    hidden: true,
+    classList: {
+      selected: null,
+      toggle(name, value) {
+        if (name === 'selected') this.selected = value;
+      }
+    }
+  },
+  summarySubtitle: { textContent: '' },
+  list: {
+    innerHTML: '',
+    querySelector: selector => selector.includes('module-1') ? sidebarRow : null
+  }
+};
+let sidebarState = {
+  combined: { isEnabled: true, enabledCount: 1 },
+  modules: [{
+    id: 'module-1',
+    name: 'Failed Module',
+    sourceURL: 'https://example.com/failed.conf',
+    sourceFormatTitle: 'Quantumult X',
+    relationshipSummary: 'GitHub 模块',
+    state: 'failed',
+    stateTitle: '失败',
+    lastError: '原始链接返回 404',
+    isEnabled: false,
+    publishesStandalone: true
+  }]
+};
+let sidebarFailuresOnly = false;
+const sidebarController = sidebarHelpers.createSidebarController({
+  ui: sidebarUI,
+  getState: () => sidebarState,
+  getSelectedID: () => 'combined',
+  getFailuresOnly: () => sidebarFailuresOnly,
+  setFailuresOnly: value => { sidebarFailuresOnly = value; }
+});
+sidebarController.render();
+assert.equal(sidebarUI.filterRow.hidden, false);
+assert.equal(sidebarUI.failureFilter.attrs['aria-pressed'], 'false');
+assert.equal(sidebarUI.summaryRow.classList.selected, true);
+assert.match(sidebarUI.list.innerHTML, /Failed Module/);
+sidebarController.toggleFailuresOnly();
+assert.equal(sidebarFailuresOnly, true);
+assert.equal(sidebarUI.failureFilter.attrs['aria-pressed'], 'true');
+sidebarState = {
+  combined: { isEnabled: true, enabledCount: 1 },
+  modules: [{ ...sidebarState.modules[0], isEnabled: true }]
+};
+sidebarController.patchLive();
+assert.equal(sidebarToggle.checked, true);
+assert.equal(sidebarRow.classList.disabled, false);
 
 assert.equal(
   logic.publishedRelativePathForDraft({
@@ -1112,6 +1197,7 @@ const logicScriptIndex = indexHTML.indexOf('/web-logic.js');
 const optionsScriptIndex = indexHTML.indexOf('/web-options.js');
 const formatScriptIndex = indexHTML.indexOf('/web-format.js');
 const markupScriptIndex = indexHTML.indexOf('/web-markup.js');
+const sidebarScriptIndex = indexHTML.indexOf('/web-sidebar.js');
 const apiScriptIndex = indexHTML.indexOf('/web-api.js');
 const stateScriptIndex = indexHTML.indexOf('/web-state.js');
 const editorScriptIndex = indexHTML.indexOf('/web-editor.js');
@@ -1122,7 +1208,8 @@ assert.ok(logicScriptIndex >= 0, 'index should load web-logic.js');
 assert.ok(optionsScriptIndex > logicScriptIndex, 'web-options.js must load after web-logic.js');
 assert.ok(formatScriptIndex > optionsScriptIndex, 'web-format.js must load after web-options.js');
 assert.ok(markupScriptIndex > formatScriptIndex, 'web-markup.js must load after web-format.js');
-assert.ok(apiScriptIndex > markupScriptIndex, 'web-api.js must load after web-markup.js');
+assert.ok(sidebarScriptIndex > markupScriptIndex, 'web-sidebar.js must load after web-markup.js');
+assert.ok(apiScriptIndex > sidebarScriptIndex, 'web-api.js must load after web-sidebar.js');
 assert.ok(stateScriptIndex > apiScriptIndex, 'web-state.js must load after web-api.js');
 assert.ok(editorScriptIndex > stateScriptIndex, 'web-editor.js must load after web-state.js');
 assert.ok(feedbackScriptIndex > editorScriptIndex, 'web-feedback.js must load after web-editor.js');

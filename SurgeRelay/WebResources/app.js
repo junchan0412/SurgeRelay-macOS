@@ -52,11 +52,13 @@ const webMarkup = window.SurgeRelayWebMarkup;
 if (!webMarkup) throw new Error('web-markup.js must load before app.js');
 const {
   emptyStateMarkup,
-  moduleRowMarkup,
   combinedDetailMarkup,
   moduleDetailMarkup,
   argumentsSectionMarkup
 } = webMarkup;
+
+const webSidebar = window.SurgeRelayWebSidebar;
+if (!webSidebar) throw new Error('web-sidebar.js must load before app.js');
 
 const webAPI = window.SurgeRelayWebAPI;
 if (!webAPI) throw new Error('web-api.js must load before app.js');
@@ -122,6 +124,13 @@ const previewController = webPreview.createPreviewController({
   askConfirmation,
   showToast
 });
+const sidebarController = webSidebar.createSidebarController({
+  ui,
+  getState: () => state,
+  getSelectedID: () => selectedID,
+  getFailuresOnly: () => showFailuresOnly,
+  setFailuresOnly: value => { showFailuresOnly = Boolean(value); }
+});
 const stateEventController = webState.createStateEventController({
   EventSource: window.EventSource,
   document,
@@ -137,11 +146,8 @@ initializeHistoryState();
 
 moduleEditor.installAdvancedOptions();
 
-ui.search.addEventListener('input', renderSidebar);
-ui.failureFilter.addEventListener('click', () => {
-  showFailuresOnly = !showFailuresOnly;
-  renderSidebar();
-});
+ui.search.addEventListener('input', sidebarController.render);
+ui.failureFilter.addEventListener('click', sidebarController.toggleFailuresOnly);
 ui.add.addEventListener('click', () => openEditor());
 ui.refresh.addEventListener('click', updateAll);
 ui.cancelActivity.addEventListener('click', cancelCurrentWork);
@@ -222,7 +228,7 @@ function applyState(next, initial = false, renderCurrentDetail = false) {
     const selectionChanged = normalizeSelection(next) || previousSelectedID !== selectedID;
     ui.body.classList.toggle('has-selection', Boolean(selectedID));
     if (initial || renderCurrentDetail || selectionChanged) {
-      renderSidebar();
+      sidebarController.render();
       renderActivity();
       renderDetail(false);
     } else {
@@ -251,13 +257,13 @@ function startStateEvents() {
 
 function patchLiveState(previous, next) {
   if (!previous) {
-    renderSidebar();
+    sidebarController.render();
     return;
   }
 
   const previousList = webLogic.sidebarListSignature(previous);
   const nextList = webLogic.sidebarListSignature(next);
-  if (previousList !== nextList) renderSidebar(); else patchSidebarLive();
+  if (previousList !== nextList) sidebarController.render(); else sidebarController.patchLive();
 
   if (detailTab !== 'info') return;
   if (selectedID === 'combined') {
@@ -290,44 +296,6 @@ function patchDetailValue(label, value) {
     .find(item => item.querySelector('.detail-label span:last-child')?.textContent === label);
   const target = row?.querySelector('.detail-value');
   if (target && target.textContent !== value) target.textContent = value;
-}
-
-function patchSidebarLive() {
-  ui.summaryRow.hidden = !state.combined.isEnabled;
-  if (state.combined.isEnabled) ui.summarySubtitle.textContent = `${state.combined.enabledCount} 个来源 · 总模块订阅`;
-  state.modules.forEach(module => {
-    const row = ui.list.querySelector(`.module-row[data-id="${module.id}"]`);
-    if (!row) return;
-    row.classList.toggle('disabled', state.combined.isEnabled && !module.isEnabled);
-    const toggle = row.querySelector('[data-module-toggle]');
-    if (toggle && toggle.checked !== module.isEnabled) toggle.checked = module.isEnabled;
-  });
-}
-
-function renderSidebar() {
-  if (!state) return;
-  const query = ui.search.value.trim();
-  const filterState = webLogic.sidebarFailureFilterState(state.modules, showFailuresOnly);
-  showFailuresOnly = filterState.failuresOnly;
-  ui.filterRow.hidden = !filterState.isVisible;
-  ui.failureFilter.hidden = !filterState.isVisible;
-  ui.failureFilter.setAttribute('aria-pressed', showFailuresOnly ? 'true' : 'false');
-  const failureFilterLabel = ui.failureFilter.querySelector('span:last-child');
-  if (failureFilterLabel) failureFilterLabel.textContent = filterState.label;
-  const modules = webLogic.sidebarModules(state.modules, {
-    query,
-    failuresOnly: showFailuresOnly
-  });
-  ui.summaryRow.hidden = !state.combined.isEnabled;
-  if (state.combined.isEnabled) ui.summarySubtitle.textContent = `${state.combined.enabledCount} 个来源 · 总模块订阅`;
-  ui.summaryRow.classList.toggle('selected', state.combined.isEnabled && selectedID === 'combined');
-  const emptyText = webLogic.sidebarEmptyText({ query, failuresOnly: showFailuresOnly });
-  ui.list.innerHTML = modules.length
-    ? modules.map(module => moduleRowMarkup(module, {
-      selectedID,
-      combinedEnabled: state.combined.isEnabled
-    })).join('')
-    : emptyStateMarkup('magnifyingglass', emptyText);
 }
 
 function renderActivity() {
@@ -473,7 +441,7 @@ function selectItem(id, pushHistory = true) {
     const entry = webState.detailHistoryEntry(location, id, cameFromList);
     history.pushState(entry.state, '', entry.url);
   }
-  renderSidebar(); renderDetail(false);
+  sidebarController.render(); renderDetail(false);
 }
 
 function initializeHistoryState() {
@@ -492,7 +460,7 @@ function showModuleList(replaceHistory = false) {
     const entry = webState.listHistoryEntry(location);
     history.replaceState(entry.state, '', entry.url);
   }
-  renderSidebar();
+  sidebarController.render();
   renderDetail(false);
 }
 

@@ -143,6 +143,8 @@ Web management list, activity, and pure editor rules live in `WebResources/web-l
 
 Web management markup helpers live in `WebResources/web-markup.js`. Keep reusable HTML fragments such as sidebar module rows, empty states, detail rows, copyable URL/value sections, preview shells, total-module and single-module detail sections, detail toolbars, argument sections and controls, advanced option containers and rows, output-folder option lists, latest-publish sections, and publish-file lists there; `app.js` should compose those fragments with live state instead of owning their escaping details.
 
+Web management sidebar rendering lives in `WebResources/web-sidebar.js`. Keep failure-filter state application, summary-row updates, module-list rendering, and sidebar live patching there; `app.js` should route state changes to the sidebar controller instead of owning list DOM details.
+
 Web management API/session helpers live in `WebResources/web-api.js`. Keep URL token extraction, session bootstrap, request headers, JSON body handling, same-origin credentials, error payload parsing, and 401 token retry there; `app.js` should call the client instead of directly owning fetch/session details.
 
 Web management state/navigation helpers live in `WebResources/web-state.js`. Keep initial module selection, mobile history URLs, history entry construction, mobile back/popstate decisions, fallback selection, and EventSource reconnect/polling behavior there; `app.js` should coordinate rendering through those helpers instead of duplicating route or live-state subscription logic.
@@ -182,6 +184,7 @@ node --check SurgeRelay/WebResources/web-logic.js
 node --check SurgeRelay/WebResources/web-options.js
 node --check SurgeRelay/WebResources/web-format.js
 node --check SurgeRelay/WebResources/web-markup.js
+node --check SurgeRelay/WebResources/web-sidebar.js
 node --check SurgeRelay/WebResources/web-api.js
 node --check SurgeRelay/WebResources/web-state.js
 node --check SurgeRelay/WebResources/web-editor.js

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将 Web 管理端侧栏渲染、失败筛选和列表 live patch 拆入 `web-sidebar.js`，让 `app.js` 更专注于状态流、详情页和用户动作编排。
 - 将 AppModel 的前台更新启动、工作取消、取消检查、工作状态切换和更新历史记录拆入 `AppModel+Work.swift`，让主 `AppModel.swift` 更专注于持久状态初始化和启动流程。
 - 将 AppModel 的更新完成阶段收尾拆入 `AppModel+UpdateCompletion.swift`，集中处理缺缓存阻断、总模块写入/移除、旧文件清理和自动发布完成状态。
 - 将 AppModel 的 GitHub 发布准备、预览、提交和发布历史记录流程拆入 `AppModel+GitHubPublishing.swift`，让 `AppModel+Publishing.swift` 更专注于用户触发的发布/预览/确认状态编排。
