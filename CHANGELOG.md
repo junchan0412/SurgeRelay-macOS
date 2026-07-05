@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将主窗口侧边栏 toolbar 的添加、更新、发布、多选和本地扫描按钮拆入 `ModuleSidebarToolbarContent.swift`，让 `ModulesView.swift` 只负责挂载 toolbar 与传递状态/动作。
 - 将主窗口详情/预览切换、详情 toolbar 和设置入口拆入 `ModuleDetailPaneView.swift`，让 `ModulesView.swift` 更专注于 split-view shell、搜索索引、侧边栏 toolbar 与 sheet 路由。
 - 将桌面模块编辑器的远程来源名称自动填充请求、`#!name` 解析和 URL fallback 抽入 `ModuleEditorSourceNameLookup`，让 `ModuleEditorView.swift` 只保留 debounce 与状态写回。
 - 将 AppKit `NSTextView` 预览/高亮桥接拆入 `ModuleCodeTextView.swift`，让 `ModulePreviewViews.swift` 只保留模块、总模块和上游对比预览页面。

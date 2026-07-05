@@ -17,9 +17,10 @@ This document records the project conventions needed to maintain this fork.
 
 ## View Boundaries
 
-Keep `ModulesView.swift` focused on the split-view shell, search/index coordination, sidebar toolbar actions, editor presentation, and sheet routing.
+Keep `ModulesView.swift` focused on the split-view shell, search/index coordination, toolbar mounting, editor presentation, and sheet routing.
 
 - `ModuleSidebarSectionPlanner` owns the sidebar grouping rules for attention, local, GitHub, and uncategorized modules. `ModuleSidebarView.swift` owns the sidebar list rendering, module rows, batch-selection checkboxes, context menu entry points, empty/sidebar states, and the bottom status card.
+- `ModuleSidebarToolbarContent.swift` owns the sidebar toolbar buttons and their enable/help rules for add, update, publish, batch publish, and local-module scanning.
 - `ModuleDetailPaneView.swift` owns main-window detail selection, the detail/preview tab picker, detail toolbar settings entry, and detail-pane search binding.
 - `ModuleDetailSummaryHeader.swift` owns the module detail title, icon, metadata pills, and summary metrics. `ModuleDetailView.swift` owns the detail page composition, management relation rows, sync status, module arguments, and publishing/local file sections.
 - `CombinedModuleViews.swift` owns the combined-module sidebar row, combined-module detail page, and publish-preview summary UI.

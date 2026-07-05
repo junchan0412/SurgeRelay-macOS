@@ -87,61 +87,13 @@ struct ModulesView: View {
             .navigationTitle("模块")
             .toolbar {
                 if columnVisibility != .detailOnly {
-                    ToolbarItemGroup(placement: .primaryAction) {
-                        Button {
-                            editorRoute = ModuleEditorRoute(module: nil)
-                        } label: {
-                            Label("添加模块", systemImage: "plus")
-                        }
-                        Button {
-                            model.startUpdateAll()
-                        } label: {
-                            Label("更新全部", systemImage: "arrow.clockwise")
-                        }
-                        .disabled(!model.updateAdmission.isAccepted)
-                        .help(model.updateAdmission.isAccepted ? "更新全部模块" : model.updateAdmission.message)
-                        Button {
-                            Task { await model.publishAll() }
-                        } label: {
-                            Label("发布全部", systemImage: "square.and.arrow.up")
-                        }
-                        .disabled(model.isWorking || !model.settings.publishToGitHub || !model.settings.github.isConfigured)
-                        .help(model.settings.publishToGitHub ? "发布当前所有输出到 GitHub" : "未开启 GitHub 发布")
-                        Button {
-                            isBatchSelecting.toggle()
-                            if !isBatchSelecting { batchSelectedModuleIDs.removeAll() }
-                        } label: {
-                            Label(isBatchSelecting ? "结束选择" : "多选", systemImage: isBatchSelecting ? "checkmark.circle" : "checklist")
-                        }
-                        .disabled(model.isWorking)
-                        if isBatchSelecting {
-                            Button {
-                                let ids = batchSelectedModuleIDs
-                                Task {
-                                    if await model.publishModules(moduleIDs: ids) {
-                                        batchSelectedModuleIDs.removeAll()
-                                        isBatchSelecting = false
-                                    }
-                                }
-                            } label: {
-                                Label("发布所选", systemImage: "square.and.arrow.up.on.square")
-                            }
-                            .disabled(
-                                model.isWorking ||
-                                batchSelectedModuleIDs.isEmpty ||
-                                !model.settings.publishToGitHub ||
-                                !model.settings.github.isConfigured
-                            )
-                            .help(batchSelectedModuleIDs.isEmpty ? "请选择要发布的模块" : "只发布勾选模块，不删除其他已发布文件")
-                        }
-                        Button {
-                            scanLocalModulesForPreview()
-                        } label: {
-                            Label("扫描本地模块", systemImage: "folder.badge.plus")
-                        }
-                        .disabled(model.isWorking || isScanningLocalModules)
-                        .help("扫描本地模块根目录下已有的 .sgmodule，并纳入 Surge Relay 管理")
-                    }
+                    ModuleSidebarToolbarContent(
+                        isBatchSelecting: $isBatchSelecting,
+                        batchSelectedModuleIDs: $batchSelectedModuleIDs,
+                        isScanningLocalModules: isScanningLocalModules,
+                        addModule: { editorRoute = ModuleEditorRoute(module: nil) },
+                        scanLocalModules: scanLocalModulesForPreview
+                    )
                 }
             }
         } detail: {
