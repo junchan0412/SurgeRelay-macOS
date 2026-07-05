@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将 GitHub Release 资产模型、版本比较和安装建议拆入 `GitHubReleaseModels.swift`，将最新 Release 与 sha256 sidecar 拉取逻辑拆入 `GitHubReleaseClient.swift`，让更新检查视图只保留界面展示。
 - 将 `LocalFileStoreTests.swift` 拆为配置迁移、本地发布写入、旧输出清理和本地模块扫描诊断测试文件，进一步明确本地文件安全边界。
 - 将本地发布旧文件清理和发布文件组装测试拆入 `LocalPublishedFilesPlannerTests.swift` 与 `PublishFileAssemblerTests.swift`，让 `PublishPlannerTests.swift` 专注于发布选择和 GitHub 发布规划。
 - 将 Web 管理顶部状态卡的更新按钮、禁用原因、取消按钮和进度条展示规则抽入 `web-logic.js`，并补充无依赖 Node 测试，减少“更新按钮灰色但原因分叉”的回归风险。

@@ -31,6 +31,8 @@
 		B7B7B7B7B7B7B7B7B7B7B7B7 /* UpdateCompletionStatusPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7C7C7C7C7C7C7C7C7C7C7C7 /* UpdateCompletionStatusPlanner.swift */; };
 		A14A14A14A14A14A14A14A14 /* WebManagementAssets.swift in Sources */ = {isa = PBXBuildFile; fileRef = B14B14B14B14B14B14B14B14 /* WebManagementAssets.swift */; };
 		A15A15A15A15A15A15A15A15 /* DiagnosticModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B15B15B15B15B15B15B15B15 /* DiagnosticModels.swift */; };
+		A16A16A16A16A16A16A16A16 /* GitHubReleaseModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B16B16B16B16B16B16B16B16 /* GitHubReleaseModels.swift */; };
+		A17A17A17A17A17A17A17A17 /* GitHubReleaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B17B17B17B17B17B17B17B17 /* GitHubReleaseClient.swift */; };
 		B8B8B8B8B8B8B8B8B8B8B8B8 /* WebManagementHTTP.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8C8C8C8C8C8C8C8C8C8C8C8 /* WebManagementHTTP.swift */; };
 		A13A13A13A13A13A13A13A13 /* WebManagementModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B13B13B13B13B13B13B13B13 /* WebManagementModels.swift */; };
 		B9B9B9B9B9B9B9B9B9B9B9B9 /* SettingsComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9C9C9C9C9C9C9C9C9C9C9C9 /* SettingsComponents.swift */; };
@@ -256,6 +258,8 @@
 		51D9670C12C677CBC8D96FA4 /* WebManagementAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebManagementAPI.swift; sourceTree = "<group>"; };
 		B14B14B14B14B14B14B14B14 /* WebManagementAssets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebManagementAssets.swift; sourceTree = "<group>"; };
 		B15B15B15B15B15B15B15B15 /* DiagnosticModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticModels.swift; sourceTree = "<group>"; };
+		B16B16B16B16B16B16B16B16 /* GitHubReleaseModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubReleaseModels.swift; sourceTree = "<group>"; };
+		B17B17B17B17B17B17B17B17 /* GitHubReleaseClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubReleaseClient.swift; sourceTree = "<group>"; };
 		B13B13B13B13B13B13B13B13 /* WebManagementModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebManagementModels.swift; sourceTree = "<group>"; };
 		5A7D7F17FB694B798F91978E /* folder.svg */ = {isa = PBXFileReference; path = folder.svg; sourceTree = "<group>"; };
 		68CAE903B934F05BC413A021 /* arrow.triangle.2.circlepath.svg */ = {isa = PBXFileReference; path = arrow.triangle.2.circlepath.svg; sourceTree = "<group>"; };
@@ -429,6 +433,7 @@
 				6B63578065A9F7B8CC166FF2 /* KeychainStore.swift */,
 				E50E50E50E50E50E50E50E50 /* CredentialTokenCoordinator.swift */,
 				E97E97E97E97E97E97E97E97 /* ConfigurationManager.swift */,
+				B17B17B17B17B17B17B17B17 /* GitHubReleaseClient.swift */,
 				E90E90E90E90E90E90E90E90 /* GitHubPublishPlanner.swift */,
 				00FF1B0D1608D65FBA6451BE /* LaunchAtLoginService.swift */,
 				B91B91B91B91B91B91B91B91 /* LegacyOutputCleanupPlanner.swift */,
@@ -491,6 +496,7 @@
 			children = (
 				EDC7CEA42FDCD13847E9AC0F /* AppSettings.swift */,
 				B15B15B15B15B15B15B15B15 /* DiagnosticModels.swift */,
+				B16B16B16B16B16B16B16B16 /* GitHubReleaseModels.swift */,
 				0EE985DC3F8F9E3172A8D062 /* RelayModule.swift */,
 				0527CB5F1032EC43E9673F5D /* ScriptHubOptions.swift */,
 				A00DC6E63075F21C67B4B1EB /* ServiceModels.swift */,
@@ -829,6 +835,8 @@
 				FC75AF5CF098DE5C35C3572B /* EngineStore.swift in Sources */,
 				407E672ECAD57CD270BB44B7 /* FilenameSanitizer.swift in Sources */,
 				CA5FB083B1568EEEEA50DBAF /* GitHubClient.swift in Sources */,
+				A17A17A17A17A17A17A17A17 /* GitHubReleaseClient.swift in Sources */,
+				A16A16A16A16A16A16A16A16 /* GitHubReleaseModels.swift in Sources */,
 				75B5F5E0E0AF845CD0C5FACE /* KeychainStore.swift in Sources */,
 				D50D50D50D50D50D50D50D50 /* CredentialTokenCoordinator.swift in Sources */,
 				91BF72296DEE134A528EDF1B /* LaunchAtLoginService.swift in Sources */,

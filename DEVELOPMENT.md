@@ -139,6 +139,8 @@ Swift Web management static asset responses, content security policy, cached ico
 
 Diagnostic payloads and snapshots live in `Models/DiagnosticModels.swift`. Keep installation, keychain, local-root, module diagnostic snapshot, and diagnostic report model changes there instead of adding them back to `ServiceModels.swift`.
 
+GitHub Release metadata, install guidance, checksum validation state, and version comparison live in `Models/GitHubReleaseModels.swift`. The GitHub latest-release API call and sha256 sidecar downloads live in `Services/GitHubReleaseClient.swift`; `Views/CheckForUpdatesView.swift` should remain UI-only apart from SwiftUI presentation adapters.
+
 ## Build And Test
 
 `ModelAndCoordinatorTests.swift` owns pure model/coordinator coverage, including source metadata restoration, source identity, published address resolution, and summary counts. `UpdateFailureTests.swift` owns update failure formatting and original-source probe planning. `DiagnosticReportTests.swift` owns diagnostic report snapshots and secret redaction. `ModulePreviewContentProviderTests.swift` owns preview content recovery and cache-miss behavior. `CredentialTokenCoordinatorTests.swift` owns GitHub/Web token migration, storage fallback, and generated token behavior. `WorkActivityTests.swift` owns task activity state and update-admission rules.
