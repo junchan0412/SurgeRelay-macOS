@@ -152,6 +152,33 @@ assert.equal(
   false
 );
 
+const sidebarModules = [
+  { ...signatureBase, id: 'failed-1', name: 'Block HTTPDNS', state: 'failed', lastError: '原始链接返回 404' },
+  { ...signatureBase, id: 'current-1', name: 'Clean Module', state: 'current', lastError: '' },
+  { ...signatureBase, id: 'failed-2', name: 'Proxy Rewrite', state: 'failed', lastError: 'DNS 查询失败' }
+];
+const activeFailureFilter = logic.sidebarFailureFilterState(sidebarModules, true);
+assert.equal(activeFailureFilter.failedCount, 2);
+assert.equal(activeFailureFilter.failuresOnly, true);
+assert.equal(activeFailureFilter.isVisible, true);
+assert.equal(activeFailureFilter.label, '失败 2');
+const hiddenFailureFilter = logic.sidebarFailureFilterState([{ ...signatureBase, state: 'current' }], true);
+assert.equal(hiddenFailureFilter.failedCount, 0);
+assert.equal(hiddenFailureFilter.failuresOnly, false);
+assert.equal(hiddenFailureFilter.isVisible, false);
+assert.equal(hiddenFailureFilter.label, '失败 0');
+assert.deepEqual(
+  Array.from(logic.sidebarModules(sidebarModules, { query: 'rewrite', failuresOnly: true }).map(module => module.id)),
+  ['failed-2']
+);
+assert.deepEqual(
+  Array.from(logic.sidebarModules(sidebarModules, { query: 'clean', failuresOnly: true }).map(module => module.id)),
+  []
+);
+assert.equal(logic.sidebarEmptyText({ query: 'missing', failuresOnly: false }), '没有搜索结果');
+assert.equal(logic.sidebarEmptyText({ query: '', failuresOnly: true }), '没有更新失败的模块');
+assert.equal(logic.sidebarEmptyText({ query: '', failuresOnly: false }), '还没有模块');
+
 assert.equal(
   logic.moduleSubtitle({
     relationshipSummary: 'GitHub 模块 · 远程 Surge 模块',

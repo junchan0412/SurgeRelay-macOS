@@ -292,21 +292,21 @@ function patchSidebarLive() {
 function renderSidebar() {
   if (!state) return;
   const query = ui.search.value.trim();
-  const failedCount = state.modules.filter(module => module.state === 'failed').length;
-  if (failedCount === 0) showFailuresOnly = false;
-  ui.filterRow.hidden = failedCount === 0;
-  ui.failureFilter.hidden = failedCount === 0;
+  const filterState = webLogic.sidebarFailureFilterState(state.modules, showFailuresOnly);
+  showFailuresOnly = filterState.failuresOnly;
+  ui.filterRow.hidden = !filterState.isVisible;
+  ui.failureFilter.hidden = !filterState.isVisible;
   ui.failureFilter.setAttribute('aria-pressed', showFailuresOnly ? 'true' : 'false');
   const failureFilterLabel = ui.failureFilter.querySelector('span:last-child');
-  if (failureFilterLabel) failureFilterLabel.textContent = `失败 ${failedCount}`;
-  const modules = state.modules.filter(module =>
-    (!showFailuresOnly || module.state === 'failed') &&
-    webLogic.moduleMatchesSearch(module, query)
-  );
+  if (failureFilterLabel) failureFilterLabel.textContent = filterState.label;
+  const modules = webLogic.sidebarModules(state.modules, {
+    query,
+    failuresOnly: showFailuresOnly
+  });
   ui.summaryRow.hidden = !state.combined.isEnabled;
   if (state.combined.isEnabled) ui.summarySubtitle.textContent = `${state.combined.enabledCount} 个来源 · 总模块订阅`;
   ui.summaryRow.classList.toggle('selected', state.combined.isEnabled && selectedID === 'combined');
-  const emptyText = query ? '没有搜索结果' : (showFailuresOnly ? '没有更新失败的模块' : '还没有模块');
+  const emptyText = webLogic.sidebarEmptyText({ query, failuresOnly: showFailuresOnly });
   ui.list.innerHTML = modules.length ? modules.map(moduleRow).join('') : `<div class="empty-state"><div><span class="symbol" data-symbol="magnifyingglass"></span><div>${emptyText}</div></div></div>`;
 }
 

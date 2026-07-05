@@ -63,6 +63,38 @@
     return !normalizedQuery || moduleSearchText(module).includes(normalizedQuery);
   }
 
+  function failedModuleCount(modules) {
+    return (modules || []).filter(isFailedModule).length;
+  }
+
+  function sidebarFailureFilterState(modules, requestedFailuresOnly) {
+    const failedCount = failedModuleCount(modules);
+    return {
+      failedCount,
+      failuresOnly: failedCount > 0 && Boolean(requestedFailuresOnly),
+      isVisible: failedCount > 0,
+      label: `失败 ${failedCount}`
+    };
+  }
+
+  function sidebarModules(modules, options = {}) {
+    const failuresOnly = Boolean(options.failuresOnly);
+    return (modules || []).filter(module =>
+      (!failuresOnly || isFailedModule(module)) &&
+      moduleMatchesSearch(module, options.query)
+    );
+  }
+
+  function sidebarEmptyText(options = {}) {
+    const hasQuery = String(options.query || '').trim().length > 0;
+    if (hasQuery) return '没有搜索结果';
+    return options.failuresOnly ? '没有更新失败的模块' : '还没有模块';
+  }
+
+  function isFailedModule(module) {
+    return module?.state === 'failed';
+  }
+
   function folderTitle(folder) {
     return folder ? folder : '根目录';
   }
@@ -158,6 +190,10 @@
     moduleStatusTitle,
     moduleSearchText,
     moduleMatchesSearch,
+    failedModuleCount,
+    sidebarFailureFilterState,
+    sidebarModules,
+    sidebarEmptyText,
     folderTitle,
     publishedRelativePathForDraft,
     outputPathNotice,
