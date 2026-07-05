@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将 Web 管理 HTTP/响应头与请求安全/限流测试拆入专属测试文件，继续缩小 `WebManagementTests.swift` 的职责范围。
 - 将 Surge metadata parser 与 module merger 测试拆入专属测试文件，让 `SurgeRelayTests.swift` 只保留基础模型/编码回归。
 - 将来源 revision 网络检查测试拆入 `SourceRevisionServiceTests.swift`，继续缩小通用 `SurgeRelayTests.swift` 的职责范围。
 - 将本地发布确认清理后的受管理路径、设置写回和状态文案规划收进 `LocalPublishedFilesPlanner`，减少 AppModel 对本地文件安全边界的内联判断。
