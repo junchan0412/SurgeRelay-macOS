@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将诊断模型拆为报告 payload、安装/崩溃诊断、钥匙串/凭据诊断和本地根目录诊断文件，避免 `DiagnosticModels.swift` 继续集中承担多个诊断域。
 - 将 AppModel 的总模块缓存重建、本地发布写入、旧输出清理和共享发布文件装配拆入 `AppModel+PublishedOutput.swift`，让 `AppModel+Publishing.swift` 专注于手动 GitHub 发布流程。
 - 将 AppModel 的本地模块扫描/导入协调拆入 `AppModel+LocalModules.swift`，将模块输出文件夹菜单与 GitHub 目录刷新拆入 `AppModel+ModuleOutputFolders.swift`，让 `AppModel+Modules.swift` 更专注于模块增删改和预览编辑。
 - 将设置窗口的安装状态、最近更新、崩溃报告和诊断导出页面拆入 `SettingsDiagnosticsView.swift`，让 `SettingsView.swift` 只保留页签壳层、凭据预加载和 Web 管理二维码 sheet。

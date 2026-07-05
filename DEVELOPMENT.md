@@ -149,7 +149,7 @@ Swift Web management DTOs, request mutations, and API errors live in `Services/W
 
 Swift Web management static asset responses, content security policy, cached icon responses, and image content-type detection live in `Services/WebManagementAssets.swift`. Do not add bundle resource lookup or image sniffing back to `WebManagementAPI.swift`.
 
-Diagnostic payloads and snapshots live in `Models/DiagnosticModels.swift`. Keep installation, keychain, local-root, module diagnostic snapshot, and diagnostic report model changes there instead of adding them back to `ServiceModels.swift`.
+Diagnostic payloads and snapshots live in focused files under `Models/`: report payloads in `DiagnosticReportModels.swift`, installation and crash diagnostics in `InstallationDiagnosticSnapshot.swift`, keychain/credential diagnostics in `CredentialDiagnostics.swift`, and local-root diagnostics in `LocalModuleRootDiagnosticSnapshot.swift`. Keep diagnostic model changes there instead of adding them back to `ServiceModels.swift`.
 
 GitHub Release metadata, install guidance, checksum validation state, and version comparison live in `Models/GitHubReleaseModels.swift`. The GitHub latest-release API call and sha256 sidecar downloads live in `Services/GitHubReleaseClient.swift`; `Views/CheckForUpdatesView.swift` should remain UI-only apart from SwiftUI presentation adapters.
 
