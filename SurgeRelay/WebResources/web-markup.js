@@ -188,6 +188,10 @@
     return `<details class="option-group" data-option-group="${escapeAttribute(group.id)}"><summary><span class="symbol" data-symbol="chevron.right"></span>${escapeHTML(group.title)}</summary><div class="option-content">${group.description ? `<p class="option-description">${escapeHTML(group.description)}</p>` : ''}${group.fields.map(optionFieldMarkup).join('')}</div></details>`;
   }
 
+  function advancedOptionsMarkup(groups = []) {
+    return `<p class="advanced-intro">这些选项由 App 内置的 Script‑Hub 引擎执行，并随当前模块保存。留空即采用上游默认行为。</p>${groups.map(advancedGroupMarkup).join('')}`;
+  }
+
   function optionFieldMarkup(field) {
     if (field.type === 'heading') return `<div class="option-row"><strong>${escapeHTML(field.label)}</strong></div>`;
     if (field.type === 'toggle') return `<label class="option-row option-toggle"><span>${escapeHTML(field.label)}</span><input name="option_${escapeAttribute(field.key)}" type="checkbox" role="switch"><span class="toggle-track" aria-hidden="true"></span></label>`;
@@ -195,6 +199,15 @@
       ? `<textarea name="option_${escapeAttribute(field.key)}" rows="2" placeholder="${escapeAttribute(field.prompt)}"></textarea>`
       : `<input name="option_${escapeAttribute(field.key)}" type="text" placeholder="${escapeAttribute(field.prompt)}">`;
     return `<div class="option-row"><label for="option_${escapeAttribute(field.key)}">${escapeHTML(field.label)}</label>${input}${field.help ? `<p class="option-help">${escapeHTML(field.help)}</p>` : ''}</div>`;
+  }
+
+  function outputFolderOptionsMarkup(folders = [], selected = '') {
+    const values = new Set(['', ...(folders || []), selected || '']);
+    return [...values].sort((a, b) => {
+      if (!a) return -1;
+      if (!b) return 1;
+      return a.localeCompare(b, 'zh-Hans-CN', { numeric: true });
+    }).map(folder => `<option value="${escapeAttribute(folder)}">${escapeHTML(logic.folderTitle(folder))}</option>`).join('');
   }
 
   global.SurgeRelayWebMarkup = {
@@ -211,6 +224,8 @@
     argumentMarkup,
     argumentsSectionMarkup,
     advancedGroupMarkup,
-    optionFieldMarkup
+    advancedOptionsMarkup,
+    optionFieldMarkup,
+    outputFolderOptionsMarkup
   };
 })(globalThis);

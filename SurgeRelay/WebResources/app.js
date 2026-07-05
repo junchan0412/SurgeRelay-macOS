@@ -46,7 +46,7 @@ const { scriptHubDefaults, advancedGroups } = webOptions;
 
 const webFormat = window.SurgeRelayWebFormat;
 if (!webFormat) throw new Error('web-format.js must load before app.js');
-const { formatDate, formatTime, escapeHTML, escapeAttribute, highlightCode } = webFormat;
+const { formatDate, formatTime, highlightCode } = webFormat;
 
 const webMarkup = window.SurgeRelayWebMarkup;
 if (!webMarkup) throw new Error('web-markup.js must load before app.js');
@@ -56,7 +56,8 @@ const {
   combinedDetailMarkup,
   moduleDetailMarkup,
   argumentsSectionMarkup,
-  advancedGroupMarkup
+  advancedOptionsMarkup,
+  outputFolderOptionsMarkup
 } = webMarkup;
 
 const webAPI = window.SurgeRelayWebAPI;
@@ -99,7 +100,7 @@ const stateEventController = webState.createStateEventController({
 apiClient.initializeAccessToken();
 initializeHistoryState();
 
-ui.advancedOptions.innerHTML = `<p class="advanced-intro">这些选项由 App 内置的 Script‑Hub 引擎执行，并随当前模块保存。留空即采用上游默认行为。</p>${advancedGroups.map(advancedGroupMarkup).join('')}`;
+ui.advancedOptions.innerHTML = advancedOptionsMarkup(advancedGroups);
 
 ui.search.addEventListener('input', renderSidebar);
 ui.failureFilter.addEventListener('click', () => {
@@ -506,12 +507,7 @@ function hasAdvancedValues(values) { return Object.keys(scriptHubDefaults).some(
 function populateOutputFolders(selected = '') {
   const select = ui.moduleForm.elements.outputFolder;
   if (!select) return;
-  const folders = new Set(['', ...(state?.moduleOutputFolders || []), selected || '']);
-  select.innerHTML = [...folders].sort((a, b) => {
-    if (!a) return -1;
-    if (!b) return 1;
-    return a.localeCompare(b, 'zh-Hans-CN', { numeric: true });
-  }).map(folder => `<option value="${escapeAttribute(folder)}">${escapeHTML(webLogic.folderTitle(folder))}</option>`).join('');
+  select.innerHTML = outputFolderOptionsMarkup(state?.moduleOutputFolders || [], selected);
   select.value = selected || '';
 }
 

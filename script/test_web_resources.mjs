@@ -374,6 +374,17 @@ assert.match(markup.advancedGroupMarkup({
   description: '说明 & 帮助',
   fields: [{ key: 'host', type: 'text', label: '主机', prompt: 'example.com', help: '仅测试' }]
 }), /data-option-group="unsafe&quot;&gt;&lt;"/);
+assert.match(markup.advancedOptionsMarkup([{
+  id: 'group<1',
+  title: '高级 <选项>',
+  description: '',
+  fields: [{ key: 'host', type: 'text', label: '主机', prompt: 'example.com' }]
+}]), /advanced-intro/);
+const folderOptionsMarkup = markup.outputFolderOptionsMarkup(['Beta', 'A&B', 'Quote"Folder'], 'Selected<Folder>');
+assert.match(folderOptionsMarkup, /^<option value="">根目录<\/option>/);
+assert.match(folderOptionsMarkup, /value="A&amp;B">A&amp;B<\/option>/);
+assert.match(folderOptionsMarkup, /value="Quote&quot;Folder">Quote&quot;Folder<\/option>/);
+assert.match(folderOptionsMarkup, /value="Selected&lt;Folder&gt;">Selected&lt;Folder&gt;<\/option>/);
 assert.match(markup.latestPublishSection({
   commitSHA: 'abcdef123456',
   commitURL: 'https://example.com/commit/abcdef',
