@@ -331,6 +331,77 @@ assert.match(markup.latestPublishSection({
   publishedFiles: ['A&B.sgmodule'],
   deletedFiles: ['Old.sgmodule']
 }), /A&amp;B\.sgmodule/);
+assert.match(markup.detailToolbar('preview', true), /data-action="edit"/);
+assert.match(markup.detailToolbar('preview', true), /tab-preview" class="selected"/);
+assert.match(markup.combinedDetailMarkup({
+  isEnabled: true,
+  name: 'Surge Relay 汇总',
+  fileName: 'Surge Relay.sgmodule',
+  enabledCount: 2,
+  sourceCount: 3,
+  subscriptionURL: 'https://example.com/combined.sgmodule',
+  lastUpdatedAt: '2026-07-04T12:00:00Z'
+}, {
+  selectedTab: 'info',
+  latestGitHubPublish: {
+    commitSHA: 'abcdef123456',
+    commitURL: 'https://example.com/commit/abcdef',
+    date: '2026-07-04T12:00:00Z',
+    publishedFiles: ['Combined.sgmodule'],
+    deletedFiles: []
+  }
+}), /总模块订阅地址/);
+assert.match(
+  markup.combinedDetailMarkup({ isEnabled: false }, { selectedTab: 'info' }),
+  /总模块功能未开启/
+);
+assert.match(
+  markup.combinedDetailMarkup({
+    isEnabled: true,
+    fileName: 'Surge Relay.sgmodule'
+  }, { selectedTab: 'preview' }),
+  /code-view/
+);
+const failedModuleDetail = markup.moduleDetailMarkup({
+  ...signatureBase,
+  name: 'Unsafe <Module>',
+  sourceURL: 'https://example.com/fallback.sgmodule',
+  effectiveOriginalSourceURL: 'https://example.com/source.sgmodule?a=1&b=2',
+  category: 'Ads',
+  outputFolder: '',
+  outputFileName: 'Unsafe.sgmodule',
+  publishedRelativePath: 'Folder/Unsafe.sgmodule',
+  publishedURL: 'https://example.com/published.sgmodule',
+  localStorageRelativePath: 'Local/Unsafe.sgmodule',
+  customIconURL: 'https://example.com/icon.png?x=1&y=2',
+  state: 'failed',
+  stateTitle: '更新失败',
+  lastError: '原始链接返回 404\n请检查仓库路径',
+  advancedSummary: 'jq: .payload',
+  hasOverrideConflict: true,
+  storageLocationIcon: 'folder',
+  sourceOriginIcon: 'link'
+}, {
+  selectedTab: 'info',
+  combined: {
+    isEnabled: true,
+    subscriptionURL: 'https://example.com/combined.sgmodule'
+  }
+});
+assert.ok(
+  failedModuleDetail.indexOf('最近一次更新失败') >= 0 &&
+    failedModuleDetail.indexOf('最近一次更新失败') < failedModuleDetail.indexOf('管理关系'),
+  'module detail markup should keep failure reason before relationship details'
+);
+assert.match(failedModuleDetail, /原始地址/);
+assert.match(failedModuleDetail, /https:\/\/example.com\/source.sgmodule\?a=1&amp;b=2/);
+assert.match(failedModuleDetail, /https:\/\/example.com\/icon.png\?x=1&amp;y=2/);
+assert.match(failedModuleDetail, /复制错误/);
+assert.match(failedModuleDetail, /本地编辑冲突/);
+assert.match(
+  markup.moduleDetailMarkup(signatureBase, { selectedTab: 'preview', combined: { isEnabled: false } }),
+  /code-editor/
+);
 
 const tokenHistory = { state: { route: 'modules' }, replacedURL: '', replaceState(state, title, url) { this.state = state; this.replacedURL = String(url); } };
 const tokenClient = api.createAPIClient({
