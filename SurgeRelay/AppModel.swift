@@ -483,7 +483,7 @@ final class AppModel {
         }
         beginWork(.scanningLocalModules)
         defer { endWork(.scanningLocalModules) }
-        statusMessage = "正在扫描本地模块根目录…"
+        statusMessage = LocalModuleImportPlanner.scanStartedStatus
         let rootDirectoryPath = settings.localModuleDirectory
         let combinedFileName = settings.combinedModuleFileName
         let existingModules = modules
@@ -499,14 +499,7 @@ final class AppModel {
         guard shouldContinueCurrentWork() else {
             return LocalModuleScanReport(candidates: [], skippedFiles: [])
         }
-        if report.candidates.isEmpty {
-            statusMessage = report.skippedFiles.isEmpty
-                ? "未发现可导入的新本地模块"
-                : "未发现可导入的新本地模块；已跳过 \(report.skippedFiles.count) 个文件"
-        } else {
-            let skippedSuffix = report.skippedFiles.isEmpty ? "" : "，跳过 \(report.skippedFiles.count) 个文件"
-            statusMessage = "发现 \(report.candidates.count) 个可导入本地模块\(skippedSuffix)"
-        }
+        statusMessage = LocalModuleImportPlanner.scanStatus(for: report)
         return report
     }
 
@@ -517,14 +510,14 @@ final class AppModel {
             await importLocalModules(report.candidates)
         } catch {
             presentedError = "扫描本地模块失败：\(error.localizedDescription)"
-            statusMessage = "本地模块扫描失败"
+            statusMessage = LocalModuleImportPlanner.scanFailedStatus
         }
     }
 
     func importLocalModules(_ candidates: [LocalModuleScanCandidate]) async {
         guard !isWorking else { return }
         guard !candidates.isEmpty else {
-            statusMessage = "没有选择需要导入的本地模块"
+            statusMessage = LocalModuleImportPlanner.noSelectionStatus
             return
         }
         beginWork(.importingLocalModules)
@@ -569,9 +562,9 @@ final class AppModel {
         guard shouldContinueCurrentWork() else { return }
 
         guard !imported.isEmpty else {
-            statusMessage = "本地模块扫描完成，但没有可导入项目"
-            if !failures.isEmpty {
-                presentedError = "以下本地模块无法导入：\n\(failures.joined(separator: "\n"))"
+            statusMessage = LocalModuleImportPlanner.emptyImportStatus
+            if let failureDetails = LocalModuleImportPlanner.failureDetails(failures, isPartialImport: false) {
+                presentedError = failureDetails
             }
             return
         }
@@ -584,10 +577,12 @@ final class AppModel {
             presentedError = "保存导入模块失败：\(error.localizedDescription)"
         }
         await rebuildCombinedFromCache()
-        let failureSuffix = failures.isEmpty ? "" : "；\(failures.count) 个文件无法导入"
-        statusMessage = "已导入 \(imported.count) 个本地模块\(failureSuffix)"
-        if !failures.isEmpty {
-            presentedError = "部分本地模块无法导入：\n\(failures.joined(separator: "\n"))"
+        statusMessage = LocalModuleImportPlanner.importStatus(
+            importedCount: imported.count,
+            failureCount: failures.count
+        )
+        if let failureDetails = LocalModuleImportPlanner.failureDetails(failures, isPartialImport: true) {
+            presentedError = failureDetails
         }
     }
 
@@ -1152,14 +1147,14 @@ final class AppModel {
                 guard self.shouldContinueCurrentWork() else { return }
                 if preview.requiresDeletionConfirmation {
                     self.pendingPublishPreview = preview
-                    self.statusMessage = "GitHub 发布需要确认删除 \(preview.deletedFiles.count) 个旧文件"
+                    self.statusMessage = GitHubPublishPlanner.automaticDeletionConfirmationStatus(
+                        deletedFileCount: preview.deletedFiles.count
+                    )
                     return
                 }
                 let report = try await self.publishAllInternal()
                 guard self.shouldContinueCurrentWork() else { return }
-                self.statusMessage = report.changedFileCount == 0
-                    ? "GitHub 内容没有变化，无需上传"
-                    : GitHubPublishPlanner.automaticSuccessMessage(report: report)
+                self.statusMessage = GitHubPublishPlanner.automaticReportStatus(report)
                 self.recordGitHubPublish(report)
             } catch {
                 guard !self.isCurrentWorkCancellation(error) else { return }

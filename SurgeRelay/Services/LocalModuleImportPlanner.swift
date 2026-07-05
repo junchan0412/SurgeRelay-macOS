@@ -11,6 +11,11 @@ struct LocalModuleImportPlan: Equatable, Sendable {
 }
 
 enum LocalModuleImportPlanner {
+    static let scanStartedStatus = "正在扫描本地模块根目录…"
+    static let scanFailedStatus = "本地模块扫描失败"
+    static let noSelectionStatus = "没有选择需要导入的本地模块"
+    static let emptyImportStatus = "本地模块扫描完成，但没有可导入项目"
+
     static func plan(
         candidates: [LocalModuleScanCandidate],
         existingModules: [RelayModule],
@@ -70,5 +75,26 @@ enum LocalModuleImportPlanner {
         }
 
         return LocalModuleImportPlan(entries: entries, failures: failures)
+    }
+
+    static func scanStatus(for report: LocalModuleScanReport) -> String {
+        if report.candidates.isEmpty {
+            return report.skippedFiles.isEmpty
+                ? "未发现可导入的新本地模块"
+                : "未发现可导入的新本地模块；已跳过 \(report.skippedFiles.count) 个文件"
+        }
+        let skippedSuffix = report.skippedFiles.isEmpty ? "" : "，跳过 \(report.skippedFiles.count) 个文件"
+        return "发现 \(report.candidates.count) 个可导入本地模块\(skippedSuffix)"
+    }
+
+    static func importStatus(importedCount: Int, failureCount: Int) -> String {
+        let failureSuffix = failureCount == 0 ? "" : "；\(failureCount) 个文件无法导入"
+        return "已导入 \(importedCount) 个本地模块\(failureSuffix)"
+    }
+
+    static func failureDetails(_ failures: [String], isPartialImport: Bool) -> String? {
+        guard !failures.isEmpty else { return nil }
+        let title = isPartialImport ? "部分本地模块无法导入" : "以下本地模块无法导入"
+        return "\(title)：\n\(failures.joined(separator: "\n"))"
     }
 }

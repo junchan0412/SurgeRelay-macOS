@@ -127,6 +127,10 @@ enum GitHubPublishPlanner {
         "发布前需要确认删除 \(deletedFileCount) 个旧文件"
     }
 
+    static func automaticDeletionConfirmationStatus(deletedFileCount: Int) -> String {
+        "GitHub 发布需要确认删除 \(deletedFileCount) 个旧文件"
+    }
+
     static func previewStatus(_ preview: PublishPreview) -> String {
         preview.hasChanges
             ? "已生成 GitHub 发布预览（\(preview.changedFileCount) 个文件变更）"
@@ -147,6 +151,12 @@ enum GitHubPublishPlanner {
         case .preview:
             return "已生成 GitHub 发布预览（\(report.changedFileCount) 个文件变更）"
         }
+    }
+
+    static func automaticReportStatus(_ report: PublishReport) -> String {
+        report.changedFileCount == 0
+            ? "GitHub 内容没有变化，无需上传"
+            : automaticSuccessMessage(report: report)
     }
 
     static func successMessage(scopeTitle: String, report: PublishReport) -> String {

@@ -268,6 +268,10 @@ final class PublishPlannerTests: XCTestCase {
         XCTAssertEqual(GitHubPublishPlanner.unchangedStatus(for: .publishSelected), "所选模块没有文件需要发布")
         XCTAssertEqual(GitHubPublishPlanner.unchangedStatus(for: .preview), "GitHub 内容没有变化")
         XCTAssertEqual(GitHubPublishPlanner.deletionConfirmationStatus(deletedFileCount: 3), "发布前需要确认删除 3 个旧文件")
+        XCTAssertEqual(
+            GitHubPublishPlanner.automaticDeletionConfirmationStatus(deletedFileCount: 3),
+            "GitHub 发布需要确认删除 3 个旧文件"
+        )
         XCTAssertEqual(GitHubPublishPlanner.previewStatus(preview), "已生成 GitHub 发布预览（2 个文件变更）")
         XCTAssertEqual(GitHubPublishPlanner.previewStatus(unchangedPreview), "GitHub 内容没有变化")
         XCTAssertEqual(
@@ -301,6 +305,14 @@ final class PublishPlannerTests: XCTestCase {
                 scopeTitle: "独立模块"
             ),
             "所选模块没有文件需要发布"
+        )
+        XCTAssertEqual(
+            GitHubPublishPlanner.automaticReportStatus(changedReport),
+            "远端分支已更新并重新同步；已合并发布到 GitHub（2 个文件变更）"
+        )
+        XCTAssertEqual(
+            GitHubPublishPlanner.automaticReportStatus(unchangedReport),
+            "GitHub 内容没有变化，无需上传"
         )
     }
 

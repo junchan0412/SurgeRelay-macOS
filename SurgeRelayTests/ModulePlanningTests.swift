@@ -733,6 +733,48 @@ final class ModulePlanningTests: XCTestCase {
         XCTAssertEqual(plan.entries.map(\.module.publishedRelativePath), ["Tools/Demo.sgmodule", "Tools/Demo-2.sgmodule"])
     }
 
+    func testLocalModuleImportPlannerBuildsUserVisibleStatuses() {
+        let candidate = scanCandidate(relativePath: "Tools/Demo.sgmodule")
+        let skipped = LocalModuleScanSkippedFile(relativePath: "Relay.sgmodule", reason: "这是当前总模块文件")
+        let emptyReport = LocalModuleScanReport(candidates: [], skippedFiles: [])
+        let skippedOnlyReport = LocalModuleScanReport(candidates: [], skippedFiles: [skipped])
+        let candidateReport = LocalModuleScanReport(candidates: [candidate], skippedFiles: [skipped])
+
+        XCTAssertEqual(LocalModuleImportPlanner.scanStartedStatus, "正在扫描本地模块根目录…")
+        XCTAssertEqual(LocalModuleImportPlanner.scanFailedStatus, "本地模块扫描失败")
+        XCTAssertEqual(LocalModuleImportPlanner.noSelectionStatus, "没有选择需要导入的本地模块")
+        XCTAssertEqual(LocalModuleImportPlanner.emptyImportStatus, "本地模块扫描完成，但没有可导入项目")
+        XCTAssertEqual(
+            LocalModuleImportPlanner.scanStatus(for: emptyReport),
+            "未发现可导入的新本地模块"
+        )
+        XCTAssertEqual(
+            LocalModuleImportPlanner.scanStatus(for: skippedOnlyReport),
+            "未发现可导入的新本地模块；已跳过 1 个文件"
+        )
+        XCTAssertEqual(
+            LocalModuleImportPlanner.scanStatus(for: candidateReport),
+            "发现 1 个可导入本地模块，跳过 1 个文件"
+        )
+        XCTAssertEqual(
+            LocalModuleImportPlanner.importStatus(importedCount: 2, failureCount: 0),
+            "已导入 2 个本地模块"
+        )
+        XCTAssertEqual(
+            LocalModuleImportPlanner.importStatus(importedCount: 2, failureCount: 1),
+            "已导入 2 个本地模块；1 个文件无法导入"
+        )
+        XCTAssertNil(LocalModuleImportPlanner.failureDetails([], isPartialImport: true))
+        XCTAssertEqual(
+            LocalModuleImportPlanner.failureDetails(["A.sgmodule：失败"], isPartialImport: false),
+            "以下本地模块无法导入：\nA.sgmodule：失败"
+        )
+        XCTAssertEqual(
+            LocalModuleImportPlanner.failureDetails(["A.sgmodule：失败"], isPartialImport: true),
+            "部分本地模块无法导入：\nA.sgmodule：失败"
+        )
+    }
+
     private func scanCandidate(
         relativePath: String,
         localStorageRelativePath: String? = nil,
