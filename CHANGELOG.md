@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将 GitHub 发布准备阶段的空选择、空文件和路径计划判断收进 `GitHubPublishPlanner`，减少 `AppModel+Publishing` 的内联发布准入逻辑。
 - 将 Web 管理 HTTP/响应头与请求安全/限流测试拆入专属测试文件，继续缩小 `WebManagementTests.swift` 的职责范围。
 - 将 Surge metadata parser 与 module merger 测试拆入专属测试文件，让 `SurgeRelayTests.swift` 只保留基础模型/编码回归。
 - 将来源 revision 网络检查测试拆入 `SourceRevisionServiceTests.swift`，继续缩小通用 `SurgeRelayTests.swift` 的职责范围。

@@ -16,6 +16,11 @@ struct GitHubRepositoryPrivacyUpdate: Equatable, Sendable {
     var shouldPersist: Bool
 }
 
+struct GitHubPublishPreparedFiles: Sendable {
+    var files: [PublishFile]
+    var pathPlan: GitHubPublishedPathPlan
+}
+
 enum GitHubPublishAction: Equatable, Sendable {
     case publishAll
     case publishSelected
@@ -31,6 +36,10 @@ enum GitHubPublishPlanner {
             repositoryIsPrivate: detectedValue,
             shouldPersist: currentValue != detectedValue
         )
+    }
+
+    static func validatePublishableSelection(_ plan: PublishPlan) throws {
+        guard plan.hasPublishableModuleSelection else { throw RelayError.noFilesToPublish }
     }
 
     static func targetDescription(settings: GitHubSettings) -> String {
@@ -50,6 +59,26 @@ enum GitHubPublishPlanner {
             activeFiles: pathPlan.currentPaths,
             changedFiles: report.publishedFiles,
             deletedFiles: report.deletedFiles
+        )
+    }
+
+    static func preparedFiles(
+        plan: PublishPlan,
+        files: [PublishFile],
+        settings: GitHubSettings,
+        knownRepositoryKey: String?,
+        knownPublishedPaths: [String]
+    ) throws -> GitHubPublishPreparedFiles {
+        try validatePublishableSelection(plan)
+        guard !files.isEmpty else { throw RelayError.noFilesToPublish }
+        return GitHubPublishPreparedFiles(
+            files: files,
+            pathPlan: pathPlan(
+                currentPaths: files.map(\.name),
+                settings: settings,
+                knownRepositoryKey: knownRepositoryKey,
+                knownPublishedPaths: knownPublishedPaths
+            )
         )
     }
 

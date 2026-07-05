@@ -380,23 +380,29 @@ extension AppModel {
     private func prepareGitHubPublish() async throws -> GitHubPublishPreparation {
         try checkCurrentWorkCancellation()
         try Task.checkCancellation()
-        guard hasGitHubPublishableModuleSelection else { throw RelayError.noFilesToPublish }
+        let plan = githubPublishPlan
+        try GitHubPublishPlanner.validatePublishableSelection(plan)
         let token = try await githubPublishTokenAndRefreshRepositoryPrivacy()
         let data = settings.combinedModuleEnabled ? try await fileStore.readCombined() : nil
         try checkCurrentWorkCancellation()
-        let files = try await currentPublishedFiles(combinedData: data, includeAssets: true, destination: .gitHub)
+        let files = try await publishedFiles(
+            plan: plan,
+            combinedData: data,
+            includeAssets: true,
+            destination: .gitHub
+        )
         try checkCurrentWorkCancellation()
-        guard !files.isEmpty else { throw RelayError.noFilesToPublish }
-        let pathPlan = GitHubPublishPlanner.pathPlan(
-            currentPaths: files.map(\.name),
+        let preparedFiles = try GitHubPublishPlanner.preparedFiles(
+            plan: plan,
+            files: files,
             settings: settings.github,
             knownRepositoryKey: settings.githubPublishedRepositoryKey,
             knownPublishedPaths: settings.githubPublishedFilePaths
         )
         return GitHubPublishPreparation(
             token: token,
-            files: files,
-            pathPlan: pathPlan
+            files: preparedFiles.files,
+            pathPlan: preparedFiles.pathPlan
         )
     }
 
@@ -404,7 +410,7 @@ extension AppModel {
         try checkCurrentWorkCancellation()
         try Task.checkCancellation()
         let plan = PublishCoordinator.selectedPlan(modules: modules, moduleIDs: moduleIDs)
-        guard plan.hasPublishableModuleSelection else { throw RelayError.noFilesToPublish }
+        try GitHubPublishPlanner.validatePublishableSelection(plan)
         let token = try await githubPublishTokenAndRefreshRepositoryPrivacy()
         let files = try await selectedPublishedFiles(plan: plan)
         guard !files.isEmpty else { throw RelayError.noFilesToPublish }
@@ -503,10 +509,6 @@ extension AppModel {
             combinedModuleFileName: settings.combinedModuleFileName,
             managedEngineFileName: settings.managedEngineFileName
         )
-    }
-
-    private var hasGitHubPublishableModuleSelection: Bool {
-        githubPublishPlan.hasPublishableModuleSelection
     }
 
     private func applyAutomaticPublishAdmission(_ admission: AutomaticPublishAdmission) {

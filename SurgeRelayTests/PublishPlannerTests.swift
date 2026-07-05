@@ -140,6 +140,55 @@ final class PublishPlannerTests: XCTestCase {
         XCTAssertTrue(movedRepositoryPlan.stalePaths.isEmpty)
     }
 
+    func testGitHubPublishPlannerPreparesFilesAndRejectsEmptyPublishSet() throws {
+        let standalone = RelayModule(
+            id: UUID(),
+            name: "Standalone",
+            sourceURL: "https://example.com/standalone.sgmodule",
+            outputFileName: "Standalone",
+            publishesStandalone: true
+        )
+        var settings = GitHubSettings()
+        settings.owner = "someone"
+        settings.repository = "relay"
+        settings.branch = "main"
+        settings.directory = "surge/modules"
+        let repositoryKey = PublishCoordinator.repositoryKey(settings)
+        let plan = PublishPlan(standaloneModules: [standalone], combinedModuleIDs: [])
+        let files = [
+            PublishFile(name: "Standalone.sgmodule", data: Data("standalone".utf8)),
+            PublishFile(name: "Assets/icon.png", data: Data("icon".utf8))
+        ]
+
+        let prepared = try GitHubPublishPlanner.preparedFiles(
+            plan: plan,
+            files: files,
+            settings: settings,
+            knownRepositoryKey: repositoryKey,
+            knownPublishedPaths: ["Standalone.sgmodule", "Old.sgmodule"]
+        )
+
+        XCTAssertEqual(prepared.files.map(\.name), ["Standalone.sgmodule", "Assets/icon.png"])
+        XCTAssertEqual(prepared.pathPlan.repositoryKey, "someone/relay/main/surge/modules")
+        XCTAssertEqual(prepared.pathPlan.currentPaths, ["Standalone.sgmodule", "Assets/icon.png"])
+        XCTAssertEqual(prepared.pathPlan.stalePaths, ["Old.sgmodule"])
+
+        XCTAssertThrowsError(try GitHubPublishPlanner.validatePublishableSelection(
+            PublishPlan(standaloneModules: [], combinedModuleIDs: [])
+        )) { error in
+            XCTAssertTrue(GitHubPublishPlanner.isNoFilesToPublish(error))
+        }
+        XCTAssertThrowsError(try GitHubPublishPlanner.preparedFiles(
+            plan: plan,
+            files: [],
+            settings: settings,
+            knownRepositoryKey: repositoryKey,
+            knownPublishedPaths: []
+        )) { error in
+            XCTAssertTrue(GitHubPublishPlanner.isNoFilesToPublish(error))
+        }
+    }
+
     func testGitHubPublishPlannerBuildsRepositoryPrivacyUpdateDecision() {
         XCTAssertEqual(
             GitHubPublishPlanner.repositoryPrivacyUpdate(currentValue: nil, detectedValue: true),
