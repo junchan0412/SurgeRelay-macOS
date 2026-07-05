@@ -261,10 +261,7 @@ extension AppModel {
     }
 
     func reorderModules(ids: [UUID]) {
-        guard ids.count == modules.count,
-              Set(ids) == Set(modules.map(\.id)) else { return }
-        let lookup = Dictionary(uniqueKeysWithValues: modules.map { ($0.id, $0) })
-        let reordered = ids.compactMap { lookup[$0] }
+        guard let reordered = ModuleOrdering.reordering(modules, matching: ids) else { return }
         guard reordered != modules else { return }
         registerLocalChange()
         modules = reordered

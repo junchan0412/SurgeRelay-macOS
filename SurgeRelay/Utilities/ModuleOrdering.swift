@@ -16,4 +16,17 @@ enum ModuleOrdering {
         result.insert(contentsOf: movingValues, at: insertionIndex)
         return result
     }
+
+    static func reordering<T: Identifiable>(
+        _ values: [T],
+        matching ids: [T.ID]
+    ) -> [T]? where T.ID: Hashable {
+        guard ids.count == values.count,
+              Set(ids).count == ids.count else { return nil }
+        let valueIDs = values.map(\.id)
+        guard Set(valueIDs).count == valueIDs.count,
+              Set(ids) == Set(valueIDs) else { return nil }
+        let lookup = Dictionary(uniqueKeysWithValues: values.map { ($0.id, $0) })
+        return ids.compactMap { lookup[$0] }
+    }
 }

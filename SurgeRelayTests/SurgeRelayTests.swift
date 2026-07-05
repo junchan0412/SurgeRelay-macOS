@@ -193,17 +193,6 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertFalse(result.contains("https://example.com/source.png"))
     }
 
-    func testModuleOrderingMovesItemsInListOrder() {
-        XCTAssertEqual(
-            ModuleOrdering.moving(["A", "B", "C"], fromOffsets: IndexSet(integer: 2), toOffset: 0),
-            ["C", "A", "B"]
-        )
-        XCTAssertEqual(
-            ModuleOrdering.moving(["A", "B", "C"], fromOffsets: IndexSet(integer: 0), toOffset: 3),
-            ["B", "C", "A"]
-        )
-    }
-
     func testMergerAddsSourceTogglesAndRemovesDeviceRestrictions() throws {
         let first = RelayModule(
             id: try XCTUnwrap(UUID(uuidString: "11111111-1111-1111-1111-111111111111")),
