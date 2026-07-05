@@ -396,7 +396,7 @@ final class AppModel {
                 },
                 requestHandler: { [weak self] request in
                     if !request.path.hasPrefix("/api/") {
-                        return WebManagementAPI.assetResponse(for: request.path)
+                        return WebManagementAssets.assetResponse(for: request.path)
                     }
                     guard let self else {
                         return .error(status: 500, message: "Surge Relay 已停止。")

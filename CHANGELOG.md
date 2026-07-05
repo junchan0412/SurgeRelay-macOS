@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将 Web 管理静态资源响应、CSP 和图标内容类型识别从 `WebManagementAPI.swift` 拆入 `WebManagementAssets.swift`。
 - 将 Web 管理状态 payload、请求 mutation 和 API 错误模型从 `WebManagementAPI.swift` 拆入 `WebManagementModels.swift`，让 API 文件更专注于路由与 AppModel 调用。
 - 将工作任务状态与更新准入规则从 `ServiceModels.swift` 拆入 `WorkActivity.swift`，继续缩小共享模型杂项文件。
 - 将 Web 管理详情页的可拷贝地址区块抽入 `web-markup.js`，总模块订阅地址和单模块发布地址共享同一套转义与按钮 markup。

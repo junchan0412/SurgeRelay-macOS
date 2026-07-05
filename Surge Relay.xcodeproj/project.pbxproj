@@ -20,6 +20,7 @@
 		27AF5D3F446A25299DC890B3 /* JavaScriptCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 13871D2C902AAF75BBD033C6 /* JavaScriptCore.framework */; };
 		25A25A25A25A25A25A25A25 /* AutomaticPublishPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = C25C25C25C25C25C25C25C25 /* AutomaticPublishPlanner.swift */; };
 		B7B7B7B7B7B7B7B7B7B7B7B7 /* UpdateCompletionStatusPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7C7C7C7C7C7C7C7C7C7C7C7 /* UpdateCompletionStatusPlanner.swift */; };
+		A14A14A14A14A14A14A14A14 /* WebManagementAssets.swift in Sources */ = {isa = PBXBuildFile; fileRef = B14B14B14B14B14B14B14B14 /* WebManagementAssets.swift */; };
 		B8B8B8B8B8B8B8B8B8B8B8B8 /* WebManagementHTTP.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8C8C8C8C8C8C8C8C8C8C8C8 /* WebManagementHTTP.swift */; };
 		A13A13A13A13A13A13A13A13 /* WebManagementModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B13B13B13B13B13B13B13B13 /* WebManagementModels.swift */; };
 		B9B9B9B9B9B9B9B9B9B9B9B9 /* SettingsComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9C9C9C9C9C9C9C9C9C9C9C9 /* SettingsComponents.swift */; };
@@ -197,6 +198,7 @@
 		462EAB132DEE9AF7DACDBFAF /* shippingbox.svg */ = {isa = PBXFileReference; path = shippingbox.svg; sourceTree = "<group>"; };
 		4815BE1727EE44787C48CEDF /* lock.svg */ = {isa = PBXFileReference; path = lock.svg; sourceTree = "<group>"; };
 		51D9670C12C677CBC8D96FA4 /* WebManagementAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebManagementAPI.swift; sourceTree = "<group>"; };
+		B14B14B14B14B14B14B14B14 /* WebManagementAssets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebManagementAssets.swift; sourceTree = "<group>"; };
 		B13B13B13B13B13B13B13B13 /* WebManagementModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebManagementModels.swift; sourceTree = "<group>"; };
 		5A7D7F17FB694B798F91978E /* folder.svg */ = {isa = PBXFileReference; path = folder.svg; sourceTree = "<group>"; };
 		68CAE903B934F05BC413A021 /* arrow.triangle.2.circlepath.svg */ = {isa = PBXFileReference; path = arrow.triangle.2.circlepath.svg; sourceTree = "<group>"; };
@@ -379,6 +381,7 @@
 				098EA18AE40BB22B02102431 /* ScriptHubUpstreamService.swift */,
 				C7C7C7C7C7C7C7C7C7C7C7C7 /* UpdateCompletionStatusPlanner.swift */,
 				E80E80E80E80E80E80E80E80 /* UpdateFailurePlanner.swift */,
+				B14B14B14B14B14B14B14B14 /* WebManagementAssets.swift */,
 				C8C8C8C8C8C8C8C8C8C8C8C8 /* WebManagementHTTP.swift */,
 				51D9670C12C677CBC8D96FA4 /* WebManagementAPI.swift */,
 				B13B13B13B13B13B13B13B13 /* WebManagementModels.swift */,
@@ -755,6 +758,7 @@
 				A12A12A12A12A12A12A12A12 /* WorkActivity.swift in Sources */,
 				D90D90D90D90D90D90D90D90 /* GitHubPublishPlanner.swift in Sources */,
 				D80D80D80D80D80D80D80D80 /* UpdateFailurePlanner.swift in Sources */,
+				A14A14A14A14A14A14A14A14 /* WebManagementAssets.swift in Sources */,
 				4B5E934EB9AC34C451301F50 /* WebManagementAPI.swift in Sources */,
 				A13A13A13A13A13A13A13A13 /* WebManagementModels.swift in Sources */,
 				540136DA3B34EAD959E5B5F7 /* WebManagementServer.swift in Sources */,

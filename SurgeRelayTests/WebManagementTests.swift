@@ -11,20 +11,20 @@ final class WebManagementTests: XCTestCase {
     }
 
     func testWebIconContentTypeDetectionOnlyAcceptsRecognizedImages() {
-        XCTAssertEqual(WebManagementAPI.imageContentType(Data([0x89, 0x50, 0x4E, 0x47, 0x0D])), "image/png")
-        XCTAssertEqual(WebManagementAPI.imageContentType(Data([0xFF, 0xD8, 0xFF, 0xE0])), "image/jpeg")
-        XCTAssertEqual(WebManagementAPI.imageContentType(Data("GIF89a".utf8)), "image/gif")
+        XCTAssertEqual(WebManagementAssets.imageContentType(Data([0x89, 0x50, 0x4E, 0x47, 0x0D])), "image/png")
+        XCTAssertEqual(WebManagementAssets.imageContentType(Data([0xFF, 0xD8, 0xFF, 0xE0])), "image/jpeg")
+        XCTAssertEqual(WebManagementAssets.imageContentType(Data("GIF89a".utf8)), "image/gif")
         XCTAssertEqual(
-            WebManagementAPI.imageContentType(Data([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50])),
+            WebManagementAssets.imageContentType(Data([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50])),
             "image/webp"
         )
-        XCTAssertEqual(WebManagementAPI.imageContentType(Data("<?xml version=\"1.0\"?><svg></svg>".utf8)), "image/svg+xml")
-        XCTAssertNil(WebManagementAPI.imageContentType(Data([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x41, 0x56, 0x45])))
-        XCTAssertNil(WebManagementAPI.imageContentType(Data("not an image".utf8)))
+        XCTAssertEqual(WebManagementAssets.imageContentType(Data("<?xml version=\"1.0\"?><svg></svg>".utf8)), "image/svg+xml")
+        XCTAssertNil(WebManagementAssets.imageContentType(Data([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x41, 0x56, 0x45])))
+        XCTAssertNil(WebManagementAssets.imageContentType(Data("not an image".utf8)))
     }
 
     func testWebContentSecurityPolicyMatchesCustomIconValidation() {
-        let policy = WebManagementAPI.webContentSecurityPolicy
+        let policy = WebManagementAssets.webContentSecurityPolicy
 
         XCTAssertTrue(policy.contains("img-src"))
         XCTAssertTrue(policy.contains("http:"))
