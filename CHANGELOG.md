@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将模块成功转换后的 revision 写回、覆盖冲突、订阅元数据恢复、图标和内容变化判断收进 `ModuleMetadataRefreshPlanner`，让更新循环继续保留在 I/O 编排层。
 - 将模块参数覆盖值的保存、清空和重置文案规划抽入 `ModuleArgumentPlanner`，减少 AppModel 中的参数存储规则分支。
 - 将本地发布写入后的持久化/清理确认决策收进 `LocalPublishedFilesPlanner`，让 AppModel 只执行本地发布完成结果。
 - 将 Web 管理 API 鉴权、同源校验和 session cookie 规则抽入 `WebRequestSecurity.swift`，继续收敛 `WebManagementHTTP.swift` 的职责。

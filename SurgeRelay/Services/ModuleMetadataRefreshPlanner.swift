@@ -7,6 +7,14 @@ struct ModuleMetadataRefreshPlan: Equatable, Sendable {
     var shouldRefreshIconCache: Bool
 }
 
+struct ModuleSuccessfulConversionPlan: Equatable, Sendable {
+    var module: RelayModule
+    var preferredIconURL: URL?
+    var shouldRefreshIconCache: Bool
+    var contentChanged: Bool
+    var historyMessage: String
+}
+
 enum ModuleMetadataRefreshPlanner {
     static func plan(
         module: RelayModule,
@@ -49,6 +57,61 @@ enum ModuleMetadataRefreshPlanner {
             isChanged: isChanged,
             preferredIconURL: preferredIconURL,
             shouldRefreshIconCache: iconChanged
+        )
+    }
+
+    static func successfulConversionPlan(
+        module: RelayModule,
+        revisionSnapshot: SourceRevisionSnapshot?,
+        nativeModule: Bool,
+        engineRevision: String?,
+        convertedContent: String,
+        effectiveContent: String,
+        hasOverride: Bool,
+        detectedIconURL: URL?,
+        nextContentHash: String,
+        updatedAt: Date = .now
+    ) -> ModuleSuccessfulConversionPlan {
+        var module = module
+        if let revisionSnapshot {
+            module.sourceETag = revisionSnapshot.etag
+            module.sourceLastModified = revisionSnapshot.lastModified
+            module.sourceContentHash = revisionSnapshot.contentHash
+            module.sourceCheckedAt = revisionSnapshot.checkedAt
+        } else {
+            module.sourceCheckedAt = updatedAt
+        }
+        module.conversionEngineRevision = nativeModule ? nil : engineRevision
+
+        if hasOverride, let baseHash = module.overrideBaseHash {
+            module.hasOverrideConflict = baseHash != Data(convertedContent.utf8).sha256String
+        } else {
+            module.hasOverrideConflict = false
+        }
+
+        if let subscription = ModuleMetadataParser.scriptHubSubscription(in: effectiveContent) {
+            _ = module.applyScriptHubSubscriptionMetadata(subscription)
+        }
+
+        let preferredIconURL = module.customIconURL.flatMap(URL.init(string:)) ?? detectedIconURL
+        module.iconURL = preferredIconURL?.absoluteString
+        module.detectedSourceFormat = ModuleNamingPlanner.detectedFormat(
+            for: module.sourceFormat,
+            source: module.sourceURL
+        )
+
+        let contentChanged = module.contentHash != nextContentHash
+        module.contentHash = nextContentHash
+        module.lastUpdatedAt = updatedAt
+        module.state = .current
+        module.lastError = nil
+
+        return ModuleSuccessfulConversionPlan(
+            module: module,
+            preferredIconURL: preferredIconURL,
+            shouldRefreshIconCache: true,
+            contentChanged: contentChanged,
+            historyMessage: module.hasOverrideConflict ? "上游已更新，本地编辑需要确认" : "转换完成"
         )
     }
 }

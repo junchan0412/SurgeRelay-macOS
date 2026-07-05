@@ -120,58 +120,45 @@ extension AppModel {
                     return
                 }
                 module = modules[latestIndex]
-                if let revisionSnapshot {
-                    module.sourceETag = revisionSnapshot.etag
-                    module.sourceLastModified = revisionSnapshot.lastModified
-                    module.sourceContentHash = revisionSnapshot.contentHash
-                    module.sourceCheckedAt = revisionSnapshot.checkedAt
-                } else {
-                    module.sourceCheckedAt = .now
-                }
-                module.conversionEngineRevision = nativeModule ? nil : upstreamState.revision
                 let convertedContent = try await fileStore.readConvertedComponent(id: module.id)
-                if await fileStore.hasOverride(id: module.id),
-                   let baseHash = module.overrideBaseHash {
-                    module.hasOverrideConflict = baseHash != Data(convertedContent.utf8).sha256String
-                } else {
-                    module.hasOverrideConflict = false
-                }
                 let detectedIcon = await processingWorker.iconURL(
                     in: effectiveContent,
                     relativeTo: module.sourceURL
                 )
-                if let subscription = ModuleMetadataParser.scriptHubSubscription(in: effectiveContent) {
-                    _ = module.applyScriptHubSubscriptionMetadata(subscription)
-                }
-                let preferredIcon = module.customIconURL.flatMap(URL.init(string:)) ?? detectedIcon
-                module.iconURL = preferredIcon?.absoluteString
-                module.detectedSourceFormat = ModuleNamingPlanner.detectedFormat(
-                    for: module.sourceFormat,
-                    source: module.sourceURL
-                )
-                if let preferredIcon {
-                    try? await iconStore.cacheIcon(from: preferredIcon, for: module.id, force: true)
-                } else {
-                    try? await iconStore.removeIcon(for: module.id)
-                }
                 let nextContentHash = await processingWorker.contentFingerprint(
                     of: effectiveContent,
                     assets: result.assets
                 )
-                let moduleContentChanged = module.contentHash != nextContentHash
-                if moduleContentChanged { contentChanged = true }
-                module.contentHash = nextContentHash
-                module.lastUpdatedAt = .now
-                module.state = .current
-                module.lastError = nil
+                let metadataPlan = await ModuleMetadataRefreshPlanner.successfulConversionPlan(
+                    module: module,
+                    revisionSnapshot: revisionSnapshot,
+                    nativeModule: nativeModule,
+                    engineRevision: upstreamState.revision,
+                    convertedContent: convertedContent,
+                    effectiveContent: effectiveContent,
+                    hasOverride: fileStore.hasOverride(id: module.id),
+                    detectedIconURL: detectedIcon,
+                    nextContentHash: nextContentHash
+                )
+                module = metadataPlan.module
+                if let preferredIcon = metadataPlan.preferredIconURL {
+                    try? await iconStore.cacheIcon(
+                        from: preferredIcon,
+                        for: module.id,
+                        force: metadataPlan.shouldRefreshIconCache
+                    )
+                } else {
+                    try? await iconStore.removeIcon(for: module.id)
+                }
+                if metadataPlan.contentChanged { contentChanged = true }
                 replace(module)
                 newHistory.append(UpdateHistoryEntry(
                     moduleID: module.id,
                     moduleName: module.name,
                     outcome: .updated,
                     duration: Date.now.timeIntervalSince(startedAt),
-                    message: module.hasOverrideConflict ? "上游已更新，本地编辑需要确认" : "转换完成",
-                    contentChanged: moduleContentChanged
+                    message: metadataPlan.historyMessage,
+                    contentChanged: metadataPlan.contentChanged
                 ))
                 let materialized = await processingWorker.materialize(
                     effectiveContent,
