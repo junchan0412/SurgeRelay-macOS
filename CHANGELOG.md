@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将模块草稿模型拆入 `ModuleDraft.swift`，将模块输出文件夹和输出路径提示拆入 `ModuleOutputPath.swift`，让 `RelayModule.swift` 更专注于持久化模块状态和来源/存放关系。
 - 将模块编辑器的预览卡、表单分区、表单行、输出路径行、存放文件夹菜单、存放位置选择器和草稿图标预览抽入 `ModuleEditorComponents.swift`，让 `ModuleEditorView.swift` 专注于草稿状态、自动命名和保存流程。
 - 将 GitHub Release 资产模型、版本比较和安装建议拆入 `GitHubReleaseModels.swift`，将最新 Release 与 sha256 sidecar 拉取逻辑拆入 `GitHubReleaseClient.swift`，让更新检查视图只保留界面展示。
 - 将 `LocalFileStoreTests.swift` 拆为配置迁移、本地发布写入、旧输出清理和本地模块扫描诊断测试文件，进一步明确本地文件安全边界。

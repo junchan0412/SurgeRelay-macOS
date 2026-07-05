@@ -34,6 +34,8 @@
 		A16A16A16A16A16A16A16A16 /* GitHubReleaseModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B16B16B16B16B16B16B16B16 /* GitHubReleaseModels.swift */; };
 		A17A17A17A17A17A17A17A17 /* GitHubReleaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B17B17B17B17B17B17B17B17 /* GitHubReleaseClient.swift */; };
 		A18A18A18A18A18A18A18A18 /* ModuleEditorComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = B18B18B18B18B18B18B18B18 /* ModuleEditorComponents.swift */; };
+		A19A19A19A19A19A19A19A19 /* ModuleDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = B19B19B19B19B19B19B19B19 /* ModuleDraft.swift */; };
+		A20A20A20A20A20A20A20A20 /* ModuleOutputPath.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20B20B20B20B20B20B20B20 /* ModuleOutputPath.swift */; };
 		B8B8B8B8B8B8B8B8B8B8B8B8 /* WebManagementHTTP.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8C8C8C8C8C8C8C8C8C8C8C8 /* WebManagementHTTP.swift */; };
 		A13A13A13A13A13A13A13A13 /* WebManagementModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B13B13B13B13B13B13B13B13 /* WebManagementModels.swift */; };
 		B9B9B9B9B9B9B9B9B9B9B9B9 /* SettingsComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9C9C9C9C9C9C9C9C9C9C9C9 /* SettingsComponents.swift */; };
@@ -262,6 +264,8 @@
 		B16B16B16B16B16B16B16B16 /* GitHubReleaseModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubReleaseModels.swift; sourceTree = "<group>"; };
 		B17B17B17B17B17B17B17B17 /* GitHubReleaseClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubReleaseClient.swift; sourceTree = "<group>"; };
 		B18B18B18B18B18B18B18B18 /* ModuleEditorComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleEditorComponents.swift; sourceTree = "<group>"; };
+		B19B19B19B19B19B19B19B19 /* ModuleDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleDraft.swift; sourceTree = "<group>"; };
+		B20B20B20B20B20B20B20B20 /* ModuleOutputPath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleOutputPath.swift; sourceTree = "<group>"; };
 		B13B13B13B13B13B13B13B13 /* WebManagementModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebManagementModels.swift; sourceTree = "<group>"; };
 		5A7D7F17FB694B798F91978E /* folder.svg */ = {isa = PBXFileReference; path = folder.svg; sourceTree = "<group>"; };
 		68CAE903B934F05BC413A021 /* arrow.triangle.2.circlepath.svg */ = {isa = PBXFileReference; path = arrow.triangle.2.circlepath.svg; sourceTree = "<group>"; };
@@ -500,6 +504,8 @@
 				EDC7CEA42FDCD13847E9AC0F /* AppSettings.swift */,
 				B15B15B15B15B15B15B15B15 /* DiagnosticModels.swift */,
 				B16B16B16B16B16B16B16B16 /* GitHubReleaseModels.swift */,
+				B19B19B19B19B19B19B19B19 /* ModuleDraft.swift */,
+				B20B20B20B20B20B20B20B20 /* ModuleOutputPath.swift */,
 				0EE985DC3F8F9E3172A8D062 /* RelayModule.swift */,
 				0527CB5F1032EC43E9673F5D /* ScriptHubOptions.swift */,
 				A00DC6E63075F21C67B4B1EB /* ServiceModels.swift */,
@@ -861,6 +867,8 @@
 				D92D92D92D92D92D92D92D92 /* ModuleMetadataRefreshPlanner.swift in Sources */,
 				D91D91D91D91D91D91D91D91 /* ModuleRefreshPlanner.swift in Sources */,
 				94D94D94D94D94D94D94D94D /* ModuleSearchIndex.swift in Sources */,
+				A19A19A19A19A19A19A19A19 /* ModuleDraft.swift in Sources */,
+				A20A20A20A20A20A20A20A20 /* ModuleOutputPath.swift in Sources */,
 				A92A92A92A92A92A92A92A92 /* ModuleSidebarSectionPlanner.swift in Sources */,
 				6FD484283175DC8133118FF1 /* ModuleMerger.swift in Sources */,
 				307EBCC9173DAEC6727856BD /* ModuleMetadataParser.swift in Sources */,
