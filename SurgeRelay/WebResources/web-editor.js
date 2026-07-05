@@ -130,6 +130,57 @@
       select.value = selected || '';
     }
 
+    function populateModuleForm(module = null, context = {}) {
+      const form = formElements();
+      const isEditing = Boolean(module);
+      resetNameLookup(module?.name || '', isEditing);
+      if (ui.moduleDialogMessage) {
+        ui.moduleDialogMessage.hidden = true;
+        ui.moduleDialogMessage.textContent = '';
+      }
+      if (ui.dialogTitle) ui.dialogTitle.textContent = isEditing ? '编辑模块' : '添加模块';
+      if (ui.saveModule) ui.saveModule.textContent = isEditing ? '保存' : '添加';
+      if (form.name) form.name.value = module?.name || '';
+      if (form.category) form.category.value = module?.category || '';
+      if (ui.iconURLPreview) ui.iconURLPreview.dataset.fallbackIconUrl = module && !module.customIconURL ? (module.iconURL || '') : '';
+      if (form.iconURL) form.iconURL.value = module?.customIconURL || '';
+      updateIconURLPreview();
+      populateOutputFolders(module?.outputFolder || '', context.state?.moduleOutputFolders || []);
+      if (form.outputFileName) form.outputFileName.value = module?.outputFileName || '';
+      if (form.sourceURL) form.sourceURL.value = module?.sourceURL || '';
+      if (form.sourceFormat) form.sourceFormat.value = module?.sourceFormat || 'automatic';
+      if (form.storageLocation) form.storageLocation.value = module?.storageLocation || 'gitHub';
+      const includeRow = form.isEnabled?.closest?.('.switch-row');
+      if (includeRow) includeRow.hidden = !context.combinedEnabled;
+      if (form.isEnabled) form.isEnabled.checked = module?.isEnabled ?? false;
+      if (form.publishesStandalone) form.publishesStandalone.checked = module?.publishesStandalone ?? true;
+      populateScriptHubOptions(module?.scriptHubOptions || scriptHubDefaults);
+      setAdvancedExpanded(Boolean(module?.advancedSummary || hasAdvancedValues(module?.scriptHubOptions)));
+      updateNativeModuleState();
+      updateOutputPathPreview({ state: context.state, editingID: module?.id || null });
+      return {
+        editingID: module?.id || null,
+        focusTarget: isEditing ? form.name : form.sourceURL
+      };
+    }
+
+    function collectModuleFields() {
+      const form = formElements();
+      return {
+        name: form.name?.value || '',
+        sourceURL: form.sourceURL?.value || '',
+        sourceFormat: form.sourceFormat?.value || 'automatic',
+        storageLocation: form.storageLocation?.value || 'gitHub',
+        category: form.category?.value || '',
+        iconURL: form.iconURL?.value || '',
+        outputFolder: form.outputFolder?.value || '',
+        outputFileName: form.outputFileName?.value || '',
+        isEnabled: Boolean(form.isEnabled?.checked),
+        publishesStandalone: Boolean(form.publishesStandalone?.checked),
+        scriptHubOptions: collectScriptHubOptions()
+      };
+    }
+
     function updateOutputPathPreview(context = {}) {
       if (!ui.outputPathPreview) return null;
       const form = formElements();
@@ -231,6 +282,8 @@
       populateScriptHubOptions,
       hasAdvancedValues,
       populateOutputFolders,
+      populateModuleForm,
+      collectModuleFields,
       updateOutputPathPreview,
       updateIconURLPreview,
       resetNameLookup,

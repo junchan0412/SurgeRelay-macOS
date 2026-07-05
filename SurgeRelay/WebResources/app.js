@@ -512,54 +512,22 @@ function handleHistoryNavigation(event) {
 }
 
 function openEditor(module = null) {
-  editingID = module?.id || null;
-  moduleEditor.resetNameLookup(module?.name || '', Boolean(module));
-  ui.moduleDialogMessage.hidden = true;
-  ui.moduleDialogMessage.textContent = '';
-  ui.dialogTitle.textContent = module ? '编辑模块' : '添加模块';
-  ui.saveModule.textContent = module ? '保存' : '添加';
-  const form = ui.moduleForm.elements;
-  form.name.value = module?.name || '';
-  form.category.value = module?.category || '';
-  ui.iconURLPreview.dataset.fallbackIconUrl = module && !module.customIconURL ? (module.iconURL || '') : '';
-  form.iconURL.value = module?.customIconURL || '';
-  moduleEditor.updateIconURLPreview();
-  moduleEditor.populateOutputFolders(module?.outputFolder || '', state?.moduleOutputFolders || []);
-  form.outputFileName.value = module?.outputFileName || '';
-  form.sourceURL.value = module?.sourceURL || '';
-  form.sourceFormat.value = module?.sourceFormat || 'automatic';
-  form.storageLocation.value = module?.storageLocation || 'gitHub';
-  const includeRow = form.isEnabled?.closest('.switch-row');
-  if (includeRow) includeRow.hidden = !combinedEnabled();
-  form.isEnabled.checked = module?.isEnabled ?? false;
-  form.publishesStandalone.checked = module?.publishesStandalone ?? true;
-  moduleEditor.populateScriptHubOptions(module?.scriptHubOptions || scriptHubDefaults);
-  moduleEditor.setAdvancedExpanded(Boolean(module?.advancedSummary || moduleEditor.hasAdvancedValues(module?.scriptHubOptions)));
-  moduleEditor.updateNativeModuleState();
-  updateOutputPathPreview();
+  const editorState = moduleEditor.populateModuleForm(module, {
+    state,
+    combinedEnabled: combinedEnabled()
+  });
+  editingID = editorState.editingID;
   openDialog(ui.moduleDialog);
   const formContent = ui.moduleDialog.querySelector('.form-content');
   if (formContent) formContent.scrollTop = 0;
-  setTimeout(() => (module ? form.name : form.sourceURL).focus(), 180);
+  setTimeout(() => editorState.focusTarget?.focus(), 180);
 }
 
 async function saveModule(event) {
   event.preventDefault();
   const form = ui.moduleForm.elements;
   const existingModule = editingID ? state.modules.find(module => module.id === editingID) : null;
-  const editorFields = {
-    name: form.name.value,
-    sourceURL: form.sourceURL.value,
-    sourceFormat: form.sourceFormat.value,
-    storageLocation: form.storageLocation.value,
-    category: form.category.value,
-    iconURL: form.iconURL.value,
-    outputFolder: form.outputFolder.value,
-    outputFileName: form.outputFileName.value,
-    isEnabled: form.isEnabled.checked,
-    publishesStandalone: form.publishesStandalone.checked,
-    scriptHubOptions: moduleEditor.collectScriptHubOptions()
-  };
+  const editorFields = moduleEditor.collectModuleFields();
   const validation = webLogic.validateModuleEditorFields(editorFields);
   if (validation) {
     ui.moduleDialogMessage.textContent = validation.message;

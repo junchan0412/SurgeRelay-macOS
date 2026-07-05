@@ -396,6 +396,7 @@ class FakeEventSource {
 }
 
 const document = new FakeDocument();
+const capturedRequests = [];
 const context = vm.createContext({
   console,
   document,
@@ -414,7 +415,8 @@ const context = vm.createContext({
   clearTimeout: () => {},
   setInterval: () => 0,
   clearInterval: () => {},
-  fetch: async path => {
+  fetch: async (path, options = {}) => {
+    capturedRequests.push({ path: String(path), options });
     if (path === '/api/state') return fakeJSONResponse(fakeState());
     if (String(path).endsWith('/arguments')) return fakeJSONResponse({ arguments: [], help: null });
     if (path === '/api/session') return fakeJSONResponse({ message: 'ok' });
@@ -501,6 +503,29 @@ form.publishesStandalone.dispatch('change');
 const note = document.querySelector('#output-path-note');
 assert.equal(note.hidden, false);
 assert.match(note.textContent, /不会写出这个独立模块文件/);
+
+form.category.value = 'Ads';
+form.sourceFormat.value = 'quantumultX';
+form.iconURL.value = 'https://example.com/icon.png';
+form.publishesStandalone.checked = true;
+document.querySelector('#module-form').dispatch('submit', { preventDefault() {} });
+await flushAsync();
+await flushAsync();
+const saveRequest = capturedRequests.find(request => request.path === '/api/modules' && request.options.method === 'POST');
+assert.ok(saveRequest, 'submitting the add-module form should post to /api/modules');
+assert.deepEqual(JSON.parse(saveRequest.options.body), {
+  name: 'YouTube Ads',
+  sourceURL: 'https://example.com/plugin.lpx',
+  sourceFormat: 'quantumultX',
+  storageLocation: 'local',
+  category: 'Ads',
+  iconURL: 'https://example.com/icon.png',
+  outputFolder: 'Ads/Video',
+  outputFileName: 'YouTube Ads.sgmodule',
+  isEnabled: false,
+  publishesStandalone: true,
+  scriptHubOptions: JSON.parse(JSON.stringify(context.SurgeRelayWebOptions.scriptHubDefaults))
+});
 
 console.log('Web DOM resource tests passed');
 

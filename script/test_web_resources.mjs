@@ -58,6 +58,11 @@ assert.doesNotMatch(
 );
 assert.doesNotMatch(
   appSource,
+  /form\.(name|category|iconURL|outputFolder|outputFileName|sourceURL|sourceFormat|storageLocation)\.value/,
+  'app.js should let web-editor populate and collect module form fields'
+);
+assert.doesNotMatch(
+  appSource,
   /function (openDialog|closeDialog|askConfirmation|resolveConfirmation|resetHorizontalScroll|copyText|showCopySuccess|showToast)\(/,
   'app.js should use web-feedback helpers for feedback and dialog details'
 );
