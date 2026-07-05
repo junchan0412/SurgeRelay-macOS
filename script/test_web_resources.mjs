@@ -9,6 +9,7 @@ const markupSource = readFileSync(new URL('../SurgeRelay/WebResources/web-markup
 const apiSource = readFileSync(new URL('../SurgeRelay/WebResources/web-api.js', import.meta.url), 'utf8');
 const stateSource = readFileSync(new URL('../SurgeRelay/WebResources/web-state.js', import.meta.url), 'utf8');
 const editorSource = readFileSync(new URL('../SurgeRelay/WebResources/web-editor.js', import.meta.url), 'utf8');
+const feedbackSource = readFileSync(new URL('../SurgeRelay/WebResources/web-feedback.js', import.meta.url), 'utf8');
 const appSource = readFileSync(new URL('../SurgeRelay/WebResources/app.js', import.meta.url), 'utf8');
 const context = vm.createContext({ console, URL });
 vm.runInContext(logicSource, context, { filename: 'web-logic.js' });
@@ -18,6 +19,7 @@ vm.runInContext(markupSource, context, { filename: 'web-markup.js' });
 vm.runInContext(apiSource, context, { filename: 'web-api.js' });
 vm.runInContext(stateSource, context, { filename: 'web-state.js' });
 vm.runInContext(editorSource, context, { filename: 'web-editor.js' });
+vm.runInContext(feedbackSource, context, { filename: 'web-feedback.js' });
 
 const logic = context.SurgeRelayWebLogic;
 assert.ok(logic, 'web logic should install a global testable API');
@@ -33,6 +35,8 @@ const stateHelpers = context.SurgeRelayWebState;
 assert.ok(stateHelpers, 'web state should install a global testable API');
 const editorHelpers = context.SurgeRelayWebEditor;
 assert.ok(editorHelpers, 'web editor should install a global testable API');
+const feedbackHelpers = context.SurgeRelayWebFeedback;
+assert.ok(feedbackHelpers, 'web feedback should install a global testable API');
 assert.equal(options.scriptHubDefaults.removeCommentedRewrites, true);
 assert.ok(
   options.advancedGroups.some(group => group.id === 'script-conversion'),
@@ -47,6 +51,11 @@ assert.doesNotMatch(
   appSource,
   /function (setAdvancedExpanded|animateAdvancedResize|animateOptionGroup|collectScriptHubOptions|populateScriptHubOptions|hasAdvancedValues|populateOutputFolders|updateIconURLPreview)\(/,
   'app.js should use web-editor helpers for editor UI details'
+);
+assert.doesNotMatch(
+  appSource,
+  /function (openDialog|closeDialog|askConfirmation|resolveConfirmation|resetHorizontalScroll|copyText|showCopySuccess|showToast)\(/,
+  'app.js should use web-feedback helpers for feedback and dialog details'
 );
 assert.doesNotMatch(
   appSource,
@@ -827,6 +836,108 @@ editorController.updateIconURLPreview();
 assert.equal(createdElements.at(-1).tagName, 'img');
 assert.equal(createdElements.at(-1).src, 'https://example.com/icon.png');
 
+const feedbackTimers = [];
+const clearedTimers = [];
+const toastElement = {
+  textContent: '',
+  classList: makeClassList()
+};
+const confirmDialog = {
+  open: false,
+  classList: makeClassList(),
+  showModal() { this.open = true; },
+  close() { this.open = false; }
+};
+const feedbackDocument = {
+  documentElement: { scrollLeft: 12 },
+  body: {
+    scrollLeft: 34,
+    append(node) { this.appended = node; }
+  },
+  createElement(tagName) {
+    return {
+      tagName,
+      value: '',
+      selected: false,
+      removed: false,
+      select() { this.selected = true; },
+      remove() { this.removed = true; }
+    };
+  },
+  execCommand(command) {
+    this.lastCommand = command;
+    return true;
+  }
+};
+const feedbackWindow = {
+  scrollY: 56,
+  scrollTo(x, y) { this.scrolledTo = [x, y]; }
+};
+const copiedTexts = [];
+const feedbackController = feedbackHelpers.createFeedbackController({
+  ui: {
+    confirmDialog,
+    confirmTitle: { textContent: '' },
+    confirmMessage: { textContent: '' },
+    confirmAccept: { textContent: '' },
+    toast: toastElement
+  },
+  document: feedbackDocument,
+  window: feedbackWindow,
+  navigator: { clipboard: { writeText: async text => copiedTexts.push(text) } },
+  setTimeout: (handler, delay) => {
+    const timer = { handler, delay };
+    feedbackTimers.push(timer);
+    if (delay === 1) handler();
+    return feedbackTimers.length;
+  },
+  clearTimeout: timer => clearedTimers.push(timer),
+  closeDelay: 1,
+  copySuccessDelay: 2,
+  toastDelay: 3
+});
+feedbackController.openDialog(confirmDialog);
+assert.equal(confirmDialog.open, true);
+assert.equal(confirmDialog.classList.contains('is-closing'), false);
+const confirmPromise = feedbackController.askConfirmation('删除模块？', '确认删除 Demo？', '删除');
+assert.equal(confirmDialog.open, true);
+await feedbackController.resolveConfirmation(true);
+assert.equal(await confirmPromise, true);
+assert.equal(confirmDialog.open, false);
+feedbackController.resetHorizontalScroll();
+assert.equal(feedbackDocument.documentElement.scrollLeft, 0);
+assert.equal(feedbackDocument.body.scrollLeft, 0);
+assert.deepEqual(feedbackWindow.scrolledTo, [0, 56]);
+const copyButton = {
+  dataset: {},
+  innerHTML: '<span>复制</span>',
+  isConnected: true,
+  classList: makeClassList()
+};
+assert.equal(await feedbackController.copyText('https://example.com/module.sgmodule', copyButton), true);
+assert.deepEqual(copiedTexts, ['https://example.com/module.sgmodule']);
+assert.match(copyButton.innerHTML, /拷贝成功/);
+assert.equal(copyButton.classList.contains('copy-success'), true);
+feedbackTimers.find(timer => timer.delay === 2).handler();
+assert.equal(copyButton.innerHTML, '<span>复制</span>');
+assert.equal(copyButton.classList.contains('copy-success'), false);
+feedbackController.showToast('保存成功');
+assert.equal(toastElement.textContent, '保存成功');
+assert.equal(toastElement.classList.contains('visible'), true);
+feedbackTimers.findLast(timer => timer.delay === 3).handler();
+assert.equal(toastElement.classList.contains('visible'), false);
+const failedToast = { textContent: '', classList: makeClassList() };
+const failedCopyController = feedbackHelpers.createFeedbackController({
+  ui: { toast: failedToast },
+  document: feedbackDocument,
+  navigator: { clipboard: { writeText: async () => { throw new Error('denied'); } } },
+  setTimeout: () => 1,
+  clearTimeout: () => {}
+});
+assert.equal(await failedCopyController.copyText('secret'), false);
+assert.equal(failedToast.textContent, '拷贝失败');
+assert.equal(failedToast.classList.contains('error'), true);
+
 const indexHTML = readFileSync(new URL('../SurgeRelay/WebResources/index.html', import.meta.url), 'utf8');
 const logicScriptIndex = indexHTML.indexOf('/web-logic.js');
 const optionsScriptIndex = indexHTML.indexOf('/web-options.js');
@@ -835,6 +946,7 @@ const markupScriptIndex = indexHTML.indexOf('/web-markup.js');
 const apiScriptIndex = indexHTML.indexOf('/web-api.js');
 const stateScriptIndex = indexHTML.indexOf('/web-state.js');
 const editorScriptIndex = indexHTML.indexOf('/web-editor.js');
+const feedbackScriptIndex = indexHTML.indexOf('/web-feedback.js');
 const appScriptIndex = indexHTML.indexOf('/app.js');
 assert.ok(logicScriptIndex >= 0, 'index should load web-logic.js');
 assert.ok(optionsScriptIndex > logicScriptIndex, 'web-options.js must load after web-logic.js');
@@ -843,7 +955,8 @@ assert.ok(markupScriptIndex > formatScriptIndex, 'web-markup.js must load after 
 assert.ok(apiScriptIndex > markupScriptIndex, 'web-api.js must load after web-markup.js');
 assert.ok(stateScriptIndex > apiScriptIndex, 'web-state.js must load after web-api.js');
 assert.ok(editorScriptIndex > stateScriptIndex, 'web-editor.js must load after web-state.js');
-assert.ok(appScriptIndex > editorScriptIndex, 'web-editor.js must load before app.js');
+assert.ok(feedbackScriptIndex > editorScriptIndex, 'web-feedback.js must load after web-editor.js');
+assert.ok(appScriptIndex > feedbackScriptIndex, 'web-feedback.js must load before app.js');
 assert.match(indexHTML, /name="storageLocation"/);
 assert.match(indexHTML, /name="outputFolder"/);
 assert.match(indexHTML, /id="output-path-preview"/);

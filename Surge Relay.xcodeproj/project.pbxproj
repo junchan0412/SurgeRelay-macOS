@@ -140,6 +140,7 @@
 		A1043C2BA470C33854288294 /* web-api.js in Resources */ = {isa = PBXBuildFile; fileRef = FC8EC697C414F11A0F8E2D11 /* web-api.js */; };
 		A1143C2BA470C33854288294 /* web-state.js in Resources */ = {isa = PBXBuildFile; fileRef = FC9EC697C414F11A0F8E2D11 /* web-state.js */; };
 		A1243C2BA470C33854288294 /* web-editor.js in Resources */ = {isa = PBXBuildFile; fileRef = FCAEC697C414F11A0F8E2D11 /* web-editor.js */; };
+		A1343C2BA470C33854288294 /* web-feedback.js in Resources */ = {isa = PBXBuildFile; fileRef = FCBEC697C414F11A0F8E2D11 /* web-feedback.js */; };
 		A11A11A11A11A11A11A11A11 /* CombinedModuleViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B11B11B11B11B11B11B11B11 /* CombinedModuleViews.swift */; };
 		A22A22A22A22A22A22A22A22 /* DetailInfoViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22B22B22B22B22B22B22B22 /* DetailInfoViews.swift */; };
 		A33A33A33A33A33A33A33A33 /* PublishFileAssembler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B33B33B33B33B33B33B33 /* PublishFileAssembler.swift */; };
@@ -370,6 +371,7 @@
 		FC8EC697C414F11A0F8E2D11 /* web-api.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "web-api.js"; sourceTree = "<group>"; };
 		FC9EC697C414F11A0F8E2D11 /* web-state.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "web-state.js"; sourceTree = "<group>"; };
 		FCAEC697C414F11A0F8E2D11 /* web-editor.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "web-editor.js"; sourceTree = "<group>"; };
+		FCBEC697C414F11A0F8E2D11 /* web-feedback.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "web-feedback.js"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -506,6 +508,7 @@
 				FC8EC697C414F11A0F8E2D11 /* web-api.js */,
 				FC9EC697C414F11A0F8E2D11 /* web-state.js */,
 				FCAEC697C414F11A0F8E2D11 /* web-editor.js */,
+				FCBEC697C414F11A0F8E2D11 /* web-feedback.js */,
 			);
 			path = WebResources;
 			sourceTree = "<group>";
@@ -785,6 +788,7 @@
 				A1043C2BA470C33854288294 /* web-api.js in Resources */,
 				A1143C2BA470C33854288294 /* web-state.js in Resources */,
 				A1243C2BA470C33854288294 /* web-editor.js in Resources */,
+				A1343C2BA470C33854288294 /* web-feedback.js in Resources */,
 				B7752C3B9A95AA5DCEF3FBE3 /* xmark.svg in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

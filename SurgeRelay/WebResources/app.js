@@ -74,6 +74,9 @@ if (!webState) throw new Error('web-state.js must load before app.js');
 const webEditor = window.SurgeRelayWebEditor;
 if (!webEditor) throw new Error('web-editor.js must load before app.js');
 
+const webFeedback = window.SurgeRelayWebFeedback;
+if (!webFeedback) throw new Error('web-feedback.js must load before app.js');
+
 let state = null;
 let selectedID = null;
 let detailTab = 'info';
@@ -81,8 +84,6 @@ let editingID = null;
 let showFailuresOnly = false;
 let previewText = '';
 let previewSavedText = '';
-let toastTimer = null;
-let confirmResolver = null;
 let nameLookupTimer = null;
 let nameLookupSequence = 0;
 let autoFilledName = '';
@@ -99,6 +100,23 @@ const moduleEditor = webEditor.createModuleEditorController({
   mobileLayout,
   setTimeout: window.setTimeout.bind(window)
 });
+const feedback = webFeedback.createFeedbackController({
+  ui,
+  document,
+  window,
+  navigator,
+  setTimeout: window.setTimeout.bind(window),
+  clearTimeout: window.clearTimeout.bind(window)
+});
+const {
+  openDialog,
+  closeDialog,
+  askConfirmation,
+  resolveConfirmation,
+  resetHorizontalScroll,
+  copyText,
+  showToast
+} = feedback;
 const stateEventController = webState.createStateEventController({
   EventSource: window.EventSource,
   document,
@@ -639,49 +657,3 @@ async function resetArguments(module) {
   try { const result = await api(`/api/modules/${module.id}/arguments`, { method: 'DELETE' }); showToast(result.message); renderModuleDetail(module, true); }
   catch (error) { showToast(error.message, true); }
 }
-
-function openDialog(dialog) { dialog.classList.remove('is-closing'); dialog.showModal(); }
-function closeDialog(dialog) { return new Promise(resolve => { if (!dialog.open) return resolve(); dialog.classList.add('is-closing'); setTimeout(() => { dialog.close(); dialog.classList.remove('is-closing'); resolve(); }, 165); }); }
-function askConfirmation(title, message, acceptLabel = '确认') { ui.confirmTitle.textContent = title; ui.confirmMessage.textContent = message; ui.confirmAccept.textContent = acceptLabel; openDialog(ui.confirmDialog); return new Promise(resolve => { confirmResolver = resolve; }); }
-async function resolveConfirmation(value) { const resolver = confirmResolver; confirmResolver = null; await closeDialog(ui.confirmDialog); resolver?.(value); }
-
-function resetHorizontalScroll() {
-  document.documentElement.scrollLeft = 0;
-  document.body.scrollLeft = 0;
-  window.scrollTo(0, window.scrollY);
-}
-
-async function copyText(text, button = null) {
-  try {
-    if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text || '');
-    else {
-      const textarea = document.createElement('textarea');
-      textarea.value = text || '';
-      document.body.append(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      textarea.remove();
-    }
-    showCopySuccess(button);
-  } catch (_) {
-    showToast('拷贝失败', true);
-  }
-}
-
-function showCopySuccess(button) {
-  if (!button) return;
-  if (!button.dataset.copyLabel) button.dataset.copyLabel = button.innerHTML;
-  clearTimeout(Number(button.dataset.copyTimer || 0));
-  button.innerHTML = '<span class="symbol" data-symbol="checkmark"></span>拷贝成功';
-  button.classList.add('copy-success');
-  const timer = setTimeout(() => {
-    if (!button.isConnected) return;
-    button.innerHTML = button.dataset.copyLabel;
-    button.classList.remove('copy-success');
-    delete button.dataset.copyLabel;
-    delete button.dataset.copyTimer;
-  }, 1600);
-  button.dataset.copyTimer = String(timer);
-}
-
-function showToast(message, isError = false) { clearTimeout(toastTimer); ui.toast.textContent = message; ui.toast.classList.toggle('error', isError); ui.toast.classList.add('visible'); toastTimer = setTimeout(() => ui.toast.classList.remove('visible'), 2600); }
