@@ -129,6 +129,11 @@ assert.notEqual(
   logic.moduleListSignature({ ...signatureBase, lastError: '原始链接返回 404' })
 );
 assert.notEqual(
+  logic.moduleListSignature({ ...signatureBase, name: 'A\u001fB', sourceURL: 'C' }),
+  logic.moduleListSignature({ ...signatureBase, name: 'A', sourceURL: 'B\u001fC' }),
+  'module list signatures should not collide when field values contain legacy separators'
+);
+assert.notEqual(
   logic.sidebarListSignature({ combined: { isEnabled: false }, modules: [signatureBase] }),
   logic.sidebarListSignature({ combined: { isEnabled: true }, modules: [signatureBase] })
 );

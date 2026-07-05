@@ -6,7 +6,7 @@
   }
 
   function moduleListSignature(module) {
-    return [
+    return JSON.stringify([
       module.id, module.name, module.sourceURL, module.effectiveOriginalSourceURL,
       module.sourceFormatTitle, module.outputFolder, module.publishedRelativePath,
       module.storageLocation, module.storageLocationTitle, module.sourceOriginTitle,
@@ -15,14 +15,14 @@
       module.state, module.stateTitle, module.lastError, module.lastUpdatedAt, module.sourceCheckedAt,
       module.contentHash, module.sourceContentHash, module.sourceETag, module.sourceLastModified,
       module.conversionEngineRevision
-    ].map(value => String(value ?? '')).join('\u{1f}');
+    ].map(value => String(value ?? '')));
   }
 
   function sidebarListSignature(snapshot) {
-    return [
+    return JSON.stringify([
       snapshot?.combined?.isEnabled ? 'combined-on' : 'combined-off',
-      (snapshot?.modules || []).map(moduleListSignature).join('\n')
-    ].join('\n');
+      (snapshot?.modules || []).map(moduleListSignature)
+    ]);
   }
 
   function metadataRowPresenceChanged(previousModule, nextModule) {
