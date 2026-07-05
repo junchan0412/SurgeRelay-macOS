@@ -1,5 +1,9 @@
 import Foundation
 
+enum ReleaseUpdateChannel {
+    static let latestReleaseURL = URL(string: "https://github.com/junchan0412/SurgeRelay-macOS/releases/latest")!
+}
+
 struct GitHubRelease: Decodable, Equatable, Sendable {
     var tagName: String
     var name: String

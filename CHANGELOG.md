@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将更新历史、发布历史条目和最近 GitHub 发布快照拆入 `UpdateHistoryModels.swift`，并把 GitHub Release 更新入口常量移入 `GitHubReleaseModels.swift`，继续收窄 `ServiceModels.swift`。
 - 将发布文件、发布报告、发布目标和发布预览模型拆入 `PublishModels.swift`，继续压缩 `ServiceModels.swift` 的跨服务杂项职责。
 - 将 GitHub API URL、请求头、JSON 响应解析、仓库可见性检测和 contents SHA 查询抽入 `GitHubRESTClient.swift`，让 `GitHubClient.swift` 更专注于发布 diff、提交和冲突重试流程。
 - 将 Surge 模块清洗与 Loon 脚本行修正逻辑拆入 `SurgeModuleSanitizer.swift`，让 `ModuleMerger.swift` 更专注于总模块段落合并。
