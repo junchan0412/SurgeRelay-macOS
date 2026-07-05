@@ -14,6 +14,7 @@
 		D0B0D0B0D0B0D0B0D0B0D0B0 /* AppModel+Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0B0E0B0E0B0E0B0E0B0E0B0 /* AppModel+Diagnostics.swift */; };
 		D0C0D0C0D0C0D0C0D0C0D0C0 /* AppModel+Credentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0C0E0C0E0C0E0C0E0C0E0C0 /* AppModel+Credentials.swift */; };
 		D110D110D110D110D110D110 /* AppModel+GitHubConnectivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = E110E110E110E110E110E110 /* AppModel+GitHubConnectivity.swift */; };
+		D113D113D113D113D113D113 /* AppModel+GitHubPublishing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E113E113E113E113E113E113 /* AppModel+GitHubPublishing.swift */; };
 		D0D0D0D0D0D0D0D0D0D0D0D0 /* AppModel+ModuleState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0D0E0D0E0D0E0D0E0D0E0D0 /* AppModel+ModuleState.swift */; };
 		D107D107D107D107D107D107 /* AppModel+LocalModules.swift in Sources */ = {isa = PBXBuildFile; fileRef = E107E107E107E107E107E107 /* AppModel+LocalModules.swift */; };
 		D108D108D108D108D108D108 /* AppModel+ModuleOutputFolders.swift in Sources */ = {isa = PBXBuildFile; fileRef = E108E108E108E108E108E108 /* AppModel+ModuleOutputFolders.swift */; };
@@ -257,6 +258,7 @@
 		E0B0E0B0E0B0E0B0E0B0E0B0 /* AppModel+Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Diagnostics.swift"; sourceTree = "<group>"; };
 		E0C0E0C0E0C0E0C0E0C0E0C0 /* AppModel+Credentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Credentials.swift"; sourceTree = "<group>"; };
 		E110E110E110E110E110E110 /* AppModel+GitHubConnectivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+GitHubConnectivity.swift"; sourceTree = "<group>"; };
+		E113E113E113E113E113E113 /* AppModel+GitHubPublishing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+GitHubPublishing.swift"; sourceTree = "<group>"; };
 		E0D0E0D0E0D0E0D0E0D0E0D0 /* AppModel+ModuleState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+ModuleState.swift"; sourceTree = "<group>"; };
 		E107E107E107E107E107E107 /* AppModel+LocalModules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+LocalModules.swift"; sourceTree = "<group>"; };
 		E108E108E108E108E108E108 /* AppModel+ModuleOutputFolders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+ModuleOutputFolders.swift"; sourceTree = "<group>"; };
@@ -480,6 +482,7 @@
 				E0C0E0C0E0C0E0C0E0C0E0C0 /* AppModel+Credentials.swift */,
 				E0B0E0B0E0B0E0B0E0B0E0B0 /* AppModel+Diagnostics.swift */,
 				E110E110E110E110E110E110 /* AppModel+GitHubConnectivity.swift */,
+				E113E113E113E113E113E113 /* AppModel+GitHubPublishing.swift */,
 				E107E107E107E107E107E107 /* AppModel+LocalModules.swift */,
 				E0D0E0D0E0D0E0D0E0D0E0D0 /* AppModel+ModuleState.swift */,
 				E108E108E108E108E108E108 /* AppModel+ModuleOutputFolders.swift */,
@@ -972,6 +975,7 @@
 				D0C0D0C0D0C0D0C0D0C0D0C0 /* AppModel+Credentials.swift in Sources */,
 				D0B0D0B0D0B0D0B0D0B0D0B0 /* AppModel+Diagnostics.swift in Sources */,
 				D110D110D110D110D110D110 /* AppModel+GitHubConnectivity.swift in Sources */,
+				D113D113D113D113D113D113 /* AppModel+GitHubPublishing.swift in Sources */,
 				D107D107D107D107D107D107 /* AppModel+LocalModules.swift in Sources */,
 				D0D0D0D0D0D0D0D0D0D0D0D0 /* AppModel+ModuleState.swift in Sources */,
 				D108D108D108D108D108D108 /* AppModel+ModuleOutputFolders.swift in Sources */,

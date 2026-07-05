@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将 AppModel 的 GitHub 发布准备、预览、提交和发布历史记录流程拆入 `AppModel+GitHubPublishing.swift`，让 `AppModel+Publishing.swift` 更专注于用户触发的发布/预览/确认状态编排。
 - 将 AppModel 的预览内容写入、恢复和本地编辑冲突接受流程拆入 `AppModel+PreviewEditing.swift`，让 `AppModel+Modules.swift` 更专注于模块增删改、排序和参数。
 - 将 Script-Hub 引擎刷新与 GitHub 连通性测试从 `AppModel+Updates.swift` 拆入独立扩展文件，让更新编排文件更专注于模块刷新循环。
 - 将剩余共享模型拆入 `ConversionModels.swift`、`ModuleCollectionSummary.swift`、`SourceRevisionModels.swift` 和 `RelayError.swift`，移除 `ServiceModels.swift` 这一杂项模型入口。
