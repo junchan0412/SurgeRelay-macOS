@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将模块输出文件夹、模块草稿规划和本地模块导入规划测试拆入独立文件，继续收敛 `ModulePlanningTests.swift` 的职责。
 - 将自动发布准入/跳过规则测试拆入 `AutomaticPublishPlannerTests.swift`，将更新完成状态文案与调度决策测试拆入 `UpdateCompletionStatusPlannerTests.swift`。
 - 将工作状态与更新准入测试拆入 `WorkActivityTests.swift`，让任务状态规则与通用模型测试分离。
 - 将模块搜索索引测试拆入 `ModuleSearchIndexTests.swift`，继续缩小通用 `SurgeRelayTests.swift` 的职责范围。
