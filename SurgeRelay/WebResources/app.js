@@ -51,6 +51,8 @@ const { formatDate, formatTime, escapeHTML, escapeAttribute, highlightCode } = w
 const webMarkup = window.SurgeRelayWebMarkup;
 if (!webMarkup) throw new Error('web-markup.js must load before app.js');
 const {
+  emptyStateMarkup,
+  moduleRowMarkup,
   combinedDetailMarkup,
   moduleDetailMarkup,
   argumentMarkup,
@@ -285,22 +287,12 @@ function renderSidebar() {
   if (state.combined.isEnabled) ui.summarySubtitle.textContent = `${state.combined.enabledCount} 个来源 · 总模块订阅`;
   ui.summaryRow.classList.toggle('selected', state.combined.isEnabled && selectedID === 'combined');
   const emptyText = webLogic.sidebarEmptyText({ query, failuresOnly: showFailuresOnly });
-  ui.list.innerHTML = modules.length ? modules.map(moduleRow).join('') : `<div class="empty-state"><div><span class="symbol" data-symbol="magnifyingglass"></span><div>${emptyText}</div></div></div>`;
-}
-
-function moduleRow(module) {
-  const icon = module.iconURL ? `<img src="${escapeAttribute(module.iconURL)}" alt="" loading="lazy">` : `<span class="symbol" data-symbol="shippingbox"></span>`;
-  const stateClass = `state-${module.state || 'never'}`;
-  const stateTitle = webLogic.moduleStatusTitle(module);
-  const toggle = state.combined.isEnabled
-    ? `<label class="module-toggle" title="${module.isEnabled ? '从总模块中停用' : '包含在总模块中'}"><input type="checkbox" data-module-toggle="${module.id}" ${module.isEnabled ? 'checked' : ''} aria-label="包含 ${escapeAttribute(module.name)}"><span class="toggle-track" aria-hidden="true"></span></label>`
-    : '';
-  return `<div class="module-row ${selectedID === module.id ? 'selected' : ''} ${state.combined.isEnabled && !module.isEnabled ? 'disabled' : ''}" data-id="${module.id}" role="button" tabindex="0">
-    <span class="module-icon ${module.iconURL ? '' : 'placeholder'}">${icon}</span>
-    <span class="module-copy"><strong>${escapeHTML(module.name)}</strong><small>${escapeHTML(webLogic.moduleSubtitle(module))}</small></span>
-    <span class="module-state-dot ${escapeAttribute(stateClass)}" title="${escapeAttribute(stateTitle)}"></span>
-    ${toggle}
-  </div>`;
+  ui.list.innerHTML = modules.length
+    ? modules.map(module => moduleRowMarkup(module, {
+      selectedID,
+      combinedEnabled: state.combined.isEnabled
+    })).join('')
+    : emptyStateMarkup('magnifyingglass', emptyText);
 }
 
 function renderActivity() {
@@ -336,7 +328,7 @@ function renderActivity() {
 }
 
 function renderDetail(animate = true) {
-  if (!state || !selectedID) { setDetailHTML(`<div class="empty-state"><div><span class="symbol" data-symbol="sidebar.left"></span><div>选择一个模块</div></div></div>`, animate); return; }
+  if (!state || !selectedID) { setDetailHTML(emptyStateMarkup('sidebar.left', '选择一个模块'), animate); return; }
   if (selectedID === 'combined') {
     if (!state.combined.isEnabled) { normalizeSelection(); renderDetail(animate); return; }
     ui.mobileTitle.textContent = state.combined.name;

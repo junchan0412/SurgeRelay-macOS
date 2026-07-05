@@ -6,6 +6,30 @@
 
   const { formatDate, escapeHTML, escapeAttribute } = format;
 
+  function emptyStateMarkup(icon, message) {
+    return `<div class="empty-state"><div><span class="symbol" data-symbol="${escapeAttribute(icon)}"></span><div>${escapeHTML(message)}</div></div></div>`;
+  }
+
+  function moduleRowMarkup(module, context = {}) {
+    const combinedEnabled = Boolean(context.combinedEnabled);
+    const selected = context.selectedID === module.id;
+    const disabled = combinedEnabled && !module.isEnabled;
+    const icon = module.iconURL
+      ? `<img src="${escapeAttribute(module.iconURL)}" alt="" loading="lazy">`
+      : '<span class="symbol" data-symbol="shippingbox"></span>';
+    const stateClass = `state-${module.state || 'never'}`;
+    const stateTitle = logic.moduleStatusTitle(module);
+    const toggle = combinedEnabled
+      ? `<label class="module-toggle" title="${module.isEnabled ? '从总模块中停用' : '包含在总模块中'}"><input type="checkbox" data-module-toggle="${escapeAttribute(module.id)}" ${module.isEnabled ? 'checked' : ''} aria-label="包含 ${escapeAttribute(module.name)}"><span class="toggle-track" aria-hidden="true"></span></label>`
+      : '';
+    return `<div class="module-row ${selected ? 'selected' : ''} ${disabled ? 'disabled' : ''}" data-id="${escapeAttribute(module.id)}" role="button" tabindex="0">
+    <span class="module-icon ${module.iconURL ? '' : 'placeholder'}">${icon}</span>
+    <span class="module-copy"><strong>${escapeHTML(module.name)}</strong><small>${escapeHTML(logic.moduleSubtitle(module))}</small></span>
+    <span class="module-state-dot ${escapeAttribute(stateClass)}" title="${escapeAttribute(stateTitle)}"></span>
+    ${toggle}
+  </div>`;
+  }
+
   function detailRow(icon, label, value, raw = false, copyValue = null) {
     const renderedValue = raw ? value : escapeHTML(String(value ?? '—'));
     const copyButton = copyValue
@@ -160,6 +184,8 @@
   }
 
   global.SurgeRelayWebMarkup = {
+    emptyStateMarkup,
+    moduleRowMarkup,
     detailRow,
     copyableValueSection,
     previewShell,

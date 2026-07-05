@@ -309,6 +309,42 @@ assert.equal(format.escapeHTML('<tag attr="1">Tom & Jerry</tag>'), '&lt;tag attr
 assert.equal(format.formatDate('not-a-date', 'fallback'), 'fallback');
 assert.match(format.highlightCode('[General]\nkey = https://example.com/1'), /code-section/);
 assert.match(format.highlightCode('[General]\nkey = https://example.com/1'), /code-url/);
+assert.match(markup.emptyStateMarkup('magnifyingglass', '没有 <模块>'), /没有 &lt;模块&gt;/);
+const selectedModuleRow = markup.moduleRowMarkup({
+  ...signatureBase,
+  id: 'module<1',
+  name: 'Demo <Module>',
+  iconURL: 'https://example.com/icon.png?a=1&b=2',
+  customIconURL: '',
+  isEnabled: false,
+  publishesStandalone: false,
+  state: 'failed',
+  stateTitle: '更新失败',
+  lastError: '原始链接返回 404'
+}, {
+  selectedID: 'module<1',
+  combinedEnabled: true
+});
+assert.match(selectedModuleRow, /module-row selected disabled/);
+assert.match(selectedModuleRow, /data-id="module&lt;1"/);
+assert.match(selectedModuleRow, /data-module-toggle="module&lt;1"/);
+assert.match(selectedModuleRow, /Demo &lt;Module&gt;/);
+assert.match(selectedModuleRow, /https:\/\/example.com\/icon.png\?a=1&amp;b=2/);
+assert.match(selectedModuleRow, /更新失败：原始链接返回 404/);
+assert.match(selectedModuleRow, /不发布独立模块/);
+const standaloneModuleRow = markup.moduleRowMarkup({
+  ...signatureBase,
+  id: 'module-2',
+  iconURL: '',
+  isEnabled: true,
+  state: 'current',
+  lastError: ''
+}, {
+  selectedID: null,
+  combinedEnabled: false
+});
+assert.match(standaloneModuleRow, /module-icon placeholder/);
+assert.doesNotMatch(standaloneModuleRow, /data-module-toggle/);
 assert.match(markup.detailRow('link', '原始地址', '<unsafe>'), /&lt;unsafe&gt;/);
 assert.match(markup.detailRow('link', '原始地址', '<a>ok</a>', true, 'https://example.com?a=1&b=2'), /data-value="https:\/\/example.com\?a=1&amp;b=2"/);
 assert.equal(markup.copyableValueSection('GitHub', ''), '');
