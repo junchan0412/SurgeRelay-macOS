@@ -79,7 +79,7 @@ Preview content reads belong in `ModulePreviewContentProvider`. Keep cache looku
 
 Module output naming belongs in `ModuleNamingPlanner`. Keep output-file uniqueness checks, combined-module filename collision avoidance, detected source-format inference, local storage relative-path derivation, and loaded-module naming normalization there. AppModel should pass the current modules and settings into the planner instead of reimplementing path rules inline.
 
-Web management HTTP primitives belong in `WebManagementHTTP.swift`; request authentication throttling belongs in `WebAuthenticationThrottle.swift`; connection lifecycle and event streaming stay in `WebManagementServer.swift`. Keep these boundaries separate so parser, security headers, rate limiting, and socket lifecycle can be tested and changed independently.
+Web management HTTP primitives belong in `WebManagementHTTP.swift`; API authentication, same-origin validation, and session cookie rules belong in `WebRequestSecurity.swift`; request authentication throttling belongs in `WebAuthenticationThrottle.swift`; connection lifecycle and event streaming stay in `WebManagementServer.swift`. Keep these boundaries separate so parser, authentication, security headers, rate limiting, and socket lifecycle can be tested and changed independently.
 
 Cached module metadata refresh belongs in `ModuleMetadataRefreshPlanner`. Keep restored Script-Hub subscription metadata, override base-hash initialization, preferred icon selection, icon-cache refresh decisions, and detected source-format updates there. AppModel should read cached files and apply the returned module/icon plan.
 

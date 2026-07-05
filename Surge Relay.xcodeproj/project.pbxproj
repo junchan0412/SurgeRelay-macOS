@@ -37,6 +37,7 @@
 		A19A19A19A19A19A19A19A19 /* ModuleDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = B19B19B19B19B19B19B19B19 /* ModuleDraft.swift */; };
 		A20A20A20A20A20A20A20A20 /* ModuleOutputPath.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20B20B20B20B20B20B20B20 /* ModuleOutputPath.swift */; };
 		A21A21A21A21A21A21A21A21 /* ModulePreviewViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B21B21B21B21B21B21B21B21 /* ModulePreviewViews.swift */; };
+		A09A09A09A09A09A09A09A09 /* WebRequestSecurity.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09B09B09B09B09B09B09B09 /* WebRequestSecurity.swift */; };
 		A10A10A10A10A10A10A10A10 /* WebAuthenticationThrottle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10B10B10B10B10B10B10B10 /* WebAuthenticationThrottle.swift */; };
 		B8B8B8B8B8B8B8B8B8B8B8B8 /* WebManagementHTTP.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8C8C8C8C8C8C8C8C8C8C8C8 /* WebManagementHTTP.swift */; };
 		A13A13A13A13A13A13A13A13 /* WebManagementModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B13B13B13B13B13B13B13B13 /* WebManagementModels.swift */; };
@@ -327,6 +328,7 @@
 		BB83E467F68776A168C3BBA3 /* ellipsis.svg */ = {isa = PBXFileReference; path = ellipsis.svg; sourceTree = "<group>"; };
 		C25C25C25C25C25C25C25C25 /* AutomaticPublishPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomaticPublishPlanner.swift; sourceTree = "<group>"; };
 		C7C7C7C7C7C7C7C7C7C7C7C7 /* UpdateCompletionStatusPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateCompletionStatusPlanner.swift; sourceTree = "<group>"; };
+		B09B09B09B09B09B09B09B09 /* WebRequestSecurity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebRequestSecurity.swift; sourceTree = "<group>"; };
 		B10B10B10B10B10B10B10B10 /* WebAuthenticationThrottle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebAuthenticationThrottle.swift; sourceTree = "<group>"; };
 		C8C8C8C8C8C8C8C8C8C8C8C8 /* WebManagementHTTP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebManagementHTTP.swift; sourceTree = "<group>"; };
 		C9C9C9C9C9C9C9C9C9C9C9C9 /* SettingsComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsComponents.swift; sourceTree = "<group>"; };
@@ -491,6 +493,7 @@
 				C8C8C8C8C8C8C8C8C8C8C8C8 /* WebManagementHTTP.swift */,
 				51D9670C12C677CBC8D96FA4 /* WebManagementAPI.swift */,
 				B13B13B13B13B13B13B13B13 /* WebManagementModels.swift */,
+				B09B09B09B09B09B09B09B09 /* WebRequestSecurity.swift */,
 				33932BCF1BFE460CA55DF088 /* WebManagementServer.swift */,
 			);
 			path = Services;
@@ -860,6 +863,7 @@
 				9457731342986CF96B53EA0F /* CheckForUpdatesView.swift in Sources */,
 				A11A11A11A11A11A11A11A11 /* CombinedModuleViews.swift in Sources */,
 				E52CE366B20E07E670D9E6E8 /* Components.swift in Sources */,
+				A09A09A09A09A09A09A09A09 /* WebRequestSecurity.swift in Sources */,
 				A10A10A10A10A10A10A10A10 /* WebAuthenticationThrottle.swift in Sources */,
 				B8B8B8B8B8B8B8B8B8B8B8B8 /* WebManagementHTTP.swift in Sources */,
 				C577752A7FA64D5E4749D52B /* DataHash.swift in Sources */,
