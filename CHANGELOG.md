@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将模块搜索索引测试拆入 `ModuleSearchIndexTests.swift`，继续缩小通用 `SurgeRelayTests.swift` 的职责范围。
 - 优化主窗口搜索内容索引：搜索词命中模块元数据时不再读取模块预览内容，内容缓存按模块 `contentHash` 失效，并补充搜索加载策略测试。
 - 将 Web 管理高级选项容器和模块存放文件夹菜单模板收进 `web-markup.js`，并补充根目录、转义和当前选中目录输出测试。
 - 将 Web 管理模块参数区模板收进 `web-markup.js`，并补充参数帮助文案转义、恢复默认按钮状态和空参数输出测试。
