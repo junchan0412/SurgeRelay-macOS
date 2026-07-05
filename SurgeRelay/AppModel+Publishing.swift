@@ -1,5 +1,11 @@
 import Foundation
 
+private struct GitHubPublishPreparation {
+    var token: String
+    var files: [PublishFile]
+    var pathPlan: GitHubPublishedPathPlan
+}
+
 @MainActor
 extension AppModel {
     func scheduleAutomaticPublish() {
@@ -335,35 +341,41 @@ extension AppModel {
     }
 
     private func githubPublishPreview() async throws -> PublishPreview {
-        try checkCurrentWorkCancellation()
-        try Task.checkCancellation()
-        guard hasGitHubPublishableModuleSelection else { throw RelayError.noFilesToPublish }
-        let token = try await githubPublishTokenAndRefreshRepositoryPrivacy()
-        let data = settings.combinedModuleEnabled ? try await fileStore.readCombined() : nil
-        try checkCurrentWorkCancellation()
-        let files = try await currentPublishedFiles(combinedData: data, includeAssets: true, destination: .gitHub)
-        try checkCurrentWorkCancellation()
-        guard !files.isEmpty else { throw RelayError.noFilesToPublish }
-        let pathPlan = GitHubPublishPlanner.pathPlan(
-            currentPaths: files.map(\.name),
-            settings: settings.github,
-            knownRepositoryKey: settings.githubPublishedRepositoryKey,
-            knownPublishedPaths: settings.githubPublishedFilePaths
-        )
+        let preparation = try await prepareGitHubPublish()
         let report = try await githubClient.previewPublish(
-            files: files,
-            deleting: pathPlan.stalePaths,
+            files: preparation.files,
+            deleting: preparation.pathPlan.stalePaths,
             settings: settings.github,
-            token: token
+            token: preparation.token
         )
         return GitHubPublishPlanner.preview(
             settings: settings.github,
-            pathPlan: pathPlan,
+            pathPlan: preparation.pathPlan,
             report: report
         )
     }
 
     private func publishAllInternal(allowDeleting: Bool = true) async throws -> PublishReport {
+        let preparation = try await prepareGitHubPublish()
+        let stalePaths = allowDeleting ? preparation.pathPlan.stalePaths : []
+        try enterNonCancellableWorkPhase(
+            statusMessage: "正在提交 GitHub 发布，已进入不可取消阶段…"
+        )
+        let report = try await githubClient.publish(
+            files: preparation.files,
+            deleting: stalePaths,
+            settings: settings.github,
+            token: preparation.token
+        )
+        if GitHubPublishPlanner.shouldPersistPathPlan(preparation.pathPlan, allowDeleting: allowDeleting) {
+            settings.githubPublishedRepositoryKey = preparation.pathPlan.repositoryKey
+            settings.githubPublishedFilePaths = preparation.pathPlan.currentPaths
+            saveSettings()
+        }
+        return report
+    }
+
+    private func prepareGitHubPublish() async throws -> GitHubPublishPreparation {
         try checkCurrentWorkCancellation()
         try Task.checkCancellation()
         guard hasGitHubPublishableModuleSelection else { throw RelayError.noFilesToPublish }
@@ -379,22 +391,11 @@ extension AppModel {
             knownRepositoryKey: settings.githubPublishedRepositoryKey,
             knownPublishedPaths: settings.githubPublishedFilePaths
         )
-        let stalePaths = allowDeleting ? pathPlan.stalePaths : []
-        try enterNonCancellableWorkPhase(
-            statusMessage: "正在提交 GitHub 发布，已进入不可取消阶段…"
-        )
-        let report = try await githubClient.publish(
+        return GitHubPublishPreparation(
+            token: token,
             files: files,
-            deleting: stalePaths,
-            settings: settings.github,
-            token: token
+            pathPlan: pathPlan
         )
-        if GitHubPublishPlanner.shouldPersistPathPlan(pathPlan, allowDeleting: allowDeleting) {
-            settings.githubPublishedRepositoryKey = pathPlan.repositoryKey
-            settings.githubPublishedFilePaths = pathPlan.currentPaths
-            saveSettings()
-        }
-        return report
     }
 
     private func publishSelectedModulesInternal(moduleIDs: Set<UUID>) async throws -> PublishReport {
