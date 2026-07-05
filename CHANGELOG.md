@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将 AppModel 的本地模块扫描/导入、模块增删改、输出文件夹刷新、模块参数和本地编辑保存拆入 `AppModel+Modules.swift`，让主状态文件只保留启动、设置保存和任务状态骨架。
 - 将 AppModel 的发布预览、手动 GitHub 发布、自动发布计划、本地输出刷新和旧输出清理拆入 `AppModel+Publishing.swift`，进一步分离发布安全边界。
 - 将 AppModel 的模块更新、Script-Hub 引擎刷新和 GitHub 连通性测试流程拆入 `AppModel+Updates.swift`，继续压缩主状态文件中的长流程编排。
 - 将 AppModel 的配置目录、发布目标开关、本地模块目录、登录启动和定时调度设置转发拆入 `AppModel+Settings.swift`，减少主编排文件中的设置 UI 粘合逻辑。

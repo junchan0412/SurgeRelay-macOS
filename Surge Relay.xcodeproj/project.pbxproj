@@ -11,6 +11,7 @@
 		D0B0D0B0D0B0D0B0D0B0D0B0 /* AppModel+Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0B0E0B0E0B0E0B0E0B0E0B0 /* AppModel+Diagnostics.swift */; };
 		D0C0D0C0D0C0D0C0D0C0D0C0 /* AppModel+Credentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0C0E0C0E0C0E0C0E0C0E0C0 /* AppModel+Credentials.swift */; };
 		D0D0D0D0D0D0D0D0D0D0D0D0 /* AppModel+ModuleState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0D0E0D0E0D0E0D0E0D0E0D0 /* AppModel+ModuleState.swift */; };
+		D103D103D103D103D103D103 /* AppModel+Modules.swift in Sources */ = {isa = PBXBuildFile; fileRef = E103E103E103E103E103E103 /* AppModel+Modules.swift */; };
 		D0E0D0E0D0E0D0E0D0E0D0E0 /* AppModel+PreviewAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0E0E0E0E0E0E0E0E0E0E0E0 /* AppModel+PreviewAccess.swift */; };
 		D102D102D102D102D102D102 /* AppModel+Publishing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E102E102E102E102E102E102 /* AppModel+Publishing.swift */; };
 		D0F0D0F0D0F0D0F0D0F0D0F0 /* AppModel+Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0F0E0F0E0F0E0F0E0F0E0F0 /* AppModel+Settings.swift */; };
@@ -189,6 +190,7 @@
 		E0B0E0B0E0B0E0B0E0B0E0B0 /* AppModel+Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Diagnostics.swift"; sourceTree = "<group>"; };
 		E0C0E0C0E0C0E0C0E0C0E0C0 /* AppModel+Credentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Credentials.swift"; sourceTree = "<group>"; };
 		E0D0E0D0E0D0E0D0E0D0E0D0 /* AppModel+ModuleState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+ModuleState.swift"; sourceTree = "<group>"; };
+		E103E103E103E103E103E103 /* AppModel+Modules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Modules.swift"; sourceTree = "<group>"; };
 		E0E0E0E0E0E0E0E0E0E0E0E0 /* AppModel+PreviewAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+PreviewAccess.swift"; sourceTree = "<group>"; };
 		E102E102E102E102E102E102 /* AppModel+Publishing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Publishing.swift"; sourceTree = "<group>"; };
 		E0F0E0F0E0F0E0F0E0F0E0F0 /* AppModel+Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Settings.swift"; sourceTree = "<group>"; };
@@ -345,6 +347,7 @@
 				E0C0E0C0E0C0E0C0E0C0E0C0 /* AppModel+Credentials.swift */,
 				E0B0E0B0E0B0E0B0E0B0E0B0 /* AppModel+Diagnostics.swift */,
 				E0D0E0D0E0D0E0D0E0D0E0D0 /* AppModel+ModuleState.swift */,
+				E103E103E103E103E103E103 /* AppModel+Modules.swift */,
 				E0E0E0E0E0E0E0E0E0E0E0E0 /* AppModel+PreviewAccess.swift */,
 				E102E102E102E102E102E102 /* AppModel+Publishing.swift */,
 				E0F0E0F0E0F0E0F0E0F0E0F0 /* AppModel+Settings.swift */,
@@ -742,6 +745,7 @@
 				D0C0D0C0D0C0D0C0D0C0D0C0 /* AppModel+Credentials.swift in Sources */,
 				D0B0D0B0D0B0D0B0D0B0D0B0 /* AppModel+Diagnostics.swift in Sources */,
 				D0D0D0D0D0D0D0D0D0D0D0D0 /* AppModel+ModuleState.swift in Sources */,
+				D103D103D103D103D103D103 /* AppModel+Modules.swift in Sources */,
 				D0E0D0E0D0E0D0E0D0E0D0E0 /* AppModel+PreviewAccess.swift in Sources */,
 				D102D102D102D102D102D102 /* AppModel+Publishing.swift in Sources */,
 				D0F0D0F0D0F0D0F0D0F0D0F0 /* AppModel+Settings.swift in Sources */,
