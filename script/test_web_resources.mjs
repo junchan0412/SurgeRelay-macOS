@@ -36,7 +36,7 @@ assert.ok(
 );
 assert.doesNotMatch(
   appSource,
-  /function (moduleSubtitle|moduleStatusTitle|failureSummary|folderTitle|publishedRelativePathForDraft|outputPathNotice|normalizedOutputFileName|suggestedNameFromSource|normalizeFolder|isFileSource|sgmoduleName|existingSgmoduleName|baseName|existingFileBaseName)\(/,
+  /function (moduleSubtitle|moduleStatusTitle|failureSummary|folderTitle|publishedRelativePathForDraft|outputPathNotice|isValidHTTPURL|isNativeSurgeSource|validateModuleEditorFields|moduleEditorPayload|normalizedOutputFileName|suggestedNameFromSource|normalizeFolder|isFileSource|sgmoduleName|existingSgmoduleName|baseName|existingFileBaseName)\(/,
   'app.js should call web-logic helpers directly instead of re-declaring wrappers'
 );
 assert.doesNotMatch(
@@ -90,6 +90,72 @@ assert.equal(
 assert.equal(
   logic.outputPathNotice('Folder/Demo.sgmodule', false).message,
   '未开启独立发布时，不会写出这个独立模块文件。'
+);
+
+assert.equal(logic.isValidHTTPURL('https://example.com/icon.png'), true);
+assert.equal(logic.isValidHTTPURL('http://example.com/icon.png'), true);
+assert.equal(logic.isValidHTTPURL('ftp://example.com/icon.png'), false);
+assert.equal(logic.isValidHTTPURL('/icon.png'), false);
+assert.equal(logic.validateModuleEditorFields({ iconURL: 'https://example.com/icon.png' }), null);
+assert.deepEqual(
+  JSON.parse(JSON.stringify(logic.validateModuleEditorFields({ iconURL: 'file:///tmp/icon.png' }))),
+  {
+    field: 'iconURL',
+    message: '图标 URL 仅支持完整的 HTTP 或 HTTPS 地址。'
+  }
+);
+
+assert.equal(logic.isNativeSurgeSource('surge', 'https://example.com/plugin.lpx'), true);
+assert.equal(logic.isNativeSurgeSource('automatic', 'https://example.com/demo.sgmodule'), true);
+assert.equal(logic.isNativeSurgeSource('automatic', 'https://example.com/surge/modules/demo.conf'), true);
+assert.equal(logic.isNativeSurgeSource('automatic', 'https://example.com/plugin.lpx'), false);
+
+assert.deepEqual(
+  JSON.parse(JSON.stringify(logic.moduleEditorPayload({
+    name: '  Demo  ',
+    sourceURL: ' https://example.com/demo.sgmodule ',
+    sourceFormat: 'surge',
+    storageLocation: 'local',
+    category: '  Ads  ',
+    iconURL: ' https://example.com/icon.png ',
+    outputFolder: 'Folder',
+    outputFileName: ' Demo Module.sgmodule ',
+    isEnabled: true,
+    publishesStandalone: false,
+    scriptHubOptions: { jqEnabled: true }
+  }, {
+    combinedEnabled: true,
+    existingModule: { isEnabled: false }
+  }))),
+  {
+    name: 'Demo',
+    sourceURL: 'https://example.com/demo.sgmodule',
+    sourceFormat: 'surge',
+    storageLocation: 'local',
+    category: 'Ads',
+    iconURL: 'https://example.com/icon.png',
+    outputFolder: 'Folder',
+    outputFileName: 'Demo Module.sgmodule',
+    isEnabled: true,
+    publishesStandalone: false,
+    scriptHubOptions: { jqEnabled: true }
+  }
+);
+assert.equal(
+  logic.moduleEditorPayload({ isEnabled: true }, {
+    combinedEnabled: false,
+    existingModule: { isEnabled: false }
+  }).isEnabled,
+  false,
+  'saving while combined module is disabled should preserve the existing include state'
+);
+assert.equal(
+  logic.moduleEditorPayload({ isEnabled: false }, {
+    combinedEnabled: false,
+    existingModule: { isEnabled: true }
+  }).isEnabled,
+  true,
+  'editing while combined module is disabled should not silently remove a previous include state'
 );
 
 const signatureBase = {

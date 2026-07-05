@@ -539,8 +539,7 @@ async function animateOptionGroup(group) {
 
 function updateNativeModuleState() {
   const form = ui.moduleForm.elements;
-  const url = form.sourceURL.value.trim().toLowerCase();
-  const native = form.sourceFormat.value === 'surge' || (form.sourceFormat.value === 'automatic' && (url.endsWith('.sgmodule') || url.includes('/surge/')));
+  const native = webLogic.isNativeSurgeSource(form.sourceFormat.value, form.sourceURL.value);
   ui.nativeNote.hidden = !native;
   ui.advancedOptions.hidden = native;
 }
@@ -634,7 +633,7 @@ function updateIconURLPreview() {
   preview.classList.toggle('placeholder', !previewURL);
   preview.classList.remove('invalid');
   preview.title = value || (fallbackURL ? '来源图标' : '默认图标');
-  if (value && !isValidHTTPURL(value)) {
+  if (value && !webLogic.isValidHTTPURL(value)) {
     preview.classList.add('invalid');
     preview.innerHTML = '<span class="symbol" data-symbol="shippingbox"></span>';
     return;
@@ -792,26 +791,30 @@ async function saveModule(event) {
   event.preventDefault();
   const form = ui.moduleForm.elements;
   const existingModule = editingID ? state.modules.find(module => module.id === editingID) : null;
-  const iconURL = form.iconURL.value.trim();
-  if (iconURL && !isValidHTTPURL(iconURL)) {
-    ui.moduleDialogMessage.textContent = '图标 URL 仅支持完整的 HTTP 或 HTTPS 地址。';
-    ui.moduleDialogMessage.hidden = false;
-    form.iconURL.focus();
-    return;
-  }
-  const payload = {
-    name: form.name.value.trim(),
-    sourceURL: form.sourceURL.value.trim(),
+  const editorFields = {
+    name: form.name.value,
+    sourceURL: form.sourceURL.value,
     sourceFormat: form.sourceFormat.value,
     storageLocation: form.storageLocation.value,
-    category: form.category.value.trim(),
-    iconURL,
+    category: form.category.value,
+    iconURL: form.iconURL.value,
     outputFolder: form.outputFolder.value,
-    outputFileName: form.outputFileName.value.trim(),
-    isEnabled: combinedEnabled() ? form.isEnabled.checked : (existingModule?.isEnabled ?? false),
+    outputFileName: form.outputFileName.value,
+    isEnabled: form.isEnabled.checked,
     publishesStandalone: form.publishesStandalone.checked,
     scriptHubOptions: collectScriptHubOptions()
   };
+  const validation = webLogic.validateModuleEditorFields(editorFields);
+  if (validation) {
+    ui.moduleDialogMessage.textContent = validation.message;
+    ui.moduleDialogMessage.hidden = false;
+    form[validation.field]?.focus();
+    return;
+  }
+  const payload = webLogic.moduleEditorPayload(editorFields, {
+    combinedEnabled: combinedEnabled(),
+    existingModule
+  });
   ui.saveModule.disabled = true;
   try {
     const path = editingID ? `/api/modules/${editingID}` : '/api/modules';
@@ -824,15 +827,6 @@ async function saveModule(event) {
     ui.moduleDialogMessage.hidden = false;
   }
   finally { ui.saveModule.disabled = false; }
-}
-
-function isValidHTTPURL(value) {
-  try {
-    const url = new URL(value);
-    return (url.protocol === 'http:' || url.protocol === 'https:') && Boolean(url.hostname);
-  } catch {
-    return false;
-  }
 }
 
 async function updateAll() {

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将 Web 管理模块编辑器的图标 URL 校验、原生 Surge 来源判定和保存 payload 生成收进 `web-logic.js`，并补充无依赖 Node 测试，减少 `app.js` 中的表单规则分叉。
 - 将 AppModel 的本地模块扫描/导入、模块增删改、输出文件夹刷新、模块参数和本地编辑保存拆入 `AppModel+Modules.swift`，让主状态文件只保留启动、设置保存和任务状态骨架。
 - 将 AppModel 的发布预览、手动 GitHub 发布、自动发布计划、本地输出刷新和旧输出清理拆入 `AppModel+Publishing.swift`，进一步分离发布安全边界。
 - 将 AppModel 的模块更新、Script-Hub 引擎刷新和 GitHub 连通性测试流程拆入 `AppModel+Updates.swift`，继续压缩主状态文件中的长流程编排。

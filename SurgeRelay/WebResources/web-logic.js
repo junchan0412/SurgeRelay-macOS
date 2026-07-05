@@ -140,6 +140,51 @@
     return null;
   }
 
+  function isValidHTTPURL(value) {
+    try {
+      const url = new URL(value);
+      return (url.protocol === 'http:' || url.protocol === 'https:') && Boolean(url.hostname);
+    } catch {
+      return false;
+    }
+  }
+
+  function isNativeSurgeSource(sourceFormat, sourceURL) {
+    const format = String(sourceFormat || 'automatic');
+    const normalizedURL = String(sourceURL || '').trim().toLowerCase();
+    return format === 'surge' ||
+      (format === 'automatic' && (normalizedURL.endsWith('.sgmodule') || normalizedURL.includes('/surge/')));
+  }
+
+  function validateModuleEditorFields(fields = {}) {
+    const iconURL = String(fields.iconURL || '').trim();
+    if (iconURL && !isValidHTTPURL(iconURL)) {
+      return {
+        field: 'iconURL',
+        message: '图标 URL 仅支持完整的 HTTP 或 HTTPS 地址。'
+      };
+    }
+    return null;
+  }
+
+  function moduleEditorPayload(fields = {}, context = {}) {
+    const existingModule = context.existingModule || {};
+    const combinedEnabled = Boolean(context.combinedEnabled);
+    return {
+      name: String(fields.name || '').trim(),
+      sourceURL: String(fields.sourceURL || '').trim(),
+      sourceFormat: String(fields.sourceFormat || 'automatic'),
+      storageLocation: String(fields.storageLocation || 'gitHub'),
+      category: String(fields.category || '').trim(),
+      iconURL: String(fields.iconURL || '').trim(),
+      outputFolder: String(fields.outputFolder || ''),
+      outputFileName: String(fields.outputFileName || '').trim(),
+      isEnabled: combinedEnabled ? Boolean(fields.isEnabled) : Boolean(existingModule.isEnabled ?? false),
+      publishesStandalone: Boolean(fields.publishesStandalone),
+      scriptHubOptions: fields.scriptHubOptions || {}
+    };
+  }
+
   function normalizedOutputFileName(draft) {
     const sourceURL = String(draft.sourceURL || '');
     const explicit = String(draft.outputFileName || '').trim();
@@ -217,6 +262,10 @@
     folderTitle,
     publishedRelativePathForDraft,
     outputPathNotice,
+    isValidHTTPURL,
+    isNativeSurgeSource,
+    validateModuleEditorFields,
+    moduleEditorPayload,
     normalizedOutputFileName,
     suggestedNameFromSource,
     normalizeFolder,
