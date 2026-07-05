@@ -37,6 +37,30 @@ final class GitHubReleaseTests: XCTestCase {
         XCTAssertNil(settings.validationMessage)
     }
 
+    func testGitHubClientTestsRepositoryVisibilityWithAPIHeaders() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GitHubMockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        GitHubMockURLProtocol.reset()
+        defer { GitHubMockURLProtocol.reset() }
+        GitHubMockURLProtocol.handler = { request in
+            XCTAssertEqual(request.url?.path, "/repos/someone/relay")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer token")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "application/vnd.github+json")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "X-GitHub-Api-Version"), "2022-11-28")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "User-Agent"), "SurgeRelay/1.0")
+            return (200, Data(#"{"private":true}"#.utf8))
+        }
+        var settings = GitHubSettings()
+        settings.owner = "someone"
+        settings.repository = "relay"
+
+        let isPrivate = try await GitHubClient(session: session).test(settings: settings, token: "token")
+
+        XCTAssertTrue(isPrivate)
+        XCTAssertEqual(GitHubMockURLProtocol.requestedPaths, ["GET /repos/someone/relay"])
+    }
+
     func testGitHubClientListsNestedModuleDirectoriesFromTree() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [GitHubMockURLProtocol.self]

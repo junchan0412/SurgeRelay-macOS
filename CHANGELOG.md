@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将 GitHub API URL、请求头、JSON 响应解析、仓库可见性检测和 contents SHA 查询抽入 `GitHubRESTClient.swift`，让 `GitHubClient.swift` 更专注于发布 diff、提交和冲突重试流程。
 - 将 Surge 模块清洗与 Loon 脚本行修正逻辑拆入 `SurgeModuleSanitizer.swift`，让 `ModuleMerger.swift` 更专注于总模块段落合并。
 - 将模块来源身份、来源格式、存放位置、来源关系和更新状态类型拆入 `ModuleSourceModels.swift`，让 `RelayModule.swift` 专注于模块持久化状态与派生属性。
 - 将本地发布受管理文件的标记插入、管理判定和 iCloud 冲突版本验证抽入 `ManagedPublishedFile`，让 `ModuleFileStore` 更专注于文件协调与导出流程。

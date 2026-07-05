@@ -70,6 +70,7 @@
 		D81D81D81D81D81D81D81D81 /* UpdateFailureFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E81E81E81E81E81E81E81E81 /* UpdateFailureFormatter.swift */; };
 		D90D90D90D90D90D90D90D90 /* GitHubPublishPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90E90E90E90E90E90E90E90 /* GitHubPublishPlanner.swift */; };
 		D93D93D93D93D93D93D93D93 /* PublishCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E93E93E93E93E93E93E93E93 /* PublishCoordinator.swift */; };
+		D9BDD9BDD9BDD9BDD9BDD9BD /* GitHubRESTClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9BEE9BEE9BEE9BEE9BEE9BE /* GitHubRESTClient.swift */; };
 		D91D91D91D91D91D91D91D91 /* ModuleRefreshPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E91E91E91E91E91E91E91E91 /* ModuleRefreshPlanner.swift */; };
 		D92D92D92D92D92D92D92D92 /* ModuleMetadataRefreshPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E92E92E92E92E92E92E92E92 /* ModuleMetadataRefreshPlanner.swift */; };
 		D99D99D99D99D99D99D99D99 /* WebManagementController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E99E99E99E99E99E99E99E99 /* WebManagementController.swift */; };
@@ -400,6 +401,7 @@
 		E81E81E81E81E81E81E81E81 /* UpdateFailureFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateFailureFormatter.swift; sourceTree = "<group>"; };
 		E90E90E90E90E90E90E90E90 /* GitHubPublishPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubPublishPlanner.swift; sourceTree = "<group>"; };
 		E93E93E93E93E93E93E93E93 /* PublishCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishCoordinator.swift; sourceTree = "<group>"; };
+		E9BEE9BEE9BEE9BEE9BEE9BE /* GitHubRESTClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubRESTClient.swift; sourceTree = "<group>"; };
 		E91E91E91E91E91E91E91E91 /* ModuleRefreshPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleRefreshPlanner.swift; sourceTree = "<group>"; };
 		E92E92E92E92E92E92E92E92 /* ModuleMetadataRefreshPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleMetadataRefreshPlanner.swift; sourceTree = "<group>"; };
 		E99E99E99E99E99E99E99E99 /* WebManagementController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebManagementController.swift; sourceTree = "<group>"; };
@@ -520,6 +522,7 @@
 				354B1BF761ABD7AADD982A17 /* EngineStore.swift */,
 				6D546CD4ADCE23EA73DE271A /* GitHubClient.swift */,
 				B23B23B23B23B23B23B23B23 /* GitHubAPIModels.swift */,
+				E9BEE9BEE9BEE9BEE9BEE9BE /* GitHubRESTClient.swift */,
 				B24B24B24B24B24B24B24B24 /* GitHubRepositoryPath.swift */,
 				6B63578065A9F7B8CC166FF2 /* KeychainStore.swift */,
 				E50E50E50E50E50E50E50E50 /* CredentialTokenCoordinator.swift */,
@@ -971,6 +974,7 @@
 				407E672ECAD57CD270BB44B7 /* FilenameSanitizer.swift in Sources */,
 				CA5FB083B1568EEEEA50DBAF /* GitHubClient.swift in Sources */,
 				A23A23A23A23A23A23A23A23 /* GitHubAPIModels.swift in Sources */,
+				D9BDD9BDD9BDD9BDD9BDD9BD /* GitHubRESTClient.swift in Sources */,
 				A24A24A24A24A24A24A24A24 /* GitHubRepositoryPath.swift in Sources */,
 				A17A17A17A17A17A17A17A17 /* GitHubReleaseClient.swift in Sources */,
 				A16A16A16A16A16A16A16A16 /* GitHubReleaseModels.swift in Sources */,
