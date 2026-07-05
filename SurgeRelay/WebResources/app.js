@@ -441,7 +441,7 @@ function renderModuleDetail(module, animate = true) {
       ${sourceRecordRow}
       ${detailRow('doc.text', '来源格式', module.sourceFormatTitle)}
       ${detailRow('tag', '模块标签', module.category || '未设置')}
-      ${detailRow('folder', '存放文件夹', folderTitle(module.outputFolder))}
+      ${detailRow('folder', '存放文件夹', webLogic.folderTitle(module.outputFolder))}
       ${localStorageRow}
       ${detailRow('doc.on.doc', '输出文件', outputPath || '未开启独立发布', false, outputPath || null)}
       ${detailRow('info.circle', '图标来源', iconSource)}
@@ -599,10 +599,6 @@ function populateScriptHubOptions(values = scriptHubDefaults) {
 
 function hasAdvancedValues(values) { return Object.keys(scriptHubDefaults).some(key => (values?.[key] ?? scriptHubDefaults[key]) !== scriptHubDefaults[key]); }
 
-function folderTitle(folder) {
-  return webLogic.folderTitle(folder);
-}
-
 function populateOutputFolders(selected = '') {
   const select = ui.moduleForm.elements.outputFolder;
   if (!select) return;
@@ -611,14 +607,14 @@ function populateOutputFolders(selected = '') {
     if (!a) return -1;
     if (!b) return 1;
     return a.localeCompare(b, 'zh-Hans-CN', { numeric: true });
-  }).map(folder => `<option value="${escapeAttribute(folder)}">${escapeHTML(folderTitle(folder))}</option>`).join('');
+  }).map(folder => `<option value="${escapeAttribute(folder)}">${escapeHTML(webLogic.folderTitle(folder))}</option>`).join('');
   select.value = selected || '';
 }
 
 function updateOutputPathPreview() {
   if (!ui.outputPathPreview) return;
   const form = ui.moduleForm.elements;
-  const path = publishedRelativePathForDraft({
+  const path = webLogic.publishedRelativePathForDraft({
     name: form.name.value,
     sourceURL: form.sourceURL.value,
     storageLocation: form.storageLocation?.value || 'gitHub',
@@ -626,7 +622,11 @@ function updateOutputPathPreview() {
     outputFileName: form.outputFileName.value
   });
   ui.outputPathPreview.textContent = path;
-  const note = outputPathNotice(path, form.publishesStandalone.checked);
+  const note = webLogic.outputPathNotice(path, form.publishesStandalone.checked, {
+    combinedFileName: state?.combined?.fileName || 'Surge Relay',
+    modules: state?.modules || [],
+    editingID
+  });
   if (ui.outputPathNote) {
     ui.outputPathNote.textContent = note?.message || '';
     ui.outputPathNote.hidden = !note;
@@ -663,50 +663,6 @@ function updateIconURLPreview() {
     preview.innerHTML = '<span class="symbol" data-symbol="exclamationmark.triangle"></span>';
   }, { once: true });
   preview.append(image);
-}
-
-function publishedRelativePathForDraft(draft) {
-  return webLogic.publishedRelativePathForDraft(draft);
-}
-
-function outputPathNotice(path, publishesStandalone) {
-  return webLogic.outputPathNotice(path, publishesStandalone, {
-    combinedFileName: state?.combined?.fileName || 'Surge Relay',
-    modules: state?.modules || [],
-    editingID
-  });
-}
-
-function normalizedOutputFileName(draft) {
-  return webLogic.normalizedOutputFileName(draft);
-}
-
-function suggestedNameFromSource(sourceURL) {
-  return webLogic.suggestedNameFromSource(sourceURL);
-}
-
-function normalizeFolder(value) {
-  return webLogic.normalizeFolder(value);
-}
-
-function isFileSource(sourceURL) {
-  return webLogic.isFileSource(sourceURL);
-}
-
-function sgmoduleName(value) {
-  return webLogic.sgmoduleName(value);
-}
-
-function existingSgmoduleName(value) {
-  return webLogic.existingSgmoduleName(value);
-}
-
-function baseName(value) {
-  return webLogic.baseName(value);
-}
-
-function existingFileBaseName(value) {
-  return webLogic.existingFileBaseName(value);
 }
 
 function handleListClick(event) {

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 移除 Web 管理 `app.js` 中输出路径、文件名和文件夹标题的重复 helper 包装，表单预览直接复用 `web-logic.js` 的单一实现。
 - 将 Web 管理 live update 的侧边栏快照签名和详情元数据行重渲染判定收进 `web-logic.js`，避免 `app.js` 继续维护易漏字段的 diff 清单。
 - 将 Web 管理侧边栏失败筛选、失败数量和空状态文案抽入 `web-logic.js`，并用无依赖 Node 测试覆盖搜索与失败筛选组合。
 - 将总模块贡献模块列表集中到 `ModuleRefreshPlanner`，让总模块预览、缓存重建和发布计划共享同一套启用/关闭规则。

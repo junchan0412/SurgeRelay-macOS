@@ -8,6 +8,7 @@ const formatSource = readFileSync(new URL('../SurgeRelay/WebResources/web-format
 const markupSource = readFileSync(new URL('../SurgeRelay/WebResources/web-markup.js', import.meta.url), 'utf8');
 const apiSource = readFileSync(new URL('../SurgeRelay/WebResources/web-api.js', import.meta.url), 'utf8');
 const stateSource = readFileSync(new URL('../SurgeRelay/WebResources/web-state.js', import.meta.url), 'utf8');
+const appSource = readFileSync(new URL('../SurgeRelay/WebResources/app.js', import.meta.url), 'utf8');
 const context = vm.createContext({ console, URL });
 vm.runInContext(logicSource, context, { filename: 'web-logic.js' });
 vm.runInContext(optionsSource, context, { filename: 'web-options.js' });
@@ -32,6 +33,11 @@ assert.equal(options.scriptHubDefaults.removeCommentedRewrites, true);
 assert.ok(
   options.advancedGroups.some(group => group.id === 'script-conversion'),
   'advanced option groups should include script conversion controls'
+);
+assert.doesNotMatch(
+  appSource,
+  /function (folderTitle|publishedRelativePathForDraft|outputPathNotice|normalizedOutputFileName|suggestedNameFromSource|normalizeFolder|isFileSource|sgmoduleName|existingSgmoduleName|baseName|existingFileBaseName)\(/,
+  'app.js should call web-logic output helpers directly instead of re-declaring wrappers'
 );
 
 assert.equal(
