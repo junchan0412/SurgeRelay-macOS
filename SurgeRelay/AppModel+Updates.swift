@@ -221,55 +221,16 @@ extension AppModel {
 
         guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
 
-        if let blockage = UpdateFailurePlanner.missingCacheBlockage(
-            moduleNames: missingCache,
-            details: missingCacheDetails
-        ) {
-            statusMessage = blockage.statusMessage
-            presentedError = blockage.presentedError
-            return
-        }
-
-        do {
-            if settings.combinedModuleEnabled {
-                try await writeCombinedModule(components)
-            } else {
-                try? await fileStore.removeCombined()
-                try await publishCurrentFiles(combinedData: nil, includeAssets: false)
-            }
-            guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
-            await cleanupLegacyOutputFiles()
-            guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
-            let canUseAutomaticGitHubPublish = AutomaticPublishPlanner.canUseAutomaticPublishing(
-                context: automaticPublishContext()
-            )
-            let pendingLocalCleanupFileCount = pendingPublishPreview?.destination == .local
-                ? pendingPublishPreview?.deletedFiles.count
-                : nil
-            let completionDecision = UpdateCompletionStatusPlanner.decision(
-                canUseAutomaticGitHubPublish: canUseAutomaticGitHubPublish,
-                publishPlan: githubPublishPlan,
-                contentChanged: contentChanged,
+        await finishModuleUpdateRun(
+            ModuleUpdateRunResult(
+                components: components,
                 failures: failures,
-                pendingLocalCleanupFileCount: pendingLocalCleanupFileCount,
-                combinedModuleEnabled: settings.combinedModuleEnabled,
-                combinedSourceCount: components.count
-            )
-            switch completionDecision.scheduleAction {
-            case .none:
-                break
-            case .scheduleAutomaticPublish:
-                scheduleAutomaticPublish()
-            case .clearAutomaticPublishSchedule:
-                clearAutomaticPublishSchedule()
-            }
-            statusMessage = completionDecision.statusMessage
-        } catch {
-            if isCurrentWorkCancellation(error) { return }
-            presentedError = settings.combinedModuleEnabled
-                ? "合并失败，当前总模块未被覆盖：\(error.localizedDescription)"
-                : "刷新模块输出失败：\(error.localizedDescription)"
-        }
+                missingCacheModuleNames: missingCache,
+                missingCacheDetails: missingCacheDetails,
+                contentChanged: contentChanged
+            ),
+            generation: updateGeneration
+        )
     }
 
     func update(moduleID: UUID) async {
