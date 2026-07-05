@@ -70,7 +70,9 @@
 		32B3C4D5E6F708192A3B4C5D /* GitHubReleaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42B3C4D5E6F708192A3B4C5D /* GitHubReleaseTests.swift */; };
 		33C4D5E6F708192A3B4C5D6E /* GitHubPublishTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43C4D5E6F708192A3B4C5D6E /* GitHubPublishTests.swift */; };
 		34D5E6F708192A3B4C5D6E7F /* LocalFileStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44D5E6F708192A3B4C5D6E7F /* LocalFileStoreTests.swift */; };
+		3E4F5A6B7C8D9E0F10213243 /* LocalPublishedFilesPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E4F5A6B7C8D9E0F10213243 /* LocalPublishedFilesPlannerTests.swift */; };
 		35E6F708192A3B4C5D6E7F80 /* PublishPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45E6F708192A3B4C5D6E7F80 /* PublishPlannerTests.swift */; };
+		3E4F5A6B7C8D9E0F10213244 /* PublishFileAssemblerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E4F5A6B7C8D9E0F10213244 /* PublishFileAssemblerTests.swift */; };
 		36F708192A3B4C5D6E7F8091 /* ScriptHubTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46F708192A3B4C5D6E7F8091 /* ScriptHubTests.swift */; };
 		5A8A9B0C1D2E3F4051627384 /* LocalModuleImportPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B8A9B0C1D2E3F4051627384 /* LocalModuleImportPlannerTests.swift */; };
 		5E8A9B0C1D2E3F4051627384 /* ModulePreviewContentProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E8A9B0C1D2E3F4051627384 /* ModulePreviewContentProviderTests.swift */; };
@@ -229,7 +231,9 @@
 		42B3C4D5E6F708192A3B4C5D /* GitHubReleaseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubReleaseTests.swift; sourceTree = "<group>"; };
 		43C4D5E6F708192A3B4C5D6E /* GitHubPublishTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubPublishTests.swift; sourceTree = "<group>"; };
 		44D5E6F708192A3B4C5D6E7F /* LocalFileStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalFileStoreTests.swift; sourceTree = "<group>"; };
+		4E4F5A6B7C8D9E0F10213243 /* LocalPublishedFilesPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalPublishedFilesPlannerTests.swift; sourceTree = "<group>"; };
 		45E6F708192A3B4C5D6E7F80 /* PublishPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishPlannerTests.swift; sourceTree = "<group>"; };
+		4E4F5A6B7C8D9E0F10213244 /* PublishFileAssemblerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishFileAssemblerTests.swift; sourceTree = "<group>"; };
 		46F708192A3B4C5D6E7F8091 /* ScriptHubTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptHubTests.swift; sourceTree = "<group>"; };
 		5B8A9B0C1D2E3F4051627384 /* LocalModuleImportPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModuleImportPlannerTests.swift; sourceTree = "<group>"; };
 		47A1B2C3D4E5F60718293A4B /* SecurityDiagnosticsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityDiagnosticsTests.swift; sourceTree = "<group>"; };
@@ -557,6 +561,7 @@
 				4F7E6D5C4B3A291807F6E5D4 /* GitHubTestSupport.swift */,
 				5B8A9B0C1D2E3F4051627384 /* LocalModuleImportPlannerTests.swift */,
 				44D5E6F708192A3B4C5D6E7F /* LocalFileStoreTests.swift */,
+				4E4F5A6B7C8D9E0F10213243 /* LocalPublishedFilesPlannerTests.swift */,
 				3F4A5B6C7D8E9F0011223344 /* ModelAndCoordinatorTests.swift */,
 				4F8A9B0C1D2E3F4051627384 /* ModuleDraftPlannerTests.swift */,
 				4E8A9B0C1D2E3F4051627384 /* ModuleOutputFolderTests.swift */,
@@ -565,6 +570,7 @@
 				6E8A9B0C1D2E3F4051627384 /* ModulePreviewContentProviderTests.swift */,
 				48B2C3D4E5F60718293A4B5C /* ModuleRefreshPlannerTests.swift */,
 				4A5E1A2B3C4D5E6F708192A3 /* ModuleSearchIndexTests.swift */,
+				4E4F5A6B7C8D9E0F10213244 /* PublishFileAssemblerTests.swift */,
 				45E6F708192A3B4C5D6E7F80 /* PublishPlannerTests.swift */,
 				46F708192A3B4C5D6E7F8091 /* ScriptHubTests.swift */,
 				47A1B2C3D4E5F60718293A4B /* SecurityDiagnosticsTests.swift */,
@@ -762,6 +768,7 @@
 				3F7E6D5C4B3A291807F6E5D4 /* GitHubTestSupport.swift in Sources */,
 				5A8A9B0C1D2E3F4051627384 /* LocalModuleImportPlannerTests.swift in Sources */,
 				34D5E6F708192A3B4C5D6E7F /* LocalFileStoreTests.swift in Sources */,
+				3E4F5A6B7C8D9E0F10213243 /* LocalPublishedFilesPlannerTests.swift in Sources */,
 				2F4A5B6C7D8E9F0011223344 /* ModelAndCoordinatorTests.swift in Sources */,
 				3F8A9B0C1D2E3F4051627384 /* ModuleDraftPlannerTests.swift in Sources */,
 				3E8A9B0C1D2E3F4051627384 /* ModuleOutputFolderTests.swift in Sources */,
@@ -770,6 +777,7 @@
 				5E8A9B0C1D2E3F4051627384 /* ModulePreviewContentProviderTests.swift in Sources */,
 				38B2C3D4E5F60718293A4B5C /* ModuleRefreshPlannerTests.swift in Sources */,
 				3A5E1A2B3C4D5E6F708192A3 /* ModuleSearchIndexTests.swift in Sources */,
+				3E4F5A6B7C8D9E0F10213244 /* PublishFileAssemblerTests.swift in Sources */,
 				35E6F708192A3B4C5D6E7F80 /* PublishPlannerTests.swift in Sources */,
 				36F708192A3B4C5D6E7F8091 /* ScriptHubTests.swift in Sources */,
 				37A1B2C3D4E5F60718293A4B /* SecurityDiagnosticsTests.swift in Sources */,
