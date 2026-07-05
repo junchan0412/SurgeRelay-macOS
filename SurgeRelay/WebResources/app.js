@@ -55,7 +55,7 @@ const {
   moduleRowMarkup,
   combinedDetailMarkup,
   moduleDetailMarkup,
-  argumentMarkup,
+  argumentsSectionMarkup,
   advancedGroupMarkup
 } = webMarkup;
 
@@ -393,11 +393,7 @@ async function loadArguments(module) {
     if (selectedID !== module.id || detailTab !== 'info') return;
     const target = document.querySelector('#arguments-section');
     if (!target || !payload.arguments.length) return;
-    target.innerHTML = `<section class="form-section-view page-enter"><h3 class="section-heading">模块参数</h3><div class="group-box">
-      ${payload.arguments.map(argumentMarkup).join('')}
-      <div class="arguments-footer"><small>修改会立即应用</small><button class="button" data-action="reset-arguments" ${payload.arguments.every(item => item.value === item.defaultValue) ? 'disabled' : ''}>恢复默认值</button></div>
-      ${payload.help ? `<details class="parameter-help"><summary><span class="symbol" data-symbol="chevron.right"></span>参数说明</summary><p>${escapeHTML(payload.help)}</p></details>` : ''}
-    </div></section>`;
+    target.innerHTML = argumentsSectionMarkup(payload);
   } catch (_) {}
 }
 

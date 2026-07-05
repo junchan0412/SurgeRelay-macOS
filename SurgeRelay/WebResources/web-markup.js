@@ -170,6 +170,20 @@
     return `<div class="detail-row argument-row"><div class="argument-name">${escapeHTML(argument.key)}</div><div class="argument-control">${control}</div></div>`;
   }
 
+  function argumentsSectionMarkup(payload) {
+    const argumentsList = payload?.arguments || [];
+    if (!argumentsList.length) return '';
+    const resetDisabled = argumentsList.every(item => item.value === item.defaultValue);
+    const help = payload.help
+      ? `<details class="parameter-help"><summary><span class="symbol" data-symbol="chevron.right"></span>参数说明</summary><p>${escapeHTML(payload.help)}</p></details>`
+      : '';
+    return `<section class="form-section-view page-enter"><h3 class="section-heading">模块参数</h3><div class="group-box">
+      ${argumentsList.map(argumentMarkup).join('')}
+      <div class="arguments-footer"><small>修改会立即应用</small><button class="button" data-action="reset-arguments" ${resetDisabled ? 'disabled' : ''}>恢复默认值</button></div>
+      ${help}
+    </div></section>`;
+  }
+
   function advancedGroupMarkup(group) {
     return `<details class="option-group" data-option-group="${escapeAttribute(group.id)}"><summary><span class="symbol" data-symbol="chevron.right"></span>${escapeHTML(group.title)}</summary><div class="option-content">${group.description ? `<p class="option-description">${escapeHTML(group.description)}</p>` : ''}${group.fields.map(optionFieldMarkup).join('')}</div></details>`;
   }
@@ -195,6 +209,7 @@
     combinedDetailMarkup,
     moduleDetailMarkup,
     argumentMarkup,
+    argumentsSectionMarkup,
     advancedGroupMarkup,
     optionFieldMarkup
   };

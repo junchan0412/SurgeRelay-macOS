@@ -354,6 +354,20 @@ assert.match(markup.copyableValueSection('GitHub <地址>', 'https://example.com
 assert.match(markup.previewShell('Demo <Module>', true), /Demo &lt;Module&gt;/);
 assert.match(markup.previewShell('Demo', true), /textarea/);
 assert.match(markup.argumentMarkup({ key: 'enabled<', value: 'true', defaultValue: 'false' }), /enabled&lt;/);
+assert.equal(markup.argumentsSectionMarkup({ arguments: [] }), '');
+assert.match(markup.argumentsSectionMarkup({
+  arguments: [
+    { key: 'enabled<', value: 'true', defaultValue: 'false' },
+    { key: 'host', value: 'example.com', defaultValue: 'example.org' }
+  ],
+  help: '输入 <host> 后立即生效'
+}), /输入 &lt;host&gt; 后立即生效/);
+assert.doesNotMatch(markup.argumentsSectionMarkup({
+  arguments: [{ key: 'host', value: 'example.com', defaultValue: 'example.org' }]
+}), /reset-arguments" disabled/);
+assert.match(markup.argumentsSectionMarkup({
+  arguments: [{ key: 'host', value: 'example.org', defaultValue: 'example.org' }]
+}), /reset-arguments" disabled/);
 assert.match(markup.advancedGroupMarkup({
   id: 'unsafe"><',
   title: '高级 <选项>',

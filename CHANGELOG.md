@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将 Web 管理模块参数区模板收进 `web-markup.js`，并补充参数帮助文案转义、恢复默认按钮状态和空参数输出测试。
 - 将 Web 管理侧边栏模块行和空状态模板收进 `web-markup.js`，统一模块名、图标 URL、状态标题和开关属性转义，并补充输出测试。
 - 将 Web 管理总模块/单模块详情页模板和详情工具栏收进 `web-markup.js`，并补充模板输出测试，让 `app.js` 继续收敛为状态、API 与事件协调。
 - 将 Web 管理模块编辑器的图标 URL 校验、原生 Surge 来源判定和保存 payload 生成收进 `web-logic.js`，并补充无依赖 Node 测试，减少 `app.js` 中的表单规则分叉。
