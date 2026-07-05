@@ -26,6 +26,10 @@ Keep `ModulesView.swift` focused on the split-view shell, search/index coordinat
 - Shared preview/editor components that are not specific to the module list stay in `Components.swift`.
 - `SettingsView.swift` owns the settings window shell, tab selection, diagnostics export, and QR sheet routing. General settings belong in `SettingsGeneralView.swift`; local/GitHub publishing settings and local root diagnostics belong in `SettingsPublishingView.swift`; credentials-specific token UI belongs in `SettingsCredentialsView.swift`; Web service access UI belongs in `SettingsWebManagementView.swift`; reusable settings chrome and rows belong in `SettingsComponents.swift`.
 
+## Model Boundaries
+
+Keep `ServiceModels.swift` for small cross-service value types that do not have a clearer owner. Work/task state and update-admission rules belong in `WorkActivity.swift`; persistent settings belong in `AppSettings.swift`; module identity, source/storage relationships, and draft construction belong in `RelayModule.swift`.
+
 ## Publishing Model
 
 `AppSettings.storageMode` is retained as a legacy compatibility field. New code should use:

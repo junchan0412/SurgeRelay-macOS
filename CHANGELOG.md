@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将工作任务状态与更新准入规则从 `ServiceModels.swift` 拆入 `WorkActivity.swift`，继续缩小共享模型杂项文件。
 - 将 Web 管理详情页的可拷贝地址区块抽入 `web-markup.js`，总模块订阅地址和单模块发布地址共享同一套转义与按钮 markup。
 - 移除 Web 管理 `app.js` 中状态标题、失败摘要和侧边栏副标题的重复 helper 包装，列表行与详情状态直接复用 `web-logic.js`。
 - 移除 Web 管理 `app.js` 中输出路径、文件名和文件夹标题的重复 helper 包装，表单预览直接复用 `web-logic.js` 的单一实现。

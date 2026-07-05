@@ -69,6 +69,7 @@
 		5D69C3A5E942C4D39EDE3B59 /* copy.svg in Resources */ = {isa = PBXBuildFile; fileRef = 2C0AF53D1B32B43A5DF8DA88 /* copy.svg */; };
 		62E8C1BFFB984922B7271C2C /* tag.svg in Resources */ = {isa = PBXBuildFile; fileRef = E917DB77B3124A92B9CE9E8E /* tag.svg */; };
 		6C8F8E71624D2151BFA675ED /* ServiceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00DC6E63075F21C67B4B1EB /* ServiceModels.swift */; };
+		A12A12A12A12A12A12A12A12 /* WorkActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = B12B12B12B12B12B12B12B12 /* WorkActivity.swift */; };
 		6FD484283175DC8133118FF1 /* ModuleMerger.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA24D7A4AEF1770EAB7A055B /* ModuleMerger.swift */; };
 		70666E3C2C7733E5D452753B /* doc.on.doc.svg in Resources */ = {isa = PBXBuildFile; fileRef = EC6EFB761A62FB63592DAC2B /* doc.on.doc.svg */; };
 		709FF80593ADF6216AF25D9D /* RelayModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EE985DC3F8F9E3172A8D062 /* RelayModule.swift */; };
@@ -211,6 +212,7 @@
 		891546F1DD330D7407BFA7E0 /* doc.text.svg */ = {isa = PBXFileReference; path = doc.text.svg; sourceTree = "<group>"; };
 		9B95F7467A9CCE279EDC451B /* sidebar.left.svg */ = {isa = PBXFileReference; path = sidebar.left.svg; sourceTree = "<group>"; };
 		A00DC6E63075F21C67B4B1EB /* ServiceModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceModels.swift; sourceTree = "<group>"; };
+		B12B12B12B12B12B12B12B12 /* WorkActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkActivity.swift; sourceTree = "<group>"; };
 		A2901CCA2355192276439C70 /* gearshape.svg */ = {isa = PBXFileReference; path = gearshape.svg; sourceTree = "<group>"; };
 		A532731E293DA280A8A42D96 /* ModuleOrdering.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleOrdering.swift; sourceTree = "<group>"; };
 		A632A09F875AFE2F6ADC7A42 /* SurgeRelayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurgeRelayTests.swift; sourceTree = "<group>"; };
@@ -409,6 +411,7 @@
 				0EE985DC3F8F9E3172A8D062 /* RelayModule.swift */,
 				0527CB5F1032EC43E9673F5D /* ScriptHubOptions.swift */,
 				A00DC6E63075F21C67B4B1EB /* ServiceModels.swift */,
+				B12B12B12B12B12B12B12B12 /* WorkActivity.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -746,6 +749,7 @@
 				6C8F8E71624D2151BFA675ED /* ServiceModels.swift in Sources */,
 				1AECEBD32D966A1910B3A007 /* SettingsView.swift in Sources */,
 				D596D087CB06F13BD28D7510 /* SurgeRelayApp.swift in Sources */,
+				A12A12A12A12A12A12A12A12 /* WorkActivity.swift in Sources */,
 				D90D90D90D90D90D90D90D90 /* GitHubPublishPlanner.swift in Sources */,
 				D80D80D80D80D80D80D80D80 /* UpdateFailurePlanner.swift in Sources */,
 				4B5E934EB9AC34C451301F50 /* WebManagementAPI.swift in Sources */,
