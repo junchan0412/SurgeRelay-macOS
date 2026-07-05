@@ -67,12 +67,11 @@ extension AppModel {
                         case let .unchanged(snapshot):
                             revisionSnapshot = snapshot
                             if !engineChanged {
-                                module.sourceETag = snapshot.etag
-                                module.sourceLastModified = snapshot.lastModified
-                                module.sourceContentHash = snapshot.contentHash
-                                module.sourceCheckedAt = snapshot.checkedAt
-                                module.state = .current
-                                module.lastError = nil
+                                let metadataPlan = ModuleMetadataRefreshPlanner.unchangedCachedContentPlan(
+                                    module: module,
+                                    revisionSnapshot: snapshot
+                                )
+                                module = metadataPlan.module
                                 replace(module)
                                 let cached = try await fileStore.readComponent(id: module.id)
                                 let materialized = await processingWorker.materialize(cached, overrides: module.argumentOverrides)
@@ -84,7 +83,7 @@ extension AppModel {
                                     moduleName: module.name,
                                     outcome: .unchanged,
                                     duration: Date.now.timeIntervalSince(startedAt),
-                                    message: "来源内容没有变化"
+                                    message: metadataPlan.historyMessage
                                 ))
                                 synchronizationCompletedCount += 1
                                 await Task.yield()

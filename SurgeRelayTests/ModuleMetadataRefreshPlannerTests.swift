@@ -213,4 +213,50 @@ final class ModuleMetadataRefreshPlannerTests: XCTestCase {
         XCTAssertTrue(plan.contentChanged)
         XCTAssertEqual(plan.historyMessage, "转换完成")
     }
+
+    func testUnchangedCachedContentPlanOnlyRefreshesSourceRevisionAndState() {
+        let lastUpdatedAt = Date(timeIntervalSince1970: 10)
+        let checkedAt = Date(timeIntervalSince1970: 20)
+        let module = RelayModule(
+            name: "Cached",
+            sourceURL: "https://example.com/cached.sgmodule",
+            sourceFormat: .surge,
+            outputFileName: "Cached.sgmodule",
+            lastUpdatedAt: lastUpdatedAt,
+            contentHash: "content-hash",
+            sourceETag: "old-etag",
+            sourceLastModified: "old-date",
+            sourceContentHash: "old-source-hash",
+            sourceCheckedAt: Date(timeIntervalSince1970: 1),
+            conversionEngineRevision: "engine-1",
+            overrideBaseHash: "override-base",
+            hasOverrideConflict: true,
+            state: .failed,
+            lastError: "previous failure"
+        )
+        let snapshot = SourceRevisionSnapshot(
+            etag: "new-etag",
+            lastModified: "new-date",
+            contentHash: "new-source-hash",
+            checkedAt: checkedAt
+        )
+
+        let plan = ModuleMetadataRefreshPlanner.unchangedCachedContentPlan(
+            module: module,
+            revisionSnapshot: snapshot
+        )
+
+        XCTAssertEqual(plan.module.sourceETag, "new-etag")
+        XCTAssertEqual(plan.module.sourceLastModified, "new-date")
+        XCTAssertEqual(plan.module.sourceContentHash, "new-source-hash")
+        XCTAssertEqual(plan.module.sourceCheckedAt, checkedAt)
+        XCTAssertEqual(plan.module.state, .current)
+        XCTAssertNil(plan.module.lastError)
+        XCTAssertEqual(plan.module.lastUpdatedAt, lastUpdatedAt)
+        XCTAssertEqual(plan.module.contentHash, "content-hash")
+        XCTAssertEqual(plan.module.conversionEngineRevision, "engine-1")
+        XCTAssertEqual(plan.module.overrideBaseHash, "override-base")
+        XCTAssertTrue(plan.module.hasOverrideConflict)
+        XCTAssertEqual(plan.historyMessage, "来源内容没有变化")
+    }
 }

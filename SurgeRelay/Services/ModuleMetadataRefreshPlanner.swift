@@ -15,6 +15,11 @@ struct ModuleSuccessfulConversionPlan: Equatable, Sendable {
     var historyMessage: String
 }
 
+struct ModuleUnchangedCachedContentPlan: Equatable, Sendable {
+    var module: RelayModule
+    var historyMessage: String
+}
+
 enum ModuleMetadataRefreshPlanner {
     static func plan(
         module: RelayModule,
@@ -112,6 +117,23 @@ enum ModuleMetadataRefreshPlanner {
             shouldRefreshIconCache: true,
             contentChanged: contentChanged,
             historyMessage: module.hasOverrideConflict ? "上游已更新，本地编辑需要确认" : "转换完成"
+        )
+    }
+
+    static func unchangedCachedContentPlan(
+        module: RelayModule,
+        revisionSnapshot: SourceRevisionSnapshot
+    ) -> ModuleUnchangedCachedContentPlan {
+        var module = module
+        module.sourceETag = revisionSnapshot.etag
+        module.sourceLastModified = revisionSnapshot.lastModified
+        module.sourceContentHash = revisionSnapshot.contentHash
+        module.sourceCheckedAt = revisionSnapshot.checkedAt
+        module.state = .current
+        module.lastError = nil
+        return ModuleUnchangedCachedContentPlan(
+            module: module,
+            historyMessage: "来源内容没有变化"
         )
     }
 }
