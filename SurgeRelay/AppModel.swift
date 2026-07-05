@@ -127,28 +127,6 @@ final class AppModel {
         return true
     }
 
-    @discardableResult
-    func ensureGitHubTokenLoaded(showStatusMessage: Bool = false) -> String {
-        let legacyToken = settings.githubToken.trimmingCharacters(in: .whitespacesAndNewlines)
-        let shouldLoad = githubTokenStorageStatus == .notChecked ||
-            (githubTokenStorageStatus == .legacyConfigurationFallback && !legacyToken.isEmpty)
-        guard shouldLoad else {
-            return githubToken.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-
-        let tokenLoad = CredentialTokenCoordinator.loadGitHubToken(migratingLegacyToken: settings.githubToken)
-        githubToken = tokenLoad.token
-        githubTokenStorageStatus = tokenLoad.storageStatus
-        if tokenLoad.shouldClearLegacyToken {
-            settings.githubToken = ""
-            PersistenceStore.saveSettings(settings)
-        }
-        if showStatusMessage, let message = tokenLoad.statusMessage {
-            statusMessage = message
-        }
-        return tokenLoad.token.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
     func start() {
         guard !hasStarted else { return }
         hasStarted = true
@@ -191,20 +169,6 @@ final class AppModel {
         PersistenceStore.saveSettings(settings)
     }
 
-    private func shouldContributeToCombined(_ module: RelayModule) -> Bool {
-        ModuleRefreshPlanner.contributesToCombined(
-            module,
-            combinedModuleEnabled: settings.combinedModuleEnabled
-        )
-    }
-
-    private func shouldUpdateModule(_ module: RelayModule) -> Bool {
-        ModuleRefreshPlanner.isUpdateable(
-            module,
-            combinedModuleEnabled: settings.combinedModuleEnabled
-        )
-    }
-
     func setCombinedModuleEnabled(_ enabled: Bool) {
         guard settings.combinedModuleEnabled != enabled else { return }
         settings.combinedModuleEnabled = enabled
@@ -216,36 +180,6 @@ final class AppModel {
         saveSettings()
         statusMessage = enabled ? "总模块功能已开启，正在准备合并" : "总模块功能已关闭"
         Task { await rebuildCombinedFromCache() }
-    }
-
-    var updateAdmission: UpdateAdmission {
-        UpdateAdmission.allModules(
-            activity: workActivity,
-            updateableModuleCount: updateableModuleCount,
-            statusMessage: statusMessage
-        )
-    }
-
-    func updateAdmission(for module: RelayModule) -> UpdateAdmission {
-        UpdateAdmission.module(
-            module,
-            moduleIsUpdateable: shouldUpdateModule(module),
-            activity: workActivity,
-            updateableModuleCount: updateableModuleCount,
-            statusMessage: statusMessage
-        )
-    }
-
-    var moduleSummary: ModuleCollectionSummary {
-        ModuleCollectionSummary(modules: modules, isUpdateable: shouldUpdateModule)
-    }
-
-    var updateableModuleCount: Int {
-        moduleSummary.updateableCount
-    }
-
-    var canCancelCurrentWork: Bool {
-        workActivity.isActive && workActivity.canCancel && !workCancellationRequested
     }
 
     func startUpdateAll() {
@@ -290,21 +224,6 @@ final class AppModel {
             automaticPublishTask?.cancel()
         }
         return true
-    }
-
-    func saveGitHubToken() {
-        githubToken = githubToken.trimmingCharacters(in: .whitespacesAndNewlines)
-        do {
-            try KeychainStore.saveGitHubToken(githubToken)
-            settings.githubToken = ""
-            githubTokenStorageStatus = githubToken.isEmpty ? .notConfigured : .keychain
-            PersistenceStore.saveSettings(settings)
-            statusMessage = githubToken.isEmpty ? "GitHub Token 已从系统钥匙串移除" : "GitHub Token 已保存到系统钥匙串"
-        } catch {
-            githubTokenStorageStatus = githubToken.isEmpty ? .unavailable : .memoryOnly
-            presentedError = "无法保存 GitHub Token：\(error.localizedDescription)"
-            statusMessage = "GitHub Token 未保存"
-        }
     }
 
     var configurationDirectoryPath: String {

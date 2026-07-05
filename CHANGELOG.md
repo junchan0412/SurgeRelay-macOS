@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 将 AppModel 的模块可更新判断、总模块贡献判断、集合摘要和更新准入逻辑拆入 `AppModel+ModuleState.swift`，统一派生状态边界。
+- 将 AppModel 的 GitHub Token 加载、旧配置迁移和钥匙串保存逻辑拆入 `AppModel+Credentials.swift`，让凭据处理与主编排继续分离。
 - 将 AppModel 的安装、钥匙串、本地根目录和诊断报告生成逻辑拆入 `AppModel+Diagnostics.swift`，继续压缩主状态模型。
 - 将 AppModel 的 Web 管理令牌、服务启动和访问地址转发拆入 `AppModel+WebManagement.swift`，让主状态模型继续收敛为应用编排核心。
 - 将更新协调、Web 管理访问地址和配置目录迁移逻辑从 `ServiceModels.swift` 拆入独立服务文件，进一步压缩共享模型杂项。

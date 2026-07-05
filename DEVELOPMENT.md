@@ -7,7 +7,7 @@ This document records the project conventions needed to maintain this fork.
 - Xcode project: `Surge Relay.xcodeproj`
 - App target: `Surge Relay`
 - Test target: `Surge RelayTests`
-- Main state owner: `SurgeRelay/AppModel.swift`; diagnostics live in `SurgeRelay/AppModel+Diagnostics.swift`, and Web-management token/server wiring lives in `SurgeRelay/AppModel+WebManagement.swift`
+- Main state owner: `SurgeRelay/AppModel.swift`; credentials live in `SurgeRelay/AppModel+Credentials.swift`, diagnostics live in `SurgeRelay/AppModel+Diagnostics.swift`, module derived state lives in `SurgeRelay/AppModel+ModuleState.swift`, and Web-management token/server wiring lives in `SurgeRelay/AppModel+WebManagement.swift`
 - Persistent settings: `SurgeRelay/Models/AppSettings.swift`
 - Module model: `SurgeRelay/Models/RelayModule.swift`
 - Conversion path: `SurgeRelay/Services/ScriptHubClient.swift`

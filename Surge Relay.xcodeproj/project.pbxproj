@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		D0A0D0A0D0A0D0A0D0A0D0A0 /* AppModel+WebManagement.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0A0E0A0E0A0E0A0E0A0E0A0 /* AppModel+WebManagement.swift */; };
 		D0B0D0B0D0B0D0B0D0B0D0B0 /* AppModel+Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0B0E0B0E0B0E0B0E0B0E0B0 /* AppModel+Diagnostics.swift */; };
+		D0C0D0C0D0C0D0C0D0C0D0C0 /* AppModel+Credentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0C0E0C0E0C0E0C0E0C0E0C0 /* AppModel+Credentials.swift */; };
+		D0D0D0D0D0D0D0D0D0D0D0D0 /* AppModel+ModuleState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0D0E0D0E0D0E0D0E0D0E0D0 /* AppModel+ModuleState.swift */; };
 		089528920AE30C1DC82F1C30 /* ScriptHubAdvancedOptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41447934F9FEEEA0E8C36B5C /* ScriptHubAdvancedOptionsView.swift */; };
 		0E49E9C10D68EAA6239A83B6 /* chevron.left.svg in Resources */ = {isa = PBXBuildFile; fileRef = 0F53743795FE4AB773A4CFDF /* chevron.left.svg */; };
 		0FDE55022718929BBBC3FC59 /* info.circle.svg in Resources */ = {isa = PBXBuildFile; fileRef = 08307B73F3678EC5C4513D20 /* info.circle.svg */; };
@@ -181,6 +183,8 @@
 		2B29AA0AD818A5D7F67A7471 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		E0A0E0A0E0A0E0A0E0A0E0A0 /* AppModel+WebManagement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+WebManagement.swift"; sourceTree = "<group>"; };
 		E0B0E0B0E0B0E0B0E0B0E0B0 /* AppModel+Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Diagnostics.swift"; sourceTree = "<group>"; };
+		E0C0E0C0E0C0E0C0E0C0E0C0 /* AppModel+Credentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Credentials.swift"; sourceTree = "<group>"; };
+		E0D0E0D0E0D0E0D0E0D0E0D0 /* AppModel+ModuleState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+ModuleState.swift"; sourceTree = "<group>"; };
 		2C0AF53D1B32B43A5DF8DA88 /* copy.svg */ = {isa = PBXFileReference; path = copy.svg; sourceTree = "<group>"; };
 		31722F50C6C17A7F74F3A1BC /* DataHash.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataHash.swift; sourceTree = "<group>"; };
 		3213BEA21A1958506F9250A1 /* apple-touch-icon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "apple-touch-icon.png"; sourceTree = "<group>"; };
@@ -330,7 +334,9 @@
 				25432D20905F79D6AE1E1480 /* Views */,
 				322455D9E3C9EDC10D774E9F /* WebResources */,
 				2B29AA0AD818A5D7F67A7471 /* AppModel.swift */,
+				E0C0E0C0E0C0E0C0E0C0E0C0 /* AppModel+Credentials.swift */,
 				E0B0E0B0E0B0E0B0E0B0E0B0 /* AppModel+Diagnostics.swift */,
+				E0D0E0D0E0D0E0D0E0D0E0D0 /* AppModel+ModuleState.swift */,
 				E0A0E0A0E0A0E0A0E0A0E0A0 /* AppModel+WebManagement.swift */,
 				3AE70978C59AAF84436C3194 /* Assets.xcassets */,
 				2968E247012225719D2FF9D5 /* Info.plist */,
@@ -721,7 +727,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				384BEBC6E1F8C9A0A53FB0FC /* AppModel.swift in Sources */,
+				D0C0D0C0D0C0D0C0D0C0D0C0 /* AppModel+Credentials.swift in Sources */,
 				D0B0D0B0D0B0D0B0D0B0D0B0 /* AppModel+Diagnostics.swift in Sources */,
+				D0D0D0D0D0D0D0D0D0D0D0D0 /* AppModel+ModuleState.swift in Sources */,
 				D0A0D0A0D0A0D0A0D0A0D0A0 /* AppModel+WebManagement.swift in Sources */,
 				30817299C54FAD6356760AD8 /* AppSettings.swift in Sources */,
 				25A25A25A25A25A25A25A25 /* AutomaticPublishPlanner.swift in Sources */,
