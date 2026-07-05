@@ -142,6 +142,7 @@ node --check SurgeRelay/WebResources/web-api.js
 node --check SurgeRelay/WebResources/web-state.js
 node --check SurgeRelay/WebResources/web-editor.js
 node --check SurgeRelay/WebResources/web-feedback.js
+node --check SurgeRelay/WebResources/web-preview.js
 node --check SurgeRelay/WebResources/app.js
 node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将 Web 管理模块/总模块预览加载、可编辑预览 dirty 状态、保存和恢复操作抽入 `web-preview.js`，减少 `app.js` 对预览状态的直接持有。
 - 将 Web 管理确认框、toast、复制反馈、对话框关闭动画和横向滚动复位抽入 `web-feedback.js`，继续收敛 `app.js` 的通用 UI 状态职责。
 - 将 Web 管理模块编辑器的高级选项展开、Script-Hub 选项收集/回填、输出文件夹菜单、输出路径提示和图标预览抽入 `web-editor.js`，让 `app.js` 更专注于状态、事件和 API 编排。
 - 将 GitHub API DTO 抽入 `GitHubAPIModels.swift`，将仓库路径、模块目录推导、重复路径校验和提交文案抽入 `GitHubRepositoryPath.swift`，让 `GitHubClient.swift` 更专注于请求、diff、提交和引用更新事务。

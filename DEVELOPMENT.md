@@ -137,6 +137,8 @@ Web management editor UI helpers live in `WebResources/web-editor.js`. Keep modu
 
 Web management feedback helpers live in `WebResources/web-feedback.js`. Keep dialog open/close animation, confirmation resolution, toast state, clipboard fallback, copy-success button state, and scroll reset there; `app.js` should call the controller instead of owning generic feedback UI state.
 
+Web management preview helpers live in `WebResources/web-preview.js`. Keep module/combined preview loading, editable preview dirty state, save/restore preview actions, and preview action error reporting there; `app.js` should only select the right preview route and react to detail toolbar events.
+
 Swift Web management DTOs, request mutations, and API errors live in `Services/WebManagementModels.swift`. Keep `WebManagementAPI.swift` focused on HTTP route dispatch, state payload assembly, and calls into `AppModel`.
 
 Swift Web management static asset responses, content security policy, cached icon responses, and image content-type detection live in `Services/WebManagementAssets.swift`. Do not add bundle resource lookup or image sniffing back to `WebManagementAPI.swift`.
@@ -170,6 +172,7 @@ node --check SurgeRelay/WebResources/web-api.js
 node --check SurgeRelay/WebResources/web-state.js
 node --check SurgeRelay/WebResources/web-editor.js
 node --check SurgeRelay/WebResources/web-feedback.js
+node --check SurgeRelay/WebResources/web-preview.js
 node --check SurgeRelay/WebResources/app.js
 node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs

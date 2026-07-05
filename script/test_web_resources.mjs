@@ -10,6 +10,7 @@ const apiSource = readFileSync(new URL('../SurgeRelay/WebResources/web-api.js', 
 const stateSource = readFileSync(new URL('../SurgeRelay/WebResources/web-state.js', import.meta.url), 'utf8');
 const editorSource = readFileSync(new URL('../SurgeRelay/WebResources/web-editor.js', import.meta.url), 'utf8');
 const feedbackSource = readFileSync(new URL('../SurgeRelay/WebResources/web-feedback.js', import.meta.url), 'utf8');
+const previewSource = readFileSync(new URL('../SurgeRelay/WebResources/web-preview.js', import.meta.url), 'utf8');
 const appSource = readFileSync(new URL('../SurgeRelay/WebResources/app.js', import.meta.url), 'utf8');
 const context = vm.createContext({ console, URL });
 vm.runInContext(logicSource, context, { filename: 'web-logic.js' });
@@ -20,6 +21,7 @@ vm.runInContext(apiSource, context, { filename: 'web-api.js' });
 vm.runInContext(stateSource, context, { filename: 'web-state.js' });
 vm.runInContext(editorSource, context, { filename: 'web-editor.js' });
 vm.runInContext(feedbackSource, context, { filename: 'web-feedback.js' });
+vm.runInContext(previewSource, context, { filename: 'web-preview.js' });
 
 const logic = context.SurgeRelayWebLogic;
 assert.ok(logic, 'web logic should install a global testable API');
@@ -37,6 +39,8 @@ const editorHelpers = context.SurgeRelayWebEditor;
 assert.ok(editorHelpers, 'web editor should install a global testable API');
 const feedbackHelpers = context.SurgeRelayWebFeedback;
 assert.ok(feedbackHelpers, 'web feedback should install a global testable API');
+const previewHelpers = context.SurgeRelayWebPreview;
+assert.ok(previewHelpers, 'web preview should install a global testable API');
 assert.equal(options.scriptHubDefaults.removeCommentedRewrites, true);
 assert.ok(
   options.advancedGroups.some(group => group.id === 'script-conversion'),
@@ -56,6 +60,11 @@ assert.doesNotMatch(
   appSource,
   /function (openDialog|closeDialog|askConfirmation|resolveConfirmation|resetHorizontalScroll|copyText|showCopySuccess|showToast)\(/,
   'app.js should use web-feedback helpers for feedback and dialog details'
+);
+assert.doesNotMatch(
+  appSource,
+  /function (loadPreview|savePreview|restorePreview)\(/,
+  'app.js should use web-preview helpers for preview state and actions'
 );
 assert.doesNotMatch(
   appSource,
@@ -938,6 +947,64 @@ assert.equal(await failedCopyController.copyText('secret'), false);
 assert.equal(failedToast.textContent, '拷贝失败');
 assert.equal(failedToast.classList.contains('error'), true);
 
+const previewAPIRequests = [];
+const previewToasts = [];
+const previewElements = {
+  '#code-editor': {
+    value: '',
+    listeners: {},
+    addEventListener(type, handler) { this.listeners[type] = handler; }
+  },
+  '#code-view': { innerHTML: '' },
+  '[data-action="save-preview"]': { disabled: true }
+};
+const previewController = previewHelpers.createPreviewController({
+  api: async (path, options = {}) => {
+    previewAPIRequests.push({ path, options });
+    if (path === '/api/modules/module-1/preview' && options.method === 'PUT') return { message: '预览已保存' };
+    if (path === '/api/modules/module-1/preview' && options.method === 'DELETE') return 'restored content';
+    if (path === '/api/modules/module-1/preview') return 'editable content';
+    if (path === '/api/combined/preview') return '[General]\nkey = value';
+    throw new Error('missing route');
+  },
+  document: {
+    querySelector: selector => previewElements[selector] || null
+  },
+  highlightCode: text => `<pre>${text}</pre>`,
+  askConfirmation: async () => true,
+  showToast: (message, isError = false) => previewToasts.push({ message, isError })
+});
+await previewController.loadPreview('/api/combined/preview', false);
+assert.equal(previewElements['#code-view'].innerHTML, '<pre>[General]\nkey = value</pre>');
+assert.equal(previewController.text, '[General]\nkey = value');
+await previewController.loadPreview('/api/modules/module-1/preview', true);
+assert.equal(previewElements['#code-editor'].value, 'editable content');
+assert.equal(previewController.savedText, 'editable content');
+previewElements['#code-editor'].value = 'edited content';
+previewElements['#code-editor'].listeners.input();
+assert.equal(previewController.text, 'edited content');
+assert.equal(previewElements['[data-action="save-preview"]'].disabled, false);
+await previewController.savePreview({ id: 'module-1' });
+assert.equal(previewAPIRequests.at(-1).options.method, 'PUT');
+assert.equal(previewAPIRequests.at(-1).options.body, 'edited content');
+assert.equal(previewController.savedText, 'edited content');
+assert.equal(previewElements['[data-action="save-preview"]'].disabled, true);
+assert.deepEqual(previewToasts.at(-1), { message: '预览已保存', isError: false });
+await previewController.restorePreview({ id: 'module-1', name: 'Demo Module' });
+assert.equal(previewAPIRequests.at(-1).options.method, 'DELETE');
+assert.equal(previewElements['#code-editor'].value, 'restored content');
+assert.equal(previewController.text, 'restored content');
+assert.equal(previewController.savedText, 'restored content');
+assert.deepEqual(previewToasts.at(-1), { message: '已恢复转换结果', isError: false });
+const refusedRestoreRequests = [];
+const refusedPreviewController = previewHelpers.createPreviewController({
+  api: async (...args) => refusedRestoreRequests.push(args),
+  document: { querySelector: () => null },
+  askConfirmation: async () => false
+});
+await refusedPreviewController.restorePreview({ id: 'module-1', name: 'Demo Module' });
+assert.equal(refusedRestoreRequests.length, 0);
+
 const indexHTML = readFileSync(new URL('../SurgeRelay/WebResources/index.html', import.meta.url), 'utf8');
 const logicScriptIndex = indexHTML.indexOf('/web-logic.js');
 const optionsScriptIndex = indexHTML.indexOf('/web-options.js');
@@ -947,6 +1014,7 @@ const apiScriptIndex = indexHTML.indexOf('/web-api.js');
 const stateScriptIndex = indexHTML.indexOf('/web-state.js');
 const editorScriptIndex = indexHTML.indexOf('/web-editor.js');
 const feedbackScriptIndex = indexHTML.indexOf('/web-feedback.js');
+const previewScriptIndex = indexHTML.indexOf('/web-preview.js');
 const appScriptIndex = indexHTML.indexOf('/app.js');
 assert.ok(logicScriptIndex >= 0, 'index should load web-logic.js');
 assert.ok(optionsScriptIndex > logicScriptIndex, 'web-options.js must load after web-logic.js');
@@ -956,7 +1024,8 @@ assert.ok(apiScriptIndex > markupScriptIndex, 'web-api.js must load after web-ma
 assert.ok(stateScriptIndex > apiScriptIndex, 'web-state.js must load after web-api.js');
 assert.ok(editorScriptIndex > stateScriptIndex, 'web-editor.js must load after web-state.js');
 assert.ok(feedbackScriptIndex > editorScriptIndex, 'web-feedback.js must load after web-editor.js');
-assert.ok(appScriptIndex > feedbackScriptIndex, 'web-feedback.js must load before app.js');
+assert.ok(previewScriptIndex > feedbackScriptIndex, 'web-preview.js must load after web-feedback.js');
+assert.ok(appScriptIndex > previewScriptIndex, 'web-preview.js must load before app.js');
 assert.match(indexHTML, /name="storageLocation"/);
 assert.match(indexHTML, /name="outputFolder"/);
 assert.match(indexHTML, /id="output-path-preview"/);

@@ -12,6 +12,7 @@ const apiSource = readFileSync(new URL('SurgeRelay/WebResources/web-api.js', roo
 const stateSource = readFileSync(new URL('SurgeRelay/WebResources/web-state.js', root), 'utf8');
 const editorSource = readFileSync(new URL('SurgeRelay/WebResources/web-editor.js', root), 'utf8');
 const feedbackSource = readFileSync(new URL('SurgeRelay/WebResources/web-feedback.js', root), 'utf8');
+const previewSource = readFileSync(new URL('SurgeRelay/WebResources/web-preview.js', root), 'utf8');
 const appSource = readFileSync(new URL('SurgeRelay/WebResources/app.js', root), 'utf8');
 
 const requiredIDs = [
@@ -440,6 +441,7 @@ vm.runInContext(apiSource, context, { filename: 'web-api.js' });
 vm.runInContext(stateSource, context, { filename: 'web-state.js' });
 vm.runInContext(editorSource, context, { filename: 'web-editor.js' });
 vm.runInContext(feedbackSource, context, { filename: 'web-feedback.js' });
+vm.runInContext(previewSource, context, { filename: 'web-preview.js' });
 vm.runInContext(appSource, context, { filename: 'app.js' });
 
 await flushAsync();

@@ -77,13 +77,14 @@ if (!webEditor) throw new Error('web-editor.js must load before app.js');
 const webFeedback = window.SurgeRelayWebFeedback;
 if (!webFeedback) throw new Error('web-feedback.js must load before app.js');
 
+const webPreview = window.SurgeRelayWebPreview;
+if (!webPreview) throw new Error('web-preview.js must load before app.js');
+
 let state = null;
 let selectedID = null;
 let detailTab = 'info';
 let editingID = null;
 let showFailuresOnly = false;
-let previewText = '';
-let previewSavedText = '';
 let nameLookupTimer = null;
 let nameLookupSequence = 0;
 let autoFilledName = '';
@@ -117,6 +118,13 @@ const {
   copyText,
   showToast
 } = feedback;
+const previewController = webPreview.createPreviewController({
+  api: (...args) => api(...args),
+  document,
+  highlightCode,
+  askConfirmation,
+  showToast
+});
 const stateEventController = webState.createStateEventController({
   EventSource: window.EventSource,
   document,
@@ -378,7 +386,7 @@ function renderCombinedDetail(animate = true) {
   }), animate);
   if (!combined.isEnabled) return;
   if (detailTab === 'preview') {
-    loadPreview('/api/combined/preview', false);
+    previewController.loadPreview('/api/combined/preview', false);
   }
 }
 
@@ -388,26 +396,10 @@ function renderModuleDetail(module, animate = true) {
     combined: state.combined
   }), animate);
   if (detailTab === 'preview') {
-    loadPreview(`/api/modules/${module.id}/preview`, true);
+    previewController.loadPreview(`/api/modules/${module.id}/preview`, true);
     return;
   }
   loadArguments(module);
-}
-
-async function loadPreview(path, editable) {
-  try {
-    const text = await api(path);
-    if (editable) {
-      const editor = document.querySelector('#code-editor');
-      if (!editor) return;
-      previewText = text; previewSavedText = text; editor.value = text;
-      editor.addEventListener('input', () => { previewText = editor.value; const save = document.querySelector('[data-action="save-preview"]'); if (save) save.disabled = previewText === previewSavedText; });
-    } else {
-      const view = document.querySelector('#code-view');
-      if (view) view.innerHTML = highlightCode(text);
-      previewText = text; previewSavedText = text;
-    }
-  } catch (error) { showToast(error.message, true); }
 }
 
 async function loadArguments(module) {
@@ -466,9 +458,9 @@ async function handleDetailClick(event) {
   case 'edit': if (module) openEditor(module); break;
   case 'delete': if (module) await deleteModule(module); break;
   case 'copy': await copyText(source.dataset.value, source); break;
-  case 'copy-preview': await copyText(previewText, source); break;
-  case 'save-preview': if (module) await savePreview(module); break;
-  case 'restore-preview': if (module) await restorePreview(module); break;
+  case 'copy-preview': await copyText(previewController.text, source); break;
+  case 'save-preview': if (module) await previewController.savePreview(module); break;
+  case 'restore-preview': if (module) await previewController.restorePreview(module); break;
   case 'reset-arguments': if (module) await resetArguments(module); break;
   case 'accept-override': if (module) await acceptOverride(module); break;
   }
@@ -639,17 +631,6 @@ async function deleteModule(module) {
     showToast(result.message);
     await loadState(false, true);
   }
-  catch (error) { showToast(error.message, true); }
-}
-
-async function savePreview(module) {
-  try { const result = await api(`/api/modules/${module.id}/preview`, { method: 'PUT', headers: { 'Content-Type': 'text/plain; charset=utf-8' }, body: previewText }); previewSavedText = previewText; document.querySelector('[data-action="save-preview"]').disabled = true; showToast(result.message); }
-  catch (error) { showToast(error.message, true); }
-}
-
-async function restorePreview(module) {
-  if (!await askConfirmation('恢复转换结果？', `“${module.name}”的手动修改会被丢弃。`, '恢复')) return;
-  try { const text = await api(`/api/modules/${module.id}/preview`, { method: 'DELETE' }); const editor = document.querySelector('#code-editor'); if (editor) editor.value = text; previewText = text; previewSavedText = text; document.querySelector('[data-action="save-preview"]').disabled = true; showToast('已恢复转换结果'); }
   catch (error) { showToast(error.message, true); }
 }
 
