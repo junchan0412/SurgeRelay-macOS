@@ -29,6 +29,17 @@ final class LocalPublishedFilesPlannerTests: XCTestCase {
         XCTAssertEqual(preview.activeFiles, ["A.sgmodule", "Folder/C.sgmodule"])
         XCTAssertTrue(preview.changedFiles.isEmpty)
         XCTAssertEqual(preview.deletedFiles, ["B.sgmodule"])
+
+        switch LocalPublishedFilesPlanner.completion(afterExporting: plan) {
+        case .requiresCleanup(let completionPreview, let message):
+            XCTAssertEqual(completionPreview.destination, .local)
+            XCTAssertEqual(completionPreview.targetDescription, "/Users/example/Surge")
+            XCTAssertEqual(completionPreview.activeFiles, ["A.sgmodule", "Folder/C.sgmodule"])
+            XCTAssertEqual(completionPreview.deletedFiles, ["B.sgmodule"])
+            XCTAssertEqual(message, "已写入本地模块，等待确认清理 1 个旧文件")
+        case .persisted:
+            XCTFail("Expected stale local files to require cleanup confirmation")
+        }
     }
 
     func testLocalPublishedFilesPlannerDoesNotCarryManagedPathsAcrossRootChange() {
@@ -43,6 +54,10 @@ final class LocalPublishedFilesPlannerTests: XCTestCase {
         XCTAssertTrue(plan.knownManagedPaths.isEmpty)
         XCTAssertTrue(plan.stalePaths.isEmpty)
         XCTAssertFalse(plan.requiresCleanupConfirmation)
+        XCTAssertEqual(
+            LocalPublishedFilesPlanner.completion(afterExporting: plan),
+            .persisted(rootDirectory: "/Users/example/NewRoot", filePaths: ["A.sgmodule"])
+        )
     }
 
     func testLocalPublishedFilesPlannerLimitsConfirmedCleanupToPreviewRoot() {

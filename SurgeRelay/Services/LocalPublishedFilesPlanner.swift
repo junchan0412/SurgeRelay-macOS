@@ -25,6 +25,11 @@ struct LocalPublishedFilePlan: Equatable, Sendable {
     }
 }
 
+enum LocalPublishedFileCompletion: Equatable, Sendable {
+    case persisted(rootDirectory: String, filePaths: [String])
+    case requiresCleanup(preview: PublishPreview, statusMessage: String)
+}
+
 enum LocalPublishedFilesPlanner {
     static func plan(
         files: [PublishFile],
@@ -43,6 +48,19 @@ enum LocalPublishedFilesPlanner {
             currentPaths: currentPaths,
             knownManagedPaths: knownManagedPaths,
             stalePaths: stalePaths
+        )
+    }
+
+    static func completion(afterExporting plan: LocalPublishedFilePlan) -> LocalPublishedFileCompletion {
+        if plan.requiresCleanupConfirmation {
+            return .requiresCleanup(
+                preview: plan.cleanupPreview(),
+                statusMessage: plan.cleanupStatusMessage
+            )
+        }
+        return .persisted(
+            rootDirectory: plan.targetDirectory,
+            filePaths: plan.currentPaths
         )
     }
 

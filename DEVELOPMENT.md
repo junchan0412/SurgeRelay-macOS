@@ -61,7 +61,7 @@ Local publish self-overwrite checks also belong in `PublishCoordinator` with pat
 
 Published file assembly belongs in `PublishFileAssembler`: it owns adding the combined module data, materializing standalone modules with argument overrides, applying Surge metadata, appending generated assets, and consulting the local self-overwrite check. Keep `AppModel` at the orchestration level for previews, commits, and persisted publish manifests.
 
-Local published-file manifest planning belongs in `LocalPublishedFilesPlanner`. Keep the "same root only" managed-path reuse, stale local-file detection, cleanup preview construction, and confirmed-cleanup managed path selection there. When the configured local module root changes, do not carry stale paths or overwrite privileges from the previous root into the new root.
+Local published-file manifest planning belongs in `LocalPublishedFilesPlanner`. Keep the "same root only" managed-path reuse, stale local-file detection, cleanup preview construction, post-export persistence/cleanup decisions, and confirmed-cleanup managed path selection there. When the configured local module root changes, do not carry stale paths or overwrite privileges from the previous root into the new root.
 
 GitHub publish result planning belongs in `GitHubPublishPlanner`. Keep repository privacy metadata update decisions, target descriptions, preview payload construction, stale-path candidates, path-plan persistence policy, selected-publish path merging, no-files error recognition, no-change/no-files status text, success messages, and update-history entry construction there. `AppModel` should own token checks, repository privacy probes, actual GitHub client calls, and persistence of the returned path plan.
 

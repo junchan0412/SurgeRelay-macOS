@@ -273,16 +273,17 @@ extension AppModel {
                 removingObsoleteRelativePaths: [],
                 knownManagedRelativePaths: localPublishPlan.knownManagedPaths
             )
-            if !localPublishPlan.requiresCleanupConfirmation {
-                settings.localPublishedRootDirectory = localPublishPlan.targetDirectory
-                settings.localPublishedFilePaths = localPublishPlan.currentPaths
+            switch LocalPublishedFilesPlanner.completion(afterExporting: localPublishPlan) {
+            case .persisted(let rootDirectory, let filePaths):
+                settings.localPublishedRootDirectory = rootDirectory
+                settings.localPublishedFilePaths = filePaths
                 if pendingPublishPreview?.destination == .local {
                     pendingPublishPreview = nil
                 }
                 saveSettings()
-            } else {
-                pendingPublishPreview = localPublishPlan.cleanupPreview()
-                statusMessage = localPublishPlan.cleanupStatusMessage
+            case .requiresCleanup(let preview, let message):
+                pendingPublishPreview = preview
+                statusMessage = message
             }
         }
     }

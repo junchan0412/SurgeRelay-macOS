@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将本地发布写入后的持久化/清理确认决策收进 `LocalPublishedFilesPlanner`，让 AppModel 只执行本地发布完成结果。
 - 将 Web 管理 API 鉴权、同源校验和 session cookie 规则抽入 `WebRequestSecurity.swift`，继续收敛 `WebManagementHTTP.swift` 的职责。
 - 将 Web 管理认证失败限流抽入 `WebAuthenticationThrottle.swift`，让 `WebManagementHTTP.swift` 聚焦 HTTP 请求、响应、解析和安全头类型。
 - 将 GitHub 发布预览与正式发布共享同一套发布准备流程，减少 token、总模块数据、发布文件和旧路径计划的重复组装逻辑。
