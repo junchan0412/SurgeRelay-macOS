@@ -65,6 +65,8 @@ Published file assembly belongs in `PublishFileAssembler`: it owns adding the co
 
 Local published-file manifest planning belongs in `LocalPublishedFilesPlanner`. Keep the "same root only" managed-path reuse, stale local-file detection, cleanup preview construction, post-export persistence/cleanup decisions, and confirmed-cleanup managed path/settings/status planning there. When the configured local module root changes, do not carry stale paths or overwrite privileges from the previous root into the new root.
 
+Local published-file markers and iCloud conflict safety checks belong in `ManagedPublishedFile`. Keep marker insertion after Surge `#!` metadata, managed-file detection, conflict-version validation, and conflict resolution there; `ModuleFileStore` should coordinate file writes/deletes and call this service instead of owning marker parsing inline.
+
 GitHub publish result planning belongs in `GitHubPublishPlanner`. Keep repository privacy metadata update decisions, target descriptions, preview payload construction, publish preparation validation, stale-path candidates, path-plan persistence policy, selected-publish path merging, no-files error recognition, no-change/no-files status text, success messages, and update-history entry construction there. `AppModel` should own token checks, repository privacy probes, actual GitHub client calls, and persistence of the returned path plan.
 
 Shared module counts should flow through `ModuleCollectionSummary`. Main window status, menu bar text, Web management state, and diagnostics should not independently reimplement enabled, standalone, failed, latest-update, or updateable counts unless they need the actual module objects.

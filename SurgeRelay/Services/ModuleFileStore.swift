@@ -266,7 +266,7 @@ actor ModuleFileStore {
         relativePath: String,
         isKnownManagedPath: Bool
     ) throws {
-        let managedData = Self.managedPublishedData(data, relativePath: relativePath)
+        let managedData = ManagedPublishedFile.dataWrapping(data, relativePath: relativePath)
         let outcome = CoordinationOutcome<Void>()
         let coordinator = NSFileCoordinator(filePresenter: nil)
         var coordinationError: NSError?
@@ -276,13 +276,13 @@ actor ModuleFileStore {
             error: &coordinationError
         ) { coordinatedURL in
             outcome.result = Result {
-                let conflictVersions = try Self.validatedManagedConflictVersions(
+                let conflictVersions = try ManagedPublishedFile.validatedConflictVersions(
                     at: coordinatedURL,
                     allowingKnownManagedPath: isKnownManagedPath
                 )
                 if FileManager.default.fileExists(atPath: coordinatedURL.path) {
                     let existing = try Data(contentsOf: coordinatedURL)
-                    guard Self.isManagedPublishedFile(existing) || isKnownManagedPath else {
+                    guard ManagedPublishedFile.isManaged(existing) || isKnownManagedPath else {
                         throw RelayError.invalidOutput(
                             "目标文件 \(relativePath) 已存在且不属于 Surge Relay 管理，已停止写入。"
                         )
@@ -292,7 +292,7 @@ actor ModuleFileStore {
                     }
                 }
                 try managedData.write(to: coordinatedURL, options: .atomic)
-                try Self.resolve(conflictVersions, at: coordinatedURL)
+                try ManagedPublishedFile.resolve(conflictVersions, at: coordinatedURL)
             }
         }
         if let coordinationError { throw coordinationError }
@@ -314,16 +314,16 @@ actor ModuleFileStore {
             outcome.result = Result {
                 guard FileManager.default.fileExists(atPath: coordinatedURL.path) else { return }
                 let existing = try Data(contentsOf: coordinatedURL)
-                guard Self.isManagedPublishedFile(existing) else {
+                guard ManagedPublishedFile.isManaged(existing) else {
                     throw RelayError.invalidOutput(
                         "旧文件 \(relativePath) 不属于 Surge Relay 管理，已停止自动清理。"
                     )
                 }
-                let conflictVersions = try Self.validatedManagedConflictVersions(
+                let conflictVersions = try ManagedPublishedFile.validatedConflictVersions(
                     at: coordinatedURL,
                     allowingKnownManagedPath: false
                 )
-                try Self.resolve(conflictVersions, at: coordinatedURL)
+                try ManagedPublishedFile.resolve(conflictVersions, at: coordinatedURL)
                 try FileManager.default.removeItem(at: coordinatedURL)
             }
         }
@@ -358,57 +358,4 @@ actor ModuleFileStore {
             .lowercased()
     }
 
-    private nonisolated static let managedMarker = "# Surge Relay managed output"
-    private nonisolated static let managedPathPrefix = "# surge-relay-relative-path: "
-
-    private nonisolated static func managedPublishedData(_ data: Data, relativePath: String) -> Data {
-        guard !isManagedPublishedFile(data) else { return data }
-        let markerLines = "\(managedMarker)\n\(managedPathPrefix)\(relativePath)"
-        if let content = String(data: data, encoding: .utf8) {
-            var lines = content.components(separatedBy: "\n")
-            var insertionIndex = 0
-            while insertionIndex < lines.count {
-                let line = lines[insertionIndex]
-                    .trimmingCharacters(in: .whitespaces)
-                    .replacingOccurrences(of: "\r", with: "")
-                guard line.hasPrefix("#!") else { break }
-                insertionIndex += 1
-            }
-            lines.insert(contentsOf: markerLines.components(separatedBy: "\n"), at: insertionIndex)
-            return Data(lines.joined(separator: "\n").utf8)
-        }
-        let header = "\(markerLines)\n"
-        var result = Data(header.utf8)
-        result.append(data)
-        return result
-    }
-
-    private nonisolated static func isManagedPublishedFile(_ data: Data) -> Bool {
-        guard let content = String(data: data, encoding: .utf8) else { return false }
-        return content
-            .replacingOccurrences(of: "\r\n", with: "\n")
-            .components(separatedBy: "\n")
-            .prefix(64)
-            .contains { $0.trimmingCharacters(in: .whitespaces) == managedMarker }
-    }
-
-    private nonisolated static func validatedManagedConflictVersions(
-        at url: URL,
-        allowingKnownManagedPath: Bool
-    ) throws -> [NSFileVersion] {
-        let versions = NSFileVersion.unresolvedConflictVersionsOfItem(at: url) ?? []
-        for version in versions {
-            let data = try Data(contentsOf: version.url)
-            guard isManagedPublishedFile(data) || allowingKnownManagedPath else {
-                throw RelayError.invalidOutput("检测到不属于 Surge Relay 的 iCloud 冲突版本，已停止操作。")
-            }
-        }
-        return versions
-    }
-
-    private nonisolated static func resolve(_ versions: [NSFileVersion], at url: URL) throws {
-        guard !versions.isEmpty else { return }
-        for version in versions { version.isResolved = true }
-        try NSFileVersion.removeOtherVersionsOfItem(at: url)
-    }
 }
