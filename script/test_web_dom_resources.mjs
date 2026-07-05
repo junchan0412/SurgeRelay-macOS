@@ -10,6 +10,7 @@ const formatSource = readFileSync(new URL('SurgeRelay/WebResources/web-format.js
 const markupSource = readFileSync(new URL('SurgeRelay/WebResources/web-markup.js', root), 'utf8');
 const apiSource = readFileSync(new URL('SurgeRelay/WebResources/web-api.js', root), 'utf8');
 const stateSource = readFileSync(new URL('SurgeRelay/WebResources/web-state.js', root), 'utf8');
+const editorSource = readFileSync(new URL('SurgeRelay/WebResources/web-editor.js', root), 'utf8');
 const appSource = readFileSync(new URL('SurgeRelay/WebResources/app.js', root), 'utf8');
 
 const requiredIDs = [
@@ -436,6 +437,7 @@ vm.runInContext(formatSource, context, { filename: 'web-format.js' });
 vm.runInContext(markupSource, context, { filename: 'web-markup.js' });
 vm.runInContext(apiSource, context, { filename: 'web-api.js' });
 vm.runInContext(stateSource, context, { filename: 'web-state.js' });
+vm.runInContext(editorSource, context, { filename: 'web-editor.js' });
 vm.runInContext(appSource, context, { filename: 'app.js' });
 
 await flushAsync();

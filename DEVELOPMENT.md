@@ -125,13 +125,15 @@ Web management Script-Hub advanced option defaults and group schema live in `Web
 
 Web management formatting helpers live in `WebResources/web-format.js`. Keep HTML escaping, attribute escaping, date/time formatting, and module preview syntax highlighting there so `app.js` stays focused on API calls, state changes, event handling, and DOM composition.
 
-Web management list, editor, activity, and output-path logic lives in `WebResources/web-logic.js`. Keep module list signatures, sidebar snapshot signatures, detail metadata row presence checks, search text, state titles, sidebar subtitles, failure summaries, failure-filter state, filtered sidebar modules, empty-state text, activity status/button/progress presentation, folder titles, native Surge source detection, icon URL validation, editor payload construction, draft output path previews, and output path collision notices there so live updates, sidebar rendering, detail status rows, editor saving, editor previews, and the update activity card share the same tested rules.
+Web management list, activity, and pure editor rules live in `WebResources/web-logic.js`. Keep module list signatures, sidebar snapshot signatures, detail metadata row presence checks, search text, state titles, sidebar subtitles, failure summaries, failure-filter state, filtered sidebar modules, empty-state text, activity status/button/progress presentation, folder titles, native Surge source detection, icon URL validation, editor payload construction, draft output path previews, and output path collision notices there so live updates, sidebar rendering, detail status rows, editor saving, editor previews, and the update activity card share the same tested rules.
 
 Web management markup helpers live in `WebResources/web-markup.js`. Keep reusable HTML fragments such as sidebar module rows, empty states, detail rows, copyable URL/value sections, preview shells, total-module and single-module detail sections, detail toolbars, argument sections and controls, advanced option containers and rows, output-folder option lists, latest-publish sections, and publish-file lists there; `app.js` should compose those fragments with live state instead of owning their escaping details.
 
 Web management API/session helpers live in `WebResources/web-api.js`. Keep URL token extraction, session bootstrap, request headers, JSON body handling, same-origin credentials, error payload parsing, and 401 token retry there; `app.js` should call the client instead of directly owning fetch/session details.
 
 Web management state/navigation helpers live in `WebResources/web-state.js`. Keep initial module selection, mobile history URLs, fallback selection, and EventSource reconnect/polling behavior there; `app.js` should coordinate rendering through those helpers instead of duplicating route or live-state subscription logic.
+
+Web management editor UI helpers live in `WebResources/web-editor.js`. Keep module editor DOM state, advanced option disclosure animation, Script-Hub option collection/backfill, output folder menu hydration, output path preview binding, native Surge source visibility, and icon URL preview rendering there; `app.js` should wire events and API calls instead of owning those editor details.
 
 Swift Web management DTOs, request mutations, and API errors live in `Services/WebManagementModels.swift`. Keep `WebManagementAPI.swift` focused on HTTP route dispatch, state payload assembly, and calls into `AppModel`.
 
@@ -164,6 +166,7 @@ node --check SurgeRelay/WebResources/web-format.js
 node --check SurgeRelay/WebResources/web-markup.js
 node --check SurgeRelay/WebResources/web-api.js
 node --check SurgeRelay/WebResources/web-state.js
+node --check SurgeRelay/WebResources/web-editor.js
 node --check SurgeRelay/WebResources/app.js
 node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs

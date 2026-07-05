@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将 Web 管理模块编辑器的高级选项展开、Script-Hub 选项收集/回填、输出文件夹菜单、输出路径提示和图标预览抽入 `web-editor.js`，让 `app.js` 更专注于状态、事件和 API 编排。
 - 将 GitHub API DTO 抽入 `GitHubAPIModels.swift`，将仓库路径、模块目录推导、重复路径校验和提交文案抽入 `GitHubRepositoryPath.swift`，让 `GitHubClient.swift` 更专注于请求、diff、提交和引用更新事务。
 - 将模块/总模块预览页、上游对比页和 AppKit 代码文本高亮桥接拆入 `ModulePreviewViews.swift`，让 `Components.swift` 继续收敛为通用小组件。
 - 将模块草稿模型拆入 `ModuleDraft.swift`，将模块输出文件夹和输出路径提示拆入 `ModuleOutputPath.swift`，让 `RelayModule.swift` 更专注于持久化模块状态和来源/存放关系。

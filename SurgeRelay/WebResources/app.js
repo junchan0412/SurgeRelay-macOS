@@ -55,9 +55,7 @@ const {
   moduleRowMarkup,
   combinedDetailMarkup,
   moduleDetailMarkup,
-  argumentsSectionMarkup,
-  advancedOptionsMarkup,
-  outputFolderOptionsMarkup
+  argumentsSectionMarkup
 } = webMarkup;
 
 const webAPI = window.SurgeRelayWebAPI;
@@ -73,6 +71,9 @@ const apiClient = webAPI.createAPIClient({
 const webState = window.SurgeRelayWebState;
 if (!webState) throw new Error('web-state.js must load before app.js');
 
+const webEditor = window.SurgeRelayWebEditor;
+if (!webEditor) throw new Error('web-editor.js must load before app.js');
+
 let state = null;
 let selectedID = null;
 let detailTab = 'info';
@@ -87,6 +88,17 @@ let nameLookupSequence = 0;
 let autoFilledName = '';
 let manualNameEdited = false;
 const mobileLayout = window.matchMedia('(max-width: 700px)');
+const moduleEditor = webEditor.createModuleEditorController({
+  ui,
+  logic: webLogic,
+  markup: webMarkup,
+  scriptHubDefaults,
+  advancedGroups,
+  document,
+  window,
+  mobileLayout,
+  setTimeout: window.setTimeout.bind(window)
+});
 const stateEventController = webState.createStateEventController({
   EventSource: window.EventSource,
   document,
@@ -100,7 +112,7 @@ const stateEventController = webState.createStateEventController({
 apiClient.initializeAccessToken();
 initializeHistoryState();
 
-ui.advancedOptions.innerHTML = advancedOptionsMarkup(advancedGroups);
+moduleEditor.installAdvancedOptions();
 
 ui.search.addEventListener('input', renderSidebar);
 ui.failureFilter.addEventListener('click', () => {
@@ -112,19 +124,19 @@ ui.refresh.addEventListener('click', updateAll);
 ui.cancelActivity.addEventListener('click', cancelCurrentWork);
 ui.summaryRow.addEventListener('click', () => { if (combinedEnabled()) selectItem('combined'); });
 ui.back.addEventListener('click', navigateBackToList);
-ui.advancedMaster.addEventListener('click', () => animateAdvancedResize(ui.advancedMaster.getAttribute('aria-expanded') !== 'true'));
+ui.advancedMaster.addEventListener('click', () => moduleEditor.animateAdvancedResize(ui.advancedMaster.getAttribute('aria-expanded') !== 'true'));
 ui.advancedOptions.addEventListener('click', event => {
   const summary = event.target.closest('.option-group > summary');
   if (!summary) return;
   event.preventDefault();
-  animateOptionGroup(summary.parentElement);
+  moduleEditor.animateOptionGroup(summary.parentElement);
 });
 ui.moduleForm.elements.sourceURL.addEventListener('input', () => {
-  updateNativeModuleState();
+  moduleEditor.updateNativeModuleState();
   updateOutputPathPreview();
   scheduleNameLookup();
 });
-ui.moduleForm.elements.sourceFormat.addEventListener('change', updateNativeModuleState);
+ui.moduleForm.elements.sourceFormat.addEventListener('change', moduleEditor.updateNativeModuleState);
 ui.moduleForm.elements.name.addEventListener('input', event => {
   manualNameEdited = event.target.value !== autoFilledName;
   if (!event.target.value) manualNameEdited = false;
@@ -133,7 +145,7 @@ ui.moduleForm.elements.name.addEventListener('input', event => {
 ui.moduleForm.elements.outputFolder.addEventListener('change', updateOutputPathPreview);
 ui.moduleForm.elements.storageLocation.addEventListener('change', updateOutputPathPreview);
 ui.moduleForm.elements.outputFileName.addEventListener('input', updateOutputPathPreview);
-ui.moduleForm.elements.iconURL.addEventListener('input', updateIconURLPreview);
+ui.moduleForm.elements.iconURL.addEventListener('input', moduleEditor.updateIconURLPreview);
 ui.moduleForm.elements.publishesStandalone.addEventListener('change', updateOutputPathPreview);
 document.querySelectorAll('.close-module-dialog').forEach(button => button.addEventListener('click', () => closeDialog(ui.moduleDialog)));
 ui.moduleDialog.addEventListener('click', async event => {
@@ -390,69 +402,6 @@ async function loadArguments(module) {
   } catch (_) {}
 }
 
-function setAdvancedExpanded(expanded) {
-  ui.advancedMaster.setAttribute('aria-expanded', String(expanded));
-  ui.advancedContent.setAttribute('aria-hidden', String(!expanded));
-  ui.advancedContent.classList.toggle('expanded', expanded);
-}
-
-async function animateAdvancedResize(expanded) {
-  const dialog = ui.moduleDialog;
-  if (!dialog.open || !mobileLayout.matches || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    setAdvancedExpanded(expanded);
-    return;
-  }
-
-  const beforeHeight = dialog.getBoundingClientRect().height;
-  const previousTransition = ui.advancedContent.style.transition;
-  ui.advancedContent.style.transition = 'none';
-  setAdvancedExpanded(expanded);
-  void ui.advancedContent.offsetHeight;
-  const afterHeight = dialog.getBoundingClientRect().height;
-  ui.advancedContent.style.transition = previousTransition;
-
-  if (Math.abs(afterHeight - beforeHeight) < 1) return;
-  dialog.style.height = `${beforeHeight}px`;
-  const animation = dialog.animate(
-    [{ height: `${beforeHeight}px` }, { height: `${afterHeight}px` }],
-    { duration: 280, easing: 'cubic-bezier(.2,.8,.2,1)' }
-  );
-  try { await animation.finished; } catch (_) {}
-  dialog.style.height = '';
-}
-
-async function animateOptionGroup(group) {
-  if (!group || group.dataset.animating === 'true') return;
-  const content = group.querySelector('.option-content');
-  if (!content) return;
-  group.dataset.animating = 'true';
-  const opening = !group.open;
-  if (opening) {
-    content.style.height = '0px';
-    content.style.opacity = '0';
-    group.open = true;
-  }
-  const fullHeight = content.scrollHeight;
-  const animation = content.animate(
-    opening
-      ? [{ height: '0px', opacity: 0 }, { height: `${fullHeight}px`, opacity: 1 }]
-      : [{ height: `${fullHeight}px`, opacity: 1 }, { height: '0px', opacity: 0 }],
-    { duration: 220, easing: 'cubic-bezier(.2,.8,.2,1)' }
-  );
-  try { await animation.finished; } catch (_) {}
-  if (!opening) group.open = false;
-  content.style.height = '';
-  content.style.opacity = '';
-  delete group.dataset.animating;
-}
-
-function updateNativeModuleState() {
-  const form = ui.moduleForm.elements;
-  const native = webLogic.isNativeSurgeSource(form.sourceFormat.value, form.sourceURL.value);
-  ui.nativeNote.hidden = !native;
-  ui.advancedOptions.hidden = native;
-}
-
 function scheduleNameLookup() {
   clearTimeout(nameLookupTimer);
   const form = ui.moduleForm.elements;
@@ -470,91 +419,8 @@ function scheduleNameLookup() {
   }, 500);
 }
 
-function collectScriptHubOptions() {
-  const options = { ...scriptHubDefaults };
-  Object.keys(options).forEach(key => {
-    const field = ui.moduleForm.elements[`option_${key}`];
-    if (!field) return;
-    options[key] = typeof options[key] === 'boolean' ? field.checked : field.value;
-  });
-  return options;
-}
-
-function populateScriptHubOptions(values = scriptHubDefaults) {
-  const options = { ...scriptHubDefaults, ...(values || {}) };
-  Object.keys(options).forEach(key => {
-    const field = ui.moduleForm.elements[`option_${key}`];
-    if (!field) return;
-    if (typeof options[key] === 'boolean') field.checked = options[key]; else field.value = options[key] || '';
-  });
-  advancedGroups.forEach(group => {
-    const configured = group.fields.some(field => field.key && options[field.key] !== scriptHubDefaults[field.key]);
-    const element = ui.advancedOptions.querySelector(`[data-option-group="${group.id}"]`);
-    if (element) element.open = configured;
-  });
-}
-
-function hasAdvancedValues(values) { return Object.keys(scriptHubDefaults).some(key => (values?.[key] ?? scriptHubDefaults[key]) !== scriptHubDefaults[key]); }
-
-function populateOutputFolders(selected = '') {
-  const select = ui.moduleForm.elements.outputFolder;
-  if (!select) return;
-  select.innerHTML = outputFolderOptionsMarkup(state?.moduleOutputFolders || [], selected);
-  select.value = selected || '';
-}
-
 function updateOutputPathPreview() {
-  if (!ui.outputPathPreview) return;
-  const form = ui.moduleForm.elements;
-  const path = webLogic.publishedRelativePathForDraft({
-    name: form.name.value,
-    sourceURL: form.sourceURL.value,
-    storageLocation: form.storageLocation?.value || 'gitHub',
-    outputFolder: form.outputFolder.value,
-    outputFileName: form.outputFileName.value
-  });
-  ui.outputPathPreview.textContent = path;
-  const note = webLogic.outputPathNotice(path, form.publishesStandalone.checked, {
-    combinedFileName: state?.combined?.fileName || 'Surge Relay',
-    modules: state?.modules || [],
-    editingID
-  });
-  if (ui.outputPathNote) {
-    ui.outputPathNote.textContent = note?.message || '';
-    ui.outputPathNote.hidden = !note;
-    ui.outputPathNote.classList.toggle('warning', Boolean(note?.warning));
-  }
-}
-
-function updateIconURLPreview() {
-  const preview = ui.iconURLPreview;
-  const input = ui.moduleForm?.elements?.iconURL;
-  if (!preview || !input) return;
-  const value = input.value.trim();
-  const fallbackURL = preview.dataset.fallbackIconUrl || '';
-  const previewURL = value || fallbackURL;
-  preview.innerHTML = '';
-  preview.classList.toggle('placeholder', !previewURL);
-  preview.classList.remove('invalid');
-  preview.title = value || (fallbackURL ? '来源图标' : '默认图标');
-  if (value && !webLogic.isValidHTTPURL(value)) {
-    preview.classList.add('invalid');
-    preview.innerHTML = '<span class="symbol" data-symbol="shippingbox"></span>';
-    return;
-  }
-  if (!previewURL) {
-    preview.innerHTML = '<span class="symbol" data-symbol="shippingbox"></span>';
-    return;
-  }
-  const image = document.createElement('img');
-  image.src = previewURL;
-  image.alt = '';
-  image.loading = 'lazy';
-  image.addEventListener('error', () => {
-    preview.classList.add('invalid');
-    preview.innerHTML = '<span class="symbol" data-symbol="exclamationmark.triangle"></span>';
-  }, { once: true });
-  preview.append(image);
+  moduleEditor.updateOutputPathPreview({ state, editingID });
 }
 
 function handleListClick(event) {
@@ -669,8 +535,8 @@ function openEditor(module = null) {
   form.category.value = module?.category || '';
   ui.iconURLPreview.dataset.fallbackIconUrl = module && !module.customIconURL ? (module.iconURL || '') : '';
   form.iconURL.value = module?.customIconURL || '';
-  updateIconURLPreview();
-  populateOutputFolders(module?.outputFolder || '');
+  moduleEditor.updateIconURLPreview();
+  moduleEditor.populateOutputFolders(module?.outputFolder || '', state?.moduleOutputFolders || []);
   form.outputFileName.value = module?.outputFileName || '';
   autoFilledName = module?.name || '';
   manualNameEdited = Boolean(module);
@@ -681,9 +547,9 @@ function openEditor(module = null) {
   if (includeRow) includeRow.hidden = !combinedEnabled();
   form.isEnabled.checked = module?.isEnabled ?? false;
   form.publishesStandalone.checked = module?.publishesStandalone ?? true;
-  populateScriptHubOptions(module?.scriptHubOptions || scriptHubDefaults);
-  setAdvancedExpanded(Boolean(module?.advancedSummary || hasAdvancedValues(module?.scriptHubOptions)));
-  updateNativeModuleState();
+  moduleEditor.populateScriptHubOptions(module?.scriptHubOptions || scriptHubDefaults);
+  moduleEditor.setAdvancedExpanded(Boolean(module?.advancedSummary || moduleEditor.hasAdvancedValues(module?.scriptHubOptions)));
+  moduleEditor.updateNativeModuleState();
   updateOutputPathPreview();
   openDialog(ui.moduleDialog);
   const formContent = ui.moduleDialog.querySelector('.form-content');
@@ -706,7 +572,7 @@ async function saveModule(event) {
     outputFileName: form.outputFileName.value,
     isEnabled: form.isEnabled.checked,
     publishesStandalone: form.publishesStandalone.checked,
-    scriptHubOptions: collectScriptHubOptions()
+    scriptHubOptions: moduleEditor.collectScriptHubOptions()
   };
   const validation = webLogic.validateModuleEditorFields(editorFields);
   if (validation) {

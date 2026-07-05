@@ -8,6 +8,7 @@ const formatSource = readFileSync(new URL('../SurgeRelay/WebResources/web-format
 const markupSource = readFileSync(new URL('../SurgeRelay/WebResources/web-markup.js', import.meta.url), 'utf8');
 const apiSource = readFileSync(new URL('../SurgeRelay/WebResources/web-api.js', import.meta.url), 'utf8');
 const stateSource = readFileSync(new URL('../SurgeRelay/WebResources/web-state.js', import.meta.url), 'utf8');
+const editorSource = readFileSync(new URL('../SurgeRelay/WebResources/web-editor.js', import.meta.url), 'utf8');
 const appSource = readFileSync(new URL('../SurgeRelay/WebResources/app.js', import.meta.url), 'utf8');
 const context = vm.createContext({ console, URL });
 vm.runInContext(logicSource, context, { filename: 'web-logic.js' });
@@ -16,6 +17,7 @@ vm.runInContext(formatSource, context, { filename: 'web-format.js' });
 vm.runInContext(markupSource, context, { filename: 'web-markup.js' });
 vm.runInContext(apiSource, context, { filename: 'web-api.js' });
 vm.runInContext(stateSource, context, { filename: 'web-state.js' });
+vm.runInContext(editorSource, context, { filename: 'web-editor.js' });
 
 const logic = context.SurgeRelayWebLogic;
 assert.ok(logic, 'web logic should install a global testable API');
@@ -29,6 +31,8 @@ const api = context.SurgeRelayWebAPI;
 assert.ok(api, 'web api should install a global testable API');
 const stateHelpers = context.SurgeRelayWebState;
 assert.ok(stateHelpers, 'web state should install a global testable API');
+const editorHelpers = context.SurgeRelayWebEditor;
+assert.ok(editorHelpers, 'web editor should install a global testable API');
 assert.equal(options.scriptHubDefaults.removeCommentedRewrites, true);
 assert.ok(
   options.advancedGroups.some(group => group.id === 'script-conversion'),
@@ -38,6 +42,11 @@ assert.doesNotMatch(
   appSource,
   /function (moduleSubtitle|moduleStatusTitle|failureSummary|folderTitle|publishedRelativePathForDraft|outputPathNotice|isValidHTTPURL|isNativeSurgeSource|validateModuleEditorFields|moduleEditorPayload|activityPresentation|normalizedOutputFileName|suggestedNameFromSource|normalizeFolder|isFileSource|sgmoduleName|existingSgmoduleName|baseName|existingFileBaseName)\(/,
   'app.js should call web-logic helpers directly instead of re-declaring wrappers'
+);
+assert.doesNotMatch(
+  appSource,
+  /function (setAdvancedExpanded|animateAdvancedResize|animateOptionGroup|collectScriptHubOptions|populateScriptHubOptions|hasAdvancedValues|populateOutputFolders|updateIconURLPreview)\(/,
+  'app.js should use web-editor helpers for editor UI details'
 );
 assert.doesNotMatch(
   appSource,
@@ -684,6 +693,140 @@ assert.equal(sessionRefreshCount, 1);
 assert.deepEqual(reloads[0], [false, false]);
 assert.equal(reconnectTimers[0].delay, 25);
 
+function makeClassList() {
+  const values = new Set();
+  return {
+    add(name) { values.add(name); },
+    remove(name) { values.delete(name); },
+    contains(name) { return values.has(name); },
+    toggle(name, force) {
+      if (force) values.add(name); else values.delete(name);
+    }
+  };
+}
+
+const editorFormElements = {
+  name: { value: 'Demo Module' },
+  sourceURL: { value: 'https://example.com/source.sgmodule' },
+  sourceFormat: { value: 'automatic' },
+  storageLocation: { value: 'local' },
+  outputFolder: { value: 'Folder' },
+  outputFileName: { value: '' },
+  publishesStandalone: { checked: true },
+  iconURL: { value: '' }
+};
+Object.entries(options.scriptHubDefaults).forEach(([key, value]) => {
+  editorFormElements[`option_${key}`] = typeof value === 'boolean'
+    ? { checked: value }
+    : { value };
+});
+const advancedGroupElements = Object.fromEntries(
+  options.advancedGroups.map(group => [`[data-option-group="${group.id}"]`, { open: false }])
+);
+const editorUI = {
+  moduleForm: { elements: editorFormElements },
+  advancedOptions: {
+    innerHTML: '',
+    hidden: false,
+    querySelector: selector => advancedGroupElements[selector] || null
+  },
+  advancedMaster: {
+    attributes: {},
+    setAttribute(name, value) { this.attributes[name] = value; }
+  },
+  advancedContent: {
+    attributes: {},
+    classList: makeClassList(),
+    style: {},
+    offsetHeight: 0,
+    setAttribute(name, value) { this.attributes[name] = value; }
+  },
+  moduleDialog: { open: false },
+  nativeNote: { hidden: true },
+  outputPathPreview: { textContent: '' },
+  outputPathNote: {
+    textContent: '',
+    hidden: true,
+    classList: makeClassList()
+  },
+  iconURLPreview: {
+    dataset: { fallbackIconUrl: '' },
+    classList: makeClassList(),
+    innerHTML: '',
+    title: '',
+    append(node) { this.appended = node; }
+  }
+};
+const createdElements = [];
+const editorController = editorHelpers.createModuleEditorController({
+  ui: editorUI,
+  logic,
+  markup,
+  scriptHubDefaults: options.scriptHubDefaults,
+  advancedGroups: options.advancedGroups,
+  document: {
+    createElement(tagName) {
+      const element = {
+        tagName,
+        addEventListener(type, handler) { this.listener = { type, handler }; }
+      };
+      createdElements.push(element);
+      return element;
+    }
+  },
+  window: { matchMedia: () => ({ matches: false }) },
+  mobileLayout: { matches: false }
+});
+editorController.installAdvancedOptions();
+assert.match(editorUI.advancedOptions.innerHTML, /advanced-intro/);
+editorController.setAdvancedExpanded(true);
+assert.equal(editorUI.advancedMaster.attributes['aria-expanded'], 'true');
+assert.equal(editorUI.advancedContent.attributes['aria-hidden'], 'false');
+assert.equal(editorUI.advancedContent.classList.contains('expanded'), true);
+assert.equal(editorController.updateNativeModuleState(), true);
+assert.equal(editorUI.nativeNote.hidden, false);
+assert.equal(editorUI.advancedOptions.hidden, true);
+editorFormElements.sourceURL.value = 'https://example.com/plugin.lpx';
+assert.equal(editorController.updateNativeModuleState(), false);
+assert.equal(editorUI.nativeNote.hidden, true);
+assert.equal(editorUI.advancedOptions.hidden, false);
+editorController.populateScriptHubOptions({
+  includeKeywords: 'ads+trackers',
+  convertAllScripts: true
+});
+assert.equal(editorFormElements.option_includeKeywords.value, 'ads+trackers');
+assert.equal(editorFormElements.option_convertAllScripts.checked, true);
+assert.equal(advancedGroupElements['[data-option-group="rewrites"]'].open, true);
+assert.equal(advancedGroupElements['[data-option-group="script-conversion"]'].open, true);
+assert.equal(editorController.collectScriptHubOptions().includeKeywords, 'ads+trackers');
+assert.equal(editorController.collectScriptHubOptions().convertAllScripts, true);
+assert.equal(editorController.hasAdvancedValues({ includeKeywords: 'ads+trackers' }), true);
+assert.equal(editorController.hasAdvancedValues({}), false);
+editorController.populateOutputFolders('Folder', ['Beta', 'Folder']);
+assert.equal(editorFormElements.outputFolder.value, 'Folder');
+assert.match(editorFormElements.outputFolder.innerHTML, /value="Folder">Folder/);
+editorFormElements.sourceURL.value = 'https://example.com/source.sgmodule';
+const outputPreview = editorController.updateOutputPathPreview({
+  state: {
+    combined: { fileName: 'Surge Relay' },
+    modules: [{ id: 'other', name: 'Other Module', publishedRelativePath: 'Folder/Demo Module.sgmodule' }]
+  },
+  editingID: null
+});
+assert.equal(outputPreview.path, 'Folder/Demo Module.sgmodule');
+assert.equal(outputPreview.notice.warning, true);
+assert.match(editorUI.outputPathNote.textContent, /Other Module/);
+assert.equal(editorUI.outputPathNote.hidden, false);
+assert.equal(editorUI.outputPathNote.classList.contains('warning'), true);
+editorFormElements.iconURL.value = 'file:///tmp/icon.png';
+editorController.updateIconURLPreview();
+assert.equal(editorUI.iconURLPreview.classList.contains('invalid'), true);
+assert.match(editorUI.iconURLPreview.innerHTML, /shippingbox/);
+editorFormElements.iconURL.value = 'https://example.com/icon.png';
+editorController.updateIconURLPreview();
+assert.equal(createdElements.at(-1).tagName, 'img');
+assert.equal(createdElements.at(-1).src, 'https://example.com/icon.png');
+
 const indexHTML = readFileSync(new URL('../SurgeRelay/WebResources/index.html', import.meta.url), 'utf8');
 const logicScriptIndex = indexHTML.indexOf('/web-logic.js');
 const optionsScriptIndex = indexHTML.indexOf('/web-options.js');
@@ -691,6 +834,7 @@ const formatScriptIndex = indexHTML.indexOf('/web-format.js');
 const markupScriptIndex = indexHTML.indexOf('/web-markup.js');
 const apiScriptIndex = indexHTML.indexOf('/web-api.js');
 const stateScriptIndex = indexHTML.indexOf('/web-state.js');
+const editorScriptIndex = indexHTML.indexOf('/web-editor.js');
 const appScriptIndex = indexHTML.indexOf('/app.js');
 assert.ok(logicScriptIndex >= 0, 'index should load web-logic.js');
 assert.ok(optionsScriptIndex > logicScriptIndex, 'web-options.js must load after web-logic.js');
@@ -698,7 +842,8 @@ assert.ok(formatScriptIndex > optionsScriptIndex, 'web-format.js must load after
 assert.ok(markupScriptIndex > formatScriptIndex, 'web-markup.js must load after web-format.js');
 assert.ok(apiScriptIndex > markupScriptIndex, 'web-api.js must load after web-markup.js');
 assert.ok(stateScriptIndex > apiScriptIndex, 'web-state.js must load after web-api.js');
-assert.ok(appScriptIndex > stateScriptIndex, 'web-state.js must load before app.js');
+assert.ok(editorScriptIndex > stateScriptIndex, 'web-editor.js must load after web-state.js');
+assert.ok(appScriptIndex > editorScriptIndex, 'web-editor.js must load before app.js');
 assert.match(indexHTML, /name="storageLocation"/);
 assert.match(indexHTML, /name="outputFolder"/);
 assert.match(indexHTML, /id="output-path-preview"/);
