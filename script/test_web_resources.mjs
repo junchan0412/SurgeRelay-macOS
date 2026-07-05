@@ -36,7 +36,7 @@ assert.ok(
 );
 assert.doesNotMatch(
   appSource,
-  /function (moduleSubtitle|moduleStatusTitle|failureSummary|folderTitle|publishedRelativePathForDraft|outputPathNotice|isValidHTTPURL|isNativeSurgeSource|validateModuleEditorFields|moduleEditorPayload|normalizedOutputFileName|suggestedNameFromSource|normalizeFolder|isFileSource|sgmoduleName|existingSgmoduleName|baseName|existingFileBaseName)\(/,
+  /function (moduleSubtitle|moduleStatusTitle|failureSummary|folderTitle|publishedRelativePathForDraft|outputPathNotice|isValidHTTPURL|isNativeSurgeSource|validateModuleEditorFields|moduleEditorPayload|activityPresentation|normalizedOutputFileName|suggestedNameFromSource|normalizeFolder|isFileSource|sgmoduleName|existingSgmoduleName|baseName|existingFileBaseName)\(/,
   'app.js should call web-logic helpers directly instead of re-declaring wrappers'
 );
 assert.doesNotMatch(
@@ -283,6 +283,87 @@ assert.deepEqual(
 assert.equal(logic.sidebarEmptyText({ query: 'missing', failuresOnly: false }), '没有搜索结果');
 assert.equal(logic.sidebarEmptyText({ query: '', failuresOnly: true }), '没有更新失败的模块');
 assert.equal(logic.sidebarEmptyText({ query: '', failuresOnly: false }), '还没有模块');
+
+assert.deepEqual(
+  JSON.parse(JSON.stringify(logic.activityPresentation({
+    kind: 'idle',
+    status: '',
+    title: '',
+    canStartUpdate: true,
+    canCancel: false,
+    isWorking: false,
+    progress: null
+  }))),
+  {
+    statusText: '准备就绪',
+    refreshDisabled: false,
+    refreshTitle: '更新全部',
+    refreshAriaLabel: '更新全部',
+    showCancel: false,
+    canCancel: false,
+    cancelLabel: '取消',
+    progressPercent: null,
+    progressVisible: false,
+    progressWidth: '0%'
+  }
+);
+assert.deepEqual(
+  JSON.parse(JSON.stringify(logic.activityPresentation({
+    kind: 'idle',
+    status: '等待本地模块根目录',
+    canStartUpdate: false,
+    updateBlockedReason: '请先配置本地模块根目录',
+    automaticPublishRunsAt: '2026-07-04T12:00:00Z'
+  }, {
+    formatAutomaticPublish: value => `formatted ${value}`
+  }))),
+  {
+    statusText: '等待本地模块根目录 · 自动发布 formatted 2026-07-04T12:00:00Z',
+    refreshDisabled: true,
+    refreshTitle: '请先配置本地模块根目录',
+    refreshAriaLabel: '无法更新：请先配置本地模块根目录',
+    showCancel: false,
+    canCancel: false,
+    cancelLabel: '取消',
+    progressPercent: null,
+    progressVisible: false,
+    progressWidth: '0%'
+  }
+);
+assert.deepEqual(
+  JSON.parse(JSON.stringify(logic.activityPresentation({
+    kind: 'updating',
+    title: '更新',
+    status: '正在转换模块',
+    canStartUpdate: false,
+    canCancel: true,
+    cancellationRequested: false,
+    isWorking: true,
+    progress: 1.4
+  }))),
+  {
+    statusText: '更新 · 正在转换模块',
+    refreshDisabled: true,
+    refreshTitle: '当前无法开始更新',
+    refreshAriaLabel: '无法更新：当前无法开始更新',
+    showCancel: true,
+    canCancel: true,
+    cancelLabel: '取消',
+    progressPercent: 100,
+    progressVisible: true,
+    progressWidth: '100%'
+  }
+);
+assert.equal(
+  logic.activityPresentation({
+    kind: 'updating',
+    canCancel: true,
+    cancellationRequested: true,
+    isWorking: true,
+    progress: 0.42
+  }).cancelLabel,
+  '正在取消'
+);
 
 assert.equal(
   logic.moduleSubtitle({

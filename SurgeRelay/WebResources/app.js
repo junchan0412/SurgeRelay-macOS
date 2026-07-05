@@ -298,32 +298,24 @@ function renderSidebar() {
 
 function renderActivity() {
   if (!state) return;
-  const activity = state.activity;
-  const autoPublishText = activity.automaticPublishRunsAt ? ` · 自动发布 ${formatTime(activity.automaticPublishRunsAt)}` : '';
-  const canStartUpdate = activity.canStartUpdate !== false;
-  const updateBlockedReason = activity.updateBlockedReason || '当前无法开始更新';
-  const title = activity.title || '';
-  const status = activity.status || (title ? `${title}任务进行中` : '准备就绪');
-  const activityText = title && activity.kind !== 'idle' && status !== title
-    ? `${title} · ${status}`
-    : status;
-  ui.status.textContent = `${activityText}${autoPublishText}`;
-  ui.refresh.disabled = !canStartUpdate;
-  ui.refresh.title = canStartUpdate ? '更新全部' : updateBlockedReason;
-  ui.refresh.setAttribute('aria-label', canStartUpdate ? '更新全部' : `无法更新：${updateBlockedReason}`);
-  const canCancel = activity.canCancel === true && activity.cancellationRequested !== true && activity.kind !== 'idle';
-  ui.cancelActivity.hidden = activity.canCancel !== true || activity.kind === 'idle';
-  ui.cancelActivity.disabled = !canCancel;
-  ui.cancelActivity.querySelector('span:last-child').textContent = activity.cancellationRequested ? '正在取消' : '取消';
-  if (activity.isWorking && activity.progress !== null) {
-    const percent = Math.round(activity.progress * 100);
-    ui.percent.textContent = `${percent}%`;
+  const activity = webLogic.activityPresentation(state.activity, {
+    formatAutomaticPublish: formatTime
+  });
+  ui.status.textContent = activity.statusText;
+  ui.refresh.disabled = activity.refreshDisabled;
+  ui.refresh.title = activity.refreshTitle;
+  ui.refresh.setAttribute('aria-label', activity.refreshAriaLabel);
+  ui.cancelActivity.hidden = !activity.showCancel;
+  ui.cancelActivity.disabled = !activity.canCancel;
+  ui.cancelActivity.querySelector('span:last-child').textContent = activity.cancelLabel;
+  if (activity.progressVisible) {
+    ui.percent.textContent = `${activity.progressPercent}%`;
     ui.progressTrack.hidden = false;
-    ui.progressFill.style.width = `${percent}%`;
+    ui.progressFill.style.width = activity.progressWidth;
   } else {
     ui.percent.textContent = '';
     ui.progressTrack.hidden = true;
-    ui.progressFill.style.width = '0%';
+    ui.progressFill.style.width = activity.progressWidth;
   }
   ui.latestUpdate.textContent = formatDate(state.combined.lastUpdatedAt, '尚未更新');
 }

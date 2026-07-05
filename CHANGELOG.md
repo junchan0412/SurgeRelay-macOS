@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将 Web 管理顶部状态卡的更新按钮、禁用原因、取消按钮和进度条展示规则抽入 `web-logic.js`，并补充无依赖 Node 测试，减少“更新按钮灰色但原因分叉”的回归风险。
 - 将更新失败、诊断报告、模块预览内容和凭据令牌协调测试拆入独立文件，让 `ModelAndCoordinatorTests.swift` 只保留基础模型与协调规则。
 - 将模块输出文件夹、模块草稿规划和本地模块导入规划测试拆入独立文件，继续收敛 `ModulePlanningTests.swift` 的职责。
 - 将自动发布准入/跳过规则测试拆入 `AutomaticPublishPlannerTests.swift`，将更新完成状态文案与调度决策测试拆入 `UpdateCompletionStatusPlannerTests.swift`。

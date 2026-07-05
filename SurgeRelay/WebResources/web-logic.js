@@ -109,6 +109,38 @@
     return options.failuresOnly ? '没有更新失败的模块' : '还没有模块';
   }
 
+  function activityPresentation(activity = {}, context = {}) {
+    const formatAutomaticPublish = context.formatAutomaticPublish || (value => String(value || ''));
+    const autoPublishText = activity.automaticPublishRunsAt
+      ? ` · 自动发布 ${formatAutomaticPublish(activity.automaticPublishRunsAt)}`
+      : '';
+    const canStartUpdate = activity.canStartUpdate !== false;
+    const updateBlockedReason = activity.updateBlockedReason || '当前无法开始更新';
+    const title = activity.title || '';
+    const status = activity.status || (title ? `${title}任务进行中` : '准备就绪');
+    const activityText = title && activity.kind !== 'idle' && status !== title
+      ? `${title} · ${status}`
+      : status;
+    const rawProgress = Number(activity.progress);
+    const progressPercent = activity.isWorking && Number.isFinite(rawProgress)
+      ? Math.min(100, Math.max(0, Math.round(rawProgress * 100)))
+      : null;
+    const showCancel = activity.canCancel === true && activity.kind !== 'idle';
+    const canCancel = showCancel && activity.cancellationRequested !== true;
+    return {
+      statusText: `${activityText}${autoPublishText}`,
+      refreshDisabled: !canStartUpdate,
+      refreshTitle: canStartUpdate ? '更新全部' : updateBlockedReason,
+      refreshAriaLabel: canStartUpdate ? '更新全部' : `无法更新：${updateBlockedReason}`,
+      showCancel,
+      canCancel,
+      cancelLabel: activity.cancellationRequested ? '正在取消' : '取消',
+      progressPercent,
+      progressVisible: progressPercent !== null,
+      progressWidth: progressPercent === null ? '0%' : `${progressPercent}%`
+    };
+  }
+
   function isFailedModule(module) {
     return module?.state === 'failed';
   }
@@ -259,6 +291,7 @@
     sidebarFailureFilterState,
     sidebarModules,
     sidebarEmptyText,
+    activityPresentation,
     folderTitle,
     publishedRelativePathForDraft,
     outputPathNotice,
