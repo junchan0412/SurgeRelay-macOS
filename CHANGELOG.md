@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将 AppModel 的 Web 管理令牌、服务启动和访问地址转发拆入 `AppModel+WebManagement.swift`，让主状态模型继续收敛为应用编排核心。
 - 将更新协调、Web 管理访问地址和配置目录迁移逻辑从 `ServiceModels.swift` 拆入独立服务文件，进一步压缩共享模型杂项。
 - 将发布计划、发布准入和本地源路径解析从 `ServiceModels.swift` 拆入 `PublishCoordinator.swift`，让共享模型文件继续保留小型跨服务值类型。
 - 将更新失败原因文案格式化从 `ServiceModels.swift` 拆入 `UpdateFailureFormatter.swift`，与更新失败补查规划保持同一服务边界。
