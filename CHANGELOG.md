@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将 AppModel 的配置目录、发布目标开关、本地模块目录、登录启动和定时调度设置转发拆入 `AppModel+Settings.swift`，减少主编排文件中的设置 UI 粘合逻辑。
 - 将 AppModel 的发布地址、最新 GitHub 发布快照和预览读取转发拆入 `AppModel+PreviewAccess.swift`，减少主编排文件的只读展示职责。
 - 将 AppModel 的模块可更新判断、总模块贡献判断、集合摘要和更新准入逻辑拆入 `AppModel+ModuleState.swift`，统一派生状态边界。
 - 将 AppModel 的 GitHub Token 加载、旧配置迁移和钥匙串保存逻辑拆入 `AppModel+Credentials.swift`，让凭据处理与主编排继续分离。
