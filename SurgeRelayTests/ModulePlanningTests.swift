@@ -503,6 +503,51 @@ final class ModulePlanningTests: XCTestCase {
         XCTAssertEqual(normalized[1].outputFileName, "Surge-Relay-2.sgmodule")
     }
 
+    func testModuleSidebarSectionPlannerGroupsVisibleModules() {
+        let failed = RelayModule(
+            name: "Failed",
+            sourceURL: "https://example.com/failed.sgmodule",
+            outputFileName: "Failed",
+            storageLocation: .local,
+            state: .failed
+        )
+        let conflicted = RelayModule(
+            name: "Conflicted",
+            sourceURL: "https://example.com/conflicted.sgmodule",
+            outputFileName: "Conflicted",
+            storageLocation: .gitHub,
+            hasOverrideConflict: true
+        )
+        let local = RelayModule(
+            name: "Local",
+            sourceURL: "https://example.com/local.sgmodule",
+            outputFileName: "Local",
+            storageLocation: .local
+        )
+        let github = RelayModule(
+            name: "GitHub",
+            sourceURL: "https://example.com/github.sgmodule",
+            outputFileName: "GitHub",
+            storageLocation: .gitHub
+        )
+        let invalid = RelayModule(
+            name: "Invalid",
+            sourceURL: "not a url",
+            outputFileName: "Invalid",
+            storageLocation: .gitHub
+        )
+
+        let sections = ModuleSidebarSectionPlanner.sections(for: [failed, conflicted, local, github, invalid])
+
+        XCTAssertEqual(sections.map(\.id), ["attention", "local", "github", "uncategorized"])
+        XCTAssertEqual(sections.map(\.title), ["需要处理", "本地模块", "GitHub 模块", "未分类"])
+        XCTAssertEqual(sections[0].modules.map(\.name), ["Failed", "Conflicted"])
+        XCTAssertEqual(sections[1].modules.map(\.name), ["Local"])
+        XCTAssertEqual(sections[2].modules.map(\.name), ["GitHub"])
+        XCTAssertEqual(sections[3].modules.map(\.name), ["Invalid"])
+        XCTAssertTrue(ModuleSidebarSectionPlanner.sections(for: []).isEmpty)
+    }
+
     func testModuleDraftPlannerBuildsLocalAddPlanWithoutLosingOriginalPath() throws {
         let root = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)

@@ -1,13 +1,6 @@
 import AppKit
 import SwiftUI
 
-struct ModuleSidebarSection: Identifiable {
-    let id: String
-    let title: String
-    let systemImage: String
-    let modules: [RelayModule]
-}
-
 struct ModuleSidebarView: View {
     @Environment(AppModel.self) private var model
     let sections: [ModuleSidebarSection]

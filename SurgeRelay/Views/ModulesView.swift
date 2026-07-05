@@ -47,39 +47,7 @@ struct ModulesView: View {
     }
 
     private var sidebarSections: [ModuleSidebarSection] {
-        let values = filteredModules
-        return [
-            ModuleSidebarSection(
-                id: "attention",
-                title: "需要处理",
-                systemImage: "exclamationmark.triangle",
-                modules: values.filter { $0.state == .failed || $0.hasOverrideConflict }
-            ),
-            ModuleSidebarSection(
-                id: "local",
-                title: "本地模块",
-                systemImage: "folder",
-                modules: values.filter { module in
-                    module.state != .failed && !module.hasOverrideConflict && module.storageLocation == .local && module.sourceOrigin != .invalid
-                }
-            ),
-            ModuleSidebarSection(
-                id: "github",
-                title: "GitHub 模块",
-                systemImage: "cloud",
-                modules: values.filter { module in
-                    module.state != .failed && !module.hasOverrideConflict && module.storageLocation == .gitHub && module.sourceOrigin != .invalid
-                }
-            ),
-            ModuleSidebarSection(
-                id: "uncategorized",
-                title: "未分类",
-                systemImage: "link.badge.plus",
-                modules: values.filter { module in
-                    module.state != .failed && !module.hasOverrideConflict && module.sourceOrigin == .invalid
-                }
-            )
-        ].filter { !$0.modules.isEmpty }
+        ModuleSidebarSectionPlanner.sections(for: filteredModules)
     }
 
     private func searchableText(for module: RelayModule) -> String {
@@ -307,7 +275,7 @@ struct ModulesView: View {
                 showsLocalImportPreview = true
             } catch {
                 model.presentedError = "扫描本地模块失败：\(error.localizedDescription)"
-                model.statusMessage = "本地模块扫描失败"
+                model.statusMessage = LocalModuleImportPlanner.scanFailedStatus
             }
         }
     }
