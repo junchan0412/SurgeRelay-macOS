@@ -40,6 +40,7 @@
 		A19A19A19A19A19A19A19A19 /* ModuleDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = B19B19B19B19B19B19B19B19 /* ModuleDraft.swift */; };
 		A20A20A20A20A20A20A20A20 /* ModuleOutputPath.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20B20B20B20B20B20B20B20 /* ModuleOutputPath.swift */; };
 		A21A21A21A21A21A21A21A21 /* ModulePreviewViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B21B21B21B21B21B21B21B21 /* ModulePreviewViews.swift */; };
+		A26A26A26A26A26A26A26A26 /* ModuleDetailPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26B26B26B26B26B26B26B26 /* ModuleDetailPaneView.swift */; };
 		A09A09A09A09A09A09A09A09 /* WebRequestSecurity.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09B09B09B09B09B09B09B09 /* WebRequestSecurity.swift */; };
 		A10A10A10A10A10A10A10A10 /* WebAuthenticationThrottle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10B10B10B10B10B10B10B10 /* WebAuthenticationThrottle.swift */; };
 		B8B8B8B8B8B8B8B8B8B8B8B8 /* WebManagementHTTP.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8C8C8C8C8C8C8C8C8C8C8C8 /* WebManagementHTTP.swift */; };
@@ -293,6 +294,7 @@
 		B19B19B19B19B19B19B19B19 /* ModuleDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleDraft.swift; sourceTree = "<group>"; };
 		B20B20B20B20B20B20B20B20 /* ModuleOutputPath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleOutputPath.swift; sourceTree = "<group>"; };
 		B21B21B21B21B21B21B21B21 /* ModulePreviewViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModulePreviewViews.swift; sourceTree = "<group>"; };
+		B26B26B26B26B26B26B26B26 /* ModuleDetailPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleDetailPaneView.swift; sourceTree = "<group>"; };
 		E105E105E105E105E105E105 /* ModuleCodeTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleCodeTextView.swift; sourceTree = "<group>"; };
 		B13B13B13B13B13B13B13B13 /* WebManagementModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebManagementModels.swift; sourceTree = "<group>"; };
 		B25B25B25B25B25B25B25B25 /* WebManagementStateBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebManagementStateBuilder.swift; sourceTree = "<group>"; };
@@ -456,6 +458,7 @@
 				B22B22B22B22B22B22B22B22 /* DetailInfoViews.swift */,
 				B44B44B44B44B44B44B44B44 /* LocalModuleImportPreviewView.swift */,
 				B79782FA982FB6C66E5D50BA /* MenuBarContent.swift */,
+				B26B26B26B26B26B26B26B26 /* ModuleDetailPaneView.swift */,
 				B81B81B81B81B81B81B81B81 /* ModuleDetailSummaryHeader.swift */,
 				B55B55B55B55B55B55B55B55 /* ModuleDetailView.swift */,
 				B18B18B18B18B18B18B18B18 /* ModuleEditorComponents.swift */,
@@ -937,6 +940,7 @@
 				92E92E92E92E92E92E92E92E /* LocalPublishedFilesPlanner.swift in Sources */,
 				A44A44A44A44A44A44A44A44 /* LocalModuleImportPreviewView.swift in Sources */,
 				93D45771DAD23A3F8AD5473F /* MenuBarContent.swift in Sources */,
+				A26A26A26A26A26A26A26A26 /* ModuleDetailPaneView.swift in Sources */,
 				A55A55A55A55A55A55A55A55 /* ModuleDetailView.swift in Sources */,
 				A18A18A18A18A18A18A18A18 /* ModuleEditorComponents.swift in Sources */,
 				280C7E38DAD9F18ED8090287 /* ModuleEditorView.swift in Sources */,

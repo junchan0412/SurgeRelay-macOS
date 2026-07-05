@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 struct ModulesView: View {
@@ -6,7 +5,6 @@ struct ModulesView: View {
     @State private var searchText = ""
     @State private var editorRoute: ModuleEditorRoute?
     @State private var deleteCandidate: RelayModule?
-    @State private var detailTab: DetailTab = .info
     @State private var contentIndexState = ModuleSearchContentIndexState()
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var isScanningLocalModules = false
@@ -16,25 +14,6 @@ struct ModulesView: View {
     @State private var selectedLocalImportCandidateIDs = Set<String>()
     @State private var isBatchSelecting = false
     @State private var batchSelectedModuleIDs = Set<UUID>()
-
-    private enum DetailTab: Hashable { case info, preview }
-
-    private enum SelectionKind {
-        case combined
-        case module(RelayModule)
-    }
-
-    private var selectionKind: SelectionKind? {
-        if model.settings.combinedModuleEnabled,
-           model.selectedModuleID == AppModel.combinedModuleSelectionID {
-            return .combined
-        }
-        if let id = model.selectedModuleID,
-           let module = model.modules.first(where: { $0.id == id }) {
-            return .module(module)
-        }
-        return nil
-    }
 
     private var normalizedSearchText: String {
         ModuleSearchIndex.normalizedQuery(searchText)
@@ -166,62 +145,8 @@ struct ModulesView: View {
                 }
             }
         } detail: {
-            Group {
-                if let kind = selectionKind {
-                    // Keep both panes mounted and just toggle opacity, so switching
-                    // tabs never destroys/recreates (and re-loads) the code preview
-                    // view — that recreation is what caused the white flash.
-                    ZStack {
-                        switch kind {
-                        case .combined:
-                            CombinedModuleDetailView()
-                                .opacity(detailTab == .info ? 1 : 0)
-                                .allowsHitTesting(detailTab == .info)
-                            CombinedPreviewPane()
-                                .opacity(detailTab == .preview ? 1 : 0)
-                                .allowsHitTesting(detailTab == .preview)
-                        case let .module(module):
-                            ModuleDetailView(module: module, onEdit: { presentEditor(module) })
-                                .opacity(detailTab == .info ? 1 : 0)
-                                .allowsHitTesting(detailTab == .info)
-                            ModulePreviewPane(module: module)
-                                .opacity(detailTab == .preview ? 1 : 0)
-                                .allowsHitTesting(detailTab == .preview)
-                        }
-                    }
-                } else {
-                    ContentUnavailableView("选择一个模块", systemImage: "sidebar.right")
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .searchable(text: $searchText, prompt: "搜索")
-            .toolbar {
-                ToolbarSpacer(.flexible)
-                if selectionKind != nil {
-                    ToolbarItem {
-                        Picker("视图", selection: $detailTab) {
-                            Image(systemName: "info.circle")
-                                .accessibilityLabel("详情")
-                                .tag(DetailTab.info)
-                            Image(systemName: "curlybraces")
-                                .accessibilityLabel("预览")
-                                .tag(DetailTab.preview)
-                        }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                    }
-                }
-                ToolbarItem {
-                    Button {
-                        model.presentsSettings = true
-                    } label: {
-                        Label("设置", systemImage: "gearshape")
-                    }
-                    .help("设置")
-                }
-            }
+            ModuleDetailPaneView(searchText: $searchText, editModule: presentEditor)
         }
-        .onChange(of: model.selectedModuleID) { _, _ in detailTab = .info }
         .task(id: contentIndexToken) { await rebuildContentIndex() }
         .sheet(item: $editorRoute) { route in
             ModuleEditorView(module: route.module)
