@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将 Script-Hub 引擎刷新与 GitHub 连通性测试从 `AppModel+Updates.swift` 拆入独立扩展文件，让更新编排文件更专注于模块刷新循环。
 - 将剩余共享模型拆入 `ConversionModels.swift`、`ModuleCollectionSummary.swift`、`SourceRevisionModels.swift` 和 `RelayError.swift`，移除 `ServiceModels.swift` 这一杂项模型入口。
 - 将更新历史、发布历史条目和最近 GitHub 发布快照拆入 `UpdateHistoryModels.swift`，并把 GitHub Release 更新入口常量移入 `GitHubReleaseModels.swift`，继续收窄 `ServiceModels.swift`。
 - 将发布文件、发布报告、发布目标和发布预览模型拆入 `PublishModels.swift`，继续压缩 `ServiceModels.swift` 的跨服务杂项职责。
