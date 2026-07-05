@@ -59,25 +59,22 @@ extension AppModel {
 
         for entry in importPlan.entries {
             guard shouldContinueCurrentWork() else { return }
-            var module = entry.module
+            let module = entry.module
             do {
                 let result = try await scriptHubClient.convert(
                     module: module,
                     github: settings.github.isConfigured ? settings.github : nil
                 )
-                if let subscription = ModuleMetadataParser.scriptHubSubscription(in: result.content) {
-                    _ = module.applyScriptHubSubscriptionMetadata(subscription)
-                }
                 try await fileStore.writeComponent(result.content, id: module.id)
                 let fingerprint = await processingWorker.contentFingerprint(
                     of: result.content,
                     assets: result.assets
                 )
-                module.contentHash = fingerprint
-                module.lastUpdatedAt = .now
-                module.state = .current
-                module.lastError = nil
-                imported.append(module)
+                imported.append(LocalModuleImportPlanner.successfulImportModule(
+                    module,
+                    convertedContent: result.content,
+                    contentHash: fingerprint
+                ))
             } catch {
                 guard shouldContinueCurrentWork() else { return }
                 failures.append("\(entry.candidate.relativePath)：\(error.localizedDescription)")

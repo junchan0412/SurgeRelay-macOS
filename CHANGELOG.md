@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将本地模块导入成功后的 Script-Hub 订阅元数据恢复、来源格式归一化、content hash 和状态写回收进 `LocalModuleImportPlanner`，让 AppModel 只负责转换与缓存写入。
 - 将更新失败后沿用缓存、缺缓存阻止总模块覆盖、失败历史记录和缺缓存弹窗文案收进 `UpdateFailurePlanner`，让 `AppModel+Updates` 只保留缓存读取与输出重建编排。
 - 将来源未变化且缓存可复用时的 revision 写回、状态恢复和历史文案收进 `ModuleMetadataRefreshPlanner`，减少 `AppModel+Updates` 的更新循环分支。
 - 将模块成功转换后的 revision 写回、覆盖冲突、订阅元数据恢复、图标和内容变化判断收进 `ModuleMetadataRefreshPlanner`，让更新循环继续保留在 I/O 编排层。

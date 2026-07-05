@@ -137,6 +137,55 @@ final class LocalModuleImportPlannerTests: XCTestCase {
         )
     }
 
+    func testLocalModuleImportPlannerBuildsSuccessfulImportedModuleState() {
+        let importedAt = Date(timeIntervalSince1970: 30_000)
+        let localSourceURL = URL(filePath: "/Users/example/Surge/Demo.sgmodule").absoluteString
+        let module = RelayModule(
+            name: "Imported",
+            sourceURL: localSourceURL,
+            sourceFormat: .surge,
+            outputFileName: "Demo.sgmodule",
+            storageLocation: .local,
+            localStorageRelativePath: "Demo.sgmodule",
+            preservesOutputFileName: true,
+            detectedSourceFormat: .surge,
+            contentHash: "old-hash",
+            state: .failed,
+            lastError: "previous failure"
+        )
+        let convertedContent = """
+        #!name=Converted
+        #SUBSCRIBED http://script.hub/file/_start_/https://example.com/QuantumultX/demo.conf/_end_/Demo.sgmodule?type=qx-rewrite&target=surge-module&category=%23%E5%B7%A5%E5%85%B7&jqEnabled=true
+
+        [Script]
+        Demo = type=http-request, pattern=^https://example.com
+        """
+
+        let imported = LocalModuleImportPlanner.successfulImportModule(
+            module,
+            convertedContent: convertedContent,
+            contentHash: "new-hash",
+            importedAt: importedAt
+        )
+
+        XCTAssertEqual(imported.sourceURL, "https://example.com/QuantumultX/demo.conf")
+        XCTAssertEqual(imported.storageLocation, .local)
+        XCTAssertTrue(imported.preservesOutputFileName)
+        XCTAssertEqual(imported.sourceFormat, .quantumultX)
+        XCTAssertEqual(imported.category, "#工具")
+        XCTAssertTrue(imported.scriptHubOptions.enableJQ)
+        XCTAssertNil(imported.sourceETag)
+        XCTAssertNil(imported.sourceLastModified)
+        XCTAssertNil(imported.sourceContentHash)
+        XCTAssertNil(imported.sourceCheckedAt)
+        XCTAssertNil(imported.conversionEngineRevision)
+        XCTAssertEqual(imported.contentHash, "new-hash")
+        XCTAssertEqual(imported.lastUpdatedAt, importedAt)
+        XCTAssertEqual(imported.state, .current)
+        XCTAssertNil(imported.lastError)
+        XCTAssertNil(imported.detectedSourceFormat)
+    }
+
     private func scanCandidate(
         relativePath: String,
         localStorageRelativePath: String? = nil,

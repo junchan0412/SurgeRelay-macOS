@@ -91,7 +91,7 @@ Module argument override planning belongs in `ModuleArgumentPlanner`. Keep overr
 
 Module output-folder catalogs belong in `ModuleOutputFolderCatalog`. Keep the merged folder menu, create-folder setting changes, local destination path planning, and GitHub directory refresh cache decisions there. `AppModel` should do the actual local directory creation and GitHub directory fetch, then apply the returned state.
 
-Local module import planning belongs in `LocalModuleImportPlanner`. Keep scanned-candidate validation, output filename de-duplication, combined-module path avoidance, imported `RelayModule` construction, and scan/import status text there. `AppModel` should only execute conversion, cache writes, persistence, and apply user-visible status/error values returned by planner helpers.
+Local module import planning belongs in `LocalModuleImportPlanner`. Keep scanned-candidate validation, output filename de-duplication, combined-module path avoidance, imported `RelayModule` construction, successful-import metadata/state writeback, and scan/import status text there. `AppModel` should only execute conversion, cache writes, persistence, and apply user-visible status/error values returned by planner helpers.
 
 User-visible publish addresses belong in `PublishedAddressResolver`. Keep GitHub publication gating, standalone module URL eligibility, combined-module GitHub URL generation, and local combined-module file URL generation there. `AppSettings` should remain configuration data, while AppModel, views, Web management, and diagnostics consume resolved addresses through AppModel forwarding properties.
 

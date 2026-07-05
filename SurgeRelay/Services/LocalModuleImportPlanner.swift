@@ -92,6 +92,27 @@ enum LocalModuleImportPlanner {
         return "已导入 \(importedCount) 个本地模块\(failureSuffix)"
     }
 
+    static func successfulImportModule(
+        _ module: RelayModule,
+        convertedContent: String,
+        contentHash: String,
+        importedAt: Date = .now
+    ) -> RelayModule {
+        var module = module
+        if let subscription = ModuleMetadataParser.scriptHubSubscription(in: convertedContent) {
+            _ = module.applyScriptHubSubscriptionMetadata(subscription)
+        }
+        module.detectedSourceFormat = ModuleNamingPlanner.detectedFormat(
+            for: module.sourceFormat,
+            source: module.sourceURL
+        )
+        module.contentHash = contentHash
+        module.lastUpdatedAt = importedAt
+        module.state = .current
+        module.lastError = nil
+        return module
+    }
+
     static func failureDetails(_ failures: [String], isPartialImport: Bool) -> String? {
         guard !failures.isEmpty else { return nil }
         let title = isPartialImport ? "部分本地模块无法导入" : "以下本地模块无法导入"
