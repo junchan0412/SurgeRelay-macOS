@@ -1494,30 +1494,6 @@ final class AppModel {
         )
     }
 
-    var combinedRawURL: URL? {
-        PublishedAddressResolver.combinedGitHubURL(settings: settings)
-    }
-
-    var combinedLocalFileURL: URL? {
-        PublishedAddressResolver.combinedLocalFileURL(settings: settings)
-    }
-
-    var latestGitHubPublish: GitHubPublishSnapshot? {
-        GitHubPublishSnapshot.latest(in: updateHistory, settings: settings.github)
-    }
-
-    func rawURL(for module: RelayModule) -> URL? {
-        PublishedAddressResolver.standaloneURL(for: module, settings: settings)
-    }
-
-    func previewContent(for module: RelayModule) async throws -> String {
-        try await modulePreviewProvider.previewContent(for: module)
-    }
-
-    func moduleArgumentInfo(for module: RelayModule) async -> ModuleArgumentInfo {
-        await modulePreviewProvider.moduleArgumentInfo(for: module)
-    }
-
     func setModuleArgument(moduleID: UUID, key: String, value: String, defaultValue: String) {
         guard let index = modules.firstIndex(where: { $0.id == moduleID }) else { return }
         let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1543,12 +1519,6 @@ final class AppModel {
         try? persistModules()
         statusMessage = "已恢复 \(modules[index].name) 的默认参数"
         Task { await rebuildCombinedFromCache() }
-    }
-
-    func combinedPreviewContent() async throws -> String {
-        try await modulePreviewProvider.combinedPreviewContent(
-            combinedModuleEnabled: settings.combinedModuleEnabled
-        )
     }
 
     func savePreviewContent(_ content: String, for module: RelayModule) async throws {
@@ -1608,10 +1578,6 @@ final class AppModel {
         modules[index].hasOverrideConflict = false
         try? persistModules()
         statusMessage = "已保留 \(modules[index].name) 的本地编辑"
-    }
-
-    func convertedPreviewContent(for module: RelayModule) async throws -> String {
-        try await modulePreviewProvider.convertedPreviewContent(for: module)
     }
 
     func clearUpdateHistory() {
@@ -1766,7 +1732,7 @@ final class AppModel {
         )
     }
 
-    private var modulePreviewProvider: ModulePreviewContentProvider {
+    var modulePreviewProvider: ModulePreviewContentProvider {
         ModulePreviewContentProvider(
             hasComponent: { [fileStore] id in
                 await fileStore.hasComponent(id: id)
