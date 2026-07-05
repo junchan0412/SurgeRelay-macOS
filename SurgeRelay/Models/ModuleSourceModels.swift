@@ -1,0 +1,167 @@
+import Foundation
+
+enum ModuleSourceIdentity {
+    static func canonicalValue(for source: String) -> String {
+        let trimmed = source.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let url = URL(string: trimmed), url.isFileURL {
+            return url.standardizedFileURL.absoluteString
+        }
+        guard var components = URLComponents(string: trimmed) else { return trimmed }
+
+        components.scheme = components.scheme?.lowercased()
+        components.host = components.host?.lowercased()
+        components.fragment = nil
+
+        if (components.scheme == "https" && components.port == 443) ||
+            (components.scheme == "http" && components.port == 80) {
+            components.port = nil
+        }
+        if components.percentEncodedPath.isEmpty {
+            components.percentEncodedPath = "/"
+        }
+
+        return components.string ?? trimmed
+    }
+
+    static func matches(_ lhs: String, _ rhs: String) -> Bool {
+        canonicalValue(for: lhs) == canonicalValue(for: rhs)
+    }
+}
+
+enum ModuleSourceFormat: String, Codable, CaseIterable, Identifiable, Sendable {
+    case automatic
+    case quantumultX
+    case loon
+    case surge
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .automatic: "自动识别"
+        case .quantumultX: "Quantumult X 重写"
+        case .loon: "Loon 插件"
+        case .surge: "Surge 模块"
+        }
+    }
+
+    var shortTitle: String {
+        switch self {
+        case .automatic: "自动"
+        case .quantumultX: "Quantumult X"
+        case .loon: "Loon"
+        case .surge: "Surge"
+        }
+    }
+
+    func resolvedFormat(for sourceURL: URL) -> ModuleSourceFormat {
+        guard self == .automatic else { return self }
+        let path = sourceURL.path.lowercased()
+        switch sourceURL.pathExtension.lowercased() {
+        case "sgmodule": return .surge
+        case "plugin", "lpx": return .loon
+        default: break
+        }
+        if path.contains("/loon/") { return .loon }
+        if path.contains("/quantumultx/") || path.contains("/quantumult-x/") || path.contains("/qx/") {
+            return .quantumultX
+        }
+        return .quantumultX
+    }
+
+    func scriptHubType(for sourceURL: URL) -> String {
+        switch resolvedFormat(for: sourceURL) {
+        case .quantumultX: "qx-rewrite"
+        case .loon: "loon-plugin"
+        case .surge: "surge-module"
+        case .automatic: "qx-rewrite"
+        }
+    }
+
+    func isNativeSurgeModule(for sourceURL: URL) -> Bool {
+        resolvedFormat(for: sourceURL) == .surge
+    }
+}
+
+enum ModuleStorageLocation: String, Codable, CaseIterable, Identifiable, Sendable {
+    case local
+    case gitHub
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .local: "本地模块"
+        case .gitHub: "GitHub 模块"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .local: "储存在本地模块根目录"
+        case .gitHub: "储存在 GitHub 模块目录"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .local: "folder"
+        case .gitHub: "cloud"
+        }
+    }
+}
+
+enum ModuleSourceOrigin: Equatable, Sendable {
+    case localSurgeFile
+    case remote(ModuleSourceFormat)
+    case invalid
+
+    var title: String {
+        switch self {
+        case .localSurgeFile:
+            "本地 Surge 模块"
+        case .remote(let format):
+            switch format {
+            case .automatic:
+                "远程来源"
+            case .quantumultX:
+                "远程 Quantumult X"
+            case .loon:
+                "远程 Loon"
+            case .surge:
+                "远程 Surge 模块"
+            }
+        case .invalid:
+            "缺少有效来源"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .localSurgeFile: "doc"
+        case .remote: "link"
+        case .invalid: "exclamationmark.triangle"
+        }
+    }
+
+    var isRemote: Bool {
+        if case .remote = self { return true }
+        return false
+    }
+}
+
+enum ModuleUpdateState: String, Codable, Sendable {
+    case never
+    case updating
+    case current
+    case failed
+
+    var title: String {
+        switch self {
+        case .never: "尚未更新"
+        case .updating: "正在更新"
+        case .current: "已是最新"
+        case .failed: "更新失败"
+        }
+    }
+}

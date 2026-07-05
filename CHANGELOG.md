@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将模块来源身份、来源格式、存放位置、来源关系和更新状态类型拆入 `ModuleSourceModels.swift`，让 `RelayModule.swift` 专注于模块持久化状态与派生属性。
 - 将本地发布受管理文件的标记插入、管理判定和 iCloud 冲突版本验证抽入 `ManagedPublishedFile`，让 `ModuleFileStore` 更专注于文件协调与导出流程。
 - 将诊断模型拆为报告 payload、安装/崩溃诊断、钥匙串/凭据诊断和本地根目录诊断文件，避免 `DiagnosticModels.swift` 继续集中承担多个诊断域。
 - 将 AppModel 的总模块缓存重建、本地发布写入、旧输出清理和共享发布文件装配拆入 `AppModel+PublishedOutput.swift`，让 `AppModel+Publishing.swift` 专注于手动 GitHub 发布流程。
