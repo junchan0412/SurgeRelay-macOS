@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将 GitHub API DTO 抽入 `GitHubAPIModels.swift`，将仓库路径、模块目录推导、重复路径校验和提交文案抽入 `GitHubRepositoryPath.swift`，让 `GitHubClient.swift` 更专注于请求、diff、提交和引用更新事务。
 - 将模块/总模块预览页、上游对比页和 AppKit 代码文本高亮桥接拆入 `ModulePreviewViews.swift`，让 `Components.swift` 继续收敛为通用小组件。
 - 将模块草稿模型拆入 `ModuleDraft.swift`，将模块输出文件夹和输出路径提示拆入 `ModuleOutputPath.swift`，让 `RelayModule.swift` 更专注于持久化模块状态和来源/存放关系。
 - 将模块编辑器的预览卡、表单分区、表单行、输出路径行、存放文件夹菜单、存放位置选择器和草稿图标预览抽入 `ModuleEditorComponents.swift`，让 `ModuleEditorView.swift` 专注于草稿状态、自动命名和保存流程。

@@ -33,6 +33,45 @@ final class GitHubPublishTests: XCTestCase {
         XCTAssertEqual(Data("hello\n".utf8).gitBlobSHA1, "ce013625030ba8dba906f756967f9e9ca394464a")
     }
 
+    func testGitHubRepositoryPathNormalizesNestedModuleRoot() {
+        var settings = GitHubSettings()
+        settings.directory = "/surge\\modules/"
+
+        XCTAssertEqual(GitHubRepositoryPath.repositoryDirectory(settings: settings), "surge/modules")
+        XCTAssertEqual(
+            GitHubRepositoryPath.repositoryPath(for: "Ads/You Tube.sgmodule", settings: settings),
+            "surge/modules/Ads/You Tube.sgmodule"
+        )
+        XCTAssertEqual(
+            GitHubRepositoryPath.encodedRepositoryPath(for: "Ads/You Tube.sgmodule", settings: settings),
+            "surge/modules/Ads/You%20Tube.sgmodule"
+        )
+
+        settings.directory = ""
+        XCTAssertEqual(
+            GitHubRepositoryPath.repositoryPath(for: "Ads/You Tube.sgmodule", settings: settings),
+            "Ads/You Tube.sgmodule"
+        )
+    }
+
+    func testGitHubRepositoryPathListsOutputFoldersRelativeToModuleRoot() {
+        var settings = GitHubSettings()
+        settings.directory = "surge/modules"
+        let tree = [
+            GitHubAPI.TreeItem(path: "surge/modules/Ads", type: "tree", sha: "tree-ads"),
+            GitHubAPI.TreeItem(path: "surge/modules/Ads/Video", type: "tree", sha: "tree-video"),
+            GitHubAPI.TreeItem(path: "surge/modules/Ads/Video/YouTube.sgmodule", type: "blob", sha: "blob-video"),
+            GitHubAPI.TreeItem(path: "surge/modules/Root.sgmodule", type: "blob", sha: "blob-root"),
+            GitHubAPI.TreeItem(path: "surge/modules/assets/Generated/script.js", type: "blob", sha: "blob-asset"),
+            GitHubAPI.TreeItem(path: "other/Ignored", type: "tree", sha: "tree-ignored")
+        ]
+
+        XCTAssertEqual(
+            GitHubRepositoryPath.moduleDirectories(from: tree, settings: settings),
+            ["Ads", "Ads/Video"]
+        )
+    }
+
     func testGitHubPublishDiffsAgainstRecursiveTree() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [GitHubMockURLProtocol.self]

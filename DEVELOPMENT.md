@@ -141,6 +141,8 @@ Diagnostic payloads and snapshots live in `Models/DiagnosticModels.swift`. Keep 
 
 GitHub Release metadata, install guidance, checksum validation state, and version comparison live in `Models/GitHubReleaseModels.swift`. The GitHub latest-release API call and sha256 sidecar downloads live in `Services/GitHubReleaseClient.swift`; `Views/CheckForUpdatesView.swift` should remain UI-only apart from SwiftUI presentation adapters.
 
+GitHub publish networking lives in `Services/GitHubClient.swift`. Keep API request/response DTOs in `Services/GitHubAPIModels.swift`, and keep repository path normalization, output-folder discovery, duplicate-path validation, and commit-message construction in `Services/GitHubRepositoryPath.swift` so GitHub directory-root behavior stays testable without a network client.
+
 Module editor presentation primitives live in `Views/ModuleEditorComponents.swift`. Keep the preview card, section chrome, editor rows, output path row, output-folder picker, storage-location picker, and draft icon preview there; `Views/ModuleEditorView.swift` should own draft state, derived editor hints, source auto-fill, folder creation, and save/cancel flow.
 
 ## Build And Test
