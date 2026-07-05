@@ -1,6 +1,29 @@
 import Foundation
 
 enum ModuleSearchIndex {
+    static func normalizedQuery(_ text: String) -> String {
+        text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    static func contentCacheKey(for module: RelayModule) -> String {
+        module.contentHash ?? ""
+    }
+
+    static func cachedContent(
+        for module: RelayModule,
+        contentIndex: [UUID: String],
+        contentIndexCacheKeys: [UUID: String]
+    ) -> String? {
+        guard contentIndexCacheKeys[module.id] == contentCacheKey(for: module) else {
+            return nil
+        }
+        return contentIndex[module.id]
+    }
+
+    static func metadataText(for module: RelayModule) -> String {
+        text(for: module, cachedContent: nil)
+    }
+
     static func text(for module: RelayModule, cachedContent: String? = nil) -> String {
         var parts = [
             module.name,
@@ -39,5 +62,12 @@ enum ModuleSearchIndex {
             parts.append(cachedContent)
         }
         return parts.joined(separator: "\n").lowercased()
+    }
+
+    static func shouldLoadContent(for module: RelayModule, query: String, cachedContent: String?) -> Bool {
+        let query = normalizedQuery(query)
+        guard !query.isEmpty else { return false }
+        guard cachedContent == nil else { return false }
+        return !metadataText(for: module).contains(query)
     }
 }
