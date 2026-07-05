@@ -239,6 +239,71 @@ final class PublishPlannerTests: XCTestCase {
         XCTAssertEqual(movedRepositoryUpdate.publishedPaths, ["B.sgmodule", "C.sgmodule"])
     }
 
+    func testGitHubPublishPlannerBuildsUserVisibleStatuses() {
+        let changedReport = PublishReport(
+            publishedFiles: ["A.sgmodule"],
+            deletedFiles: ["Old.sgmodule"],
+            retriedAfterConflict: true
+        )
+        let unchangedReport = PublishReport(publishedFiles: [])
+        let preview = PublishPreview(
+            destination: .gitHub,
+            targetDescription: "someone/relay@main/modules",
+            activeFiles: ["A.sgmodule"],
+            changedFiles: ["A.sgmodule"],
+            deletedFiles: ["Old.sgmodule"]
+        )
+        let unchangedPreview = PublishPreview(
+            destination: .gitHub,
+            targetDescription: "someone/relay@main/modules",
+            activeFiles: ["A.sgmodule"],
+            changedFiles: [],
+            deletedFiles: []
+        )
+
+        XCTAssertEqual(GitHubPublishPlanner.noFilesStatus(for: .publishAll), "没有可发布的模块文件")
+        XCTAssertEqual(GitHubPublishPlanner.noFilesStatus(for: .publishSelected), "所选模块没有可发布的独立输出")
+        XCTAssertEqual(GitHubPublishPlanner.noFilesStatus(for: .preview), "没有可发布的模块文件，已跳过 GitHub 发布预览")
+        XCTAssertEqual(GitHubPublishPlanner.unchangedStatus(for: .publishAll), "没有文件需要发布")
+        XCTAssertEqual(GitHubPublishPlanner.unchangedStatus(for: .publishSelected), "所选模块没有文件需要发布")
+        XCTAssertEqual(GitHubPublishPlanner.unchangedStatus(for: .preview), "GitHub 内容没有变化")
+        XCTAssertEqual(GitHubPublishPlanner.deletionConfirmationStatus(deletedFileCount: 3), "发布前需要确认删除 3 个旧文件")
+        XCTAssertEqual(GitHubPublishPlanner.previewStatus(preview), "已生成 GitHub 发布预览（2 个文件变更）")
+        XCTAssertEqual(GitHubPublishPlanner.previewStatus(unchangedPreview), "GitHub 内容没有变化")
+        XCTAssertEqual(
+            GitHubPublishPlanner.reportStatus(
+                for: .publishAll,
+                report: changedReport,
+                scopeTitle: "独立模块"
+            ),
+            "远端分支已更新并重新同步；独立模块已发布到 GitHub（2 个文件变更）"
+        )
+        XCTAssertEqual(
+            GitHubPublishPlanner.reportStatus(
+                for: .publishSelected,
+                report: changedReport,
+                scopeTitle: "独立模块"
+            ),
+            "远端分支已更新并重新同步；已发布所选模块到 GitHub（2 个文件变更）"
+        )
+        XCTAssertEqual(
+            GitHubPublishPlanner.reportStatus(
+                for: .publishAll,
+                report: unchangedReport,
+                scopeTitle: "独立模块"
+            ),
+            "没有文件需要发布"
+        )
+        XCTAssertEqual(
+            GitHubPublishPlanner.reportStatus(
+                for: .publishSelected,
+                report: unchangedReport,
+                scopeTitle: "独立模块"
+            ),
+            "所选模块没有文件需要发布"
+        )
+    }
+
     func testGitHubPublishPlannerBuildsMessagesHistoryAndNoFilesDecision() throws {
         let report = PublishReport(
             publishedFiles: ["A.sgmodule"],

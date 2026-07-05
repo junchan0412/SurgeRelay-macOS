@@ -16,6 +16,12 @@ struct GitHubRepositoryPrivacyUpdate: Equatable, Sendable {
     var shouldPersist: Bool
 }
 
+enum GitHubPublishAction: Equatable, Sendable {
+    case publishAll
+    case publishSelected
+    case preview
+}
+
 enum GitHubPublishPlanner {
     static func repositoryPrivacyUpdate(
         currentValue: Bool?,
@@ -93,6 +99,54 @@ enum GitHubPublishPlanner {
             return false
         }
         return true
+    }
+
+    static func noFilesStatus(for action: GitHubPublishAction) -> String {
+        switch action {
+        case .publishAll:
+            return "没有可发布的模块文件"
+        case .publishSelected:
+            return "所选模块没有可发布的独立输出"
+        case .preview:
+            return "没有可发布的模块文件，已跳过 GitHub 发布预览"
+        }
+    }
+
+    static func unchangedStatus(for action: GitHubPublishAction) -> String {
+        switch action {
+        case .publishAll:
+            return "没有文件需要发布"
+        case .publishSelected:
+            return "所选模块没有文件需要发布"
+        case .preview:
+            return "GitHub 内容没有变化"
+        }
+    }
+
+    static func deletionConfirmationStatus(deletedFileCount: Int) -> String {
+        "发布前需要确认删除 \(deletedFileCount) 个旧文件"
+    }
+
+    static func previewStatus(_ preview: PublishPreview) -> String {
+        preview.hasChanges
+            ? "已生成 GitHub 发布预览（\(preview.changedFileCount) 个文件变更）"
+            : unchangedStatus(for: .preview)
+    }
+
+    static func reportStatus(
+        for action: GitHubPublishAction,
+        report: PublishReport,
+        scopeTitle: String
+    ) -> String {
+        guard report.changedFileCount > 0 else { return unchangedStatus(for: action) }
+        switch action {
+        case .publishAll:
+            return successMessage(scopeTitle: scopeTitle, report: report)
+        case .publishSelected:
+            return selectedSuccessMessage(report: report)
+        case .preview:
+            return "已生成 GitHub 发布预览（\(report.changedFileCount) 个文件变更）"
+        }
     }
 
     static func successMessage(scopeTitle: String, report: PublishReport) -> String {

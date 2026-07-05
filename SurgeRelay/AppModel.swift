@@ -1247,19 +1247,23 @@ final class AppModel {
             guard shouldContinueCurrentWork() else { return }
             if preview.requiresDeletionConfirmation {
                 pendingPublishPreview = preview
-                statusMessage = "发布前需要确认删除 \(preview.deletedFiles.count) 个旧文件"
+                statusMessage = GitHubPublishPlanner.deletionConfirmationStatus(
+                    deletedFileCount: preview.deletedFiles.count
+                )
                 return
             }
             let report = try await publishAllInternal()
             guard shouldContinueCurrentWork() else { return }
-            statusMessage = report.changedFileCount == 0
-                ? "没有文件需要发布"
-                : githubPublishSuccessMessage(report)
+            statusMessage = GitHubPublishPlanner.reportStatus(
+                for: .publishAll,
+                report: report,
+                scopeTitle: githubPublishPlan.scopeTitle
+            )
             recordGitHubPublish(report)
         } catch {
             if isCurrentWorkCancellation(error) { return }
             if GitHubPublishPlanner.isNoFilesToPublish(error) {
-                statusMessage = "没有可发布的模块文件"
+                statusMessage = GitHubPublishPlanner.noFilesStatus(for: .publishAll)
                 return
             }
             presentedError = error.localizedDescription
@@ -1282,15 +1286,17 @@ final class AppModel {
         do {
             let report = try await publishSelectedModulesInternal(moduleIDs: moduleIDs)
             guard shouldContinueCurrentWork() else { return false }
-            statusMessage = report.changedFileCount == 0
-                ? "所选模块没有文件需要发布"
-                : GitHubPublishPlanner.selectedSuccessMessage(report: report)
+            statusMessage = GitHubPublishPlanner.reportStatus(
+                for: .publishSelected,
+                report: report,
+                scopeTitle: githubPublishPlan.scopeTitle
+            )
             recordGitHubPublish(report)
             return true
         } catch {
             if isCurrentWorkCancellation(error) { return false }
             if GitHubPublishPlanner.isNoFilesToPublish(error) {
-                statusMessage = "所选模块没有可发布的独立输出"
+                statusMessage = GitHubPublishPlanner.noFilesStatus(for: .publishSelected)
                 return false
             }
             presentedError = error.localizedDescription
@@ -1311,13 +1317,11 @@ final class AppModel {
             let preview = try await githubPublishPreview()
             guard shouldContinueCurrentWork() else { return }
             pendingPublishPreview = preview
-            statusMessage = preview.hasChanges
-                ? "已生成 GitHub 发布预览（\(preview.changedFileCount) 个文件变更）"
-                : "GitHub 内容没有变化"
+            statusMessage = GitHubPublishPlanner.previewStatus(preview)
         } catch {
             if isCurrentWorkCancellation(error) { return }
             if GitHubPublishPlanner.isNoFilesToPublish(error) {
-                statusMessage = "没有可发布的模块文件，已跳过 GitHub 发布预览"
+                statusMessage = GitHubPublishPlanner.noFilesStatus(for: .preview)
                 return
             }
             presentedError = error.localizedDescription
@@ -1334,9 +1338,11 @@ final class AppModel {
                 let report = try await publishAllInternal(allowDeleting: true)
                 guard shouldContinueCurrentWork() else { return }
                 pendingPublishPreview = nil
-                statusMessage = report.changedFileCount == 0
-                    ? "没有文件需要发布"
-                    : githubPublishSuccessMessage(report)
+                statusMessage = GitHubPublishPlanner.reportStatus(
+                    for: .publishAll,
+                    report: report,
+                    scopeTitle: githubPublishPlan.scopeTitle
+                )
                 recordGitHubPublish(report)
             case .local:
                 try enterNonCancellableWorkPhase(
@@ -1362,7 +1368,7 @@ final class AppModel {
             if isCurrentWorkCancellation(error) { return }
             if GitHubPublishPlanner.isNoFilesToPublish(error) {
                 pendingPublishPreview = nil
-                statusMessage = "没有可发布的模块文件"
+                statusMessage = GitHubPublishPlanner.noFilesStatus(for: .publishAll)
                 return
             }
             presentedError = error.localizedDescription
@@ -1654,10 +1660,6 @@ final class AppModel {
         for directory in legacyOutputCleanupDirectories() {
             _ = try? await fileStore.removeLegacyPublishedFiles(in: directory, relativePaths: paths)
         }
-    }
-
-    private func githubPublishSuccessMessage(_ report: PublishReport) -> String {
-        GitHubPublishPlanner.successMessage(scopeTitle: githubPublishPlan.scopeTitle, report: report)
     }
 
     private func legacyOutputCleanupDirectories() -> [String] {
