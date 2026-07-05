@@ -26,7 +26,7 @@ Keep `ModulesView.swift` focused on the split-view shell, search/index coordinat
 - `CombinedModuleViews.swift` owns the combined-module sidebar row, combined-module detail page, and publish-preview summary UI.
 - `DetailInfoViews.swift` owns reusable detail rows and section chrome used by module and combined-module detail pages.
 - Module and combined-module preview panes plus override comparison belong in `ModulePreviewViews.swift`; the AppKit `NSTextView` code/highlight bridge belongs in `ModuleCodeTextView.swift`; small reusable visual primitives stay in `Components.swift`.
-- `SettingsView.swift` owns the settings window shell, tab selection, diagnostics export, and QR sheet routing. General settings belong in `SettingsGeneralView.swift`; local/GitHub publishing settings and local root diagnostics belong in `SettingsPublishingView.swift`; credentials-specific token UI belongs in `SettingsCredentialsView.swift`; Web service access UI belongs in `SettingsWebManagementView.swift`; reusable settings chrome and rows belong in `SettingsComponents.swift`.
+- `SettingsView.swift` owns the settings window shell, tab selection, credential preloading, and QR sheet routing. General settings belong in `SettingsGeneralView.swift`; local/GitHub publishing settings and local root diagnostics belong in `SettingsPublishingView.swift`; credentials-specific token UI belongs in `SettingsCredentialsView.swift`; Web service access UI belongs in `SettingsWebManagementView.swift`; installation/update diagnostics and export live in `SettingsDiagnosticsView.swift`; reusable settings chrome and rows belong in `SettingsComponents.swift`.
 
 ## Model Boundaries
 

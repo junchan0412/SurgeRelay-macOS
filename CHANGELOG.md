@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 将设置窗口的安装状态、最近更新、崩溃报告和诊断导出页面拆入 `SettingsDiagnosticsView.swift`，让 `SettingsView.swift` 只保留页签壳层、凭据预加载和 Web 管理二维码 sheet。
 - 将桌面模块编辑器的基本信息、图标、发布、来源和转换区块拆入 `ModuleEditorSections.swift`，让 `ModuleEditorView.swift` 更集中于草稿状态、自动命名、文件夹创建和保存流程。
 - 将 Web 管理初始 history、详情页 history、列表 history 和移动端 popstate 判定抽入 `web-state.js`，减少 `app.js` 对导航 URL/state 细节的直接维护。
 - 将 Web 管理添加/编辑模块表单的字段回填与保存字段收集收进 `web-editor.js`，让 `app.js` 只负责打开对话框、调用 API 和处理反馈，并补充 DOM 保存路径测试。

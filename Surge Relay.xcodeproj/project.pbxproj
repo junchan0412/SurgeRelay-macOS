@@ -172,6 +172,7 @@
 		A77A77A77A77A77A77A77A77 /* SettingsWebManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B97B97B97B97B97B97B97B97 /* SettingsWebManagementView.swift */; };
 		A78A78A78A78A78A78A78A78 /* SettingsGeneralView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B98B98B98B98B98B98B98B98 /* SettingsGeneralView.swift */; };
 		A79A79A79A79A79A79A79A79 /* SettingsPublishingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B99B99B99B99B99B99B99B99 /* SettingsPublishingView.swift */; };
+		A83A83A83A83A83A83A83A83 /* SettingsDiagnosticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100B100B100B100B100B100 /* SettingsDiagnosticsView.swift */; };
 		A539280CA083F785A10720E4 /* exclamationmark.triangle.svg in Resources */ = {isa = PBXBuildFile; fileRef = 36BAB6179FD0D6477CCD7527 /* exclamationmark.triangle.svg */; };
 		A8F3D6A87774ABA071E95490 /* eye.svg in Resources */ = {isa = PBXBuildFile; fileRef = 882056C6C077004DCDC917F2 /* eye.svg */; };
 		AA8F7B5F28379ACDB4DDEDB9 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDD7A6C8082510469A2FA843 /* RootView.swift */; };
@@ -354,6 +355,7 @@
 		B97B97B97B97B97B97B97B97 /* SettingsWebManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWebManagementView.swift; sourceTree = "<group>"; };
 		B98B98B98B98B98B98B98B98 /* SettingsGeneralView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsGeneralView.swift; sourceTree = "<group>"; };
 		B99B99B99B99B99B99B99B99 /* SettingsPublishingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPublishingView.swift; sourceTree = "<group>"; };
+		B100B100B100B100B100B100 /* SettingsDiagnosticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsDiagnosticsView.swift; sourceTree = "<group>"; };
 		B7DAE6646C847419124DE9BB /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		B9CF6B25A0E233718DB970EF /* arrow.up.arrow.down.svg */ = {isa = PBXFileReference; path = arrow.up.arrow.down.svg; sourceTree = "<group>"; };
 		BB83E467F68776A168C3BBA3 /* ellipsis.svg */ = {isa = PBXFileReference; path = ellipsis.svg; sourceTree = "<group>"; };
@@ -480,6 +482,7 @@
 				B98B98B98B98B98B98B98B98 /* SettingsGeneralView.swift */,
 				B99B99B99B99B99B99B99B99 /* SettingsPublishingView.swift */,
 				B97B97B97B97B97B97B97B97 /* SettingsWebManagementView.swift */,
+				B100B100B100B100B100B100 /* SettingsDiagnosticsView.swift */,
 				F53C80368CE81330FB2D723A /* SettingsView.swift */,
 			);
 			path = Views;
@@ -987,6 +990,7 @@
 				A78A78A78A78A78A78A78A78 /* SettingsGeneralView.swift in Sources */,
 				A79A79A79A79A79A79A79A79 /* SettingsPublishingView.swift in Sources */,
 				A77A77A77A77A77A77A77A77 /* SettingsWebManagementView.swift in Sources */,
+				A83A83A83A83A83A83A83A83 /* SettingsDiagnosticsView.swift in Sources */,
 				B8555D3D9FEACB351D53EBC9 /* ScriptHubOptions.swift in Sources */,
 				8DA26E8693FBA37A8D155709 /* ScriptHubUpstreamService.swift in Sources */,
 				6C8F8E71624D2151BFA675ED /* ServiceModels.swift in Sources */,
