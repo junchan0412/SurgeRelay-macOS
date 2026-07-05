@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D105D105D105D105D105D105 /* ModuleCodeTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E105E105E105E105E105E105 /* ModuleCodeTextView.swift */; };
 		D104D104D104D104D104D104 /* AppModel+AutomaticPublishing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E104E104E104E104E104E104 /* AppModel+AutomaticPublishing.swift */; };
 		D0A0D0A0D0A0D0A0D0A0D0A0 /* AppModel+WebManagement.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0A0E0A0E0A0E0A0E0A0E0A0 /* AppModel+WebManagement.swift */; };
 		D0B0D0B0D0B0D0B0D0B0D0B0 /* AppModel+Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0B0E0B0E0B0E0B0E0B0E0B0 /* AppModel+Diagnostics.swift */; };
@@ -291,6 +292,7 @@
 		B19B19B19B19B19B19B19B19 /* ModuleDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleDraft.swift; sourceTree = "<group>"; };
 		B20B20B20B20B20B20B20B20 /* ModuleOutputPath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleOutputPath.swift; sourceTree = "<group>"; };
 		B21B21B21B21B21B21B21B21 /* ModulePreviewViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModulePreviewViews.swift; sourceTree = "<group>"; };
+		E105E105E105E105E105E105 /* ModuleCodeTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleCodeTextView.swift; sourceTree = "<group>"; };
 		B13B13B13B13B13B13B13B13 /* WebManagementModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebManagementModels.swift; sourceTree = "<group>"; };
 		B25B25B25B25B25B25B25B25 /* WebManagementStateBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebManagementStateBuilder.swift; sourceTree = "<group>"; };
 		5A7D7F17FB694B798F91978E /* folder.svg */ = {isa = PBXFileReference; path = folder.svg; sourceTree = "<group>"; };
@@ -456,6 +458,7 @@
 				B55B55B55B55B55B55B55B55 /* ModuleDetailView.swift */,
 				B18B18B18B18B18B18B18B18 /* ModuleEditorComponents.swift */,
 				E43B99091BF5C4100CE1DA0E /* ModuleEditorView.swift */,
+				E105E105E105E105E105E105 /* ModuleCodeTextView.swift */,
 				B21B21B21B21B21B21B21B21 /* ModulePreviewViews.swift */,
 				B80B80B80B80B80B80B80B80 /* ModuleSidebarView.swift */,
 				F02309DE998787F453FD1166 /* ModulesView.swift */,
@@ -942,6 +945,7 @@
 				D70D70D70D70D70D70D70D70 /* ModuleOutputFolderCatalog.swift in Sources */,
 				D20D20D20D20D20D20D20D20 /* ModulePreviewContentProvider.swift in Sources */,
 				D21D21D21D21D21D21D21D21 /* ModulePreviewEditPlanner.swift in Sources */,
+				D105D105D105D105D105D105 /* ModuleCodeTextView.swift in Sources */,
 				A21A21A21A21A21A21A21A21 /* ModulePreviewViews.swift in Sources */,
 				D92D92D92D92D92D92D92D92 /* ModuleMetadataRefreshPlanner.swift in Sources */,
 				D91D91D91D91D91D91D91D91 /* ModuleRefreshPlanner.swift in Sources */,
