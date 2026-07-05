@@ -45,6 +45,7 @@
 		B9B9B9B9B9B9B9B9B9B9B9B9 /* SettingsComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9C9C9C9C9C9C9C9C9C9C9C9 /* SettingsComponents.swift */; };
 		D10D10D10D10D10D10D10D10 /* DiagnosticReportBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10E10E10E10E10E10E10E10 /* DiagnosticReportBuilder.swift */; };
 		D20D20D20D20D20D20D20D20 /* ModulePreviewContentProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20E20E20E20E20E20E20E20 /* ModulePreviewContentProvider.swift */; };
+		D21D21D21D21D21D21D21D21 /* ModulePreviewEditPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E21E21E21E21E21E21E21E21 /* ModulePreviewEditPlanner.swift */; };
 		D30D30D30D30D30D30D30D30 /* ModuleNamingPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E30E30E30E30E30E30E30E30 /* ModuleNamingPlanner.swift */; };
 		D40D40D40D40D40D40D40D40 /* PublishedAddressResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = E40E40E40E40E40E40E40E40 /* PublishedAddressResolver.swift */; };
 		D50D50D50D50D50D50D50D50 /* CredentialTokenCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E50E50E50E50E50E50E50E50 /* CredentialTokenCoordinator.swift */; };
@@ -90,6 +91,7 @@
 		36F708192A3B4C5D6E7F8091 /* ScriptHubTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46F708192A3B4C5D6E7F8091 /* ScriptHubTests.swift */; };
 		5A8A9B0C1D2E3F4051627384 /* LocalModuleImportPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B8A9B0C1D2E3F4051627384 /* LocalModuleImportPlannerTests.swift */; };
 		5E8A9B0C1D2E3F4051627384 /* ModulePreviewContentProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E8A9B0C1D2E3F4051627384 /* ModulePreviewContentProviderTests.swift */; };
+		5E9A9B0C1D2E3F4051627384 /* ModulePreviewEditPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E9A9B0C1D2E3F4051627384 /* ModulePreviewEditPlannerTests.swift */; };
 		37A1B2C3D4E5F60718293A4B /* SecurityDiagnosticsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47A1B2C3D4E5F60718293A4B /* SecurityDiagnosticsTests.swift */; };
 		38B2C3D4E5F60718293A4B5C /* ModuleRefreshPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48B2C3D4E5F60718293A4B5C /* ModuleRefreshPlannerTests.swift */; };
 		39C3D4E5F60718293A4B5C6D /* ModuleMetadataRefreshPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49C3D4E5F60718293A4B5C6D /* ModuleMetadataRefreshPlannerTests.swift */; };
@@ -263,6 +265,7 @@
 		5B8A9B0C1D2E3F4051627384 /* LocalModuleImportPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModuleImportPlannerTests.swift; sourceTree = "<group>"; };
 		47A1B2C3D4E5F60718293A4B /* SecurityDiagnosticsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityDiagnosticsTests.swift; sourceTree = "<group>"; };
 		6E8A9B0C1D2E3F4051627384 /* ModulePreviewContentProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModulePreviewContentProviderTests.swift; sourceTree = "<group>"; };
+		6E9A9B0C1D2E3F4051627384 /* ModulePreviewEditPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModulePreviewEditPlannerTests.swift; sourceTree = "<group>"; };
 		48B2C3D4E5F60718293A4B5C /* ModuleRefreshPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleRefreshPlannerTests.swift; sourceTree = "<group>"; };
 		49C3D4E5F60718293A4B5C6D /* ModuleMetadataRefreshPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleMetadataRefreshPlannerTests.swift; sourceTree = "<group>"; };
 		4B6F2A3C4D5E6F708192A3B4 /* WorkActivityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkActivityTests.swift; sourceTree = "<group>"; };
@@ -341,6 +344,7 @@
 		C9C9C9C9C9C9C9C9C9C9C9C9 /* SettingsComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsComponents.swift; sourceTree = "<group>"; };
 		E10E10E10E10E10E10E10E10 /* DiagnosticReportBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticReportBuilder.swift; sourceTree = "<group>"; };
 		E20E20E20E20E20E20E20E20 /* ModulePreviewContentProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModulePreviewContentProvider.swift; sourceTree = "<group>"; };
+		E21E21E21E21E21E21E21E21 /* ModulePreviewEditPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModulePreviewEditPlanner.swift; sourceTree = "<group>"; };
 		E30E30E30E30E30E30E30E30 /* ModuleNamingPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleNamingPlanner.swift; sourceTree = "<group>"; };
 		E40E40E40E40E40E40E40E40 /* PublishedAddressResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishedAddressResolver.swift; sourceTree = "<group>"; };
 		E50E50E50E50E50E50E50E50 /* CredentialTokenCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialTokenCoordinator.swift; sourceTree = "<group>"; };
@@ -481,6 +485,7 @@
 				E30E30E30E30E30E30E30E30 /* ModuleNamingPlanner.swift */,
 				E70E70E70E70E70E70E70E70 /* ModuleOutputFolderCatalog.swift */,
 				E20E20E20E20E20E20E20E20 /* ModulePreviewContentProvider.swift */,
+				E21E21E21E21E21E21E21E21 /* ModulePreviewEditPlanner.swift */,
 				E92E92E92E92E92E92E92E92 /* ModuleMetadataRefreshPlanner.swift */,
 				E91E91E91E91E91E91E91E91 /* ModuleRefreshPlanner.swift */,
 				B94B94B94B94B94B94B94B94 /* ModuleSearchIndex.swift */,
@@ -627,6 +632,7 @@
 				41B2C3D4E5F60718293A4B5C /* ModulePlanningTests.swift */,
 				49C3D4E5F60718293A4B5C6D /* ModuleMetadataRefreshPlannerTests.swift */,
 				6E8A9B0C1D2E3F4051627384 /* ModulePreviewContentProviderTests.swift */,
+				6E9A9B0C1D2E3F4051627384 /* ModulePreviewEditPlannerTests.swift */,
 				48B2C3D4E5F60718293A4B5C /* ModuleRefreshPlannerTests.swift */,
 				4A5E1A2B3C4D5E6F708192A3 /* ModuleSearchIndexTests.swift */,
 				4E4F5A6B7C8D9E0F10213244 /* PublishFileAssemblerTests.swift */,
@@ -842,6 +848,7 @@
 				31B2C3D4E5F60718293A4B5C /* ModulePlanningTests.swift in Sources */,
 				39C3D4E5F60718293A4B5C6D /* ModuleMetadataRefreshPlannerTests.swift in Sources */,
 				5E8A9B0C1D2E3F4051627384 /* ModulePreviewContentProviderTests.swift in Sources */,
+				5E9A9B0C1D2E3F4051627384 /* ModulePreviewEditPlannerTests.swift in Sources */,
 				38B2C3D4E5F60718293A4B5C /* ModuleRefreshPlannerTests.swift in Sources */,
 				3A5E1A2B3C4D5E6F708192A3 /* ModuleSearchIndexTests.swift in Sources */,
 				3E4F5A6B7C8D9E0F10213244 /* PublishFileAssemblerTests.swift in Sources */,
@@ -910,6 +917,7 @@
 				D30D30D30D30D30D30D30D30 /* ModuleNamingPlanner.swift in Sources */,
 				D70D70D70D70D70D70D70D70 /* ModuleOutputFolderCatalog.swift in Sources */,
 				D20D20D20D20D20D20D20D20 /* ModulePreviewContentProvider.swift in Sources */,
+				D21D21D21D21D21D21D21D21 /* ModulePreviewEditPlanner.swift in Sources */,
 				A21A21A21A21A21A21A21A21 /* ModulePreviewViews.swift in Sources */,
 				D92D92D92D92D92D92D92D92 /* ModuleMetadataRefreshPlanner.swift in Sources */,
 				D91D91D91D91D91D91D91D91 /* ModuleRefreshPlanner.swift in Sources */,

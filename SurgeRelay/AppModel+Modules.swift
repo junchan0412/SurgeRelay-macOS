@@ -352,23 +352,37 @@ extension AppModel {
             category: module.category,
             to: content
         )
-        if let current = try? await modulePreviewProvider.componentContent(for: module),
-           current == namedContent {
-            statusMessage = "内容没有变化"
+        let currentContent = try? await modulePreviewProvider.componentContent(for: module)
+        if currentContent == namedContent {
+            let plan = ModulePreviewEditPlanner.savePlan(
+                module: module,
+                namedContent: namedContent,
+                currentContent: currentContent,
+                convertedContent: nil,
+                automaticallyPublish: settings.automaticallyPublish
+            )
+            statusMessage = plan.statusMessage
             return
         }
         beginWork(.savingPreview)
         defer { endWork(.savingPreview) }
         registerLocalChange()
-        try await fileStore.writeComponentOverride(namedContent, id: module.id)
-        if let index = modules.firstIndex(where: { $0.id == module.id }),
-           let converted = try? await modulePreviewProvider.convertedComponentContent(for: module) {
-            modules[index].overrideBaseHash = Data(converted.utf8).sha256String
-            modules[index].hasOverrideConflict = false
+        let convertedContent = try? await modulePreviewProvider.convertedComponentContent(for: module)
+        let moduleForPlan = modules.first(where: { $0.id == module.id }) ?? module
+        let plan = ModulePreviewEditPlanner.savePlan(
+            module: moduleForPlan,
+            namedContent: namedContent,
+            currentContent: currentContent,
+            convertedContent: convertedContent,
+            automaticallyPublish: settings.automaticallyPublish
+        )
+        try await fileStore.writeComponentOverride(plan.overrideContent, id: module.id)
+        if let index = modules.firstIndex(where: { $0.id == module.id }) {
+            modules[index] = plan.module
         }
         await rebuildCombinedFromCache()
         try persistModules()
-        statusMessage = settings.automaticallyPublish ? "已写入 \(module.name)，等待合并发布" : "已写入 \(module.name)"
+        statusMessage = plan.statusMessage
     }
 
     func restorePreviewContent(for module: RelayModule) async throws -> String {
@@ -378,15 +392,17 @@ extension AppModel {
         registerLocalChange()
         try await fileStore.removeComponentOverride(id: module.id)
         let content = try await modulePreviewProvider.convertedComponentContent(for: module)
+        let moduleForPlan = modules.first(where: { $0.id == module.id }) ?? module
+        let plan = ModulePreviewEditPlanner.restorePlan(
+            module: moduleForPlan,
+            automaticallyPublish: settings.automaticallyPublish
+        )
         if let index = modules.firstIndex(where: { $0.id == module.id }) {
-            modules[index].overrideBaseHash = nil
-            modules[index].hasOverrideConflict = false
+            modules[index] = plan.module
             try? persistModules()
         }
         await rebuildCombinedFromCache()
-        statusMessage = settings.automaticallyPublish
-            ? "已恢复 \(module.name) 的转换结果，等待合并发布"
-            : "已恢复 \(module.name) 的转换结果"
+        statusMessage = plan.statusMessage
         let materialized = await processingWorker.materialize(content, overrides: module.argumentOverrides)
         return await processingWorker.applyingModuleMetadata(
             name: module.name,
@@ -398,10 +414,13 @@ extension AppModel {
     func acceptOverrideConflict(moduleID: UUID) async {
         guard let index = modules.firstIndex(where: { $0.id == moduleID }),
               let converted = try? await modulePreviewProvider.convertedComponentContent(for: modules[index]) else { return }
-        modules[index].overrideBaseHash = Data(converted.utf8).sha256String
-        modules[index].hasOverrideConflict = false
+        let plan = ModulePreviewEditPlanner.acceptConflictPlan(
+            module: modules[index],
+            convertedContent: converted
+        )
+        modules[index] = plan.module
         try? persistModules()
-        statusMessage = "已保留 \(modules[index].name) 的本地编辑"
+        statusMessage = plan.statusMessage
     }
 
     func openModule(_ id: UUID) {
