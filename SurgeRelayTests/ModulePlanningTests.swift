@@ -45,6 +45,14 @@ final class ModulePlanningTests: XCTestCase {
         XCTAssertEqual(name, "remote module")
     }
 
+    func testModuleEditorSourceNameLookupFallsBackWhenBoundedFetcherBlocksPrivateURL() async {
+        let name = await ModuleEditorSourceNameLookup.autofillName(
+            from: "http://127.0.0.1/private-module.sgmodule"
+        )
+
+        XCTAssertEqual(name, "private module")
+    }
+
     func testModuleEditorSourceNameLookupSkipsNonRemoteSources() async {
         let localURL = URL(filePath: "/tmp/Local Module.sgmodule").absoluteString
         let name = await ModuleEditorSourceNameLookup.autofillName(from: localURL) { _ in
@@ -54,6 +62,92 @@ final class ModulePlanningTests: XCTestCase {
 
         XCTAssertNil(name)
         XCTAssertNil(ModuleEditorSourceNameLookup.remoteURL(from: "ftp://example.com/demo.sgmodule"))
+    }
+
+    func testBoundedRemoteDataFetcherRejectsPrivateNetworkTargets() async throws {
+        let fetcher = BoundedRemoteDataFetcher(maximumResponseSize: 64, timeoutInterval: 1)
+        let blockedURLs = [
+            "http://127.0.0.1/demo.sgmodule",
+            "http://10.0.0.1/demo.sgmodule",
+            "http://[::1]/demo.sgmodule",
+            "http://router.local/demo.sgmodule"
+        ]
+
+        for value in blockedURLs {
+            let url = try XCTUnwrap(URL(string: value))
+            do {
+                _ = try await fetcher.data(for: URLRequest(url: url))
+                XCTFail("Expected \(value) to be blocked")
+            } catch let error as BoundedRemoteFetchError {
+                guard case .blockedPrivateAddress = error else {
+                    return XCTFail("Expected private-address error for \(value), got \(error)")
+                }
+            }
+        }
+    }
+
+    func testBoundedRemoteDataFetcherRejectsLargeContentLength() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [BoundedRemoteDataFetcherURLProtocol.self]
+        let fetcher = BoundedRemoteDataFetcher(
+            maximumResponseSize: 8,
+            timeoutInterval: 1,
+            configuration: configuration
+        )
+        BoundedRemoteDataFetcherURLProtocol.response = (
+            status: 200,
+            headers: ["Content-Length": "32"],
+            chunks: [Data("tiny".utf8)]
+        )
+
+        do {
+            _ = try await fetcher.data(for: URLRequest(url: try XCTUnwrap(URL(string: "https://public.example/large.sgmodule"))))
+            XCTFail("Expected oversized Content-Length to be rejected")
+        } catch BoundedRemoteFetchError.responseTooLarge(let maximumSize) {
+            XCTAssertEqual(maximumSize, 8)
+        }
+    }
+
+    func testBoundedRemoteDataFetcherAppliesConfiguredTimeout() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [BoundedRemoteDataFetcherURLProtocol.self]
+        let fetcher = BoundedRemoteDataFetcher(
+            maximumResponseSize: 64,
+            timeoutInterval: 3,
+            configuration: configuration
+        )
+        BoundedRemoteDataFetcherURLProtocol.requestedTimeouts = []
+        BoundedRemoteDataFetcherURLProtocol.response = (
+            status: 200,
+            headers: [:],
+            chunks: [Data("#!name=Tiny\n".utf8)]
+        )
+
+        _ = try await fetcher.data(for: URLRequest(url: try XCTUnwrap(URL(string: "https://public.example/timeout.sgmodule"))))
+
+        XCTAssertEqual(BoundedRemoteDataFetcherURLProtocol.requestedTimeouts, [3])
+    }
+
+    func testBoundedRemoteDataFetcherRejectsLargeBodyWithoutContentLength() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [BoundedRemoteDataFetcherURLProtocol.self]
+        let fetcher = BoundedRemoteDataFetcher(
+            maximumResponseSize: 8,
+            timeoutInterval: 1,
+            configuration: configuration
+        )
+        BoundedRemoteDataFetcherURLProtocol.response = (
+            status: 200,
+            headers: [:],
+            chunks: [Data("this body is too large".utf8)]
+        )
+
+        do {
+            _ = try await fetcher.data(for: URLRequest(url: try XCTUnwrap(URL(string: "https://public.example/body.sgmodule"))))
+            XCTFail("Expected oversized response body to be rejected")
+        } catch BoundedRemoteFetchError.responseTooLarge(let maximumSize) {
+            XCTAssertEqual(maximumSize, 8)
+        }
     }
 
     func testModuleOutputPathInspectorExplainsNonPublishingAndCollisions() {
@@ -379,4 +473,30 @@ final class ModulePlanningTests: XCTestCase {
         XCTAssertTrue(ModuleSidebarSectionPlanner.sections(for: []).isEmpty)
     }
 
+}
+
+private final class BoundedRemoteDataFetcherURLProtocol: URLProtocol, @unchecked Sendable {
+    nonisolated(unsafe) static var response: (status: Int, headers: [String: String], chunks: [Data]) = (200, [:], [])
+    nonisolated(unsafe) static var requestedTimeouts: [TimeInterval] = []
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        let responseValue = Self.response
+        Self.requestedTimeouts.append(request.timeoutInterval)
+        let response = HTTPURLResponse(
+            url: request.url!,
+            statusCode: responseValue.status,
+            httpVersion: "HTTP/1.1",
+            headerFields: responseValue.headers
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        for chunk in responseValue.chunks {
+            client?.urlProtocol(self, didLoad: chunk)
+        }
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
 }

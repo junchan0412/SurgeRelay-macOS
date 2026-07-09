@@ -54,6 +54,36 @@ final class WebManagementTests: XCTestCase {
         XCTAssertFalse(displayURL.absoluteString.contains("secret-token"))
     }
 
+    @MainActor
+    func testWebSourceNamePayloadUsesSharedLookup() async throws {
+        let payload = try await WebManagementAPI.sourceNamePayload(
+            for: "https://public.example/remote.conf"
+        ) { request in
+            XCTAssertEqual(request.url?.absoluteString, "https://public.example/remote.conf")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "User-Agent"), "Surge Relay")
+            return Data("#!name=Remote From Web\n[Script]\n".utf8)
+        }
+
+        XCTAssertEqual(payload.name, "Remote From Web")
+    }
+
+    @MainActor
+    func testWebSourceNamePayloadRejectsPrivateURLBeforeFetching() async throws {
+        do {
+            _ = try await WebManagementAPI.sourceNamePayload(
+                for: "http://127.0.0.1/private.sgmodule"
+            ) { _ in
+                XCTFail("Private URL should be rejected before fetching.")
+                return Data()
+            }
+            XCTFail("Expected private URL to be rejected")
+        } catch let error as BoundedRemoteFetchError {
+            guard case .blockedPrivateAddress = error else {
+                return XCTFail("Expected private-address error, got \(error)")
+            }
+        }
+    }
+
     func testAppSettingsDecodesWebManagementDefaults() throws {
         let settings = try JSONDecoder().decode(AppSettings.self, from: Data("{}".utf8))
         XCTAssertFalse(settings.combinedModuleEnabled)

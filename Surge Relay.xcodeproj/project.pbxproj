@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D116D116D116D116D116D116 /* BoundedRemoteDataFetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = E116E116E116E116E116E116 /* BoundedRemoteDataFetcher.swift */; };
 		D106D106D106D106D106D106 /* ModuleEditorSourceNameLookup.swift in Sources */ = {isa = PBXBuildFile; fileRef = E106E106E106E106E106E106 /* ModuleEditorSourceNameLookup.swift */; };
 		D105D105D105D105D105D105 /* ModuleCodeTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E105E105E105E105E105E105 /* ModuleCodeTextView.swift */; };
 		D104D104D104D104D104D104 /* AppModel+AutomaticPublishing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E104E104E104E104E104E104 /* AppModel+AutomaticPublishing.swift */; };
@@ -413,6 +414,7 @@
 		E20E20E20E20E20E20E20E20 /* ModulePreviewContentProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModulePreviewContentProvider.swift; sourceTree = "<group>"; };
 		E21E21E21E21E21E21E21E21 /* ModulePreviewEditPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModulePreviewEditPlanner.swift; sourceTree = "<group>"; };
 		E106E106E106E106E106E106 /* ModuleEditorSourceNameLookup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleEditorSourceNameLookup.swift; sourceTree = "<group>"; };
+		E116E116E116E116E116E116 /* BoundedRemoteDataFetcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoundedRemoteDataFetcher.swift; sourceTree = "<group>"; };
 		E30E30E30E30E30E30E30E30 /* ModuleNamingPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleNamingPlanner.swift; sourceTree = "<group>"; };
 		E40E40E40E40E40E40E40E40 /* PublishedAddressResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishedAddressResolver.swift; sourceTree = "<group>"; };
 		E50E50E50E50E50E50E50E50 /* CredentialTokenCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialTokenCoordinator.swift; sourceTree = "<group>"; };
@@ -549,6 +551,7 @@
 			isa = PBXGroup;
 			children = (
 				C25C25C25C25C25C25C25C25 /* AutomaticPublishPlanner.swift */,
+				E116E116E116E116E116E116 /* BoundedRemoteDataFetcher.swift */,
 				E10E10E10E10E10E10E10E10 /* DiagnosticReportBuilder.swift */,
 				AE767EF4FAD14A21E2B2FDCC /* EmbeddedScriptHubEngine.swift */,
 				354B1BF761ABD7AADD982A17 /* EngineStore.swift */,
@@ -1011,6 +1014,7 @@
 				A11A11A11A11A11A11A11A11 /* CombinedModuleViews.swift in Sources */,
 				E52CE366B20E07E670D9E6E8 /* Components.swift in Sources */,
 				A09A09A09A09A09A09A09A09 /* WebRequestSecurity.swift in Sources */,
+				D116D116D116D116D116D116 /* BoundedRemoteDataFetcher.swift in Sources */,
 				A10A10A10A10A10A10A10A10 /* WebAuthenticationThrottle.swift in Sources */,
 				B8B8B8B8B8B8B8B8B8B8B8B8 /* WebManagementHTTP.swift in Sources */,
 				C577752A7FA64D5E4749D52B /* DataHash.swift in Sources */,
@@ -1155,7 +1159,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 59;
+				CURRENT_PROJECT_VERSION = 60;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1169,7 +1173,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.3.10;
+				MARKETING_VERSION = 1.3.11;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1253,7 +1257,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 59;
+				CURRENT_PROJECT_VERSION = 60;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -1273,7 +1277,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.3.10;
+				MARKETING_VERSION = 1.3.11;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

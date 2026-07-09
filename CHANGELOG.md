@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.3.11
+
+- 新增共享 bounded remote fetcher，模块名称自动填充会统一限制远程抓取超时时间和响应大小。
+- Web 管理 `/api/source/name` 与 macOS 模块编辑器共用同一套抓取边界，拒绝 localhost、`.local`、私网、链路本地、保留地址以及 DNS 解析到私网的主机。
+- 补充名称自动填充安全回归测试，覆盖本机/内网拦截、Content-Length 超限、实际响应体超限、timeout 配置和 Web API helper。
+
 ## 1.3.10
 
 - 左侧模块列表分组标题支持展开与收起，并保留每个窗口自己的折叠状态，便于在模块较多时只查看当前关注的来源类型。

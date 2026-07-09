@@ -58,18 +58,7 @@ enum WebManagementAPI {
                 return .json(ActionPayload(ok: true, message: model.statusMessage), status: 201, reason: "Created")
             case ("POST", "/api/source/name"):
                 let payload = try request.decodeBody(WebSourceNameRequest.self)
-                guard let url = URL(string: payload.url),
-                      ["http", "https"].contains(url.scheme?.lowercased()) else {
-                    throw WebAPIError.invalidSourceURL
-                }
-                var sourceRequest = URLRequest(url: url)
-                sourceRequest.setValue("Surge Relay", forHTTPHeaderField: "User-Agent")
-                let (data, _) = try await URLSession.shared.data(for: sourceRequest)
-                let fallback = FilenameSanitizer.suggestedName(from: payload.url)
-                    .replacingOccurrences(of: "-", with: " ")
-                let name = String(data: data, encoding: .utf8)
-                    .flatMap { ModuleMetadataParser.displayName(in: $0) } ?? fallback
-                return .json(WebSourceNamePayload(name: name))
+                return .json(try await sourceNamePayload(for: payload.url))
             case ("GET", "/api/combined/preview"):
                 return .text(try await model.combinedPreviewContent())
             default:
@@ -86,6 +75,21 @@ enum WebManagementAPI {
         } catch {
             return .error(status: 400, message: error.localizedDescription)
         }
+    }
+
+    static func sourceNamePayload(
+        for sourceURL: String,
+        fetchData: @Sendable (URLRequest) async throws -> Data = BoundedRemoteDataFetcher.sourceNameLookup.data(for:)
+    ) async throws -> WebSourceNamePayload {
+        guard let url = ModuleEditorSourceNameLookup.remoteURL(from: sourceURL) else {
+            throw WebAPIError.invalidSourceURL
+        }
+        try BoundedRemoteDataFetcher.validateRemoteRequest(URLRequest(url: url))
+        let name = try await ModuleEditorSourceNameLookup.resolvedName(
+            from: sourceURL,
+            fetchData: fetchData
+        )
+        return WebSourceNamePayload(name: name)
     }
 
     private static func moduleResponse(for request: WebHTTPRequest, model: AppModel) async throws -> WebHTTPResponse {

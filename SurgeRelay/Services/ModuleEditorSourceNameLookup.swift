@@ -9,19 +9,30 @@ enum ModuleEditorSourceNameLookup {
 
     static func autofillName(
         from sourceURL: String,
-        fetchData: (URLRequest) async throws -> Data
+        fetchData: @Sendable (URLRequest) async throws -> Data
     ) async -> String? {
-        guard let url = remoteURL(from: sourceURL) else { return nil }
+        guard remoteURL(from: sourceURL) != nil else { return nil }
+        do {
+            return try await resolvedName(from: sourceURL, fetchData: fetchData)
+        } catch {
+            return fallbackName(from: sourceURL)
+        }
+    }
+
+    static func resolvedName(
+        from sourceURL: String,
+        fetchData: @Sendable (URLRequest) async throws -> Data = defaultFetchData(for:)
+    ) async throws -> String {
+        guard let url = remoteURL(from: sourceURL) else {
+            throw BoundedRemoteFetchError.invalidSourceURL
+        }
         let fallback = fallbackName(from: sourceURL)
         var request = URLRequest(url: url)
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
 
-        guard let data = try? await fetchData(request),
-              let content = String(data: data, encoding: .utf8),
-              let name = ModuleMetadataParser.displayName(in: content) else {
-            return fallback
-        }
-        return name
+        let data = try await fetchData(request)
+        return String(data: data, encoding: .utf8)
+            .flatMap { ModuleMetadataParser.displayName(in: $0) } ?? fallback
     }
 
     static func remoteURL(from sourceURL: String) -> URL? {
@@ -39,7 +50,6 @@ enum ModuleEditorSourceNameLookup {
     }
 
     private static func defaultFetchData(for request: URLRequest) async throws -> Data {
-        let (data, _) = try await URLSession.shared.data(for: request)
-        return data
+        try await BoundedRemoteDataFetcher.sourceNameLookup.data(for: request)
     }
 }

@@ -2,7 +2,7 @@
 
 Updated: 2026-07-10
 
-This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.10 (59)`.
+This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.11 (60)`.
 
 ## Completed Work
 
@@ -10,6 +10,7 @@ This document tracks the optimization work completed after the deep audit and th
 
 - Local and GitHub module storage are modeled separately from the original source URL, so scanned local modules, remote sources, and converted outputs no longer share one ambiguous path concept.
 - Module sidebar sections can be collapsed or expanded, and remote modules that are not independently published are labeled as remote/cache-backed instead of GitHub-stored.
+- Source-name autofill now uses a shared bounded remote fetcher across the macOS editor and Web API, with private-address blocking, response-size limits, and timeout enforcement.
 - Existing local `.sgmodule` files with Script-Hub `#SUBSCRIBED` metadata can be restored with their original source URL, source format, parameters, category, and local relative path.
 - Update failures now preserve user-facing causes such as 404, 403, 429, DNS failures, timeouts, and TLS errors, and the UI can copy the detailed error.
 - GitHub automatic publishing skips empty publish sets instead of attempting a meaningless publish when no standalone module is selected.
