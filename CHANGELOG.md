@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.3.14
+
+- 左侧模块分组标题改为真实可点击行，展开/收起状态更清晰且继续按窗口记忆。
+- 本地存放、远程来源的模块详情现在明确显示“转换结果储存在本地模块根目录”；添加模块时如果本地发布已开启，默认选择本地模块，避免误入 GitHub 模块分类。
+- 新增 release hardening 路线图，明确当前自签名、未公证、`NSAllowsArbitraryLoads=true` 与 App Sandbox 关闭的状态、原因和迁移顺序。
+- Release preflight 现在会检查 ATS/Sandbox 当前配置与 README、SECURITY 和 hardening 文档是否同步，避免发布配置静默漂移。
+
 ## 1.3.13
 
 - Cloudflare Worker 示例提交 `package-lock.json`，并将 `wrangler` 固定到精确版本，提升部署可重复性。

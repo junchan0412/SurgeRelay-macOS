@@ -35,6 +35,7 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertEqual(localModule.sourceOrigin, .remote(.quantumultX))
         XCTAssertEqual(localModule.publishedRelativePath, "Rewrite Demo.sgmodule")
         XCTAssertEqual(localModule.relationshipSummary, "本地模块 · 远程 Quantumult X")
+        XCTAssertEqual(localModule.standaloneStorageDetail, "转换结果储存在本地模块根目录")
         XCTAssertEqual(remoteOnlyModule.displayStorageLocationTitle, "远程模块")
         XCTAssertEqual(remoteOnlyModule.displayStorageLocationSystemImage, "link")
         XCTAssertEqual(remoteOnlyModule.standaloneStorageDetail, "未开启独立发布；转换结果保存在本地缓存")

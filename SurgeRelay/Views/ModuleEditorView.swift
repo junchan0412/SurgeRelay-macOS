@@ -77,9 +77,7 @@ struct ModuleEditorView: View {
             }
             .scrollIndicators(.visible)
             .task {
-                if module == nil,
-                   !model.settings.publishToGitHub,
-                   model.settings.publishToLocal {
+                if module == nil, model.settings.publishToLocal {
                     draft.storageLocation = .local
                 }
                 await model.refreshModuleOutputFolders()

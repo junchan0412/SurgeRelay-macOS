@@ -196,7 +196,15 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         guard publishesStandalone else {
             return "未开启独立发布；转换结果保存在本地缓存"
         }
-        return storageLocation.detail
+        switch storageLocation {
+        case .local:
+            if sourceOrigin.isRemote {
+                return "转换结果储存在本地模块根目录"
+            }
+            return storageLocation.detail
+        case .gitHub:
+            return storageLocation.detail
+        }
     }
 
     var standaloneStorageSystemImage: String {

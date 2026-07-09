@@ -54,10 +54,10 @@ normalization rules so generated module paths stay predictable.
 ## macOS Permissions
 
 The app currently keeps `NSAllowsArbitraryLoads=true` because users can add
-arbitrary HTTP module sources that must still be convertible. App Sandbox is
-currently disabled because Surge Relay writes to user-selected Surge/iCloud
+arbitrary HTTP module sources that must still be convertible. App Sandbox is currently disabled because Surge Relay writes to user-selected Surge/iCloud
 directories and maintains compatibility with existing non-sandboxed installs.
 
 Future sandboxing should use security-scoped bookmarks for local module roots
-and migration coverage for existing configuration directories.
-
+and migration coverage for existing configuration directories. The current
+release hardening status and migration order are tracked in
+`docs/RELEASE_HARDENING.md`.

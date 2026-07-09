@@ -46,12 +46,6 @@ struct ModuleSidebarView: View {
     private func moduleSection(_ section: ModuleSidebarSection) -> some View {
         let isExpanded = isSectionExpanded(section.id)
         Section {
-            if isExpanded {
-                ForEach(section.modules) { module in
-                    moduleRow(module)
-                }
-            }
-        } header: {
             ModuleSidebarSectionHeader(
                 title: section.title,
                 count: section.modules.count,
@@ -59,6 +53,13 @@ struct ModuleSidebarView: View {
                 isExpanded: isExpanded
             ) {
                 setSection(section.id, expanded: !isExpanded)
+            }
+            .listRowSeparator(.hidden)
+
+            if isExpanded {
+                ForEach(section.modules) { module in
+                    moduleRow(module)
+                }
             }
         }
     }
@@ -135,11 +136,15 @@ private struct ModuleSidebarSectionHeader: View {
                     .frame(width: 10)
                 Label("\(title) \(count)", systemImage: systemImage)
                     .font(.caption.weight(.medium))
+                    .labelStyle(.titleAndIcon)
                 Spacer(minLength: 0)
             }
+            .foregroundStyle(.secondary)
+            .padding(.vertical, 4)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .help(isExpanded ? "收起\(title)" : "展开\(title)")
         .accessibilityLabel("\(isExpanded ? "收起" : "展开")\(title)")
     }
 }
