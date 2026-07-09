@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.3.13
+
+- Cloudflare Worker 示例提交 `package-lock.json`，并将 `wrangler` 固定到精确版本，提升部署可重复性。
+- Worker 部署文档改为使用 `npm ci`，说明 Node.js 22+ 要求和 secret 配置步骤。
+- `.gitignore` 增加 `node_modules/`，避免本地 npm 安装产物被误提交。
+
 ## 1.3.12
 
 - 将 GitHub release workflow 中的 `actions/checkout` 固定到 full commit SHA，并保留对应版本注释，降低签名发布流程的供应链漂移风险。

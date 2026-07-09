@@ -2,7 +2,7 @@
 
 Updated: 2026-07-10
 
-This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.12 (61)`.
+This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.13 (62)`.
 
 ## Completed Work
 
@@ -12,6 +12,7 @@ This document tracks the optimization work completed after the deep audit and th
 - Module sidebar sections can be collapsed or expanded, and remote modules that are not independently published are labeled as remote/cache-backed instead of GitHub-stored.
 - Source-name autofill now uses a shared bounded remote fetcher across the macOS editor and Web API, with private-address blocking, response-size limits, and timeout enforcement.
 - The release workflow pins external actions to full commit SHAs, and release preflight rejects mutable action references before signing assets.
+- The Cloudflare Worker example now pins Wrangler with a committed npm lockfile and documents `npm ci` based deployment.
 - Existing local `.sgmodule` files with Script-Hub `#SUBSCRIBED` metadata can be restored with their original source URL, source format, parameters, category, and local relative path.
 - Update failures now preserve user-facing causes such as 404, 403, 429, DNS failures, timeouts, and TLS errors, and the UI can copy the detailed error.
 - GitHub automatic publishing skips empty publish sets instead of attempting a meaningless publish when no standalone module is selected.

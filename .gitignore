@@ -3,6 +3,7 @@ Build/
 build/
 .build/
 .build-*/
+node_modules/
 DerivedData/
 dist/
 *.profraw
