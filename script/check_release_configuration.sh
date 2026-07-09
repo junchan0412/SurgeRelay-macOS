@@ -11,6 +11,7 @@ WORKFLOW_PATH="$ROOT_DIR/.github/workflows/package-release-app.yml"
 HARDENING_DOC="$ROOT_DIR/docs/RELEASE_HARDENING.md"
 README_PATH="$ROOT_DIR/README.md"
 SECURITY_PATH="$ROOT_DIR/SECURITY.md"
+WEB_RESOURCE_TEST_DIR="$ROOT_DIR/script/web-resource-tests"
 TAG="${TAG:-}"
 VERSION="${VERSION:-}"
 BUILD="${BUILD:-}"
@@ -182,6 +183,14 @@ require_contains "$ROOT_DIR/CHANGELOG.md" "## $VERSION" "CHANGELOG.md"
 ok "verified changelog section for $VERSION"
 
 require_command node
+require_file "$ROOT_DIR/script/test_web_resources.mjs"
+[[ -d "$WEB_RESOURCE_TEST_DIR" ]] || fail "missing Web resource split test directory: $WEB_RESOURCE_TEST_DIR"
+WEB_RESOURCE_AGGREGATE_LINES="$(wc -l < "$ROOT_DIR/script/test_web_resources.mjs" | tr -d ' ')"
+[[ "$WEB_RESOURCE_AGGREGATE_LINES" -le 120 ]] \
+  || fail "script/test_web_resources.mjs should remain a small aggregate entrypoint"
+WEB_RESOURCE_SPLIT_COUNT="$(find "$WEB_RESOURCE_TEST_DIR" -maxdepth 1 -name '*.test.mjs' | wc -l | tr -d ' ')"
+[[ "$WEB_RESOURCE_SPLIT_COUNT" -ge 4 ]] \
+  || fail "Web resource behavior tests should stay split by responsibility"
 for resource in \
   "$ROOT_DIR/SurgeRelay/WebResources/web-logic.js" \
   "$ROOT_DIR/SurgeRelay/WebResources/web-options.js" \
@@ -200,13 +209,12 @@ do
   node --check "$resource" >/dev/null
 done
 
-for web_test in \
-  "$ROOT_DIR/script/test_web_resources.mjs" \
-  "$ROOT_DIR/script/test_web_dom_resources.mjs"
-do
+for web_test in "$WEB_RESOURCE_TEST_DIR"/*.test.mjs; do
   require_file "$web_test"
   node "$web_test"
 done
+node "$ROOT_DIR/script/test_web_resources.mjs"
+node "$ROOT_DIR/script/test_web_dom_resources.mjs"
 ok "verified web resource syntax and behavior tests"
 
 if [[ -f "$APPCAST_PATH" ]]; then

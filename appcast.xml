@@ -3,6 +3,21 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.3.15</title>
+            <pubDate>Fri, 10 Jul 2026 03:32:59 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.15</link>
+            <sparkle:version>64</sparkle:version>
+            <sparkle:shortVersionString>1.3.15</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.3.15
+
+
+- 拆分 Web resource 行为测试：保留 `script/test_web_resources.mjs` 聚合入口，同时把架构边界、sidebar/activity、logic/markup、API/state、editor/feedback/preview、index contract 分到独立测试文件。
+- Release preflight 新增 Web resource 测试组织检查，要求聚合入口保持小文件，并逐个运行拆分后的 `.test.mjs`，避免测试继续集中膨胀。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.3.15/Surge-Relay-1.3.15.app.zip" length="9520591" type="application/zip" sparkle:edSignature="zg+kxyby6lr6xKo5rmp+8ejbDIJDiLdhv3mRTfp9n/k3SbAtpRtHyAJykp37T/qdaW4SUmrxVCrL8Zb+NK8LDg=="/>
+        </item>
+        <item>
             <title>1.3.14</title>
             <pubDate>Fri, 10 Jul 2026 03:03:25 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.14</link>

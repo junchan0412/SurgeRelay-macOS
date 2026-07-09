@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.3.15
+
+- 拆分 Web resource 行为测试：保留 `script/test_web_resources.mjs` 聚合入口，同时把架构边界、sidebar/activity、logic/markup、API/state、editor/feedback/preview、index contract 分到独立测试文件。
+- Release preflight 新增 Web resource 测试组织检查，要求聚合入口保持小文件，并逐个运行拆分后的 `.test.mjs`，避免测试继续集中膨胀。
+
 ## 1.3.14
 
 - 左侧模块分组标题改为真实可点击行，展开/收起状态更清晰且继续按窗口记忆。
