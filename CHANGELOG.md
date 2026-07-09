@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.3.12
+
+- 将 GitHub release workflow 中的 `actions/checkout` 固定到 full commit SHA，并保留对应版本注释，降低签名发布流程的供应链漂移风险。
+- 扩展 release preflight：扫描 workflow 中所有非本地 `uses:` 引用，拒绝 mutable action ref，要求固定到 40 位 commit SHA。
+
 ## 1.3.11
 
 - 新增共享 bounded remote fetcher，模块名称自动填充会统一限制远程抓取超时时间和响应大小。

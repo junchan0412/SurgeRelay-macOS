@@ -3,6 +3,21 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.3.12</title>
+            <pubDate>Fri, 10 Jul 2026 02:13:55 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.12</link>
+            <sparkle:version>61</sparkle:version>
+            <sparkle:shortVersionString>1.3.12</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.3.12
+
+
+- 将 GitHub release workflow 中的 `actions/checkout` 固定到 full commit SHA，并保留对应版本注释，降低签名发布流程的供应链漂移风险。
+- 扩展 release preflight：扫描 workflow 中所有非本地 `uses:` 引用，拒绝 mutable action ref，要求固定到 40 位 commit SHA。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.3.12/Surge-Relay-1.3.12.app.zip" length="9516889" type="application/zip" sparkle:edSignature="F8ZDsjEl+58yzIXWDBwn0LM51FQA3uhIhz+XQLtkzKk7bE6TAM3Nnzdl1cQvnxEAnNmktx364wtNgyXOZ1h0DA=="/>
+        </item>
+        <item>
             <title>1.3.11</title>
             <pubDate>Fri, 10 Jul 2026 02:09:19 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.11</link>

@@ -76,6 +76,36 @@ require_contains() {
   grep -Fq "$needle" "$file" || fail "$label missing '$needle'"
 }
 
+verify_pinned_workflow_actions() {
+  local line_number=0
+  local line spec ref
+  while IFS= read -r line; do
+    line_number=$((line_number + 1))
+    [[ "$line" == *uses:* ]] || continue
+    [[ "$line" =~ '^[[:space:]]*uses:[[:space:]]*' ]] || continue
+
+    spec="${line#*uses:}"
+    spec="${spec%%#*}"
+    spec="${spec#"${spec%%[![:space:]]*}"}"
+    spec="${spec%"${spec##*[![:space:]]}"}"
+    spec="${spec#\"}"
+    spec="${spec%\"}"
+    spec="${spec#\'}"
+    spec="${spec%\'}"
+
+    [[ -n "$spec" ]] || fail "release workflow action at line $line_number is empty"
+    if [[ "$spec" == ./* || "$spec" == /* ]]; then
+      continue
+    fi
+    [[ "$spec" == *@* ]] \
+      || fail "release workflow action at line $line_number is missing an @ref: $spec"
+
+    ref="${spec##*@}"
+    [[ "$ref" =~ '^[0-9A-Fa-f]{40}$' ]] \
+      || fail "release workflow action at line $line_number uses mutable ref '$ref'; pin to a full commit SHA: $spec"
+  done < "$WORKFLOW_PATH"
+}
+
 project_value() {
   local key="$1"
   awk -F': *' -v key="$key" '$1 ~ key { gsub(/"/, "", $2); print $2; exit }' "$PROJECT_FILE"
@@ -194,6 +224,7 @@ require_contains "$WORKFLOW_PATH" './script/build_release_assets.sh' "release wo
 require_contains "$WORKFLOW_PATH" './script/verify_github_release_assets.sh' "release workflow"
 require_contains "$WORKFLOW_PATH" 'REQUIRE_STABLE_CODESIGN=1' "release workflow"
 require_contains "$WORKFLOW_PATH" 'REQUIRE_SPARKLE_SIGNATURES=1' "release workflow"
+verify_pinned_workflow_actions
 ok "verified release workflow references"
 
 ok "release configuration preflight passed for $VERSION ($BUILD)"
