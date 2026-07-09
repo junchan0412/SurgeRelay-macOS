@@ -122,11 +122,18 @@ struct ModuleEditorView: View {
     }
 
     private var editorPreviewSubtitle: String {
-        var parts = [draft.storageLocation.title, draftSourceOrigin.title]
+        var parts = [draftDisplayStorageLocationTitle, draftSourceOrigin.title]
         let category = draft.category.trimmingCharacters(in: .whitespacesAndNewlines)
         if !category.isEmpty { parts.append(category) }
         if !draft.publishesStandalone { parts.append("不发布独立模块") }
         return parts.joined(separator: " · ")
+    }
+
+    private var draftDisplayStorageLocationTitle: String {
+        if draft.storageLocation == .gitHub, !draft.publishesStandalone, draftSourceOrigin.isRemote {
+            return "远程模块"
+        }
+        return draft.storageLocation.title
     }
 
     private var draftSourceOrigin: ModuleSourceOrigin {
@@ -139,7 +146,10 @@ struct ModuleEditorView: View {
     }
 
     private var relationshipHint: String {
-        switch (draft.storageLocation, draftSourceOrigin) {
+        if !draft.publishesStandalone {
+            return "未开启独立发布：转换结果保存在本地缓存，不会写入 GitHub 独立模块目录。"
+        }
+        return switch (draft.storageLocation, draftSourceOrigin) {
         case (.local, .localSurgeFile):
             "纯本地模块：直接管理本地根目录中的 Surge .sgmodule。"
         case (.local, .remote):

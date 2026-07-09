@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ModuleSidebarView: View {
     @Environment(AppModel.self) private var model
+    @SceneStorage("ModuleSidebarView.collapsedSectionIDs") private var collapsedSectionIDsRaw = ""
     let sections: [ModuleSidebarSection]
     let filteredModulesAreEmpty: Bool
     let allModulesAreEmpty: Bool
@@ -23,14 +24,7 @@ struct ModuleSidebarView: View {
             }
 
             ForEach(sections) { section in
-                Section {
-                    ForEach(section.modules) { module in
-                        moduleRow(module)
-                    }
-                } header: {
-                    Label("\(section.title) \(section.modules.count)", systemImage: section.systemImage)
-                        .font(.caption.weight(.medium))
-                }
+                moduleSection(section)
             }
         }
         .overlay {
@@ -45,6 +39,27 @@ struct ModuleSidebarView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             ModuleSidebarStatusCard()
                 .background(.bar)
+        }
+    }
+
+    @ViewBuilder
+    private func moduleSection(_ section: ModuleSidebarSection) -> some View {
+        let isExpanded = isSectionExpanded(section.id)
+        Section {
+            if isExpanded {
+                ForEach(section.modules) { module in
+                    moduleRow(module)
+                }
+            }
+        } header: {
+            ModuleSidebarSectionHeader(
+                title: section.title,
+                count: section.modules.count,
+                systemImage: section.systemImage,
+                isExpanded: isExpanded
+            ) {
+                setSection(section.id, expanded: !isExpanded)
+            }
         }
     }
 
@@ -79,6 +94,53 @@ struct ModuleSidebarView: View {
                 }
             }
         )
+    }
+
+    private var collapsedSectionIDs: Set<String> {
+        Set(collapsedSectionIDsRaw.split(separator: ",").map(String.init))
+    }
+
+    private func isSectionExpanded(_ id: String) -> Bool {
+        !collapsedSectionIDs.contains(id)
+    }
+
+    private func setSection(_ id: String, expanded: Bool) {
+        var ids = collapsedSectionIDs
+        if expanded {
+            ids.remove(id)
+        } else {
+            ids.insert(id)
+        }
+        collapsedSectionIDsRaw = ids.sorted().joined(separator: ",")
+    }
+}
+
+private struct ModuleSidebarSectionHeader: View {
+    let title: String
+    let count: Int
+    let systemImage: String
+    let isExpanded: Bool
+    let toggle: () -> Void
+
+    var body: some View {
+        Button {
+            withAnimation(.snappy) {
+                toggle()
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .frame(width: 10)
+                Label("\(title) \(count)", systemImage: systemImage)
+                    .font(.caption.weight(.medium))
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(isExpanded ? "收起" : "展开")\(title)")
     }
 }
 
@@ -269,7 +331,7 @@ private struct ModuleRow: View {
         if module.state == .failed, let failureSummary {
             return "更新失败：\(failureSummary)"
         }
-        var parts = [module.storageLocation.title, module.sourceOrigin.title]
+        var parts = [module.displayStorageLocationTitle, module.sourceOrigin.title]
         if !module.category.isEmpty { parts.append(module.category) }
         let folder = ModuleOutputFolder.normalized(module.outputFolder)
         if folder != ModuleOutputFolder.root {

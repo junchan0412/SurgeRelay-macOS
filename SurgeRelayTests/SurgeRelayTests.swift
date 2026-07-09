@@ -18,14 +18,27 @@ final class SurgeRelayTests: XCTestCase {
             storageLocation: .local,
             localStorageRelativePath: "Rewrite Demo.sgmodule"
         )
+        let remoteOnlyModule = RelayModule(
+            name: "Remote Only",
+            sourceURL: "https://example.com/surge/demo.sgmodule",
+            sourceFormat: .surge,
+            outputFileName: "Demo",
+            storageLocation: .gitHub,
+            publishesStandalone: false
+        )
 
         XCTAssertEqual(githubModule.storageLocation, .gitHub)
         XCTAssertEqual(githubModule.sourceOrigin, .remote(.loon))
         XCTAssertEqual(githubModule.publishedRelativePath, "Plugin-Demo.sgmodule")
+        XCTAssertEqual(githubModule.displayStorageLocationTitle, "GitHub 模块")
         XCTAssertEqual(localModule.storageLocation, .local)
         XCTAssertEqual(localModule.sourceOrigin, .remote(.quantumultX))
         XCTAssertEqual(localModule.publishedRelativePath, "Rewrite Demo.sgmodule")
         XCTAssertEqual(localModule.relationshipSummary, "本地模块 · 远程 Quantumult X")
+        XCTAssertEqual(remoteOnlyModule.displayStorageLocationTitle, "远程模块")
+        XCTAssertEqual(remoteOnlyModule.displayStorageLocationSystemImage, "link")
+        XCTAssertEqual(remoteOnlyModule.standaloneStorageDetail, "未开启独立发布；转换结果保存在本地缓存")
+        XCTAssertEqual(remoteOnlyModule.relationshipSummary, "远程模块 · 远程 Surge 模块")
     }
 
     func testRefreshPolicyDoesNotRefreshAgainBeforeInterval() {

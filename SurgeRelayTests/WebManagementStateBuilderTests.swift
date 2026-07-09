@@ -145,6 +145,7 @@ final class WebManagementStateBuilderTests: XCTestCase {
         XCTAssertEqual(payload.sourceOriginTitle, "本地 Surge 模块")
         XCTAssertEqual(payload.storageLocation, ModuleStorageLocation.local.rawValue)
         XCTAssertEqual(payload.storageLocationTitle, "本地模块")
+        XCTAssertEqual(payload.storageLocationDetail, "未开启独立发布；转换结果保存在本地缓存")
         XCTAssertEqual(payload.relationshipSummary, "本地模块 · 本地 Surge 模块")
         XCTAssertEqual(payload.outputFileName, "Managed Local.sgmodule")
         XCTAssertEqual(payload.publishedRelativePath, "Rules/Managed Local.sgmodule")

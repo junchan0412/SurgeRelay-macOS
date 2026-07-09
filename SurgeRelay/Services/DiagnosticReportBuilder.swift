@@ -89,7 +89,7 @@ enum DiagnosticReportBuilder {
             sourceURL: redactedSourceURL(module.sourceURL),
             effectiveOriginalSourceURL: redactedSourceURL(module.effectiveOriginalSourceURL),
             storageLocation: module.storageLocation.rawValue,
-            storageLocationTitle: module.storageLocation.title,
+            storageLocationTitle: module.displayStorageLocationTitle,
             sourceOriginTitle: module.sourceOrigin.title,
             relationshipSummary: module.relationshipSummary,
             localStorageRelativePath: module.localStorageRelativePath,

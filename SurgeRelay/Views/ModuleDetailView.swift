@@ -37,7 +37,11 @@ struct ModuleDetailView: View {
 
     private var sourceAndOutputSection: some View {
         detailSection("管理关系") {
-            detailRow("模块存放", value: module.storageLocation.detail, icon: module.storageLocation.systemImage)
+            detailRow(
+                "独立模块存放",
+                value: standaloneStorageDescription,
+                icon: module.standaloneStorageSystemImage
+            )
             detailRow("转换前来源", value: module.sourceOrigin.title, icon: module.sourceOrigin.systemImage)
             if let localStoragePath {
                 detailRow("本地相对路径", value: localStoragePath, icon: "folder", monospaced: true, copyValue: localStoragePath)
@@ -228,6 +232,15 @@ struct ModuleDetailView: View {
     private var localStoragePath: String? {
         guard module.storageLocation == .local else { return nil }
         return module.localStorageRelativePath ?? module.publishedRelativePath
+    }
+
+    private var standaloneStorageDescription: String {
+        guard !module.publishesStandalone,
+              model.settings.combinedModuleEnabled,
+              module.isEnabled else {
+            return module.standaloneStorageDetail
+        }
+        return "未开启独立发布；转换结果保存在本地缓存，可作为总模块来源"
     }
 
     private var iconSourceDescription: String {

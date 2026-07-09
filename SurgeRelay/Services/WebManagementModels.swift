@@ -32,6 +32,7 @@ struct WebModulePayload: Encodable {
     let outputFolder: String
     let storageLocation: String
     let storageLocationTitle: String
+    let storageLocationDetail: String
     let storageLocationIcon: String
     let relationshipSummary: String
     let localStorageRelativePath: String?

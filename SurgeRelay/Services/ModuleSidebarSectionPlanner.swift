@@ -27,12 +27,24 @@ enum ModuleSidebarSectionPlanner {
                 }
             ),
             ModuleSidebarSection(
+                id: "remote",
+                title: "远程模块",
+                systemImage: "link",
+                modules: modules.filter { module in
+                    !needsAttention(module) &&
+                        module.storageLocation == .gitHub &&
+                        !module.publishesStandalone &&
+                        module.sourceOrigin != .invalid
+                }
+            ),
+            ModuleSidebarSection(
                 id: "github",
                 title: "GitHub 模块",
                 systemImage: "cloud",
                 modules: modules.filter { module in
                     !needsAttention(module) &&
                         module.storageLocation == .gitHub &&
+                        module.publishesStandalone &&
                         module.sourceOrigin != .invalid
                 }
             ),

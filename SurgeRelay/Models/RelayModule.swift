@@ -175,7 +175,32 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     }
 
     var relationshipSummary: String {
-        "\(storageLocation.title) · \(sourceOrigin.title)"
+        "\(displayStorageLocationTitle) · \(sourceOrigin.title)"
+    }
+
+    var displayStorageLocationTitle: String {
+        if storageLocation == .gitHub, !publishesStandalone {
+            return "远程模块"
+        }
+        return storageLocation.title
+    }
+
+    var displayStorageLocationSystemImage: String {
+        if storageLocation == .gitHub, !publishesStandalone {
+            return "link"
+        }
+        return storageLocation.systemImage
+    }
+
+    var standaloneStorageDetail: String {
+        guard publishesStandalone else {
+            return "未开启独立发布；转换结果保存在本地缓存"
+        }
+        return storageLocation.detail
+    }
+
+    var standaloneStorageSystemImage: String {
+        publishesStandalone ? storageLocation.systemImage : "internaldrive"
     }
 
     var effectiveOriginalSourceURL: String {

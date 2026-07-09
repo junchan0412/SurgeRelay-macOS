@@ -9,7 +9,7 @@
     return JSON.stringify([
       module.id, module.name, module.sourceURL, module.effectiveOriginalSourceURL,
       module.sourceFormatTitle, module.outputFolder, module.publishedRelativePath,
-      module.storageLocation, module.storageLocationTitle, module.sourceOriginTitle,
+      module.storageLocation, module.storageLocationTitle, module.storageLocationDetail, module.sourceOriginTitle,
       module.relationshipSummary, module.localStorageRelativePath,
       module.iconURL, module.customIconURL, module.isEnabled, module.publishesStandalone,
       module.state, module.stateTitle, module.lastError, module.lastUpdatedAt, module.sourceCheckedAt,
@@ -31,8 +31,10 @@
       Boolean(previousModule.sourceETag) !== Boolean(nextModule.sourceETag) ||
       Boolean(previousModule.sourceLastModified) !== Boolean(nextModule.sourceLastModified) ||
       previousModule.storageLocation !== nextModule.storageLocation ||
+      previousModule.storageLocationDetail !== nextModule.storageLocationDetail ||
       previousModule.sourceOriginTitle !== nextModule.sourceOriginTitle ||
       previousModule.localStorageRelativePath !== nextModule.localStorageRelativePath ||
+      previousModule.publishesStandalone !== nextModule.publishesStandalone ||
       previousModule.lastError !== nextModule.lastError;
   }
 
@@ -60,6 +62,7 @@
       module.sourceFormatTitle,
       module.sourceOriginTitle,
       module.storageLocationTitle,
+      module.storageLocationDetail,
       module.relationshipSummary,
       module.outputFileName,
       module.publishedRelativePath,

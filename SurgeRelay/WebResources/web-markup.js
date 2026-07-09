@@ -136,7 +136,7 @@
     return `${detailToolbar(selectedTab, true)}
     ${error}
     <section class="form-section-view"><h3 class="section-heading">管理关系</h3><div class="group-box">
-      ${detailRow(module.storageLocationIcon || 'folder', '模块存放', module.storageLocationTitle || 'GitHub 模块')}
+      ${detailRow(module.publishesStandalone ? (module.storageLocationIcon || 'folder') : 'folder', '独立模块存放', module.storageLocationDetail || module.storageLocationTitle || '未开启独立发布')}
       ${detailRow(module.sourceOriginIcon || 'link', '转换前来源', module.sourceOriginTitle || module.sourceFormatTitle)}
       ${detailRow('link', '原始地址', sourceAddressValue, true, sourceAddress)}
       ${sourceRecordRow}

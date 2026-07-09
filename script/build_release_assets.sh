@@ -191,7 +191,10 @@ elif [[ -d "/Volumes/TR 5000/Applications/Xcode.app/Contents/Developer" ]]; then
   export DEVELOPER_DIR="${DEVELOPER_DIR:-/Volumes/TR 5000/Applications/Xcode.app/Contents/Developer}"
 fi
 
-if ! xcodebuild -project "$ROOT_DIR/Surge Relay.xcodeproj" -list >/dev/null 2>&1; then
+if ! xcodebuild \
+  -project "$ROOT_DIR/Surge Relay.xcodeproj" \
+  -list \
+  -clonedSourcePackagesDirPath "$SOURCE_PACKAGES" >/dev/null 2>&1; then
   echo "Xcode is not ready for command-line builds." >&2
   echo "Run this once in Terminal, then re-run this script:" >&2
   echo "  DEVELOPER_DIR='${DEVELOPER_DIR:-}' sudo --preserve-env=DEVELOPER_DIR xcodebuild -license accept" >&2

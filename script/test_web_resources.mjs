@@ -363,6 +363,7 @@ const signatureBase = {
   publishedRelativePath: 'Folder/Demo.sgmodule',
   storageLocation: 'gitHub',
   storageLocationTitle: 'GitHub 模块',
+  storageLocationDetail: '储存在 GitHub 模块目录',
   sourceOriginTitle: '远程 Surge 模块',
   relationshipSummary: 'GitHub 模块 · 远程 Surge 模块',
   localStorageRelativePath: '',
@@ -381,6 +382,10 @@ const signatureBase = {
   sourceLastModified: 'date',
   conversionEngineRevision: 'rev'
 };
+assert.notEqual(
+  logic.moduleListSignature(signatureBase),
+  logic.moduleListSignature({ ...signatureBase, storageLocationDetail: '未开启独立发布；转换结果保存在本地缓存' })
+);
 assert.notEqual(
   logic.moduleListSignature(signatureBase),
   logic.moduleListSignature({ ...signatureBase, relationshipSummary: '本地模块 · 远程 Surge 模块' })
@@ -562,13 +567,13 @@ assert.equal(
 
 assert.equal(
   logic.moduleSubtitle({
-    relationshipSummary: 'GitHub 模块 · 远程 Surge 模块',
+    relationshipSummary: '远程模块 · 远程 Surge 模块',
     category: 'Ads',
     outputFolder: 'Folder',
     publishesStandalone: false,
     state: 'current'
   }),
-  'GitHub 模块 · 远程 Surge 模块 · Ads · Folder · 不发布独立模块'
+  '远程模块 · 远程 Surge 模块 · Ads · Folder · 不发布独立模块'
 );
 
 assert.equal(
@@ -716,6 +721,8 @@ const failedModuleDetail = markup.moduleDetailMarkup({
   lastError: '原始链接返回 404\n请检查仓库路径',
   advancedSummary: 'jq: .payload',
   hasOverrideConflict: true,
+  publishesStandalone: false,
+  storageLocationDetail: '未开启独立发布；转换结果保存在本地缓存',
   storageLocationIcon: 'folder',
   sourceOriginIcon: 'link'
 }, {
@@ -731,6 +738,8 @@ assert.ok(
   'module detail markup should keep failure reason before relationship details'
 );
 assert.match(failedModuleDetail, /原始地址/);
+assert.match(failedModuleDetail, /独立模块存放/);
+assert.match(failedModuleDetail, /未开启独立发布；转换结果保存在本地缓存/);
 assert.match(failedModuleDetail, /https:\/\/example.com\/source.sgmodule\?a=1&amp;b=2/);
 assert.match(failedModuleDetail, /https:\/\/example.com\/icon.png\?x=1&amp;y=2/);
 assert.match(failedModuleDetail, /复制错误/);

@@ -50,7 +50,10 @@ struct ModuleDetailSummaryHeader: View {
 
     private var metadataPills: [ModuleDetailMetadataPill] {
         var pills = [
-            ModuleDetailMetadataPill(title: module.storageLocation.title, systemImage: module.storageLocation.systemImage),
+            ModuleDetailMetadataPill(
+                title: module.displayStorageLocationTitle,
+                systemImage: module.displayStorageLocationSystemImage
+            ),
             ModuleDetailMetadataPill(title: module.sourceOrigin.title, systemImage: module.sourceOrigin.systemImage)
         ]
         if !module.category.isEmpty {
