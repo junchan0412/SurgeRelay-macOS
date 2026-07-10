@@ -44,6 +44,15 @@ final class ModuleOutputFolderTests: XCTestCase {
         )
 
         XCTAssertEqual(folders, ["", "Custom", "GitHub", "Local", "Selected", "Used"])
+
+        let localFolders = ModuleOutputFolderCatalog.options(
+            settings: settings,
+            modules: [module],
+            localFolders: ["Local"],
+            githubFolders: ["GitHub"],
+            storageLocation: .local
+        )
+        XCTAssertEqual(localFolders, ["", "Custom", "Local"])
     }
 
     func testModuleOutputFolderCatalogCreatePlanBuildsLocalDirectoryAndRecordedFolders() throws {
@@ -57,6 +66,7 @@ final class ModuleOutputFolderTests: XCTestCase {
 
         let plan = try ModuleOutputFolderCatalog.createPlan(
             named: " /Tools/Nested/ ",
+            storageLocation: .local,
             settings: settings,
             githubModuleOutputFolders: ["", "Remote"]
         )
@@ -64,8 +74,8 @@ final class ModuleOutputFolderTests: XCTestCase {
         XCTAssertEqual(plan.folder, "Tools/Nested")
         XCTAssertEqual(plan.localDirectoryURL?.path, root.appending(path: "Tools/Nested", directoryHint: .isDirectory).path)
         XCTAssertEqual(plan.customModuleOutputFolders, ["Existing", "Tools/Nested"])
-        XCTAssertEqual(plan.githubModuleOutputFolders, ["", "Remote", "Tools/Nested"])
-        XCTAssertEqual(plan.statusMessage, "已创建/记录文件夹 Tools/Nested")
+        XCTAssertEqual(plan.githubModuleOutputFolders, ["", "Remote"])
+        XCTAssertEqual(plan.statusMessage, "已在本地模块根目录创建文件夹 Tools/Nested")
     }
 
     func testModuleOutputFolderCatalogCreatePlanHandlesGitHubOnlyAndInvalidInput() throws {
@@ -75,16 +85,18 @@ final class ModuleOutputFolderTests: XCTestCase {
 
         let githubPlan = try ModuleOutputFolderCatalog.createPlan(
             named: "GitHub Only",
+            storageLocation: .gitHub,
             settings: settings,
             githubModuleOutputFolders: []
         )
         XCTAssertNil(githubPlan.localDirectoryURL)
         XCTAssertEqual(githubPlan.customModuleOutputFolders, ["GitHub Only"])
         XCTAssertEqual(githubPlan.githubModuleOutputFolders, ["", "GitHub Only"])
-        XCTAssertEqual(githubPlan.statusMessage, "已添加 GitHub 文件夹 GitHub Only，发布模块时会自动创建路径")
+        XCTAssertEqual(githubPlan.statusMessage, "已记录 GitHub 文件夹 GitHub Only，发布时会自动创建路径")
 
         XCTAssertThrowsError(try ModuleOutputFolderCatalog.createPlan(
             named: " / ",
+            storageLocation: .gitHub,
             settings: settings,
             githubModuleOutputFolders: []
         )) { error in
@@ -95,6 +107,7 @@ final class ModuleOutputFolderTests: XCTestCase {
         settings.localModuleDirectory = " "
         XCTAssertThrowsError(try ModuleOutputFolderCatalog.createPlan(
             named: "Local",
+            storageLocation: .local,
             settings: settings,
             githubModuleOutputFolders: []
         )) { error in

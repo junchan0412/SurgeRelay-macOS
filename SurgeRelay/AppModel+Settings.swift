@@ -39,7 +39,11 @@ extension AppModel {
 
     func setLocalModuleDirectory(_ path: String) {
         settings.localModuleDirectory = path
+        localModuleOutputFolders = [ModuleOutputFolder.root]
+        localModuleOutputFoldersRootPath = nil
+        localModuleOutputFoldersLastRefreshedAt = nil
         saveSettings()
+        Task { await refreshModuleOutputFolders(force: true) }
         if settings.publishToLocal { Task { await rebuildCombinedFromCache() } }
     }
 

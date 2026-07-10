@@ -4,13 +4,14 @@ import XCTest
 
 final class ModuleMetadataRefreshPlannerTests: XCTestCase {
     func testPlanRestoresSubscriptionMetadataAndOverrideBaseHash() throws {
-        let cachedContent = """
+        let convertedContent = """
         #!name=Converted
         #SUBSCRIBED http://script.hub/file/_start_/https://example.com/QuantumultX/demo.conf/_end_/Demo.sgmodule?type=qx-rewrite&target=surge-module&category=%23%E5%B7%A5%E5%85%B7&jqEnabled=true
 
         [Script]
         Demo = type=http-request, pattern=^https://example.com
         """
+        let overrideContent = "#!name=Customized\n[Script]\nDemo = type=http-request"
         let detectedIconURL = try XCTUnwrap(URL(string: "https://example.com/detected.png"))
         let localSourceURL = URL(filePath: "/Users/example/Surge/Demo.sgmodule").absoluteString
         let module = RelayModule(
@@ -28,14 +29,14 @@ final class ModuleMetadataRefreshPlannerTests: XCTestCase {
 
         let plan = ModuleMetadataRefreshPlanner.plan(
             module: module,
-            cachedContent: cachedContent,
-            convertedContent: "converted-content",
+            cachedContent: overrideContent,
+            convertedContent: convertedContent,
             hasOverride: true,
             detectedIconURL: detectedIconURL
         )
 
         XCTAssertTrue(plan.isChanged)
-        XCTAssertEqual(plan.module.overrideBaseHash, Data("converted-content".utf8).sha256String)
+        XCTAssertEqual(plan.module.overrideBaseHash, Data(convertedContent.utf8).sha256String)
         XCTAssertEqual(plan.module.sourceURL, "https://example.com/QuantumultX/demo.conf")
         XCTAssertEqual(plan.module.storageLocation, .local)
         XCTAssertTrue(plan.module.preservesOutputFileName)
@@ -103,6 +104,32 @@ final class ModuleMetadataRefreshPlannerTests: XCTestCase {
         XCTAssertTrue(plan.shouldRefreshIconCache)
     }
 
+    func testPlanClearsStaleSubscriptionWhenConvertedContentHasNoSubscribedMetadata() throws {
+        let subscription = try XCTUnwrap(ModuleMetadataParser.scriptHubSubscription(in: """
+        #SUBSCRIBED http://script.hub/file/_start_/https://example.com/demo.conf/_end_/Demo.sgmodule?type=qx-rewrite&target=surge-module
+        """))
+        let module = RelayModule(
+            name: "Previously Subscribed",
+            sourceURL: "https://example.com/demo.conf",
+            sourceFormat: .quantumultX,
+            outputFileName: "Demo",
+            scriptHubSubscription: subscription
+        )
+
+        let plan = ModuleMetadataRefreshPlanner.plan(
+            module: module,
+            cachedContent: "#!name=Customized\n[General]",
+            convertedContent: "#!name=Self Authored\n[General]",
+            hasOverride: true,
+            detectedIconURL: nil
+        )
+
+        XCTAssertTrue(plan.isChanged)
+        XCTAssertNil(plan.module.scriptHubSubscription)
+        XCTAssertEqual(plan.module.initialSource, .selfAuthored)
+        XCTAssertEqual(plan.module.updateSourceURL, module.sourceURL)
+    }
+
     func testSuccessfulConversionPlanRecordsRevisionAndOverrideConflict() throws {
         let checkedAt = Date(timeIntervalSince1970: 100)
         let updatedAt = Date(timeIntervalSince1970: 200)
@@ -157,13 +184,14 @@ final class ModuleMetadataRefreshPlannerTests: XCTestCase {
 
     func testSuccessfulConversionPlanRestoresSubscriptionMetadataForLocalImports() throws {
         let updatedAt = Date(timeIntervalSince1970: 300)
-        let effectiveContent = """
+        let convertedContent = """
         #!name=Converted
         #SUBSCRIBED http://script.hub/file/_start_/https://example.com/QuantumultX/demo.conf/_end_/Demo.sgmodule?type=qx-rewrite&target=surge-module&category=%23%E5%B7%A5%E5%85%B7&jqEnabled=true
 
         [Script]
         Demo = type=http-request, pattern=^https://example.com
         """
+        let effectiveContent = "#!name=Customized\n[Script]\nDemo = type=http-request"
         let localSourceURL = URL(filePath: "/Users/example/Surge/Demo.sgmodule").absoluteString
         let module = RelayModule(
             name: "Imported",
@@ -188,7 +216,7 @@ final class ModuleMetadataRefreshPlannerTests: XCTestCase {
             revisionSnapshot: snapshot,
             nativeModule: false,
             engineRevision: "engine-2",
-            convertedContent: "converted",
+            convertedContent: convertedContent,
             effectiveContent: effectiveContent,
             hasOverride: false,
             detectedIconURL: nil,

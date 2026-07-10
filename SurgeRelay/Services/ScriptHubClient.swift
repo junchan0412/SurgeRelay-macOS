@@ -16,7 +16,7 @@ actor ScriptHubClient {
     }
 
     func conversionURL(module: RelayModule, baseURL: String) throws -> URL {
-        guard let sourceURL = URL(string: module.sourceURL),
+        guard let sourceURL = URL(string: module.updateSourceURL),
               ["http", "https"].contains(sourceURL.scheme?.lowercased()) else {
             throw RelayError.invalidSourceURL
         }
@@ -44,7 +44,7 @@ actor ScriptHubClient {
     }
 
     func convert(module: RelayModule, github: GitHubSettings? = nil) async throws -> ConversionResult {
-        guard let sourceURL = URL(string: module.sourceURL) else { throw RelayError.invalidSourceURL }
+        guard let sourceURL = URL(string: module.updateSourceURL) else { throw RelayError.invalidSourceURL }
         if module.sourceFormat.isNativeSurgeModule(for: sourceURL) {
             let data: Data
             if sourceURL.isFileURL {
@@ -159,7 +159,7 @@ actor SourceRevisionService {
     }
 
     func check(_ module: RelayModule) async throws -> SourceRevisionResult {
-        guard let url = URL(string: module.effectiveOriginalSourceURL) else {
+        guard let url = URL(string: module.updateSourceURL) else {
             throw RelayError.invalidSourceURL
         }
         if url.isFileURL {

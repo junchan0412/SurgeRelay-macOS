@@ -32,7 +32,7 @@ struct ModuleSidebarView: View {
                 ContentUnavailableView(
                     allModulesAreEmpty ? "还没有模块" : "没有搜索结果",
                     systemImage: "shippingbox",
-                    description: Text(allModulesAreEmpty ? "添加第一个原始地址，Surge Relay 会生成模块输出。" : "换个关键词试试。")
+                    description: Text(allModulesAreEmpty ? "添加第一个更新地址，或扫描现有本地模块。" : "换个关键词试试。")
                 )
             }
         }
@@ -71,8 +71,8 @@ struct ModuleSidebarView: View {
                 Toggle("", isOn: batchSelectionBinding(for: module.id))
                     .labelsHidden()
                     .toggleStyle(.checkbox)
-                    .disabled(!module.publishesStandalone)
-                    .help(module.publishesStandalone ? "选择发布该模块" : "该模块未开启独立发布")
+                    .disabled(!isGitHubPublishable(module))
+                    .help(gitHubPublishHelp(for: module))
             }
             ModuleRow(module: module)
         }
@@ -95,6 +95,16 @@ struct ModuleSidebarView: View {
                 }
             }
         )
+    }
+
+    private func isGitHubPublishable(_ module: RelayModule) -> Bool {
+        module.publishesStandalone && module.storageLocation == .gitHub
+    }
+
+    private func gitHubPublishHelp(for module: RelayModule) -> String {
+        if !module.publishesStandalone { return "该模块未开启独立发布" }
+        if module.storageLocation != .gitHub { return "本地模块不会发布为 GitHub 独立模块" }
+        return "选择发布该 GitHub 模块"
     }
 
     private var collapsedSectionIDs: Set<String> {
@@ -336,7 +346,7 @@ private struct ModuleRow: View {
         if module.state == .failed, let failureSummary {
             return "更新失败：\(failureSummary)"
         }
-        var parts = [module.displayStorageLocationTitle, module.sourceOrigin.title]
+        var parts = [module.displayStorageLocationTitle, module.initialSource.title]
         if !module.category.isEmpty { parts.append(module.category) }
         let folder = ModuleOutputFolder.normalized(module.outputFolder)
         if folder != ModuleOutputFolder.root {
@@ -347,9 +357,7 @@ private struct ModuleRow: View {
     }
 
     private var failureSummary: String? {
-        guard let error = module.lastError else { return nil }
-        let summary = UpdateFailureFormatter.summary(from: error)
-        return summary.isEmpty ? nil : summary
+        module.failureSummary
     }
 
     private var statusHelp: String {
@@ -358,11 +366,6 @@ private struct ModuleRow: View {
     }
 
     private var statusColor: Color {
-        switch module.state {
-        case .never: .secondary
-        case .updating: .blue
-        case .current: .green
-        case .failed: .red
-        }
+        module.state.tintColor
     }
 }

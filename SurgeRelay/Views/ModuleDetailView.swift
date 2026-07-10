@@ -42,11 +42,18 @@ struct ModuleDetailView: View {
                 value: standaloneStorageDescription,
                 icon: module.standaloneStorageSystemImage
             )
-            detailRow("转换前来源", value: module.sourceOrigin.title, icon: module.sourceOrigin.systemImage)
+            detailRow("初始来源", value: module.initialSource.title, icon: module.initialSource.systemImage)
+            if let initialSourceURL = module.initialSourceURL {
+                detailRow("订阅原始地址", value: initialSourceURL, icon: "link", monospaced: true, copyValue: initialSourceURL)
+            }
             if let localStoragePath {
                 detailRow("本地相对路径", value: localStoragePath, icon: "folder", monospaced: true, copyValue: localStoragePath)
             }
-            detailRow("原始地址", value: sourceAddressDisplay, icon: "link", monospaced: true, copyValue: sourceAddressCopyValue)
+            if module.initialSourceURL == nil {
+                detailRow("更新地址", value: sourceAddressDisplay, icon: "link", monospaced: true, copyValue: sourceAddressCopyValue)
+            } else if let registeredSourceAddress {
+                detailRow("登记地址", value: registeredSourceAddress.display, icon: "link", monospaced: true, copyValue: registeredSourceAddress.copyValue)
+            }
             detailRow("来源格式", value: module.sourceFormatDisplayTitle, icon: "doc.text")
             if let subscription = module.scriptHubSubscription {
                 detailRow("来源记录", value: subscription.displaySummary, icon: "point.3.connected.trianglepath.dotted")
@@ -64,7 +71,7 @@ struct ModuleDetailView: View {
                 monospaced: module.publishesStandalone,
                 copyValue: module.publishesStandalone ? module.publishedRelativePath : nil
             )
-            detailRow("图标来源", value: iconSourceDescription, icon: "photo")
+            detailRow("图标来源", value: module.iconSourceDescription, icon: "photo")
             if let iconURLDisplay {
                 detailRow("图标地址", value: iconURLDisplay, icon: "link", monospaced: true, copyValue: iconURLDisplay)
             }
@@ -73,7 +80,7 @@ struct ModuleDetailView: View {
 
     private var synchronizationSection: some View {
         detailSection("同步状态") {
-            detailRow("更新状态", value: module.state.title, icon: statusIcon)
+            detailRow("更新状态", value: module.state.title, icon: module.state.systemImage)
             detailRow("创建时间", value: module.createdAt.formatted(date: .long, time: .standard), icon: "calendar")
             detailRow("上次更新", value: module.lastUpdatedAt?.formatted(date: .long, time: .standard) ?? "从未更新", icon: "clock")
             detailRow("来源检查", value: module.sourceCheckedAt?.formatted(date: .long, time: .standard) ?? "尚未检查", icon: "dot.radiowaves.left.and.right")
@@ -161,7 +168,7 @@ struct ModuleDetailView: View {
 
     @ViewBuilder
     private var publishingSection: some View {
-        if model.settings.publishToGitHub {
+        if model.settings.publishToGitHub, module.storageLocation == .gitHub {
             detailSection(model.settings.github.repositoryIsPrivate == true ? "Cloudflare" : "GitHub") {
                 if !module.publishesStandalone {
                     Label("该模块未开启独立发布。", systemImage: "pause.circle")
@@ -174,7 +181,9 @@ struct ModuleDetailView: View {
                 }
             }
         }
-        if model.settings.publishToLocal, module.publishesStandalone {
+        if model.settings.publishToLocal,
+           module.storageLocation == .local,
+           module.publishesStandalone {
             detailSection("本地文件") {
                 detailRow("文件位置", value: localPublishedPath, icon: "doc", monospaced: true, copyValue: localPublishedPath)
             }
@@ -243,43 +252,38 @@ struct ModuleDetailView: View {
         return "未开启独立发布；转换结果保存在本地缓存，可作为总模块来源"
     }
 
-    private var iconSourceDescription: String {
-        if module.customIconURL != nil {
-            return "自定义图标（仅展示）"
-        }
-        if module.iconURL != nil {
-            return "来源元数据（仅展示）"
-        }
-        return "默认图标"
-    }
-
     private var iconURLDisplay: String? {
         module.customIconURL ?? module.iconURL
     }
 
     private var sourceAddressDisplay: String {
-        let sourceURL = module.effectiveOriginalSourceURL
+        let sourceURL = module.updateSourceURL
         if let url = URL(string: sourceURL), url.isFileURL {
             return url.path
         }
         return sourceURL.removingPercentEncoding ?? sourceURL
     }
 
+    private var registeredSourceAddress: (display: String, copyValue: String)? {
+        guard let initialSourceURL = module.initialSourceURL,
+              !ModuleSourceIdentity.matches(initialSourceURL, module.sourceURL) else {
+            return nil
+        }
+        if let url = URL(string: module.sourceURL), url.isFileURL {
+            return (url.path, url.path)
+        }
+        return (
+            module.sourceURL.removingPercentEncoding ?? module.sourceURL,
+            module.sourceURL
+        )
+    }
+
     private var sourceAddressCopyValue: String {
-        let sourceURL = module.effectiveOriginalSourceURL
+        let sourceURL = module.updateSourceURL
         if let url = URL(string: sourceURL), url.isFileURL {
             return url.path
         }
         return sourceURL
-    }
-
-    private var statusIcon: String {
-        switch module.state {
-        case .never: "circle"
-        case .updating: "arrow.triangle.2.circlepath"
-        case .current: "checkmark.circle"
-        case .failed: "exclamationmark.triangle"
-        }
     }
 
     private var failureCacheNote: String {

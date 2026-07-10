@@ -118,15 +118,16 @@ const signatureBase = {
   id: 'module-1',
   name: 'Demo',
   sourceURL: 'https://example.com/demo.sgmodule',
-  effectiveOriginalSourceURL: 'https://example.com/demo.sgmodule',
+  initialSourceURL: null,
+  updateSourceURL: 'https://example.com/demo.sgmodule',
   sourceFormatTitle: 'Surge 模块',
   outputFolder: 'Folder',
   publishedRelativePath: 'Folder/Demo.sgmodule',
   storageLocation: 'gitHub',
   storageLocationTitle: 'GitHub 模块',
   storageLocationDetail: '储存在 GitHub 模块目录',
-  sourceOriginTitle: '远程 Surge 模块',
-  relationshipSummary: 'GitHub 模块 · 远程 Surge 模块',
+  initialSourceTitle: '自写模块',
+  relationshipSummary: 'GitHub 模块 · 自写模块',
   localStorageRelativePath: '',
   iconURL: '',
   customIconURL: '',
@@ -149,7 +150,7 @@ assert.notEqual(
 );
 assert.notEqual(
   logic.moduleListSignature(signatureBase),
-  logic.moduleListSignature({ ...signatureBase, relationshipSummary: '本地模块 · 远程 Surge 模块' })
+  logic.moduleListSignature({ ...signatureBase, relationshipSummary: '本地模块 · 自写模块' })
 );
 assert.notEqual(
   logic.moduleListSignature(signatureBase),
@@ -168,7 +169,7 @@ assert.notEqual(
   logic.sidebarListSignature({ combined: { isEnabled: false }, modules: [signatureBase] }),
   logic.sidebarListSignature({
     combined: { isEnabled: false },
-    modules: [{ ...signatureBase, relationshipSummary: '本地模块 · 远程 Surge 模块' }]
+    modules: [{ ...signatureBase, relationshipSummary: '本地模块 · 自写模块' }]
   })
 );
 assert.equal(
@@ -366,7 +367,9 @@ const failedModuleDetail = markup.moduleDetailMarkup({
   ...signatureBase,
   name: 'Unsafe <Module>',
   sourceURL: 'https://example.com/fallback.sgmodule',
-  effectiveOriginalSourceURL: 'https://example.com/source.sgmodule?a=1&b=2',
+  initialSourceURL: 'https://example.com/source.sgmodule?a=1&b=2',
+  updateSourceURL: 'https://example.com/source.sgmodule?a=1&b=2',
+  initialSourceTitle: '订阅 Surge 模块',
   category: 'Ads',
   outputFolder: '',
   outputFileName: 'Unsafe.sgmodule',
@@ -382,7 +385,7 @@ const failedModuleDetail = markup.moduleDetailMarkup({
   publishesStandalone: false,
   storageLocationDetail: '未开启独立发布；转换结果保存在本地缓存',
   storageLocationIcon: 'folder',
-  sourceOriginIcon: 'link'
+  initialSourceIcon: 'link'
 }, {
   selectedTab: 'info',
   combined: {
@@ -395,7 +398,8 @@ assert.ok(
     failedModuleDetail.indexOf('最近一次更新失败') < failedModuleDetail.indexOf('管理关系'),
   'module detail markup should keep failure reason before relationship details'
 );
-assert.match(failedModuleDetail, /原始地址/);
+assert.match(failedModuleDetail, /初始来源/);
+assert.match(failedModuleDetail, /订阅原始地址/);
 assert.match(failedModuleDetail, /独立模块存放/);
 assert.match(failedModuleDetail, /未开启独立发布；转换结果保存在本地缓存/);
 assert.match(failedModuleDetail, /https:\/\/example.com\/source.sgmodule\?a=1&amp;b=2/);

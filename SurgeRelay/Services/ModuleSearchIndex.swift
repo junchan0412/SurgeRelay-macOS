@@ -60,7 +60,7 @@ enum ModuleSearchIndex {
             ModuleOutputFolder.displayTitle(for: module.outputFolder),
             module.displayStorageLocationTitle,
             module.standaloneStorageDetail,
-            module.sourceOrigin.title,
+            module.initialSource.title,
             module.relationshipSummary,
             module.publishesStandalone ? "独立模块" : "不发布独立模块",
             module.state.title,

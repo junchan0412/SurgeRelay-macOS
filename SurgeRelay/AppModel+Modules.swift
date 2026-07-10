@@ -17,7 +17,9 @@ extension AppModel {
             Task { try? await iconStore.cacheIcon(from: url, for: module.id, force: true) }
         }
         try persistModules()
-        statusMessage = "已添加 \(module.name)，即将自动更新"
+        statusMessage = AppRuntimeOptions.isUIQAMode
+            ? "已添加 \(module.name)；UI QA 模式未启动自动更新"
+            : "已添加 \(module.name)，即将自动更新"
         scheduleAutomaticUpdate()
     }
 
@@ -46,9 +48,13 @@ extension AppModel {
             }
         }
         try persistModules()
-        statusMessage = plan.sourceChanged
-            ? "已保存 \(modules[index].name)，即将自动更新"
-            : "已保存 \(modules[index].name)，正在刷新输出"
+        statusMessage = if plan.sourceChanged, AppRuntimeOptions.isUIQAMode {
+            "已保存 \(modules[index].name)；UI QA 模式未启动自动更新"
+        } else if plan.sourceChanged {
+            "已保存 \(modules[index].name)，即将自动更新"
+        } else {
+            "已保存 \(modules[index].name)，正在刷新输出"
+        }
         if plan.sourceChanged, shouldUpdateModule(modules[index]) {
             scheduleAutomaticUpdate()
         } else {
@@ -123,10 +129,13 @@ extension AppModel {
         for moduleValue in modules {
             guard let content = try? await fileStore.readComponent(id: moduleValue.id) else { continue }
             let hasOverride = await fileStore.hasOverride(id: moduleValue.id)
-            let convertedContent = hasOverride && moduleValue.overrideBaseHash == nil
+            let convertedContent = hasOverride
                 ? try? await fileStore.readConvertedComponent(id: moduleValue.id)
                 : nil
-            let detectedIcon = await processingWorker.iconURL(in: content, relativeTo: moduleValue.sourceURL)
+            let detectedIcon = await processingWorker.iconURL(
+                in: content,
+                relativeTo: moduleValue.updateSourceURL
+            )
             let plan = ModuleMetadataRefreshPlanner.plan(
                 module: moduleValue,
                 cachedContent: content,
@@ -198,6 +207,7 @@ extension AppModel {
     }
 
     private func scheduleAutomaticUpdate() {
+        guard !AppRuntimeOptions.isUIQAMode else { return }
         automaticUpdateTask?.cancel()
         automaticUpdateTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(8))

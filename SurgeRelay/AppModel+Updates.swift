@@ -57,7 +57,7 @@ extension AppModel {
             statusMessage = "正在检查 \(module.name)…"
             do {
                 let hasCache = await fileStore.hasComponent(id: module.id)
-                let sourceURL = URL(string: module.sourceURL)
+                let sourceURL = URL(string: module.updateSourceURL)
                 let nativeModule = sourceURL.map { module.sourceFormat.isNativeSurgeModule(for: $0) } ?? false
                 let engineChanged = !nativeModule && module.conversionEngineRevision != upstreamState.revision
                 if hasCache {
@@ -122,7 +122,7 @@ extension AppModel {
                 let convertedContent = try await fileStore.readConvertedComponent(id: module.id)
                 let detectedIcon = await processingWorker.iconURL(
                     in: effectiveContent,
-                    relativeTo: module.sourceURL
+                    relativeTo: module.updateSourceURL
                 )
                 let nextContentHash = await processingWorker.contentFingerprint(
                     of: effectiveContent,
@@ -250,7 +250,7 @@ extension AppModel {
         existingFailure: (any Error)?
     ) async -> (any Error)? {
         if let existingFailure { return existingFailure }
-        guard UpdateFailurePlanner.shouldCheckOriginalSourceAfterConversionFailure(
+        guard UpdateFailurePlanner.shouldCheckUpdateSourceAfterConversionFailure(
             error,
             module: module,
             existingSourceCheckFailure: existingFailure

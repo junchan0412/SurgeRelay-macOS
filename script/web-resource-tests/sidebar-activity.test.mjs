@@ -223,13 +223,13 @@ assert.equal(
 
 assert.equal(
   logic.moduleSubtitle({
-    relationshipSummary: '远程模块 · 远程 Surge 模块',
+    relationshipSummary: '远程模块 · 自写模块',
     category: 'Ads',
     outputFolder: 'Folder',
     publishesStandalone: false,
     state: 'current'
   }),
-  '远程模块 · 远程 Surge 模块 · Ads · Folder · 不发布独立模块'
+  '远程模块 · 自写模块 · Ads · Folder · 不发布独立模块'
 );
 
 assert.equal(

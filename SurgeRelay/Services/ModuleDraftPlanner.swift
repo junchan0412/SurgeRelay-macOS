@@ -19,6 +19,86 @@ struct ModuleDraftUpdatePlan: Equatable, Sendable {
     }
 }
 
+struct ModuleDraftRelationshipPresentation: Equatable, Sendable {
+    var storageTitle: String
+    var initialSource: ModuleInitialSource
+    var hint: String
+    var isWarning: Bool
+}
+
+enum ModuleDraftRelationshipPlanner {
+    static func presentation(
+        draft: ModuleDraft,
+        existingModule: RelayModule?,
+        publishToLocal: Bool,
+        publishToGitHub: Bool
+    ) -> ModuleDraftRelationshipPresentation {
+        let initialSource = initialSource(draft: draft, existingModule: existingModule)
+        let storageTitle = draft.storageLocation == .gitHub && !draft.publishesStandalone
+            ? "远程模块"
+            : draft.storageLocation.title
+        let isWarning = draft.publishesStandalone && (
+            draft.storageLocation == .local ? !publishToLocal : !publishToGitHub
+        )
+        return ModuleDraftRelationshipPresentation(
+            storageTitle: storageTitle,
+            initialSource: initialSource,
+            hint: hint(
+                draft: draft,
+                initialSource: initialSource,
+                isWarning: isWarning
+            ),
+            isWarning: isWarning
+        )
+    }
+
+    private static func initialSource(
+        draft: ModuleDraft,
+        existingModule: RelayModule?
+    ) -> ModuleInitialSource {
+        let source = draft.sourceURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !source.isEmpty else { return .pending }
+        guard let url = URL(string: source),
+              url.isFileURL || ["http", "https"].contains(url.scheme?.lowercased()) else {
+            return .invalid
+        }
+        guard let existingModule,
+              ModuleSourceIdentity.matches(existingModule.sourceURL, source) else {
+            return .pending
+        }
+        return existingModule.initialSource
+    }
+
+    private static func hint(
+        draft: ModuleDraft,
+        initialSource: ModuleInitialSource,
+        isWarning: Bool
+    ) -> String {
+        if !draft.publishesStandalone {
+            return "未开启独立发布：转换结果保存在本地缓存，不会写入独立模块目录。"
+        }
+        if isWarning {
+            return draft.storageLocation == .local
+                ? "该模块设为本地存放，但全局“发布到本地”尚未开启；保存后暂不会生成独立文件。"
+                : "该模块设为 GitHub 存放，但全局“发布到 GitHub”尚未开启；保存后暂不会发布独立文件。"
+        }
+        return switch (draft.storageLocation, initialSource) {
+        case (_, .pending):
+            "保存并更新后会解析转换内容中的 #SUBSCRIBED originalURL，确认模块的初始来源。"
+        case (.local, .selfAuthored):
+            "自写模块：未检测到 #SUBSCRIBED originalURL，文件由本地根目录管理。"
+        case (.local, .subscribed):
+            "订阅模块：从 originalURL 更新，转换结果保存在本地模块根目录。"
+        case (.gitHub, .selfAuthored):
+            "自写模块：未检测到 #SUBSCRIBED originalURL，独立输出发布到 GitHub。"
+        case (.gitHub, .subscribed):
+            "订阅模块：从 originalURL 更新，转换结果发布到 GitHub 模块目录。"
+        case (_, .invalid):
+            "来源地址格式无效；请填写 HTTP、HTTPS 或本地 Surge 模块地址。"
+        }
+    }
+}
+
 enum ModuleDraftPlanner {
     static func addPlan(
         from draft: ModuleDraft,
@@ -34,7 +114,7 @@ enum ModuleDraftPlanner {
             localModuleDirectory: localModuleDirectory
         )
         guard !modules.contains(where: {
-            ModuleSourceIdentity.matches($0.effectiveOriginalSourceURL, normalizedDraft.source)
+            ModuleSourceIdentity.matches($0.updateSourceURL, normalizedDraft.source)
         }) else {
             throw RelayError.duplicateSourceURL
         }
@@ -75,7 +155,7 @@ enum ModuleDraftPlanner {
             excluding: id
         )
         guard !modules.contains(where: {
-            $0.id != id && ModuleSourceIdentity.matches($0.effectiveOriginalSourceURL, normalizedDraft.source)
+            $0.id != id && ModuleSourceIdentity.matches($0.updateSourceURL, normalizedDraft.source)
         }) else {
             throw RelayError.duplicateSourceURL
         }

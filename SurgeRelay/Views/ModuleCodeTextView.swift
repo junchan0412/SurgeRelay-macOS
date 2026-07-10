@@ -60,6 +60,22 @@ struct ModuleCodeTextView: NSViewRepresentable {
 
     @MainActor
     final class Coordinator: NSObject, NSTextViewDelegate {
+        private static let commentExpression = try! NSRegularExpression(
+            pattern: #"^(?:#|//|;).*$"#,
+            options: [.anchorsMatchLines]
+        )
+        private static let sectionExpression = try! NSRegularExpression(
+            pattern: #"^\[[^\n]+\]$"#,
+            options: [.anchorsMatchLines]
+        )
+        private static let metadataExpression = try! NSRegularExpression(
+            pattern: #"^#![^\n]*"#,
+            options: [.anchorsMatchLines]
+        )
+        private static let urlExpression = try! NSRegularExpression(
+            pattern: #"https?://[^\s,\"]+"#
+        )
+
         @Binding private var text: String
         weak var textView: NSTextView?
         var isApplyingUpdate = false
@@ -100,17 +116,17 @@ struct ModuleCodeTextView: NSViewRepresentable {
                 .backgroundColor: NSColor.clear,
             ], range: fullRange)
 
-            apply(pattern: #"^(?:#|//|;).*$"#, options: [.anchorsMatchLines], attributes: [
+            apply(expression: Self.commentExpression, attributes: [
                 .foregroundColor: NSColor.secondaryLabelColor,
             ], to: textStorage)
-            apply(pattern: #"^\[[^\n]+\]$"#, options: [.anchorsMatchLines], attributes: [
+            apply(expression: Self.sectionExpression, attributes: [
                 .foregroundColor: NSColor.systemPurple,
                 .font: NSFont.monospacedSystemFont(ofSize: 13, weight: .semibold),
             ], to: textStorage)
-            apply(pattern: #"^#![^\n]*"#, options: [.anchorsMatchLines], attributes: [
+            apply(expression: Self.metadataExpression, attributes: [
                 .foregroundColor: NSColor.systemTeal,
             ], to: textStorage)
-            apply(pattern: #"https?://[^\s,\"]+"#, attributes: [
+            apply(expression: Self.urlExpression, attributes: [
                 .foregroundColor: NSColor.systemOrange,
             ], to: textStorage)
 
@@ -148,26 +164,32 @@ struct ModuleCodeTextView: NSViewRepresentable {
             let selectedKey = selectedModuleID
                 .flatMap { id in modules.first(where: { $0.id == id }) }
                 .map { ModuleMerger.toggleKey(for: $0) }
+            let string = textStorage.string as NSString
             for (key, color) in colors {
-                apply(
-                    pattern: "^%\(NSRegularExpression.escapedPattern(for: key))%.*$",
-                    options: [.anchorsMatchLines],
-                    attributes: [
-                        .foregroundColor: color,
-                        .backgroundColor: color.withAlphaComponent(key == selectedKey ? 0.16 : 0.06),
-                    ],
-                    to: textStorage
-                )
+                let marker = "%\(key)%"
+                var searchRange = NSRange(location: 0, length: string.length)
+                while searchRange.length > 0 {
+                    let markerRange = string.range(of: marker, options: [], range: searchRange)
+                    guard markerRange.location != NSNotFound else { break }
+                    let lineRange = string.lineRange(for: markerRange)
+                    if markerRange.location == lineRange.location {
+                        textStorage.addAttributes([
+                            .foregroundColor: color,
+                            .backgroundColor: color.withAlphaComponent(key == selectedKey ? 0.16 : 0.06),
+                        ], range: lineRange)
+                        break
+                    }
+                    let nextLocation = NSMaxRange(markerRange)
+                    searchRange = NSRange(location: nextLocation, length: string.length - nextLocation)
+                }
             }
         }
 
         private func apply(
-            pattern: String,
-            options: NSRegularExpression.Options = [],
+            expression: NSRegularExpression,
             attributes: [NSAttributedString.Key: Any],
             to textStorage: NSTextStorage
         ) {
-            guard let expression = try? NSRegularExpression(pattern: pattern, options: options) else { return }
             let string = textStorage.string
             let range = NSRange(location: 0, length: (string as NSString).length)
             for match in expression.matches(in: string, range: range) {

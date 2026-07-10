@@ -16,6 +16,24 @@ final class ScriptHubTests: XCTestCase {
         XCTAssertTrue(url.absoluteString.contains("target=surge-module"))
     }
 
+    func testScriptHubConversionURLUsesSubscribedOriginalAddress() async throws {
+        let subscription = try XCTUnwrap(ModuleMetadataParser.scriptHubSubscription(in: """
+        #SUBSCRIBED http://script.hub/file/_start_/https://example.com/original.conf/_end_/Demo.sgmodule?type=qx-rewrite&target=surge-module
+        """))
+        let module = RelayModule(
+            name: "Subscribed",
+            sourceURL: "https://example.com/converted.sgmodule",
+            sourceFormat: .quantumultX,
+            outputFileName: "Subscribed",
+            scriptHubSubscription: subscription
+        )
+
+        let url = try await ScriptHubClient().conversionURL(module: module, baseURL: "http://script.hub")
+
+        XCTAssertTrue(url.absoluteString.contains("https://example.com/original.conf/_end_/Subscribed.sgmodule"))
+        XCTAssertFalse(url.absoluteString.contains("converted.sgmodule"))
+    }
+
     func testScriptHubAdvancedOptionsAreAddedToConversionURL() async throws {
         var options = ScriptHubOptions()
         options.policy = "Proxy Group"

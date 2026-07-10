@@ -296,22 +296,29 @@ function fakeState() {
       automaticPublishRunsAt: null,
       latestGitHubPublish: null
     },
-    moduleOutputFolders: ['', 'Ads/Video'],
+    moduleEditor: {
+      defaultStorageLocation: 'gitHub',
+      localOutputFolders: ['', 'Local'],
+      githubOutputFolders: ['', 'Ads/Video'],
+      publishToLocal: true,
+      publishToGitHub: true
+    },
     modules: [
       {
         id: 'module-1',
         name: 'Block HTTPDNS',
         sourceURL: 'https://raw.githubusercontent.com/example/repo/main/block.conf',
-        effectiveOriginalSourceURL: 'https://raw.githubusercontent.com/example/repo/main/block.conf',
+        initialSourceURL: 'https://raw.githubusercontent.com/example/repo/main/block.conf',
+        updateSourceURL: 'https://raw.githubusercontent.com/example/repo/main/block.conf',
         sourceFormat: 'quantumultX',
         sourceFormatTitle: 'Quantumult X 重写',
-        sourceOriginTitle: '远程 Quantumult X',
-        sourceOriginIcon: 'link',
+        initialSourceTitle: '订阅 Quantumult X',
+        initialSourceIcon: 'link',
         storageLocation: 'gitHub',
         storageLocationTitle: 'GitHub 模块',
         storageLocationDetail: '储存在 GitHub 模块目录',
         storageLocationIcon: 'cloud',
-        relationshipSummary: 'GitHub 模块 · 远程 Quantumult X',
+        relationshipSummary: 'GitHub 模块 · 订阅 Quantumult X',
         localStorageRelativePath: null,
         outputFileName: 'Block-HTTPDNS.sgmodule',
         publishedRelativePath: 'Ads/Video/Block-HTTPDNS.sgmodule',
@@ -338,16 +345,17 @@ function fakeState() {
         id: 'module-2',
         name: 'Clean Module',
         sourceURL: 'https://example.com/clean.sgmodule',
-        effectiveOriginalSourceURL: 'https://example.com/clean.sgmodule',
+        initialSourceURL: null,
+        updateSourceURL: 'https://example.com/clean.sgmodule',
         sourceFormat: 'surge',
         sourceFormatTitle: 'Surge 模块',
-        sourceOriginTitle: '远程 Surge 模块',
-        sourceOriginIcon: 'link',
+        initialSourceTitle: '自写模块',
+        initialSourceIcon: 'pencil.and.outline',
         storageLocation: 'gitHub',
         storageLocationTitle: 'GitHub 模块',
         storageLocationDetail: '储存在 GitHub 模块目录',
         storageLocationIcon: 'cloud',
-        relationshipSummary: 'GitHub 模块 · 远程 Surge 模块',
+        relationshipSummary: 'GitHub 模块 · 自写模块',
         localStorageRelativePath: null,
         outputFileName: 'Clean-Module.sgmodule',
         publishedRelativePath: 'Clean-Module.sgmodule',
@@ -477,11 +485,14 @@ assert.ok(
   'module detail should expose failure reason before management details'
 );
 assert.match(detail.innerHTML, /复制错误/, 'module detail should provide a copy action for failure reasons');
-assert.match(detail.innerHTML, /原始地址/, 'module detail should expose original source address');
+assert.match(detail.innerHTML, /订阅原始地址/, 'module detail should expose subscribed original source address');
 assert.equal(refresh.disabled, false, 'refresh button should stay enabled when update admission allows it');
 
 document.querySelector('#add-button').dispatch('click');
 const form = document.querySelector('#module-form').elements;
+assert.equal(form.storageLocation.value, 'gitHub');
+assert.match(form.outputFolder.innerHTML, /Ads\/Video/);
+assert.doesNotMatch(form.outputFolder.innerHTML, /Local/);
 form.name.value = 'YouTube Ads';
 form.name.dispatch('input');
 form.sourceURL.value = 'https://example.com/plugin.lpx';
@@ -497,10 +508,14 @@ assert.equal(
 form.storageLocation.value = 'local';
 form.outputFileName.value = 'YouTube Ads.sgmodule';
 form.storageLocation.dispatch('change');
+assert.match(form.outputFolder.innerHTML, /Local/);
+assert.doesNotMatch(form.outputFolder.innerHTML, /Ads\/Video/);
+form.outputFolder.value = 'Local';
+form.outputFolder.dispatch('change');
 form.outputFileName.dispatch('input');
 assert.equal(
   document.querySelector('#output-path-preview').textContent,
-  'Ads/Video/YouTube Ads.sgmodule',
+  'Local/YouTube Ads.sgmodule',
   'local output preview should preserve existing file names'
 );
 
@@ -526,7 +541,7 @@ assert.deepEqual(JSON.parse(saveRequest.options.body), {
   storageLocation: 'local',
   category: 'Ads',
   iconURL: 'https://example.com/icon.png',
-  outputFolder: 'Ads/Video',
+  outputFolder: 'Local',
   outputFileName: 'YouTube Ads.sgmodule',
   isEnabled: false,
   publishesStandalone: true,

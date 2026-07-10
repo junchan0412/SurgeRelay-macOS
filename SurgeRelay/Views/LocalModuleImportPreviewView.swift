@@ -27,12 +27,12 @@ struct LocalModuleImportPreviewView: View {
         selectedCandidates.contains { $0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 
-    private var pureLocalCandidateCount: Int {
-        candidates.filter { $0.sourceOrigin == .localSurgeFile }.count
+    private var selfAuthoredCandidateCount: Int {
+        candidates.filter { $0.initialSource == .selfAuthored }.count
     }
 
-    private var remoteBackedLocalCandidateCount: Int {
-        candidates.filter { $0.sourceOrigin.isRemote }.count
+    private var subscribedCandidateCount: Int {
+        candidates.filter { $0.initialSource.isSubscribed }.count
     }
 
     var body: some View {
@@ -127,11 +127,11 @@ struct LocalModuleImportPreviewView: View {
     @ViewBuilder
     private var summaryPills: some View {
         importPill("\(candidates.count) 个可导入", systemImage: "doc.text")
-        if pureLocalCandidateCount > 0 {
-            importPill("\(pureLocalCandidateCount) 个纯本地", systemImage: "doc")
+        if selfAuthoredCandidateCount > 0 {
+            importPill("\(selfAuthoredCandidateCount) 个自写模块", systemImage: "pencil.and.outline")
         }
-        if remoteBackedLocalCandidateCount > 0 {
-            importPill("\(remoteBackedLocalCandidateCount) 个远程来源", systemImage: "link")
+        if subscribedCandidateCount > 0 {
+            importPill("\(subscribedCandidateCount) 个订阅来源", systemImage: "link")
         }
         importPill("\(selectedCandidates.count) 个已选择", systemImage: "checkmark.circle")
         if !skippedFiles.isEmpty {
@@ -307,7 +307,10 @@ struct LocalModuleImportPreviewView: View {
 
     private func outputFolderOptions(preserving selected: String) -> [String] {
         ModuleOutputFolder.options(
-            from: model.moduleOutputFolderOptions(preserving: selected) + candidates.map(\.outputFolder),
+            from: model.moduleOutputFolderOptions(
+                storageLocation: .local,
+                preserving: selected
+            ) + candidates.map(\.outputFolder),
             preserving: selected
         )
     }

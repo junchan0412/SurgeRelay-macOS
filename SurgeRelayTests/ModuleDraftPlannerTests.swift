@@ -3,6 +3,66 @@ import XCTest
 @testable import SurgeRelay
 
 final class ModuleDraftPlannerTests: XCTestCase {
+    func testModuleDraftRelationshipPlannerUsesSubscriptionMetadataAndWarnsForDisabledDestination() throws {
+        let subscription = try XCTUnwrap(ModuleMetadataParser.scriptHubSubscription(in: """
+        #SUBSCRIBED http://script.hub/file/_start_/https://example.com/demo.conf/_end_/Demo.sgmodule?type=qx-rewrite&target=surge-module
+        """))
+        let module = RelayModule(
+            name: "Subscribed",
+            sourceURL: "https://example.com/demo.conf",
+            sourceFormat: .quantumultX,
+            outputFileName: "Demo",
+            storageLocation: .gitHub,
+            scriptHubSubscription: subscription
+        )
+        let subscribed = ModuleDraftRelationshipPlanner.presentation(
+            draft: ModuleDraft(module: module),
+            existingModule: module,
+            publishToLocal: true,
+            publishToGitHub: true
+        )
+        XCTAssertEqual(subscribed.initialSource, .subscribed(.quantumultX))
+        XCTAssertEqual(subscribed.storageTitle, "GitHub 模块")
+        XCTAssertFalse(subscribed.isWarning)
+        XCTAssertTrue(subscribed.hint.contains("originalURL"))
+
+        var localDraft = ModuleDraft()
+        localDraft.name = "Local"
+        localDraft.sourceURL = "file:///Users/example/Local.sgmodule"
+        localDraft.storageLocation = .local
+        let disabledLocal = ModuleDraftRelationshipPlanner.presentation(
+            draft: localDraft,
+            existingModule: nil,
+            publishToLocal: false,
+            publishToGitHub: true
+        )
+        XCTAssertEqual(disabledLocal.initialSource, .pending)
+        XCTAssertTrue(disabledLocal.isWarning)
+        XCTAssertTrue(disabledLocal.hint.contains("发布到本地"))
+    }
+
+    func testModuleDraftRelationshipPlannerKeepsUnresolvedDraftsPending() {
+        let empty = ModuleDraftRelationshipPlanner.presentation(
+            draft: ModuleDraft(defaultStorageLocation: .local),
+            existingModule: nil,
+            publishToLocal: true,
+            publishToGitHub: false
+        )
+        XCTAssertEqual(empty.initialSource, .pending)
+        XCTAssertTrue(empty.hint.contains("保存并更新"))
+
+        var invalidDraft = ModuleDraft()
+        invalidDraft.sourceURL = "not a url"
+        let invalid = ModuleDraftRelationshipPlanner.presentation(
+            draft: invalidDraft,
+            existingModule: nil,
+            publishToLocal: true,
+            publishToGitHub: true
+        )
+        XCTAssertEqual(invalid.initialSource, .invalid)
+        XCTAssertTrue(invalid.hint.contains("格式无效"))
+    }
+
     func testLocalFileSourceIsAcceptedForSurgeModules() {
         var draft = ModuleDraft()
         draft.name = "Local"

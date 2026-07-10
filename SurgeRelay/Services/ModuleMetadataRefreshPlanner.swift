@@ -36,9 +36,9 @@ enum ModuleMetadataRefreshPlanner {
             isChanged = true
         }
 
-        if let subscription = ModuleMetadataParser.scriptHubSubscription(in: cachedContent) {
-            isChanged = module.applyScriptHubSubscriptionMetadata(subscription) || isChanged
-        }
+        let metadataContent = convertedContent ?? cachedContent
+        let subscription = ModuleMetadataParser.scriptHubSubscription(in: metadataContent)
+        isChanged = module.reconcileScriptHubSubscriptionMetadata(subscription) || isChanged
 
         let preferredIconURL = module.customIconURL.flatMap(URL.init(string:)) ?? detectedIconURL
         let nextIconValue = preferredIconURL?.absoluteString
@@ -49,7 +49,7 @@ enum ModuleMetadataRefreshPlanner {
 
         let resolvedFormat = ModuleNamingPlanner.detectedFormat(
             for: module.sourceFormat,
-            source: module.sourceURL
+            source: module.updateSourceURL
         )
         let formatChanged = module.detectedSourceFormat != resolvedFormat
         if formatChanged {
@@ -94,15 +94,14 @@ enum ModuleMetadataRefreshPlanner {
             module.hasOverrideConflict = false
         }
 
-        if let subscription = ModuleMetadataParser.scriptHubSubscription(in: effectiveContent) {
-            _ = module.applyScriptHubSubscriptionMetadata(subscription)
-        }
+        let subscription = ModuleMetadataParser.scriptHubSubscription(in: convertedContent)
+        _ = module.reconcileScriptHubSubscriptionMetadata(subscription)
 
         let preferredIconURL = module.customIconURL.flatMap(URL.init(string:)) ?? detectedIconURL
         module.iconURL = preferredIconURL?.absoluteString
         module.detectedSourceFormat = ModuleNamingPlanner.detectedFormat(
             for: module.sourceFormat,
-            source: module.sourceURL
+            source: module.updateSourceURL
         )
 
         let contentChanged = module.contentHash != nextContentHash

@@ -109,43 +109,51 @@ enum ModuleStorageLocation: String, Codable, CaseIterable, Identifiable, Sendabl
         case .gitHub: "cloud"
         }
     }
+
+    static func preferredDefault(publishToLocal: Bool) -> ModuleStorageLocation {
+        publishToLocal ? .local : .gitHub
+    }
 }
 
-enum ModuleSourceOrigin: Equatable, Sendable {
-    case localSurgeFile
-    case remote(ModuleSourceFormat)
+enum ModuleInitialSource: Equatable, Sendable {
+    case pending
+    case selfAuthored
+    case subscribed(ModuleSourceFormat)
     case invalid
 
     var title: String {
         switch self {
-        case .localSurgeFile:
-            "本地 Surge 模块"
-        case .remote(let format):
+        case .pending:
+            "待更新识别"
+        case .selfAuthored:
+            "自写模块"
+        case .subscribed(let format):
             switch format {
             case .automatic:
-                "远程来源"
+                "订阅来源"
             case .quantumultX:
-                "远程 Quantumult X"
+                "订阅 Quantumult X"
             case .loon:
-                "远程 Loon"
+                "订阅 Loon"
             case .surge:
-                "远程 Surge 模块"
+                "订阅 Surge 模块"
             }
         case .invalid:
-            "缺少有效来源"
+            "来源记录无效"
         }
     }
 
     var systemImage: String {
         switch self {
-        case .localSurgeFile: "doc"
-        case .remote: "link"
+        case .pending: "clock.arrow.circlepath"
+        case .selfAuthored: "pencil.and.outline"
+        case .subscribed: "link"
         case .invalid: "exclamationmark.triangle"
         }
     }
 
-    var isRemote: Bool {
-        if case .remote = self { return true }
+    var isSubscribed: Bool {
+        if case .subscribed = self { return true }
         return false
     }
 }
@@ -162,6 +170,15 @@ enum ModuleUpdateState: String, Codable, Sendable {
         case .updating: "正在更新"
         case .current: "已是最新"
         case .failed: "更新失败"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .never: "circle"
+        case .updating: "arrow.triangle.2.circlepath"
+        case .current: "checkmark.circle"
+        case .failed: "exclamationmark.triangle"
         }
     }
 }

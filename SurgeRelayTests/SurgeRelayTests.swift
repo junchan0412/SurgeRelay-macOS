@@ -2,7 +2,7 @@ import XCTest
 @testable import SurgeRelay
 
 final class SurgeRelayTests: XCTestCase {
-    func testRelayModuleSeparatesStorageLocationFromSourceOrigin() {
+    func testRelayModuleSeparatesStorageLocationFromInitialSource() {
         let githubModule = RelayModule(
             name: "GitHub Remote",
             sourceURL: "https://example.com/loon/plugin.plugin",
@@ -28,18 +28,18 @@ final class SurgeRelayTests: XCTestCase {
         )
 
         XCTAssertEqual(githubModule.storageLocation, .gitHub)
-        XCTAssertEqual(githubModule.sourceOrigin, .remote(.loon))
+        XCTAssertEqual(githubModule.initialSource, .selfAuthored)
         XCTAssertEqual(githubModule.publishedRelativePath, "Plugin-Demo.sgmodule")
         XCTAssertEqual(githubModule.displayStorageLocationTitle, "GitHub 模块")
         XCTAssertEqual(localModule.storageLocation, .local)
-        XCTAssertEqual(localModule.sourceOrigin, .remote(.quantumultX))
+        XCTAssertEqual(localModule.initialSource, .selfAuthored)
         XCTAssertEqual(localModule.publishedRelativePath, "Rewrite Demo.sgmodule")
-        XCTAssertEqual(localModule.relationshipSummary, "本地模块 · 远程 Quantumult X")
-        XCTAssertEqual(localModule.standaloneStorageDetail, "转换结果储存在本地模块根目录")
+        XCTAssertEqual(localModule.relationshipSummary, "本地模块 · 自写模块")
+        XCTAssertEqual(localModule.standaloneStorageDetail, "储存在本地模块根目录")
         XCTAssertEqual(remoteOnlyModule.displayStorageLocationTitle, "远程模块")
         XCTAssertEqual(remoteOnlyModule.displayStorageLocationSystemImage, "link")
         XCTAssertEqual(remoteOnlyModule.standaloneStorageDetail, "未开启独立发布；转换结果保存在本地缓存")
-        XCTAssertEqual(remoteOnlyModule.relationshipSummary, "远程模块 · 远程 Surge 模块")
+        XCTAssertEqual(remoteOnlyModule.relationshipSummary, "远程模块 · 自写模块")
     }
 
     func testRefreshPolicyDoesNotRefreshAgainBeforeInterval() {
@@ -85,6 +85,25 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertNil(decoded.sourceETag)
         XCTAssertNil(decoded.sourceContentHash)
         XCTAssertFalse(decoded.hasOverrideConflict)
+    }
+
+    func testRelayModuleDecodingUsesLegacyLocalPathAsStorageEvidence() throws {
+        let legacyData = Data("""
+        {
+          "id": "33333333-3333-3333-3333-333333333333",
+          "name": "Legacy Local",
+          "sourceURL": "https://example.com/original.conf",
+          "sourceFormat": "quantumultX",
+          "outputFileName": "Legacy Local.sgmodule",
+          "localStorageRelativePath": "Converted/Legacy Local.sgmodule"
+        }
+        """.utf8)
+
+        let decoded = try JSONDecoder().decode(RelayModule.self, from: legacyData)
+        XCTAssertEqual(decoded.storageLocation, .local)
+        XCTAssertEqual(decoded.localStorageRelativePath, "Converted/Legacy Local.sgmodule")
+        XCTAssertTrue(decoded.preservesOutputFileName)
+        XCTAssertEqual(decoded.outputFileName, "Legacy Local.sgmodule")
     }
 
     func testUpdateHistoryRoundTrip() throws {

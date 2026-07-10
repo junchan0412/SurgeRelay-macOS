@@ -4,10 +4,11 @@ struct DiagnosticModuleSnapshot: Codable, Sendable {
     var id: UUID
     var name: String
     var sourceURL: String
-    var effectiveOriginalSourceURL: String
+    var initialSourceURL: String?
+    var updateSourceURL: String
     var storageLocation: String
     var storageLocationTitle: String
-    var sourceOriginTitle: String
+    var initialSourceTitle: String
     var relationshipSummary: String
     var localStorageRelativePath: String?
     var enabled: Bool

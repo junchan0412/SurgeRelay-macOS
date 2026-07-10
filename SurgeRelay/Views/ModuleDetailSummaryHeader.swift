@@ -54,7 +54,7 @@ struct ModuleDetailSummaryHeader: View {
                 title: module.displayStorageLocationTitle,
                 systemImage: module.displayStorageLocationSystemImage
             ),
-            ModuleDetailMetadataPill(title: module.sourceOrigin.title, systemImage: module.sourceOrigin.systemImage)
+            ModuleDetailMetadataPill(title: module.initialSource.title, systemImage: module.initialSource.systemImage)
         ]
         if !module.category.isEmpty {
             pills.append(ModuleDetailMetadataPill(title: module.category, systemImage: "tag"))
@@ -93,12 +93,12 @@ struct ModuleDetailSummaryHeader: View {
             ModuleDetailSummaryMetric(
                 title: "更新",
                 value: summaryUpdateValue,
-                systemImage: statusIcon,
-                tint: statusColor
+                systemImage: module.state.systemImage,
+                tint: module.state.tintColor
             ),
             ModuleDetailSummaryMetric(
                 title: "图标",
-                value: iconSourceDescription,
+                value: module.iconSourceDescription,
                 systemImage: module.iconURL == nil ? "shippingbox" : "photo",
                 tint: .secondary
             )
@@ -121,37 +121,7 @@ struct ModuleDetailSummaryHeader: View {
     }
 
     private var failureSummary: String? {
-        guard let error = module.lastError else { return nil }
-        let summary = UpdateFailureFormatter.summary(from: error)
-        return summary.isEmpty ? nil : summary
-    }
-
-    private var statusIcon: String {
-        switch module.state {
-        case .never: "circle"
-        case .updating: "arrow.triangle.2.circlepath"
-        case .current: "checkmark.circle"
-        case .failed: "exclamationmark.triangle"
-        }
-    }
-
-    private var statusColor: Color {
-        switch module.state {
-        case .never: .secondary
-        case .updating: .blue
-        case .current: .green
-        case .failed: .red
-        }
-    }
-
-    private var iconSourceDescription: String {
-        if module.customIconURL != nil {
-            return "自定义图标（仅展示）"
-        }
-        if module.iconURL != nil {
-            return "来源元数据（仅展示）"
-        }
-        return "默认图标"
+        module.failureSummary
     }
 
     private var summaryMetricLayout: some View {

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 1.3.16
+
+- 重构模块初始来源判定：只解析转换内容中的 Script-Hub `#SUBSCRIBED originalURL`；缺失该元数据时归类为“自写模块”，不再根据登记 URL 或文件路径猜测来源。
+- 明确区分订阅原始地址、实际更新地址、登记地址和本地物理路径；缓存恢复、轻量检查、正式转换和格式识别统一使用各自职责对应的地址。
+- 独立模块严格按 `storageLocation` 发布：本地模块只写入本地，GitHub 模块只发布到 GitHub；关闭独立发布后仍可作为总模块来源，总模块继续支持两个全局目标。
+- macOS 与 Web 模块编辑器统一默认存放策略、目标文件夹、来源关系和未启用目标提示，降低新建、导入和发布模块时的理解成本。
+- 优化元数据逐行解析、本地目录异步缓存、图标异步加载、侧边栏单次分组和预览编辑器按需挂载，减少 SwiftUI 重绘中的磁盘 I/O、正则开销和隐藏视图内存占用。
+- 新增统一的 Debug 构建/运行/日志/UI QA 脚本和共享 Xcode scheme，并补充来源、存放、发布与性能边界的回归测试。
+
 ## 1.3.15
 
 - 拆分 Web resource 行为测试：保留 `script/test_web_resources.mjs` 聚合入口，同时把架构边界、sidebar/activity、logic/markup、API/state、editor/feedback/preview、index contract 分到独立测试文件。

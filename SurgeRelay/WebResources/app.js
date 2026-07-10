@@ -178,7 +178,10 @@ ui.moduleForm.elements.name.addEventListener('input', event => {
   updateOutputPathPreview();
 });
 ui.moduleForm.elements.outputFolder.addEventListener('change', updateOutputPathPreview);
-ui.moduleForm.elements.storageLocation.addEventListener('change', updateOutputPathPreview);
+ui.moduleForm.elements.storageLocation.addEventListener('change', () => {
+  moduleEditor.refreshOutputFolders(state);
+  updateOutputPathPreview();
+});
 ui.moduleForm.elements.outputFileName.addEventListener('input', updateOutputPathPreview);
 ui.moduleForm.elements.iconURL.addEventListener('input', moduleEditor.updateIconURLPreview);
 ui.moduleForm.elements.publishesStandalone.addEventListener('change', updateOutputPathPreview);
@@ -288,7 +291,7 @@ function patchLiveState(previous, next) {
     return;
   }
   patchDetailValue('更新状态', webLogic.moduleStatusTitle(module));
-  patchDetailValue('转换前来源', module.sourceOriginTitle || module.sourceFormatTitle);
+  patchDetailValue('初始来源', module.initialSourceTitle || '自写模块');
   patchDetailValue('来源格式', module.sourceFormatTitle);
   if (next.combined.isEnabled) patchDetailValue('汇总订阅', next.combined.subscriptionURL || '等待发布配置');
   patchDetailValue('创建时间', formatDate(module.createdAt, '—'));

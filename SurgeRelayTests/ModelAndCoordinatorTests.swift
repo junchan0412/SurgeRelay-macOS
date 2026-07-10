@@ -73,11 +73,13 @@ final class ModelAndCoordinatorTests: XCTestCase {
             conversionEngineRevision: "old-engine"
         )
 
-        XCTAssertTrue(module.applyScriptHubSubscriptionMetadata(subscription))
+        XCTAssertTrue(module.reconcileScriptHubSubscriptionMetadata(subscription))
 
         XCTAssertEqual(module.sourceURL, "https://raw.githubusercontent.com/example/repo/main/QuantumultX/demo.conf")
-        XCTAssertEqual(module.effectiveOriginalSourceURL, module.sourceURL)
-        XCTAssertTrue(module.hasRemoteOriginalSource)
+        XCTAssertEqual(module.initialSourceURL, module.sourceURL)
+        XCTAssertEqual(module.updateSourceURL, module.sourceURL)
+        XCTAssertEqual(module.initialSource, .subscribed(.quantumultX))
+        XCTAssertTrue(module.hasRemoteUpdateSource)
         XCTAssertEqual(module.sourceFormat, .quantumultX)
         XCTAssertEqual(module.category, "#工具")
         XCTAssertEqual(module.scriptHubSubscription, subscription)
@@ -88,6 +90,26 @@ final class ModelAndCoordinatorTests: XCTestCase {
         XCTAssertNil(module.sourceContentHash)
         XCTAssertNil(module.sourceCheckedAt)
         XCTAssertNil(module.conversionEngineRevision)
+    }
+
+    func testRelayModuleTreatsMissingSubscriptionAsSelfAuthoredAndClearsStaleMetadata() throws {
+        let subscription = try XCTUnwrap(ModuleMetadataParser.scriptHubSubscription(in: """
+        #SUBSCRIBED http://script.hub/file/_start_/https://example.com/demo.conf/_end_/Demo.sgmodule?type=qx-rewrite&target=surge-module
+        """))
+        var module = RelayModule(
+            name: "Demo",
+            sourceURL: "https://example.com/demo.sgmodule",
+            sourceFormat: .surge,
+            outputFileName: "Demo",
+            scriptHubSubscription: subscription
+        )
+
+        XCTAssertEqual(module.initialSource, .subscribed(.quantumultX))
+        XCTAssertTrue(module.reconcileScriptHubSubscriptionMetadata(nil))
+        XCTAssertEqual(module.initialSource, .selfAuthored)
+        XCTAssertNil(module.initialSourceURL)
+        XCTAssertEqual(module.updateSourceURL, module.sourceURL)
+        XCTAssertFalse(module.reconcileScriptHubSubscriptionMetadata(nil))
     }
 
     func testModuleArgumentMaterializePreservesSemanticComments() {
@@ -158,8 +180,8 @@ final class ModelAndCoordinatorTests: XCTestCase {
         XCTAssertEqual(candidate.sourceURL, "https://raw.githubusercontent.com/example/repo/main/QuantumultX/demo.conf")
         XCTAssertEqual(candidate.localStorageRelativePath, "Converted/Demo.sgmodule")
         XCTAssertEqual(candidate.sourceFormat, .quantumultX)
-        XCTAssertEqual(candidate.sourceOrigin, .remote(.quantumultX))
-        XCTAssertEqual(candidate.relationshipSummary, "本地模块 · 远程 Quantumult X")
+        XCTAssertEqual(candidate.initialSource, .subscribed(.quantumultX))
+        XCTAssertEqual(candidate.relationshipSummary, "本地模块 · 订阅 Quantumult X")
         XCTAssertEqual(candidate.category, "#工具")
         XCTAssertEqual(candidate.outputFolder, "Converted")
         XCTAssertNil(candidate.sourceContentHash)

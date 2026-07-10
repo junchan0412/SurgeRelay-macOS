@@ -4,12 +4,15 @@ import SwiftUI
 struct ModuleIconView: View {
     let module: RelayModule
     var size: CGFloat = 28
+    @State private var cachedImage: NSImage?
+    @State private var hasLoadedCachedImage = false
 
     var body: some View {
         Group {
             if let image = cachedImage {
                 moduleImage(Image(nsImage: image))
-            } else if let iconURL = module.iconURL.flatMap(URL.init(string:)) {
+            } else if hasLoadedCachedImage,
+                      let iconURL = module.iconURL.flatMap(URL.init(string:)) {
                 AsyncImage(url: iconURL) { phase in
                     switch phase {
                     case .empty:
@@ -29,11 +32,21 @@ struct ModuleIconView: View {
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)
+        .task(id: cacheIdentity) {
+            cachedImage = nil
+            hasLoadedCachedImage = false
+            let url = ModuleIconStore.cachedURL(for: module.id)
+            let data = await Task.detached(priority: .utility) {
+                try? Data(contentsOf: url, options: .mappedIfSafe)
+            }.value
+            guard !Task.isCancelled else { return }
+            cachedImage = data.flatMap(NSImage.init(data:))
+            hasLoadedCachedImage = true
+        }
     }
 
-    private var cachedImage: NSImage? {
-        guard let data = try? Data(contentsOf: ModuleIconStore.cachedURL(for: module.id)) else { return nil }
-        return NSImage(data: data)
+    private var cacheIdentity: String {
+        "\(module.id.uuidString)|\(module.iconURL ?? "")|\(module.lastUpdatedAt?.timeIntervalSinceReferenceDate ?? 0)"
     }
 
     private func moduleImage(_ image: Image) -> some View {
@@ -83,16 +96,11 @@ struct StatusPill: View {
     var detail: String?
 
     private var color: Color {
-        switch state {
-        case .never: .secondary
-        case .updating: .blue
-        case .current: .green
-        case .failed: .red
-        }
+        state.tintColor
     }
 
     var body: some View {
-        Label(title, systemImage: state == .updating ? "arrow.triangle.2.circlepath" : "circle.fill")
+        Label(title, systemImage: state.systemImage)
             .font(.caption)
             .lineLimit(1)
             .foregroundStyle(color)
@@ -109,6 +117,35 @@ struct StatusPill: View {
             return state.title
         }
         return "\(state.title)：\(detail)"
+    }
+}
+
+extension ModuleUpdateState {
+    var tintColor: Color {
+        switch self {
+        case .never: .secondary
+        case .updating: .blue
+        case .current: .green
+        case .failed: .red
+        }
+    }
+}
+
+extension RelayModule {
+    var failureSummary: String? {
+        guard let lastError else { return nil }
+        let summary = UpdateFailureFormatter.summary(from: lastError)
+        return summary.isEmpty ? nil : summary
+    }
+
+    var iconSourceDescription: String {
+        if customIconURL != nil {
+            return "自定义图标（仅展示）"
+        }
+        if iconURL != nil {
+            return "来源元数据（仅展示）"
+        }
+        return "默认图标"
     }
 }
 

@@ -13,7 +13,9 @@ struct ModuleDraft: Sendable {
     var scriptHubOptions = ScriptHubOptions()
     var iconURL = ""
 
-    init() {}
+    init(defaultStorageLocation: ModuleStorageLocation = .gitHub) {
+        storageLocation = defaultStorageLocation
+    }
 
     init(module: RelayModule) {
         name = module.name

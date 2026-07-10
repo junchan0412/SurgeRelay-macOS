@@ -45,7 +45,7 @@ final class WorkActivityTests: XCTestCase {
             statusMessage: "准备就绪"
         )
         XCTAssertFalse(empty.isAccepted)
-        XCTAssertEqual(empty.message, "没有可更新的模块。请添加远程原始地址，或扫描带 Script-Hub 模块链接的本地模块。")
+        XCTAssertEqual(empty.message, "没有可更新的模块。请添加 HTTP/HTTPS 更新地址，或让本地模块参与独立/总模块输出。")
 
         let disabled = RelayModule(
             name: "Demo",
@@ -61,7 +61,7 @@ final class WorkActivityTests: XCTestCase {
             statusMessage: "准备就绪"
         )
         XCTAssertFalse(disabledAdmission.isAccepted)
-        XCTAssertEqual(disabledAdmission.message, "“Demo”没有远程原始地址，无法从上游更新。")
+        XCTAssertEqual(disabledAdmission.message, "“Demo”没有远程更新地址，也未参与独立或总模块输出。")
 
         let enabled = RelayModule(
             name: "Demo",

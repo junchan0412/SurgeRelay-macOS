@@ -27,22 +27,15 @@ struct ScriptHubSubscriptionInfo: Codable, Hashable, Sendable {
 
 enum ModuleMetadataParser {
     static func scriptHubSubscription(in content: String) -> ScriptHubSubscriptionInfo? {
-        let pattern = #"(?im)^\s*#\s*SUBSCRIBED\s+(.+?)\s*$"#
-        guard let expression = try? NSRegularExpression(pattern: pattern) else { return nil }
-        let range = NSRange(content.startIndex..., in: content)
-        guard let match = expression.firstMatch(in: content, range: range),
-              let urlRange = Range(match.range(at: 1), in: content) else { return nil }
-        let value = String(content[urlRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let value = ModuleMetadataLineReader.subscribedValue(in: content) else { return nil }
         return parseScriptHubSubscriptionURL(value)
     }
 
     static func iconURL(in content: String, relativeTo source: String? = nil) -> URL? {
-        let pattern = #"(?im)^\s*#!icon\s*=\s*(.+?)\s*$"#
-        guard let expression = try? NSRegularExpression(pattern: pattern),
-              let match = expression.firstMatch(in: content, range: NSRange(content.startIndex..., in: content)),
-              let range = Range(match.range(at: 1), in: content) else { return nil }
-
-        let value = String(content[range])
+        guard let rawValue = ModuleMetadataLineReader.hashBangValue(named: "icon", in: content) else {
+            return nil
+        }
+        let value = rawValue
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
         guard !value.isEmpty else { return nil }
@@ -57,22 +50,20 @@ enum ModuleMetadataParser {
     /// used by Surge `.sgmodule` and Loon plugins. Returns nil when absent
     /// (e.g. most Quantumult X rewrite `.conf` files have no name field).
     static func displayName(in content: String) -> String? {
-        let pattern = #"(?im)^\s*#!\s*name\s*=\s*(.+?)\s*$"#
-        guard let expression = try? NSRegularExpression(pattern: pattern),
-              let match = expression.firstMatch(in: content, range: NSRange(content.startIndex..., in: content)),
-              let range = Range(match.range(at: 1), in: content) else { return nil }
-        let value = String(content[range])
+        guard let rawValue = ModuleMetadataLineReader.hashBangValue(named: "name", in: content) else {
+            return nil
+        }
+        let value = rawValue
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
         return value.isEmpty ? nil : value
     }
 
     static func category(in content: String) -> String? {
-        let pattern = #"(?im)^\s*#!\s*category\s*=\s*(.+?)\s*$"#
-        guard let expression = try? NSRegularExpression(pattern: pattern),
-              let match = expression.firstMatch(in: content, range: NSRange(content.startIndex..., in: content)),
-              let range = Range(match.range(at: 1), in: content) else { return nil }
-        let value = String(content[range])
+        guard let rawValue = ModuleMetadataLineReader.hashBangValue(named: "category", in: content) else {
+            return nil
+        }
+        let value = rawValue
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
         return value.isEmpty ? nil : value
@@ -137,10 +128,7 @@ enum ModuleMetadataParser {
     }
 
     private static func isIconMetadataLine(_ line: String) -> Bool {
-        guard let expression = try? NSRegularExpression(pattern: #"(?i)^\s*#!\s*icon\s*="#) else {
-            return false
-        }
-        return expression.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) != nil
+        ModuleMetadataLineReader.hashBangName(in: line)?.caseInsensitiveCompare("icon") == .orderedSame
     }
 
     private static func parseScriptHubSubscriptionURL(_ value: String) -> ScriptHubSubscriptionInfo? {
@@ -291,22 +279,61 @@ enum ModuleArgumentProcessor {
     }
 
     private static func metadataValue(named name: String, in content: String) -> String? {
-        let escapedName = NSRegularExpression.escapedPattern(for: name)
-        let pattern = "(?im)^\\s*#!\\s*\(escapedName)\\s*=\\s*(.*?)\\s*$"
-        guard let expression = try? NSRegularExpression(pattern: pattern),
-              let match = expression.firstMatch(
-                in: content,
-                range: NSRange(content.startIndex..., in: content)
-              ),
-              let range = Range(match.range(at: 1), in: content) else { return nil }
-        return String(content[range])
+        ModuleMetadataLineReader.hashBangValue(named: name, in: content)
     }
 
     private static func isArgumentMetadata(_ line: String) -> Bool {
-        guard let expression = try? NSRegularExpression(
-            pattern: #"(?i)^#!\s*arguments(?:-desc)?\s*="#
-        ) else { return false }
-        return expression.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) != nil
+        guard let name = ModuleMetadataLineReader.hashBangName(in: line)?.lowercased() else {
+            return false
+        }
+        return name == "arguments" || name == "arguments-desc"
     }
 
+}
+
+private enum ModuleMetadataLineReader {
+    static func hashBangValue(named name: String, in content: String) -> String? {
+        for line in content.split(whereSeparator: { $0.isNewline }) {
+            let parsed = parseHashBangLine(String(line))
+            guard parsed?.name.caseInsensitiveCompare(name) == .orderedSame else { continue }
+            return parsed?.value
+        }
+        return nil
+    }
+
+    static func hashBangName(in line: String) -> String? {
+        parseHashBangLine(line)?.name
+    }
+
+    static func subscribedValue(in content: String) -> String? {
+        for line in content.split(whereSeparator: { $0.isNewline }) {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmed.hasPrefix("#") else { continue }
+            let body = trimmed.dropFirst().trimmingCharacters(in: .whitespacesAndNewlines)
+            let token = "SUBSCRIBED"
+            guard body.count >= token.count,
+                  body.prefix(token.count).caseInsensitiveCompare(token) == .orderedSame else {
+                continue
+            }
+            var remainder = body.dropFirst(token.count)
+            guard remainder.first.map({ $0.isWhitespace || $0 == "=" }) == true else { continue }
+            while remainder.first.map({ $0.isWhitespace || $0 == "=" }) == true {
+                remainder.removeFirst()
+            }
+            let value = remainder.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !value.isEmpty { return value }
+        }
+        return nil
+    }
+
+    private static func parseHashBangLine(_ line: String) -> (name: String, value: String)? {
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("#!") else { return nil }
+        let body = trimmed.dropFirst(2).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let separator = body.firstIndex(of: "=") else { return nil }
+        let name = body[..<separator].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return nil }
+        let value = body[body.index(after: separator)...].trimmingCharacters(in: .whitespacesAndNewlines)
+        return (name, value)
+    }
 }

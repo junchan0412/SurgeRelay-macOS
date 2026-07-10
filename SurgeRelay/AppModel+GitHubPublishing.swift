@@ -11,7 +11,8 @@ extension AppModel {
     var githubPublishPlan: PublishPlan {
         PublishCoordinator.plan(
             modules: modules,
-            combinedModuleEnabled: settings.combinedModuleEnabled
+            combinedModuleEnabled: settings.combinedModuleEnabled,
+            destination: .gitHub
         )
     }
 
@@ -99,7 +100,11 @@ extension AppModel {
     func publishSelectedModulesInternal(moduleIDs: Set<UUID>) async throws -> PublishReport {
         try checkCurrentWorkCancellation()
         try Task.checkCancellation()
-        let plan = PublishCoordinator.selectedPlan(modules: modules, moduleIDs: moduleIDs)
+        let plan = PublishCoordinator.selectedPlan(
+            modules: modules,
+            moduleIDs: moduleIDs,
+            destination: .gitHub
+        )
         try GitHubPublishPlanner.validatePublishableSelection(plan)
         let token = try await githubPublishTokenAndRefreshRepositoryPrivacy()
         let files = try await selectedPublishedFiles(plan: plan)

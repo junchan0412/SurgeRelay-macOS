@@ -121,10 +121,31 @@ assert.equal(editorController.hasAdvancedValues({}), false);
 editorController.populateOutputFolders('Folder', ['Beta', 'Folder']);
 assert.equal(editorFormElements.outputFolder.value, 'Folder');
 assert.match(editorFormElements.outputFolder.innerHTML, /value="Folder">Folder/);
+assert.deepEqual(
+  editorController.outputFoldersForStorage({
+    moduleEditor: {
+      localOutputFolders: ['', 'Local'],
+      githubOutputFolders: ['', 'Remote']
+    }
+  }, 'local'),
+  ['', 'Local']
+);
+editorFormElements.storageLocation.value = 'gitHub';
+editorController.refreshOutputFolders({
+  moduleEditor: {
+    localOutputFolders: ['', 'Local'],
+    githubOutputFolders: ['', 'Remote']
+  }
+}, 'Remote');
+assert.equal(editorFormElements.outputFolder.value, 'Remote');
+assert.match(editorFormElements.outputFolder.innerHTML, /value="Remote">Remote/);
+editorFormElements.storageLocation.value = 'local';
+editorFormElements.outputFolder.value = 'Folder';
 editorFormElements.sourceURL.value = 'https://example.com/source.sgmodule';
 const outputPreview = editorController.updateOutputPathPreview({
   state: {
     combined: { fileName: 'Surge Relay' },
+    moduleEditor: { publishToLocal: true, publishToGitHub: true },
     modules: [{ id: 'other', name: 'Other Module', publishedRelativePath: 'Folder/Demo Module.sgmodule' }]
   },
   editingID: null
@@ -134,6 +155,16 @@ assert.equal(outputPreview.notice.warning, true);
 assert.match(editorUI.outputPathNote.textContent, /Other Module/);
 assert.equal(editorUI.outputPathNote.hidden, false);
 assert.equal(editorUI.outputPathNote.classList.contains('warning'), true);
+const disabledTargetPreview = editorController.updateOutputPathPreview({
+  state: {
+    combined: { fileName: 'Surge Relay' },
+    moduleEditor: { publishToLocal: false, publishToGitHub: true },
+    modules: []
+  },
+  editingID: null
+});
+assert.equal(disabledTargetPreview.notice.warning, true);
+assert.match(disabledTargetPreview.notice.message, /发布到本地.*尚未开启/);
 editorFormElements.iconURL.value = 'file:///tmp/icon.png';
 editorController.updateIconURLPreview();
 assert.equal(editorUI.iconURLPreview.classList.contains('invalid'), true);

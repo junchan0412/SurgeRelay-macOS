@@ -1,14 +1,17 @@
 # Surge Relay Development Status
 
-Updated: 2026-07-10
+Updated: 2026-07-11
 
-This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.15 (64)`.
+This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.16 (65)`.
 
 ## Completed Work
 
 ### Product Behavior
 
-- Local and GitHub module storage are modeled separately from the original source URL, so scanned local modules, remote sources, and converted outputs no longer share one ambiguous path concept.
+- Local and GitHub standalone destinations are modeled separately from initial source provenance. Initial source now comes only from converted `#SUBSCRIBED originalURL` metadata; modules without it are self-authored.
+- Draft modules remain in a pending-source state until their first successful update. A valid subscription uses `originalURL` as the resolved update source, while registration URLs and local storage paths retain separate responsibilities.
+- Standalone publishing is destination-specific: local modules publish only locally, GitHub modules publish only to GitHub, and cache-backed modules can still contribute to the combined module without producing a standalone file.
+- The macOS and Web editors share the same default-storage decision, destination-specific folder options, disabled-target warnings, and source/storage terminology.
 - Module sidebar sections can be collapsed or expanded, and remote modules that are not independently published are labeled as remote/cache-backed instead of GitHub-stored.
 - Source-name autofill now uses a shared bounded remote fetcher across the macOS editor and Web API, with private-address blocking, response-size limits, and timeout enforcement.
 - The release workflow pins external actions to full commit SHAs, and release preflight rejects mutable action references before signing assets.
@@ -37,11 +40,19 @@ This document tracks the optimization work completed after the deep audit and th
 
 ### Testing And Release Tooling
 
+- `script/build_and_run.sh` is the shared Debug build, launch, log, telemetry, verification, and isolated UI-QA entrypoint; `.codex/environments/environment.toml` and the shared Xcode scheme use the same project configuration.
 - Unit tests have been split into focused files for publishing, GitHub releases, Web management, Web HTTP security, settings, diagnostics, Script-Hub, local publishing, local import, ordering, search, metadata refresh, update failures, and task activity.
 - Web resources now have Node syntax checks, split behavior tests, a small aggregate entrypoint, and a lightweight DOM regression harness.
 - `script/check_release_configuration.sh` verifies version/build metadata, Sparkle configuration, appcast latest item, Web resources, release scripts, and GitHub Actions release workflow references.
 - `script/build_release_assets.sh` builds `.app.zip`, `.pkg`, sha256 sidecars, Sparkle EdDSA signature files, and can update `appcast.xml`.
 - Release builds use the fixed self-signed code signing identity `Surge Relay Self-Signed Code Signing` and Sparkle EdDSA update signatures.
+
+### Performance And Memory
+
+- Module metadata parsing is line-based and avoids recompiling regular expressions during refreshes.
+- Local output-folder discovery runs off the main actor and reuses a bounded cache instead of recursively scanning during SwiftUI redraws.
+- Module icons load and decode on utility tasks keyed by icon revision; hidden preview editors are mounted only after the preview tab is used and are released when the selected module changes.
+- Sidebar grouping performs one classification pass over modules, and code-highlighting patterns are reused across editor updates.
 
 ## Pending Work
 

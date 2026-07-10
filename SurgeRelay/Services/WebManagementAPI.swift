@@ -54,7 +54,11 @@ enum WebManagementAPI {
                 )
             case ("POST", "/api/modules"):
                 let mutation = try request.decodeBody(WebModuleMutation.self)
-                try model.addModule(from: mutation.draft())
+                try model.addModule(from: mutation.draft(
+                    defaultStorageLocation: .preferredDefault(
+                        publishToLocal: model.settings.publishToLocal
+                    )
+                ))
                 return .json(ActionPayload(ok: true, message: model.statusMessage), status: 201, reason: "Created")
             case ("POST", "/api/source/name"):
                 let payload = try request.decodeBody(WebSourceNameRequest.self)

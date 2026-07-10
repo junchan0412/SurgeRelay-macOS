@@ -28,23 +28,30 @@ enum ModuleOutputFolderCatalog {
         modules: [RelayModule],
         localFolders: [String],
         githubFolders: [String],
+        storageLocation: ModuleStorageLocation? = nil,
         preserving selected: String? = nil
     ) -> [String] {
         var configuredFolders: [String] = []
-        if settings.publishToLocal {
+        if settings.publishToLocal, storageLocation == nil || storageLocation == .local {
             configuredFolders.append(contentsOf: localFolders)
         }
-        if settings.publishToGitHub {
+        if settings.publishToGitHub, storageLocation == nil || storageLocation == .gitHub {
             configuredFolders.append(contentsOf: githubFolders)
         }
+        let moduleFolders = modules.compactMap { module in
+            storageLocation == nil || module.storageLocation == storageLocation
+                ? module.outputFolder
+                : nil
+        }
         return ModuleOutputFolder.options(
-            from: configuredFolders + settings.customModuleOutputFolders + modules.map(\.outputFolder),
+            from: configuredFolders + settings.customModuleOutputFolders + moduleFolders,
             preserving: selected
         )
     }
 
     static func createPlan(
         named rawValue: String,
+        storageLocation: ModuleStorageLocation,
         settings: AppSettings,
         githubModuleOutputFolders: [String]
     ) throws -> ModuleOutputFolderCreatePlan {
@@ -54,7 +61,7 @@ enum ModuleOutputFolderCatalog {
         }
 
         let localDirectoryURL: URL?
-        if settings.publishToLocal {
+        if storageLocation == .local {
             let rootPath = settings.localModuleDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !rootPath.isEmpty else {
                 throw RelayError.invalidOutput("请先设置本地模块根目录。")
@@ -72,12 +79,12 @@ enum ModuleOutputFolderCatalog {
         customFolders.insert(folder)
         let nextCustomFolders = ModuleOutputFolder.options(from: Array(customFolders))
             .filter { !$0.isEmpty }
-        let nextGitHubFolders = githubModuleOutputFolders.contains(folder)
-            ? ModuleOutputFolder.options(from: githubModuleOutputFolders)
-            : ModuleOutputFolder.options(from: githubModuleOutputFolders + [folder])
-        let statusMessage = settings.publishToLocal
-            ? "已创建/记录文件夹 \(folder)"
-            : "已添加 GitHub 文件夹 \(folder)，发布模块时会自动创建路径"
+        let nextGitHubFolders = storageLocation == .gitHub
+            ? ModuleOutputFolder.options(from: githubModuleOutputFolders + [folder])
+            : ModuleOutputFolder.options(from: githubModuleOutputFolders)
+        let statusMessage = storageLocation == .local
+            ? "已在本地模块根目录创建文件夹 \(folder)"
+            : "已记录 GitHub 文件夹 \(folder)，发布时会自动创建路径"
         return ModuleOutputFolderCreatePlan(
             folder: folder,
             localDirectoryURL: localDirectoryURL,

@@ -38,6 +38,7 @@ final class AppModel {
     var synchronizingModuleID: UUID?
     var webServerState: WebServerRuntimeState = .stopped
     var updateHistory: [UpdateHistoryEntry]
+    var localModuleOutputFolders: [String] = [ModuleOutputFolder.root]
     var githubModuleOutputFolders: [String] = [ModuleOutputFolder.root]
     var pendingPublishPreview: PublishPreview?
     var automaticPublishScheduledAt: Date?
@@ -62,6 +63,8 @@ final class AppModel {
     @ObservationIgnored private var hasStarted = false
     @ObservationIgnored var githubModuleOutputFoldersLastRefreshedAt: Date?
     @ObservationIgnored var githubModuleOutputFoldersConfiguration: GitHubSettings?
+    @ObservationIgnored var localModuleOutputFoldersRootPath: String?
+    @ObservationIgnored var localModuleOutputFoldersLastRefreshedAt: Date?
     @ObservationIgnored static let automaticPublishDelaySeconds = 30
 
     init() {

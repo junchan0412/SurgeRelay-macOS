@@ -101,7 +101,12 @@ struct ModulesView: View {
         }
         .task(id: contentIndexToken) { await rebuildContentIndex() }
         .sheet(item: $editorRoute) { route in
-            ModuleEditorView(module: route.module)
+            ModuleEditorView(
+                module: route.module,
+                defaultStorageLocation: .preferredDefault(
+                    publishToLocal: model.settings.publishToLocal
+                )
+            )
                 .environment(model)
         }
         .sheet(isPresented: $showsLocalImportPreview) {

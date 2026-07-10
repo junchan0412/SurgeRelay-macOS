@@ -13,14 +13,14 @@ struct UpdateMissingCacheBlockage: Equatable, Sendable {
 }
 
 enum UpdateFailurePlanner {
-    static func shouldCheckOriginalSourceAfterConversionFailure(
+    static func shouldCheckUpdateSourceAfterConversionFailure(
         _ error: any Error,
         module: RelayModule,
         existingSourceCheckFailure: (any Error)?
     ) -> Bool {
         existingSourceCheckFailure == nil &&
             !UpdateFailureFormatter.isActionableNetworkFailure(error) &&
-            module.hasRemoteOriginalSource
+            module.hasRemoteUpdateSource
     }
 
     static func detailedMessage(
@@ -32,7 +32,7 @@ enum UpdateFailurePlanner {
         let current = latestModule ?? module
         return UpdateFailureFormatter.detailedMessage(
             for: error,
-            sourceURL: current.effectiveOriginalSourceURL,
+            sourceURL: current.updateSourceURL,
             sourceCheckError: sourceCheckFailure
         )
     }

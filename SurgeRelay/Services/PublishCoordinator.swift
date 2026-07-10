@@ -45,10 +45,13 @@ enum PublishCoordinator {
 
     static func plan(
         modules: [RelayModule],
-        combinedModuleEnabled: Bool
+        combinedModuleEnabled: Bool,
+        destination: PublishDestination
     ) -> PublishPlan {
         PublishPlan(
-            standaloneModules: modules.filter(\.publishesStandalone),
+            standaloneModules: modules.filter {
+                $0.publishesStandalone && $0.storageLocation.matches(destination)
+            },
             combinedModuleIDs: Set(ModuleRefreshPlanner.combinedContributorModules(
                 in: modules,
                 combinedModuleEnabled: combinedModuleEnabled
@@ -58,29 +61,17 @@ enum PublishCoordinator {
 
     static func selectedPlan(
         modules: [RelayModule],
-        moduleIDs: Set<UUID>
+        moduleIDs: Set<UUID>,
+        destination: PublishDestination
     ) -> PublishPlan {
         PublishPlan(
-            standaloneModules: modules.filter { moduleIDs.contains($0.id) && $0.publishesStandalone },
+            standaloneModules: modules.filter {
+                moduleIDs.contains($0.id) &&
+                    $0.publishesStandalone &&
+                    $0.storageLocation.matches(destination)
+            },
             combinedModuleIDs: []
         )
-    }
-
-    static func publishableModuleIDs(
-        modules: [RelayModule],
-        combinedModuleEnabled: Bool
-    ) -> Set<UUID> {
-        plan(modules: modules, combinedModuleEnabled: combinedModuleEnabled).assetModuleIDs
-    }
-
-    static func hasPublishableModuleSelection(
-        modules: [RelayModule],
-        combinedModuleEnabled: Bool
-    ) -> Bool {
-        plan(
-            modules: modules,
-            combinedModuleEnabled: combinedModuleEnabled
-        ).hasPublishableModuleSelection
     }
 
     static func shouldSkipStandaloneLocalExport(
@@ -96,6 +87,15 @@ enum PublishCoordinator {
             return false
         }
         return sourceRelativePath.lowercased() == module.publishedRelativePath.lowercased()
+    }
+}
+
+private extension ModuleStorageLocation {
+    func matches(_ destination: PublishDestination) -> Bool {
+        switch (self, destination) {
+        case (.local, .local), (.gitHub, .gitHub): true
+        default: false
+        }
     }
 }
 

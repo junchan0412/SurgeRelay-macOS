@@ -5,8 +5,9 @@ struct ModuleEditorBasicInfoSection: View {
     @Binding var storageLocation: ModuleStorageLocation
     @Binding var category: String
     @Binding var outputFolder: String
-    let sourceOrigin: ModuleSourceOrigin
+    let initialSource: ModuleInitialSource
     let relationshipHint: String
+    let relationshipIsWarning: Bool
     let folders: [String]
     let onCreateFolder: () -> Void
 
@@ -16,10 +17,13 @@ struct ModuleEditorBasicInfoSection: View {
             ModuleEditorControlRow("模块存放", icon: storageLocation.systemImage) {
                 ModuleEditorStorageLocationPicker(storageLocation: $storageLocation)
             }
-            ModuleEditorInfoRow("关系", icon: sourceOrigin.systemImage) {
+            ModuleEditorInfoRow(
+                relationshipIsWarning ? "发布目标未开启" : "关系",
+                icon: relationshipIsWarning ? "exclamationmark.triangle" : initialSource.systemImage
+            ) {
                 Text(relationshipHint)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(relationshipIsWarning ? .orange : .secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             ModuleEditorTextFieldRow(title: "模块标签", icon: "tag", text: $category, prompt: "Surge category，例如：广告过滤")
@@ -106,9 +110,9 @@ struct ModuleEditorSourceSection: View {
     @Binding var sourceFormat: ModuleSourceFormat
 
     var body: some View {
-        ModuleEditorSection("转换前来源") {
+        ModuleEditorSection("更新来源") {
             ModuleEditorTextFieldRow(
-                title: "来源地址",
+                title: "更新地址",
                 icon: "link",
                 text: $sourceURL,
                 prompt: "https://example.com/module.plugin 或 file:///.../Demo.sgmodule"
@@ -121,6 +125,12 @@ struct ModuleEditorSourceSection: View {
                 }
                 .labelsHidden()
                 .frame(maxWidth: 220, alignment: .leading)
+            }
+            ModuleEditorInfoRow("初始来源规则", icon: "info.circle") {
+                Text("更新后解析模块中的 #SUBSCRIBED originalURL；存在时显示订阅来源，缺失时归类为自写模块。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

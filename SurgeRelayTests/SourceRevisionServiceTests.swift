@@ -24,7 +24,7 @@ final class SourceRevisionServiceTests: XCTestCase {
         XCTAssertEqual(snapshot.etag, "demo-v1")
     }
 
-    func testChecksEffectiveOriginalSourceURL() async throws {
+    func testChecksResolvedUpdateSourceURL() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [SourceRevisionURLProtocol.self]
         let session = URLSession(configuration: configuration)

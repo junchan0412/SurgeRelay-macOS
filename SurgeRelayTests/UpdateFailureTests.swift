@@ -43,7 +43,7 @@ final class UpdateFailureTests: XCTestCase {
         XCTAssertFalse(message.contains("token=secret"))
     }
 
-    func testUpdateFailurePlannerDecidesWhenToProbeOriginalSource() {
+    func testUpdateFailurePlannerDecidesWhenToProbeUpdateSource() {
         let remote = RelayModule(
             name: "Remote",
             sourceURL: "https://example.com/source.conf",
@@ -57,22 +57,22 @@ final class UpdateFailureTests: XCTestCase {
             outputFileName: "Local"
         )
 
-        XCTAssertTrue(UpdateFailurePlanner.shouldCheckOriginalSourceAfterConversionFailure(
+        XCTAssertTrue(UpdateFailurePlanner.shouldCheckUpdateSourceAfterConversionFailure(
             RelayError.invalidOutput("Script-Hub 转换失败"),
             module: remote,
             existingSourceCheckFailure: nil
         ))
-        XCTAssertFalse(UpdateFailurePlanner.shouldCheckOriginalSourceAfterConversionFailure(
+        XCTAssertFalse(UpdateFailurePlanner.shouldCheckUpdateSourceAfterConversionFailure(
             RelayError.httpFailure(status: 404, message: "Not Found"),
             module: remote,
             existingSourceCheckFailure: nil
         ))
-        XCTAssertFalse(UpdateFailurePlanner.shouldCheckOriginalSourceAfterConversionFailure(
+        XCTAssertFalse(UpdateFailurePlanner.shouldCheckUpdateSourceAfterConversionFailure(
             RelayError.invalidOutput("Script-Hub 转换失败"),
             module: local,
             existingSourceCheckFailure: nil
         ))
-        XCTAssertFalse(UpdateFailurePlanner.shouldCheckOriginalSourceAfterConversionFailure(
+        XCTAssertFalse(UpdateFailurePlanner.shouldCheckUpdateSourceAfterConversionFailure(
             RelayError.invalidOutput("Script-Hub 转换失败"),
             module: remote,
             existingSourceCheckFailure: URLError(.timedOut)

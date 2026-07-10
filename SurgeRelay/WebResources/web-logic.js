@@ -7,9 +7,9 @@
 
   function moduleListSignature(module) {
     return JSON.stringify([
-      module.id, module.name, module.sourceURL, module.effectiveOriginalSourceURL,
+      module.id, module.name, module.sourceURL, module.initialSourceURL, module.updateSourceURL,
       module.sourceFormatTitle, module.outputFolder, module.publishedRelativePath,
-      module.storageLocation, module.storageLocationTitle, module.storageLocationDetail, module.sourceOriginTitle,
+      module.storageLocation, module.storageLocationTitle, module.storageLocationDetail, module.initialSourceTitle,
       module.relationshipSummary, module.localStorageRelativePath,
       module.iconURL, module.customIconURL, module.isEnabled, module.publishesStandalone,
       module.state, module.stateTitle, module.lastError, module.lastUpdatedAt, module.sourceCheckedAt,
@@ -32,7 +32,7 @@
       Boolean(previousModule.sourceLastModified) !== Boolean(nextModule.sourceLastModified) ||
       previousModule.storageLocation !== nextModule.storageLocation ||
       previousModule.storageLocationDetail !== nextModule.storageLocationDetail ||
-      previousModule.sourceOriginTitle !== nextModule.sourceOriginTitle ||
+      previousModule.initialSourceTitle !== nextModule.initialSourceTitle ||
       previousModule.localStorageRelativePath !== nextModule.localStorageRelativePath ||
       previousModule.publishesStandalone !== nextModule.publishesStandalone ||
       previousModule.lastError !== nextModule.lastError;
@@ -58,9 +58,10 @@
     return [
       module.name,
       module.sourceURL,
-      module.effectiveOriginalSourceURL,
+      module.initialSourceURL,
+      module.updateSourceURL,
       module.sourceFormatTitle,
-      module.sourceOriginTitle,
+      module.initialSourceTitle,
       module.storageLocationTitle,
       module.storageLocationDetail,
       module.relationshipSummary,
@@ -160,6 +161,12 @@
 
   function outputPathNotice(path, publishesStandalone, context = {}) {
     if (!publishesStandalone) return { message: '未开启独立发布时，不会写出这个独立模块文件。', warning: false };
+    if (context.storageLocation === 'local' && context.publishToLocal === false) {
+      return { message: '该模块设为本地存放，但全局“发布到本地”尚未开启；保存后暂不会生成独立文件。', warning: true };
+    }
+    if (context.storageLocation === 'gitHub' && context.publishToGitHub === false) {
+      return { message: '该模块设为 GitHub 存放，但全局“发布到 GitHub”尚未开启；保存后暂不会发布独立文件。', warning: true };
+    }
     const normalizedPath = String(path || '').toLowerCase();
     const combinedFile = sgmoduleName(context.combinedFileName || 'Surge Relay');
     if (normalizedPath === combinedFile.toLowerCase()) {

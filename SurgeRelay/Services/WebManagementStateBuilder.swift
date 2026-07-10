@@ -12,7 +12,11 @@ enum WebManagementStateBuilder {
                 rawURL: model.combinedRawURL,
                 localFileURL: model.combinedLocalFileURL
             ),
-            moduleOutputFolders: model.moduleOutputFolderOptions(),
+            moduleEditor: moduleEditorPayload(
+                settings: model.settings,
+                localOutputFolders: model.moduleOutputFolderOptions(storageLocation: .local),
+                githubOutputFolders: model.moduleOutputFolderOptions(storageLocation: .gitHub)
+            ),
             modules: model.modules.map { module in
                 modulePayload(
                     module,
@@ -35,6 +39,22 @@ enum WebManagementStateBuilder {
                 error: model.presentedError,
                 cancellationRequested: model.workCancellationRequested
             )
+        )
+    }
+
+    static func moduleEditorPayload(
+        settings: AppSettings,
+        localOutputFolders: [String],
+        githubOutputFolders: [String]
+    ) -> WebModuleEditorPayload {
+        WebModuleEditorPayload(
+            defaultStorageLocation: ModuleStorageLocation.preferredDefault(
+                publishToLocal: settings.publishToLocal
+            ).rawValue,
+            localOutputFolders: localOutputFolders,
+            githubOutputFolders: githubOutputFolders,
+            publishToLocal: settings.publishToLocal,
+            publishToGitHub: settings.publishToGitHub
         )
     }
 
@@ -67,11 +87,12 @@ enum WebManagementStateBuilder {
             id: module.id.uuidString.lowercased(),
             name: module.name,
             sourceURL: module.sourceURL,
-            effectiveOriginalSourceURL: module.effectiveOriginalSourceURL,
+            initialSourceURL: module.initialSourceURL,
+            updateSourceURL: module.updateSourceURL,
             sourceFormat: module.sourceFormat.rawValue,
             sourceFormatTitle: module.sourceFormatDisplayTitle,
-            sourceOriginTitle: module.sourceOrigin.title,
-            sourceOriginIcon: module.sourceOrigin.systemImage,
+            initialSourceTitle: module.initialSource.title,
+            initialSourceIcon: module.initialSource.systemImage,
             outputFileName: module.outputFileName,
             publishedRelativePath: module.publishedRelativePath,
             category: module.category,

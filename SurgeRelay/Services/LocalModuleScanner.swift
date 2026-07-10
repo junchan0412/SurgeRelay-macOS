@@ -50,15 +50,17 @@ struct LocalModuleScanCandidate: Identifiable, Hashable, Sendable {
 
     var id: String { relativePath }
 
-    var sourceOrigin: ModuleSourceOrigin {
-        guard let url = URL(string: sourceURL) else { return .invalid }
-        if url.isFileURL { return .localSurgeFile }
-        guard ["http", "https"].contains(url.scheme?.lowercased()) else { return .invalid }
-        return .remote(sourceFormat.resolvedFormat(for: url))
+    var initialSource: ModuleInitialSource {
+        guard let scriptHubSubscription else { return .selfAuthored }
+        guard let url = URL(string: scriptHubSubscription.originalURL),
+              ["http", "https"].contains(url.scheme?.lowercased()) else {
+            return .invalid
+        }
+        return .subscribed(scriptHubSubscription.sourceFormat ?? sourceFormat.resolvedFormat(for: url))
     }
 
     var relationshipSummary: String {
-        "\(ModuleStorageLocation.local.title) · \(sourceOrigin.title)"
+        "\(ModuleStorageLocation.local.title) · \(initialSource.title)"
     }
 }
 
@@ -110,7 +112,7 @@ enum LocalModuleScanner {
             fileName: combinedFileName,
             folder: ModuleOutputFolder.root
         ).lowercased()
-        var existingSources = Set(existingModules.map { ModuleSourceIdentity.canonicalValue(for: $0.effectiveOriginalSourceURL) })
+        var existingSources = Set(existingModules.map { ModuleSourceIdentity.canonicalValue(for: $0.updateSourceURL) })
         var existingPaths = Set(existingModules.map { $0.publishedRelativePath.lowercased() })
         existingPaths.formUnion(existingModules.compactMap { $0.localStorageRelativePath?.lowercased() })
         existingPaths.formUnion(publishedFilePaths.map { ModuleOutputFolder.normalized($0).lowercased() })

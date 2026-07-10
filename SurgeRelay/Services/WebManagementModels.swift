@@ -2,9 +2,17 @@ import Foundation
 
 struct WebStatePayload: Encodable {
     let combined: WebCombinedPayload
-    let moduleOutputFolders: [String]
+    let moduleEditor: WebModuleEditorPayload
     let modules: [WebModulePayload]
     let activity: WebActivityPayload
+}
+
+struct WebModuleEditorPayload: Encodable {
+    let defaultStorageLocation: String
+    let localOutputFolders: [String]
+    let githubOutputFolders: [String]
+    let publishToLocal: Bool
+    let publishToGitHub: Bool
 }
 
 struct WebCombinedPayload: Encodable {
@@ -21,11 +29,12 @@ struct WebModulePayload: Encodable {
     let id: String
     let name: String
     let sourceURL: String
-    let effectiveOriginalSourceURL: String
+    let initialSourceURL: String?
+    let updateSourceURL: String
     let sourceFormat: String
     let sourceFormatTitle: String
-    let sourceOriginTitle: String
-    let sourceOriginIcon: String
+    let initialSourceTitle: String
+    let initialSourceIcon: String
     let outputFileName: String
     let publishedRelativePath: String
     let category: String
@@ -137,8 +146,12 @@ struct WebModuleMutation: Decodable {
     let enableJQ: Bool?
     let scriptHubOptions: ScriptHubOptions?
 
-    func draft(existing: RelayModule? = nil) throws -> ModuleDraft {
-        var draft = existing.map(ModuleDraft.init(module:)) ?? ModuleDraft()
+    func draft(
+        existing: RelayModule? = nil,
+        defaultStorageLocation: ModuleStorageLocation = .gitHub
+    ) throws -> ModuleDraft {
+        var draft = existing.map(ModuleDraft.init(module:))
+            ?? ModuleDraft(defaultStorageLocation: defaultStorageLocation)
         draft.name = name
         draft.sourceURL = sourceURL
         if let sourceFormat {

@@ -4,11 +4,22 @@ import XCTest
 
 final class PublishPlannerTests: XCTestCase {
     func testPublishCoordinatorRequiresAtLeastOnePublishableModule() {
-        let standalone = RelayModule(
+        let gitHubStandalone = RelayModule(
             id: UUID(),
-            name: "Standalone",
-            sourceURL: "https://example.com/standalone.sgmodule",
-            outputFileName: "Standalone",
+            name: "GitHub Standalone",
+            sourceURL: "https://example.com/github.sgmodule",
+            outputFileName: "GitHub",
+            storageLocation: .gitHub,
+            publishesStandalone: true,
+            isEnabled: false
+        )
+        let localStandalone = RelayModule(
+            id: UUID(),
+            name: "Local Standalone",
+            sourceURL: "file:///Users/example/Surge/Local.sgmodule",
+            outputFileName: "Local.sgmodule",
+            storageLocation: .local,
+            localStorageRelativePath: "Local.sgmodule",
             publishesStandalone: true,
             isEnabled: false
         )
@@ -29,50 +40,49 @@ final class PublishPlannerTests: XCTestCase {
             isEnabled: false
         )
 
-        XCTAssertEqual(
-            PublishCoordinator.publishableModuleIDs(
-                modules: [standalone, combinedOnly, ignored],
-                combinedModuleEnabled: true
-            ),
-            Set([standalone.id, combinedOnly.id])
+        let gitHubPlan = PublishCoordinator.plan(
+            modules: [gitHubStandalone, localStandalone, combinedOnly, ignored],
+            combinedModuleEnabled: true,
+            destination: .gitHub
         )
-        let combinedPlan = PublishCoordinator.plan(
-            modules: [standalone, combinedOnly, ignored],
-            combinedModuleEnabled: true
+        XCTAssertEqual(gitHubPlan.standaloneModules.map(\.id), [gitHubStandalone.id])
+        XCTAssertEqual(gitHubPlan.combinedModuleIDs, Set([combinedOnly.id]))
+        XCTAssertEqual(gitHubPlan.assetModuleIDs, Set([gitHubStandalone.id, combinedOnly.id]))
+        XCTAssertTrue(gitHubPlan.hasStandaloneModuleSelection)
+        XCTAssertEqual(gitHubPlan.scopeTitle, "总模块与独立模块")
+
+        let localPlan = PublishCoordinator.plan(
+            modules: [gitHubStandalone, localStandalone, combinedOnly, ignored],
+            combinedModuleEnabled: true,
+            destination: .local
         )
-        XCTAssertEqual(combinedPlan.standaloneModules.map(\.id), [standalone.id])
-        XCTAssertEqual(combinedPlan.combinedModuleIDs, Set([combinedOnly.id]))
-        XCTAssertEqual(combinedPlan.assetModuleIDs, Set([standalone.id, combinedOnly.id]))
-        XCTAssertTrue(combinedPlan.hasStandaloneModuleSelection)
-        XCTAssertEqual(combinedPlan.scopeTitle, "总模块与独立模块")
+        XCTAssertEqual(localPlan.standaloneModules.map(\.id), [localStandalone.id])
+        XCTAssertEqual(localPlan.combinedModuleIDs, Set([combinedOnly.id]))
+        XCTAssertEqual(localPlan.assetModuleIDs, Set([localStandalone.id, combinedOnly.id]))
 
         let combinedOnlyPlan = PublishCoordinator.plan(
             modules: [combinedOnly, ignored],
-            combinedModuleEnabled: true
+            combinedModuleEnabled: true,
+            destination: .gitHub
         )
         XCTAssertTrue(combinedOnlyPlan.hasPublishableModuleSelection)
         XCTAssertFalse(combinedOnlyPlan.hasStandaloneModuleSelection)
 
-        XCTAssertEqual(
-            PublishCoordinator.publishableModuleIDs(
-                modules: [standalone, combinedOnly, ignored],
-                combinedModuleEnabled: false
-            ),
-            Set([standalone.id])
-        )
         let standalonePlan = PublishCoordinator.plan(
-            modules: [standalone, combinedOnly, ignored],
-            combinedModuleEnabled: false
+            modules: [gitHubStandalone, localStandalone, combinedOnly, ignored],
+            combinedModuleEnabled: false,
+            destination: .gitHub
         )
-        XCTAssertEqual(standalonePlan.standaloneModules.map(\.id), [standalone.id])
+        XCTAssertEqual(standalonePlan.standaloneModules.map(\.id), [gitHubStandalone.id])
         XCTAssertTrue(standalonePlan.combinedModuleIDs.isEmpty)
-        XCTAssertEqual(standalonePlan.assetModuleIDs, Set([standalone.id]))
+        XCTAssertEqual(standalonePlan.assetModuleIDs, Set([gitHubStandalone.id]))
         XCTAssertEqual(standalonePlan.scopeTitle, "独立模块")
 
-        XCTAssertFalse(PublishCoordinator.hasPublishableModuleSelection(
+        XCTAssertFalse(PublishCoordinator.plan(
             modules: [ignored],
-            combinedModuleEnabled: true
-        ))
+            combinedModuleEnabled: true,
+            destination: .gitHub
+        ).hasPublishableModuleSelection)
     }
 
     func testSelectedPublishPlanIgnoresNonStandaloneModules() {
@@ -95,7 +105,8 @@ final class PublishPlannerTests: XCTestCase {
 
         let plan = PublishCoordinator.selectedPlan(
             modules: [standalone, combinedOnly],
-            moduleIDs: [standalone.id, combinedOnly.id]
+            moduleIDs: [standalone.id, combinedOnly.id],
+            destination: .gitHub
         )
 
         XCTAssertEqual(plan.standaloneModules.map(\.id), [standalone.id])
@@ -105,7 +116,8 @@ final class PublishPlannerTests: XCTestCase {
 
         let emptyPlan = PublishCoordinator.selectedPlan(
             modules: [standalone, combinedOnly],
-            moduleIDs: [combinedOnly.id]
+            moduleIDs: [combinedOnly.id],
+            destination: .gitHub
         )
         XCTAssertFalse(emptyPlan.hasPublishableModuleSelection)
         XCTAssertTrue(emptyPlan.assetModuleIDs.isEmpty)

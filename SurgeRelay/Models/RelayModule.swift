@@ -64,8 +64,9 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         state: ModuleUpdateState = .never,
         lastError: String? = nil
     ) {
+        let normalizedLocalStorageRelativePath = Self.normalizedOptionalRelativePath(localStorageRelativePath)
         let inferredStorageLocation = storageLocation
-            ?? (URL(string: sourceURL)?.isFileURL == true ? .local : .gitHub)
+            ?? (normalizedLocalStorageRelativePath != nil || URL(string: sourceURL)?.isFileURL == true ? .local : .gitHub)
         let shouldPreserveOutputFileName = preservesOutputFileName
             ?? (inferredStorageLocation == .local || URL(string: sourceURL)?.isFileURL == true)
         self.id = id
@@ -79,7 +80,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         self.category = category.trimmingCharacters(in: .whitespacesAndNewlines)
         self.outputFolder = ModuleOutputFolder.normalized(outputFolder)
         self.storageLocation = inferredStorageLocation
-        self.localStorageRelativePath = Self.normalizedOptionalRelativePath(localStorageRelativePath)
+        self.localStorageRelativePath = normalizedLocalStorageRelativePath
         self.preservesOutputFileName = shouldPreserveOutputFileName
         self.publishesStandalone = publishesStandalone
         self.isEnabled = isEnabled
@@ -117,11 +118,11 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         name = try container.decode(String.self, forKey: .name)
         sourceURL = try container.decode(String.self, forKey: .sourceURL)
         sourceFormat = try container.decodeIfPresent(ModuleSourceFormat.self, forKey: .sourceFormat) ?? .automatic
-        storageLocation = try container.decodeIfPresent(ModuleStorageLocation.self, forKey: .storageLocation)
-            ?? (URL(string: sourceURL)?.isFileURL == true ? .local : .gitHub)
         localStorageRelativePath = Self.normalizedOptionalRelativePath(
             try container.decodeIfPresent(String.self, forKey: .localStorageRelativePath)
         )
+        storageLocation = try container.decodeIfPresent(ModuleStorageLocation.self, forKey: .storageLocation)
+            ?? (localStorageRelativePath != nil || URL(string: sourceURL)?.isFileURL == true ? .local : .gitHub)
         preservesOutputFileName = try container.decodeIfPresent(Bool.self, forKey: .preservesOutputFileName)
             ?? (storageLocation == .local || URL(string: sourceURL)?.isFileURL == true)
         let decodedOutputFileName = try container.decodeIfPresent(String.self, forKey: .outputFileName)
@@ -161,21 +162,25 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
 
     var sourceFormatDisplayTitle: String {
         guard sourceFormat == .automatic else { return sourceFormat.title }
-        let resolved = detectedSourceFormat ?? URL(string: sourceURL).map { sourceFormat.resolvedFormat(for: $0) }
+        let resolved = detectedSourceFormat ?? URL(string: updateSourceURL).map { sourceFormat.resolvedFormat(for: $0) }
         guard let resolved else { return sourceFormat.title }
         return "自动识别（\(resolved.shortTitle)）"
     }
 
-    var sourceOrigin: ModuleSourceOrigin {
-        guard let url = URL(string: effectiveOriginalSourceURL) else { return .invalid }
-        if url.isFileURL { return .localSurgeFile }
-        guard ["http", "https"].contains(url.scheme?.lowercased()) else { return .invalid }
-        let resolved = detectedSourceFormat ?? sourceFormat.resolvedFormat(for: url)
-        return .remote(resolved)
+    var initialSource: ModuleInitialSource {
+        guard let subscription = scriptHubSubscription else { return .selfAuthored }
+        guard let url = URL(string: subscription.originalURL),
+              ["http", "https"].contains(url.scheme?.lowercased()) else {
+            return .invalid
+        }
+        let resolved = subscription.sourceFormat
+            ?? detectedSourceFormat
+            ?? sourceFormat.resolvedFormat(for: url)
+        return .subscribed(resolved)
     }
 
     var relationshipSummary: String {
-        "\(displayStorageLocationTitle) · \(sourceOrigin.title)"
+        "\(displayStorageLocationTitle) · \(initialSource.title)"
     }
 
     var displayStorageLocationTitle: String {
@@ -196,33 +201,45 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         guard publishesStandalone else {
             return "未开启独立发布；转换结果保存在本地缓存"
         }
-        switch storageLocation {
-        case .local:
-            if sourceOrigin.isRemote {
-                return "转换结果储存在本地模块根目录"
-            }
-            return storageLocation.detail
-        case .gitHub:
-            return storageLocation.detail
-        }
+        return storageLocation.detail
     }
 
     var standaloneStorageSystemImage: String {
         publishesStandalone ? storageLocation.systemImage : "internaldrive"
     }
 
-    var effectiveOriginalSourceURL: String {
-        scriptHubSubscription?.originalURL ?? sourceURL
+    var initialSourceURL: String? {
+        guard let value = scriptHubSubscription?.originalURL.trimmingCharacters(in: .whitespacesAndNewlines),
+              !value.isEmpty else {
+            return nil
+        }
+        return value
     }
 
-    var hasRemoteOriginalSource: Bool {
-        guard let scheme = URL(string: effectiveOriginalSourceURL)?.scheme?.lowercased() else {
+    var updateSourceURL: String {
+        initialSourceURL ?? sourceURL
+    }
+
+    var hasValidUpdateSource: Bool {
+        guard let url = URL(string: updateSourceURL) else { return false }
+        if url.isFileURL { return true }
+        return ["http", "https"].contains(url.scheme?.lowercased()) && url.host?.isEmpty == false
+    }
+
+    var hasRemoteUpdateSource: Bool {
+        guard let scheme = URL(string: updateSourceURL)?.scheme?.lowercased() else {
             return false
         }
         return scheme == "http" || scheme == "https"
     }
 
-    mutating func applyScriptHubSubscriptionMetadata(_ subscription: ScriptHubSubscriptionInfo) -> Bool {
+    mutating func reconcileScriptHubSubscriptionMetadata(_ subscription: ScriptHubSubscriptionInfo?) -> Bool {
+        guard let subscription else {
+            guard scriptHubSubscription != nil else { return false }
+            scriptHubSubscription = nil
+            return true
+        }
+
         var changed = false
         let sourceWasFile = URL(string: sourceURL)?.isFileURL == true
         let sourceWasScriptHub = sourceURL.hasPrefix("http://script.hub/") || sourceURL.hasPrefix("https://script.hub/")

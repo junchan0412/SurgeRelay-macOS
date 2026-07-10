@@ -2,6 +2,18 @@ import XCTest
 @testable import SurgeRelay
 
 final class ModuleMetadataParserTests: XCTestCase {
+    func testReadsSubscribedMetadataWithoutRegexFormattingAssumptions() throws {
+        let content = """
+          # subscribed = http://script.hub/file/_start_/https://example.com/demo.conf/_end_/Demo.sgmodule?type=qx-rewrite&target=surge-module
+        [General]
+        """
+
+        let subscription = try XCTUnwrap(ModuleMetadataParser.scriptHubSubscription(in: content))
+        XCTAssertEqual(subscription.originalURL, "https://example.com/demo.conf")
+        XCTAssertEqual(subscription.sourceFormat, .quantumultX)
+        XCTAssertNil(ModuleMetadataParser.scriptHubSubscription(in: "#!name=Self Authored\n[General]"))
+    }
+
     func testFindsIconWithoutScrapingCatalog() throws {
         let content = """
         #!name=Demo

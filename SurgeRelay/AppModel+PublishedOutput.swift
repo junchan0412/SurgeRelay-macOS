@@ -128,8 +128,13 @@ extension AppModel {
         includeAssets: Bool,
         destination: PublishDestination
     ) async throws -> [PublishFile] {
-        try await publishedFiles(
-            plan: githubPublishPlan,
+        let plan = PublishCoordinator.plan(
+            modules: modules,
+            combinedModuleEnabled: settings.combinedModuleEnabled,
+            destination: destination
+        )
+        return try await publishedFiles(
+            plan: plan,
             combinedData: combinedData,
             includeAssets: includeAssets,
             destination: destination

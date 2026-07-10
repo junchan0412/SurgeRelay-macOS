@@ -41,9 +41,12 @@ struct ModuleEditorView: View {
         return "留空时优先展示来源里的 #!icon；自定义图标只用于 Surge Relay 与 Web 管理，不写入 Surge 输出。"
     }
 
-    init(module: RelayModule?) {
+    init(module: RelayModule?, defaultStorageLocation: ModuleStorageLocation = .gitHub) {
         self.module = module
-        _draft = State(initialValue: module.map(ModuleDraft.init(module:)) ?? ModuleDraft())
+        _draft = State(
+            initialValue: module.map(ModuleDraft.init(module:))
+                ?? ModuleDraft(defaultStorageLocation: defaultStorageLocation)
+        )
         _isAdvancedExpanded = State(initialValue: module.map { $0.scriptHubOptions != ScriptHubOptions() } ?? false)
     }
 
@@ -52,7 +55,7 @@ struct ModuleEditorView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(module == nil ? "添加模块" : "编辑模块").font(.title2.bold())
-                    Text("原始地址可以随时修改，已发布的稳定地址不会改变。")
+                    Text("更新地址可以随时修改，已发布的稳定地址不会改变。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -77,9 +80,6 @@ struct ModuleEditorView: View {
             }
             .scrollIndicators(.visible)
             .task {
-                if module == nil, model.settings.publishToLocal {
-                    draft.storageLocation = .local
-                }
                 await model.refreshModuleOutputFolders()
             }
             .onChange(of: draft.sourceURL) { _, newValue in
@@ -108,7 +108,7 @@ struct ModuleEditorView: View {
             Button("创建") { createFolder() }
             Button("取消", role: .cancel) {}
         } message: {
-            Text(model.settings.publishToLocal
+            Text(draft.storageLocation == .local
                 ? "将在本地模块根目录下创建文件夹。"
                 : "GitHub 不支持空文件夹；该路径会先保存为选项，发布模块时自动创建。")
         }
@@ -120,45 +120,20 @@ struct ModuleEditorView: View {
     }
 
     private var editorPreviewSubtitle: String {
-        var parts = [draftDisplayStorageLocationTitle, draftSourceOrigin.title]
+        var parts = [draftRelationship.storageTitle, draftRelationship.initialSource.title]
         let category = draft.category.trimmingCharacters(in: .whitespacesAndNewlines)
         if !category.isEmpty { parts.append(category) }
         if !draft.publishesStandalone { parts.append("不发布独立模块") }
         return parts.joined(separator: " · ")
     }
 
-    private var draftDisplayStorageLocationTitle: String {
-        if draft.storageLocation == .gitHub, !draft.publishesStandalone, draftSourceOrigin.isRemote {
-            return "远程模块"
-        }
-        return draft.storageLocation.title
-    }
-
-    private var draftSourceOrigin: ModuleSourceOrigin {
-        guard let url = URL(string: draft.sourceURL), !draft.sourceURL.isEmpty else {
-            return .invalid
-        }
-        if url.isFileURL { return .localSurgeFile }
-        guard ["http", "https"].contains(url.scheme?.lowercased()) else { return .invalid }
-        return .remote(draft.sourceFormat.resolvedFormat(for: url))
-    }
-
-    private var relationshipHint: String {
-        if !draft.publishesStandalone {
-            return "未开启独立发布：转换结果保存在本地缓存，不会写入 GitHub 独立模块目录。"
-        }
-        return switch (draft.storageLocation, draftSourceOrigin) {
-        case (.local, .localSurgeFile):
-            "纯本地模块：直接管理本地根目录中的 Surge .sgmodule。"
-        case (.local, .remote):
-            "本地模块，转换前来源是远程地址：会在本地根目录保留模块文件，并可从原始远程地址更新。"
-        case (.gitHub, .remote):
-            "GitHub 模块：转换结果按所选路径发布到 GitHub 模块目录。"
-        case (.gitHub, .localSurgeFile):
-            "GitHub 模块，转换前来源是本地 Surge 文件：适合把本地文件整理后发布到 GitHub。"
-        case (_, .invalid):
-            "先填写来源地址后，会显示清晰的存放位置与转换前来源关系。"
-        }
+    private var draftRelationship: ModuleDraftRelationshipPresentation {
+        ModuleDraftRelationshipPlanner.presentation(
+            draft: draft,
+            existingModule: module,
+            publishToLocal: model.settings.publishToLocal,
+            publishToGitHub: model.settings.publishToGitHub
+        )
     }
 
     private var previewPublishedRelativePath: String {
@@ -205,9 +180,13 @@ struct ModuleEditorView: View {
             storageLocation: $draft.storageLocation,
             category: $draft.category,
             outputFolder: $draft.outputFolder,
-            sourceOrigin: draftSourceOrigin,
-            relationshipHint: relationshipHint,
-            folders: model.moduleOutputFolderOptions(preserving: draft.outputFolder),
+            initialSource: draftRelationship.initialSource,
+            relationshipHint: draftRelationship.hint,
+            relationshipIsWarning: draftRelationship.isWarning,
+            folders: model.moduleOutputFolderOptions(
+                storageLocation: draft.storageLocation,
+                preserving: draft.outputFolder
+            ),
             onCreateFolder: presentNewFolderDialog
         )
     }
@@ -281,7 +260,10 @@ struct ModuleEditorView: View {
 
     private func createFolder() {
         do {
-            let folder = try model.createModuleOutputFolder(named: newFolderName)
+            let folder = try model.createModuleOutputFolder(
+                named: newFolderName,
+                storageLocation: draft.storageLocation
+            )
             draft.outputFolder = folder
         } catch {
             localError = error.localizedDescription

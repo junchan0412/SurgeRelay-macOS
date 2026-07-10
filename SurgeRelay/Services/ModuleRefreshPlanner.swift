@@ -21,7 +21,7 @@ enum ModuleRefreshPlanner {
         _ module: RelayModule,
         combinedModuleEnabled: Bool
     ) -> Bool {
-        module.hasRemoteOriginalSource ||
+        module.hasRemoteUpdateSource ||
             contributesToCombined(module, combinedModuleEnabled: combinedModuleEnabled) ||
             module.publishesStandalone
     }

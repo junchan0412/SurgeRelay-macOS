@@ -89,7 +89,9 @@ final class DiagnosticReportTests: XCTestCase {
         XCTAssertEqual(report.activeWorkStatus, "正在提交 GitHub 发布")
         XCTAssertTrue(report.activeWorkCancellationRequested)
         XCTAssertEqual(snapshot.sourceURL, "https://example.com/path/module.sgmodule")
-        XCTAssertEqual(snapshot.effectiveOriginalSourceURL, "https://example.com/path/module.sgmodule")
+        XCTAssertNil(snapshot.initialSourceURL)
+        XCTAssertEqual(snapshot.updateSourceURL, "https://example.com/path/module.sgmodule")
+        XCTAssertEqual(snapshot.initialSourceTitle, "自写模块")
 
         let json = try XCTUnwrap(String(data: DiagnosticReportBuilder.data(for: request), encoding: .utf8))
         XCTAssertFalse(json.contains("token=secret"))

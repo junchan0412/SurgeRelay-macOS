@@ -6,6 +6,7 @@ struct ModuleDetailPaneView: View {
     let editModule: (RelayModule) -> Void
 
     @State private var selectedTab: DetailTab = .info
+    @State private var hasPresentedPreview = false
 
     private enum DetailTab: Hashable {
         case info
@@ -64,29 +65,39 @@ struct ModuleDetailPaneView: View {
                 .help("设置")
             }
         }
-        .onChange(of: model.selectedModuleID) { _, _ in selectedTab = .info }
+        .onChange(of: selectedTab) { _, newValue in
+            if newValue == .preview {
+                hasPresentedPreview = true
+            }
+        }
+        .onChange(of: model.selectedModuleID) { _, _ in
+            selectedTab = .info
+            hasPresentedPreview = false
+        }
     }
 
     @ViewBuilder
     private func detailContent(for kind: SelectionKind) -> some View {
-        // Keep both panes mounted and just toggle opacity, so switching tabs never
-        // destroys/recreates (and reloads) the code preview view.
         ZStack {
             switch kind {
             case .combined:
                 CombinedModuleDetailView()
                     .opacity(selectedTab == .info ? 1 : 0)
                     .allowsHitTesting(selectedTab == .info)
-                CombinedPreviewPane()
-                    .opacity(selectedTab == .preview ? 1 : 0)
-                    .allowsHitTesting(selectedTab == .preview)
+                if hasPresentedPreview {
+                    CombinedPreviewPane()
+                        .opacity(selectedTab == .preview ? 1 : 0)
+                        .allowsHitTesting(selectedTab == .preview)
+                }
             case let .module(module):
                 ModuleDetailView(module: module, onEdit: { editModule(module) })
                     .opacity(selectedTab == .info ? 1 : 0)
                     .allowsHitTesting(selectedTab == .info)
-                ModulePreviewPane(module: module)
-                    .opacity(selectedTab == .preview ? 1 : 0)
-                    .allowsHitTesting(selectedTab == .preview)
+                if hasPresentedPreview {
+                    ModulePreviewPane(module: module)
+                        .opacity(selectedTab == .preview ? 1 : 0)
+                        .allowsHitTesting(selectedTab == .preview)
+                }
             }
         }
     }

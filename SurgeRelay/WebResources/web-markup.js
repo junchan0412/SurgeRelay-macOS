@@ -123,12 +123,20 @@
     const sourceETagRow = module.sourceETag ? detailRow('tag', '来源 ETag', module.sourceETag, false, module.sourceETag) : '';
     const sourceLastModifiedRow = module.sourceLastModified ? detailRow('clock', '来源修改时间', module.sourceLastModified) : '';
     const outputPath = module.publishesStandalone ? (module.publishedRelativePath || module.outputFileName) : '';
-    const sourceAddress = module.effectiveOriginalSourceURL || module.sourceURL || '';
-    const sourceAddressValue = /^https?:\/\//i.test(sourceAddress)
-      ? `<a href="${escapeAttribute(sourceAddress)}" target="_blank" rel="noreferrer">${escapeHTML(sourceAddress)}</a>`
-      : escapeHTML(sourceAddress);
-    const sourceRecordRow = module.sourceURL && module.sourceURL !== sourceAddress
-      ? detailRow('link', '来源记录', escapeHTML(module.sourceURL), true, module.sourceURL)
+    const initialSourceAddress = module.initialSourceURL || '';
+    const configuredSourceAddress = module.sourceURL || '';
+    const updateSourceAddress = module.updateSourceURL || configuredSourceAddress;
+    const addressMarkup = value => /^https?:\/\//i.test(value)
+      ? `<a href="${escapeAttribute(value)}" target="_blank" rel="noreferrer">${escapeHTML(value)}</a>`
+      : escapeHTML(value);
+    const initialSourceRow = initialSourceAddress
+      ? detailRow('link', '订阅原始地址', addressMarkup(initialSourceAddress), true, initialSourceAddress)
+      : '';
+    const updateSourceRow = !initialSourceAddress
+      ? detailRow('link', '更新地址', addressMarkup(updateSourceAddress), true, updateSourceAddress)
+      : '';
+    const registeredSourceRow = initialSourceAddress && configuredSourceAddress && configuredSourceAddress !== initialSourceAddress
+      ? detailRow('link', '登记地址', addressMarkup(configuredSourceAddress), true, configuredSourceAddress)
       : '';
     const localStorageRow = module.localStorageRelativePath
       ? detailRow('folder', '本地相对路径', module.localStorageRelativePath, false, module.localStorageRelativePath)
@@ -137,9 +145,10 @@
     ${error}
     <section class="form-section-view"><h3 class="section-heading">管理关系</h3><div class="group-box">
       ${detailRow(module.publishesStandalone ? (module.storageLocationIcon || 'folder') : 'folder', '独立模块存放', module.storageLocationDetail || module.storageLocationTitle || '未开启独立发布')}
-      ${detailRow(module.sourceOriginIcon || 'link', '转换前来源', module.sourceOriginTitle || module.sourceFormatTitle)}
-      ${detailRow('link', '原始地址', sourceAddressValue, true, sourceAddress)}
-      ${sourceRecordRow}
+      ${detailRow(module.initialSourceIcon || 'link', '初始来源', module.initialSourceTitle || '自写模块')}
+      ${initialSourceRow}
+      ${updateSourceRow}
+      ${registeredSourceRow}
       ${detailRow('doc.text', '来源格式', module.sourceFormatTitle)}
       ${detailRow('tag', '模块标签', module.category || '未设置')}
       ${detailRow('folder', '存放文件夹', logic.folderTitle(module.outputFolder))}

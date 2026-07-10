@@ -130,6 +130,21 @@
       select.value = selected || '';
     }
 
+    function outputFoldersForStorage(state, storageLocation) {
+      const editor = state?.moduleEditor || {};
+      return storageLocation === 'local'
+        ? (editor.localOutputFolders || [])
+        : (editor.githubOutputFolders || []);
+    }
+
+    function refreshOutputFolders(state, selected = null, preservingUnknown = false) {
+      const form = formElements();
+      const folders = outputFoldersForStorage(state, form.storageLocation?.value || 'gitHub');
+      const requested = selected ?? form.outputFolder?.value ?? '';
+      const nextSelected = preservingUnknown || folders.includes(requested) ? requested : '';
+      populateOutputFolders(nextSelected, folders);
+    }
+
     function populateModuleForm(module = null, context = {}) {
       const form = formElements();
       const isEditing = Boolean(module);
@@ -145,11 +160,15 @@
       if (ui.iconURLPreview) ui.iconURLPreview.dataset.fallbackIconUrl = module && !module.customIconURL ? (module.iconURL || '') : '';
       if (form.iconURL) form.iconURL.value = module?.customIconURL || '';
       updateIconURLPreview();
-      populateOutputFolders(module?.outputFolder || '', context.state?.moduleOutputFolders || []);
       if (form.outputFileName) form.outputFileName.value = module?.outputFileName || '';
       if (form.sourceURL) form.sourceURL.value = module?.sourceURL || '';
       if (form.sourceFormat) form.sourceFormat.value = module?.sourceFormat || 'automatic';
-      if (form.storageLocation) form.storageLocation.value = module?.storageLocation || 'gitHub';
+      if (form.storageLocation) {
+        form.storageLocation.value = module?.storageLocation
+          || context.state?.moduleEditor?.defaultStorageLocation
+          || 'gitHub';
+      }
+      refreshOutputFolders(context.state, module?.outputFolder || '', Boolean(module));
       const includeRow = form.isEnabled?.closest?.('.switch-row');
       if (includeRow) includeRow.hidden = !context.combinedEnabled;
       if (form.isEnabled) form.isEnabled.checked = module?.isEnabled ?? false;
@@ -195,7 +214,10 @@
       const notice = logic.outputPathNotice(path, form.publishesStandalone?.checked, {
         combinedFileName: context.state?.combined?.fileName || 'Surge Relay',
         modules: context.state?.modules || [],
-        editingID: context.editingID
+        editingID: context.editingID,
+        storageLocation: form.storageLocation?.value || 'gitHub',
+        publishToLocal: context.state?.moduleEditor?.publishToLocal,
+        publishToGitHub: context.state?.moduleEditor?.publishToGitHub
       });
       if (ui.outputPathNote) {
         ui.outputPathNote.textContent = notice?.message || '';
@@ -282,6 +304,8 @@
       populateScriptHubOptions,
       hasAdvancedValues,
       populateOutputFolders,
+      outputFoldersForStorage,
+      refreshOutputFolders,
       populateModuleForm,
       collectModuleFields,
       updateOutputPathPreview,

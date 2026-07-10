@@ -44,10 +44,10 @@ Both can be enabled at the same time. Local export and GitHub publishing share `
 
 Keep these two axes separate:
 
-- `RelayModule.storageLocation`: where Surge Relay stores the converted module (`local` or `gitHub`).
-- `RelayModule.sourceOrigin`: where the pre-conversion source comes from (local Surge file, remote QX/Loon/Surge, or invalid).
+- `RelayModule.storageLocation`: which destination owns the standalone output (`local` or `gitHub`).
+- `RelayModule.initialSource`: whether converted content contains a valid Script-Hub `#SUBSCRIBED originalURL`; missing metadata means a self-authored module.
 
-Do not infer storage from `sourceURL` after Script-Hub subscription metadata has been applied: a local file can restore a remote original URL while still being managed as a local module. For local modules, preserve `localStorageRelativePath` whenever it is known.
+Do not infer initial source from `sourceURL`. Parse it from converted content, never from a user override; a local file can restore a remote `originalURL` while still being managed as a local module. Missing `#SUBSCRIBED` metadata must clear stale subscription state and classify the module as self-authored. For local modules, preserve `localStorageRelativePath` whenever it is known.
 
 Manual GitHub publishing has two paths:
 
@@ -72,9 +72,9 @@ GitHub publish result planning belongs in `GitHubPublishPlanner`. Keep repositor
 
 Shared module counts should flow through `ModuleCollectionSummary`. Main window status, menu bar text, Web management state, and diagnostics should not independently reimplement enabled, standalone, failed, latest-update, or updateable counts unless they need the actual module objects.
 
-Update failure message formatting lives in `Services/UpdateFailureFormatter.swift`. If an original source returns 404/401/403/429, times out, fails DNS, or fails TLS validation, store that reason on the module and in update history; aggregate alerts that block combined-module replacement should include the same reason rather than only the module name.
+Update failure message formatting lives in `Services/UpdateFailureFormatter.swift`. If the resolved update source returns 404/401/403/429, times out, fails DNS, or fails TLS validation, store that reason on the module and in update history; aggregate alerts that block combined-module replacement should include the same reason rather than only the module name.
 
-Update failure source-check and outcome decisions belong in `UpdateFailurePlanner`. Keep "should probe the original source after a generic conversion failure", latest-module source selection for error text, cached-after-failure history, missing-cache combined-module blockage, and missing-cache detail formatting there. `AppModel` should perform only the actual `SourceRevisionService` check, cache reads, and output rebuild, then apply the returned messages/history plans.
+Update failure source-check and outcome decisions belong in `UpdateFailurePlanner`. Keep "should probe the resolved update source after a generic conversion failure", latest-module source selection for error text, cached-after-failure history, missing-cache combined-module blockage, and missing-cache detail formatting there. `AppModel` should perform only the actual `SourceRevisionService` check, cache reads, and output rebuild, then apply the returned messages/history plans.
 
 Update completion status and automatic-publish scheduling decisions belong in `UpdateCompletionStatusPlanner`. Keep the choice between queueing GitHub automatic publish, clearing an impossible automatic-publish schedule, showing local cleanup confirmation, and reporting a plain refreshed output there. `AppModel+UpdateCompletion.swift` should execute the returned schedule action, assign the returned status message, handle missing-cache blockage, and finish combined/local output work after the per-module update loop completes.
 
@@ -128,7 +128,7 @@ Converted modules may contain a semantic source line:
 
 Treat this as data, not disposable commentary. `ModuleMetadataParser.scriptHubSubscription(in:)` restores:
 
-- original source URL
+- subscribed original URL (`#SUBSCRIBED`) and configured update URL
 - source format (`qx-rewrite`, `loon-plugin`, `surge-module`)
 - output name
 - Script-Hub query options
@@ -172,13 +172,27 @@ Module editor presentation primitives live in `Views/ModuleEditorComponents.swif
 
 ## Build And Test
 
+日常 Debug 构建与启动统一使用：
+
+```bash
+./script/build_and_run.sh
+```
+
+脚本支持 `--debug`、`--logs`、`--telemetry` 和 `--verify`。Codex Run action 由 `.codex/environments/environment.toml` 指向该脚本。需要隔离配置做界面检查时使用：
+
+```bash
+SURGE_RELAY_RUN_UI_QA=1 ./script/build_and_run.sh --verify
+```
+
+UI QA 模式使用临时配置与本地模块目录，并暂停启动期和编辑后的自动更新。
+
 `ModelAndCoordinatorTests.swift` owns pure model/coordinator coverage, including source metadata restoration, source identity, published address resolution, and summary counts. `UpdateFailureTests.swift` owns update failure formatting and original-source probe planning. `DiagnosticReportTests.swift` owns diagnostic report snapshots and secret redaction. `ModulePreviewContentProviderTests.swift` owns preview content recovery and cache-miss behavior. `ModulePreviewEditPlannerTests.swift` owns preview edit save/restore/conflict state planning. `CredentialTokenCoordinatorTests.swift` owns GitHub/Web token migration, storage fallback, and generated token behavior. `WorkActivityTests.swift` owns task activity state and update-admission rules.
 
 `ModulePlanningTests.swift` owns module naming, module editor source-name lookup, module argument override planning, sidebar section planning, output path inspection, and local self-export protection. `ModuleDraftPlannerTests.swift` owns module draft validation plus add/update planning. `ModuleOutputFolderTests.swift` owns output-folder path helpers, folder option catalogs, folder creation plans, and remote-folder refresh cache decisions. `ModuleOrderingTests.swift` owns module move/reorder helpers and invalid ID-set handling. `LocalModuleImportPlannerTests.swift` owns local import candidate planning, deduplication, failure details, and user-visible scan/import statuses. `ModuleSearchIndexTests.swift` owns main-window search text, content-cache keys, and preview-content loading decisions. `ModuleMetadataParserTests.swift` owns Surge metadata parsing and metadata application rules. `ModuleMergerTests.swift` owns combined-module merge behavior. `ModuleMetadataRefreshPlannerTests.swift` owns cached metadata refresh planning, including restored subscription metadata, icon preference, and override base-hash rules.
 
 `PublishPlannerTests.swift` owns publish-plan selection and GitHub publish result planning. `PublishFileAssemblerTests.swift` owns publish-file assembly. `LocalPublishedFilesPlannerTests.swift` owns local published-file manifest and confirmed-cleanup state planning. `AutomaticPublishPlannerTests.swift` owns automatic publish admission, queueing, skip messages, and cached standalone-output checks; automatic publishing needs any cached standalone output, not every standalone output. `UpdateCompletionStatusPlannerTests.swift` owns update-completion status text and scheduling decisions. `ConfigurationMigrationTests.swift` owns local configuration migration and migrated-file cleanup. `LocalPublishedExportTests.swift` owns local publish write/cleanup safety and generated asset file coverage. `LegacyOutputCleanupPlannerTests.swift` owns old output cleanup path planning. `LocalModuleScannerTests.swift` owns local module scanning, folder discovery, root diagnostics, and skipped-file reporting.
 
-`AppSettingsTests.swift` owns settings decoding, migration defaults, and combined-module setting defaults. `SecurityDiagnosticsTests.swift` owns keychain round trips, credential diagnostics, keychain probe snapshots, and installation diagnostics. `SourceRevisionServiceTests.swift` owns source revision network checks and effective original-source URL selection. `ScriptHubTests.swift` owns Script-Hub conversion URLs, upstream pinning and script hashes, embedded-engine bridge safety, native Surge conversion, argument materialization, advanced option summaries, and sanitizer behavior. `WebManagementTests.swift` owns Web management request parsing, API payload, session cookie, same-origin, throttling, response hardening, and icon content-type coverage. `WebManagementStateBuilderTests.swift` owns Web management state payload field mapping, combined-module visibility, and activity progress rules. `GitHubReleaseTests.swift` owns GitHub settings, remote directory discovery, release asset parsing, checksum validation, and install guidance coverage. `GitHubPublishTests.swift` owns GitHub publish diffing, preview, duplicate path rejection, commit snapshots, and reference-move retry coverage; GitHub network fakes belong in `GitHubTestSupport.swift`. Keep shrinking the larger test files by moving similarly cohesive tests into focused files instead of adding more unrelated cases there.
+`AppSettingsTests.swift` owns settings decoding, migration defaults, and combined-module setting defaults. `SecurityDiagnosticsTests.swift` owns keychain round trips, credential diagnostics, keychain probe snapshots, and installation diagnostics. `SourceRevisionServiceTests.swift` owns source revision network checks and resolved update-source selection. `ScriptHubTests.swift` owns Script-Hub conversion URLs, upstream pinning and script hashes, embedded-engine bridge safety, native Surge conversion, argument materialization, advanced option summaries, and sanitizer behavior. `WebManagementTests.swift` owns Web management request parsing, API payload, session cookie, same-origin, throttling, response hardening, and icon content-type coverage. `WebManagementStateBuilderTests.swift` owns Web management state payload field mapping, combined-module visibility, and activity progress rules. `GitHubReleaseTests.swift` owns GitHub settings, remote directory discovery, release asset parsing, checksum validation, and install guidance coverage. `GitHubPublishTests.swift` owns GitHub publish diffing, preview, duplicate path rejection, commit snapshots, and reference-move retry coverage; GitHub network fakes belong in `GitHubTestSupport.swift`. Keep shrinking the larger test files by moving similarly cohesive tests into focused files instead of adding more unrelated cases there.
 
 Use the local Xcode beta explicitly:
 
@@ -214,6 +228,10 @@ The active maintenance machine may print CoreSimulator version warnings even for
 
 The module list should not eagerly read every converted preview at launch. `ModulesView` keeps metadata-only search available immediately and builds the heavier converted-content search index only after the user enters a search query. Preserve that lazy behavior when changing search or preview code.
 
+`ModuleIconView` must not synchronously read and decode cached icon files from `body`; icon data is loaded on a utility task keyed by module/icon revision. Keep disk I/O out of SwiftUI redraw paths.
+
+`ModuleDetailPaneView` mounts a preview editor only after the user first selects the preview tab. Do not eagerly create hidden code editors for every selected module: doing so consumes memory and can surface cache-miss errors while the detail tab is visible.
+
 Web management list updates use `sidebarListSignature(snapshot)` from `WebResources/web-logic.js` to decide whether a sidebar re-render is needed. When adding fields that affect list rows, search subtitles, icons, relationship labels, or failure state, update that signature path in one place and run `node script/test_web_resources.mjs`. Detail metadata rows use `metadataRowPresenceChanged(previous, next)` from the same file to decide when patching is not enough and a full detail render is required.
 
 `script/test_web_dom_resources.mjs` provides a dependency-free DOM harness for the Web management shell. Keep it focused on behavior that depends on the real `index.html` structure and `app.js` startup path: required nodes, initial state rendering, detail sections, update admission controls, and editor output-path preview behavior.
@@ -229,7 +247,7 @@ Release builds require:
 Before importing signing certificates or calling GitHub, run the local release preflight:
 
 ```bash
-VERSION=1.3.8 ./script/check_release_configuration.sh
+VERSION=1.3.16 BUILD=65 ./script/check_release_configuration.sh
 ```
 
 The preflight checks version/build consistency, Sparkle feed and public key metadata, Web resource syntax and behavior/DOM tests, the latest appcast entry, the release entitlement, shell syntax for release scripts, and the GitHub Actions release entrypoint.

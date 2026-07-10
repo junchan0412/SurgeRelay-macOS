@@ -2,6 +2,24 @@ import XCTest
 @testable import SurgeRelay
 
 final class WebManagementStateBuilderTests: XCTestCase {
+    func testModuleEditorPayloadUsesSharedDefaultAndTargetFolders() {
+        var settings = AppSettings()
+        settings.publishToLocal = true
+        settings.publishToGitHub = false
+
+        let payload = WebManagementStateBuilder.moduleEditorPayload(
+            settings: settings,
+            localOutputFolders: ["", "Local"],
+            githubOutputFolders: ["", "Remote"]
+        )
+
+        XCTAssertEqual(payload.defaultStorageLocation, ModuleStorageLocation.local.rawValue)
+        XCTAssertEqual(payload.localOutputFolders, ["", "Local"])
+        XCTAssertEqual(payload.githubOutputFolders, ["", "Remote"])
+        XCTAssertTrue(payload.publishToLocal)
+        XCTAssertFalse(payload.publishToGitHub)
+    }
+
     func testCombinedPayloadHidesSubscriptionWhenCombinedModuleIsDisabled() throws {
         let lastUpdatedAt = Date(timeIntervalSince1970: 100)
         let modules = [
@@ -142,11 +160,13 @@ final class WebManagementStateBuilderTests: XCTestCase {
         )
 
         XCTAssertEqual(payload.id, id.uuidString.lowercased())
-        XCTAssertEqual(payload.sourceOriginTitle, "本地 Surge 模块")
+        XCTAssertEqual(payload.initialSourceTitle, "自写模块")
+        XCTAssertNil(payload.initialSourceURL)
+        XCTAssertEqual(payload.updateSourceURL, module.sourceURL)
         XCTAssertEqual(payload.storageLocation, ModuleStorageLocation.local.rawValue)
         XCTAssertEqual(payload.storageLocationTitle, "本地模块")
         XCTAssertEqual(payload.storageLocationDetail, "未开启独立发布；转换结果保存在本地缓存")
-        XCTAssertEqual(payload.relationshipSummary, "本地模块 · 本地 Surge 模块")
+        XCTAssertEqual(payload.relationshipSummary, "本地模块 · 自写模块")
         XCTAssertEqual(payload.outputFileName, "Managed Local.sgmodule")
         XCTAssertEqual(payload.publishedRelativePath, "Rules/Managed Local.sgmodule")
         XCTAssertEqual(payload.localStorageRelativePath, "Rules/Managed Local.sgmodule")

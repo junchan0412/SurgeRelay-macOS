@@ -100,11 +100,13 @@ enum LocalModuleImportPlanner {
     ) -> RelayModule {
         var module = module
         if let subscription = ModuleMetadataParser.scriptHubSubscription(in: convertedContent) {
-            _ = module.applyScriptHubSubscriptionMetadata(subscription)
+            _ = module.reconcileScriptHubSubscriptionMetadata(subscription)
+        } else {
+            _ = module.reconcileScriptHubSubscriptionMetadata(nil)
         }
         module.detectedSourceFormat = ModuleNamingPlanner.detectedFormat(
             for: module.sourceFormat,
-            source: module.sourceURL
+            source: module.updateSourceURL
         )
         module.contentHash = contentHash
         module.lastUpdatedAt = importedAt
