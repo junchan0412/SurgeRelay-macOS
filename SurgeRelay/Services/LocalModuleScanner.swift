@@ -35,6 +35,74 @@ enum LocalModuleFolderScanner {
     }
 }
 
+struct LocalModuleMetadataSnapshot: Equatable, Sendable {
+    var localStorageRelativePath: String
+    var scriptHubSubscription: ScriptHubSubscriptionInfo?
+}
+
+enum LocalModuleMetadataReader {
+    static func snapshot(
+        for module: RelayModule,
+        rootDirectoryPath: String
+    ) -> LocalModuleMetadataSnapshot? {
+        guard module.storageLocation == .local,
+              let relativePath = module.localStorageRelativePath,
+              let fileURL = fileURL(relativePath: relativePath, rootDirectoryPath: rootDirectoryPath),
+              let data = try? Data(contentsOf: fileURL),
+              !data.isEmpty,
+              data.count <= 20 * 1024 * 1024,
+              let content = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        let root = URL(filePath: rootDirectoryPath, directoryHint: .isDirectory).standardizedFileURL
+        let rootPrefix = root.path.hasSuffix("/") ? root.path : root.path + "/"
+        guard fileURL.path.hasPrefix(rootPrefix) else { return nil }
+        return LocalModuleMetadataSnapshot(
+            localStorageRelativePath: String(fileURL.path.dropFirst(rootPrefix.count)),
+            scriptHubSubscription: ModuleMetadataParser.scriptHubSubscription(in: content)
+        )
+    }
+
+    private static func fileURL(relativePath: String, rootDirectoryPath: String) -> URL? {
+        let trimmedRoot = rootDirectoryPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedRelativePath = ModuleOutputFolder.normalized(relativePath)
+        guard !trimmedRoot.isEmpty, !normalizedRelativePath.isEmpty else { return nil }
+
+        let root = URL(filePath: trimmedRoot, directoryHint: .isDirectory).standardizedFileURL
+        let candidate = root.appending(path: normalizedRelativePath).standardizedFileURL
+        let rootPrefix = root.path.hasSuffix("/") ? root.path : root.path + "/"
+        guard candidate.path.hasPrefix(rootPrefix),
+              candidate.pathExtension.lowercased() == "sgmodule" else {
+            return nil
+        }
+        if FileManager.default.fileExists(atPath: candidate.path) { return candidate }
+
+        let directory = candidate.deletingLastPathComponent()
+        guard let siblings = try? FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return nil
+        }
+        let expectedIdentity = fileNameIdentity(candidate.lastPathComponent)
+        let matches = siblings.filter { url in
+            url.pathExtension.lowercased() == "sgmodule"
+                && fileNameIdentity(url.lastPathComponent) == expectedIdentity
+                && (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+        }
+        return matches.count == 1 ? matches[0].standardizedFileURL : nil
+    }
+
+    private static func fileNameIdentity(_ value: String) -> String {
+        value.precomposedStringWithCanonicalMapping
+            .replacingOccurrences(of: "-", with: " ")
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
+            .lowercased()
+    }
+}
+
 struct LocalModuleScanCandidate: Identifiable, Hashable, Sendable {
     var relativePath: String
     var localStorageRelativePath: String

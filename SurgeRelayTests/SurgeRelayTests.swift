@@ -36,10 +36,10 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertEqual(localModule.publishedRelativePath, "Rewrite Demo.sgmodule")
         XCTAssertEqual(localModule.relationshipSummary, "本地模块 · 自写模块")
         XCTAssertEqual(localModule.standaloneStorageDetail, "储存在本地模块根目录")
-        XCTAssertEqual(remoteOnlyModule.displayStorageLocationTitle, "远程模块")
-        XCTAssertEqual(remoteOnlyModule.displayStorageLocationSystemImage, "link")
+        XCTAssertEqual(remoteOnlyModule.displayStorageLocationTitle, "GitHub 模块")
+        XCTAssertEqual(remoteOnlyModule.displayStorageLocationSystemImage, "cloud")
         XCTAssertEqual(remoteOnlyModule.standaloneStorageDetail, "未开启独立发布；转换结果保存在本地缓存")
-        XCTAssertEqual(remoteOnlyModule.relationshipSummary, "远程模块 · 自写模块")
+        XCTAssertEqual(remoteOnlyModule.relationshipSummary, "GitHub 模块 · 自写模块")
     }
 
     func testRefreshPolicyDoesNotRefreshAgainBeforeInterval() {
@@ -104,6 +104,27 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertEqual(decoded.localStorageRelativePath, "Converted/Legacy Local.sgmodule")
         XCTAssertTrue(decoded.preservesOutputFileName)
         XCTAssertEqual(decoded.outputFileName, "Legacy Local.sgmodule")
+    }
+
+    func testRelayModuleDecodingRepairsConflictingGitHubStorageWhenLocalPathExists() throws {
+        let legacyData = Data("""
+        {
+          "id": "44444444-4444-4444-4444-444444444444",
+          "name": "Conflicting Local",
+          "sourceURL": "https://example.com/original.sgmodule",
+          "sourceFormat": "surge",
+          "outputFileName": "Conflicting Local.sgmodule",
+          "storageLocation": "gitHub",
+          "localStorageRelativePath": "Modules/Conflicting Local.sgmodule",
+          "publishesStandalone": false
+        }
+        """.utf8)
+
+        let decoded = try JSONDecoder().decode(RelayModule.self, from: legacyData)
+
+        XCTAssertEqual(decoded.storageLocation, .local)
+        XCTAssertEqual(decoded.displayStorageLocationTitle, "本地模块")
+        XCTAssertEqual(decoded.localStorageRelativePath, "Modules/Conflicting Local.sgmodule")
     }
 
     func testUpdateHistoryRoundTrip() throws {

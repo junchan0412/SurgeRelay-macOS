@@ -1,4 +1,3 @@
-import AppKit
 import Foundation
 
 @MainActor
@@ -19,21 +18,6 @@ extension AppModel {
             statusMessage = "配置和手动编辑内容已迁移到新的同步目录"
         } catch {
             presentedError = "无法更改配置目录：\(error.localizedDescription)"
-        }
-    }
-
-    func setStorageMode(_ mode: StorageMode) {
-        let nextLocal = mode == .local
-        let nextGitHub = mode == .gitHub
-        guard settings.publishToLocal != nextLocal || settings.publishToGitHub != nextGitHub else { return }
-        settings.storageMode = mode
-        settings.publishToLocal = nextLocal
-        settings.publishToGitHub = nextGitHub
-        saveSettings()
-        if mode == .local {
-            Task { await rebuildCombinedFromCache() }
-        } else {
-            Task { await refreshModuleOutputFolders(force: true) }
         }
     }
 
@@ -72,10 +56,6 @@ extension AppModel {
             Task { await refreshModuleOutputFolders(force: true) }
             scheduleAutomaticPublish()
         }
-    }
-
-    func openConfigurationDirectory() {
-        NSWorkspace.shared.open(PersistenceStore.configurationDirectoryURL)
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {

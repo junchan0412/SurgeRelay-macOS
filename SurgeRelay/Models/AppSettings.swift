@@ -254,24 +254,3 @@ struct ScriptHubUpstreamState: Codable, Equatable, Sendable {
         lastError = try container.decodeIfPresent(String.self, forKey: .lastError)
     }
 }
-
-enum SidebarDestination: String, CaseIterable, Hashable, Identifiable {
-    case modules
-    case settings
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .modules: "模块"
-        case .settings: "设置"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .modules: "shippingbox"
-        case .settings: "gear"
-        }
-    }
-}

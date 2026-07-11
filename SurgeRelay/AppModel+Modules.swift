@@ -83,34 +83,6 @@ extension AppModel {
         }
     }
 
-    func moveModules(fromOffsets offsets: IndexSet, toOffset destination: Int) {
-        let reordered = ModuleOrdering.moving(modules, fromOffsets: offsets, toOffset: destination)
-        guard reordered != modules else { return }
-        registerLocalChange()
-        modules = reordered
-        do {
-            try persistModules()
-            statusMessage = "已调整模块优先级，正在刷新输出"
-            Task { await rebuildCombinedFromCache() }
-        } catch {
-            presentedError = "保存模块顺序失败：\(error.localizedDescription)"
-        }
-    }
-
-    func reorderModules(ids: [UUID]) {
-        guard let reordered = ModuleOrdering.reordering(modules, matching: ids) else { return }
-        guard reordered != modules else { return }
-        registerLocalChange()
-        modules = reordered
-        do {
-            try persistModules()
-            statusMessage = "已调整模块优先级，正在刷新输出"
-            Task { await rebuildCombinedFromCache() }
-        } catch {
-            presentedError = "保存模块顺序失败：\(error.localizedDescription)"
-        }
-    }
-
     func deleteModule(id: UUID) async {
         guard let index = modules.firstIndex(where: { $0.id == id }) else { return }
         registerLocalChange()
@@ -127,23 +99,46 @@ extension AppModel {
     func refreshModuleMetadataFromCache() async {
         var changed = false
         for moduleValue in modules {
-            guard let content = try? await fileStore.readComponent(id: moduleValue.id) else { continue }
+            let localModuleDirectory = settings.localModuleDirectory
+            let localMetadata = await Task.detached(priority: .utility) {
+                LocalModuleMetadataReader.snapshot(
+                    for: moduleValue,
+                    rootDirectoryPath: localModuleDirectory
+                )
+            }.value
+            var moduleForPlanning = moduleValue
+            if let localMetadata,
+               moduleForPlanning.localStorageRelativePath != localMetadata.localStorageRelativePath {
+                moduleForPlanning.localStorageRelativePath = localMetadata.localStorageRelativePath
+                moduleForPlanning.storageLocation = .local
+                moduleForPlanning.preservesOutputFileName = true
+                changed = true
+            }
+            guard let content = try? await fileStore.readComponent(id: moduleValue.id) else {
+                if let subscription = localMetadata?.scriptHubSubscription,
+                   moduleForPlanning.reconcileScriptHubSubscriptionMetadata(subscription) {
+                    changed = true
+                }
+                if moduleForPlanning != moduleValue { replace(moduleForPlanning) }
+                continue
+            }
             let hasOverride = await fileStore.hasOverride(id: moduleValue.id)
             let convertedContent = hasOverride
                 ? try? await fileStore.readConvertedComponent(id: moduleValue.id)
                 : nil
             let detectedIcon = await processingWorker.iconURL(
                 in: content,
-                relativeTo: moduleValue.updateSourceURL
+                relativeTo: moduleForPlanning.updateSourceURL
             )
             let plan = ModuleMetadataRefreshPlanner.plan(
-                module: moduleValue,
+                module: moduleForPlanning,
                 cachedContent: content,
                 convertedContent: convertedContent,
+                authoritativeSubscription: localMetadata?.scriptHubSubscription,
                 hasOverride: hasOverride,
                 detectedIconURL: detectedIcon
             )
-            if plan.isChanged {
+            if plan.isChanged || plan.module != moduleValue {
                 replace(plan.module)
                 changed = true
             }
@@ -183,12 +178,6 @@ extension AppModel {
         try? persistModules()
         statusMessage = plan.statusMessage
         Task { await rebuildCombinedFromCache() }
-    }
-
-    func openModule(_ id: UUID) {
-        guard modules.contains(where: { $0.id == id }) else { return }
-        selectedModuleID = id
-        navigationRequest = .modules
     }
 
     func replace(_ module: RelayModule) {

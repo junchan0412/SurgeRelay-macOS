@@ -34,9 +34,7 @@ enum ModuleDraftRelationshipPlanner {
         publishToGitHub: Bool
     ) -> ModuleDraftRelationshipPresentation {
         let initialSource = initialSource(draft: draft, existingModule: existingModule)
-        let storageTitle = draft.storageLocation == .gitHub && !draft.publishesStandalone
-            ? "远程模块"
-            : draft.storageLocation.title
+        let storageTitle = draft.storageLocation.title
         let isWarning = draft.publishesStandalone && (
             draft.storageLocation == .local ? !publishToLocal : !publishToGitHub
         )

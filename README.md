@@ -40,12 +40,16 @@ xattr -dr com.apple.quarantine "/Applications/Surge Relay.app"
 
 扫描本地根目录时，App 会读取已有 `.sgmodule` 的 `#!name`、`#!category` 和 Script-Hub `#SUBSCRIBED` 来源记录，并在导入前展示预览。存在可解析的 `originalURL` 时，初始来源显示为对应的订阅格式，并恢复更新地址、Script-Hub 参数和模块标签；没有该记录时，模块归类为“自写模块”，更新地址保存为本地 `file://` 文件。原文件仍留在原位置，不会被复制到另一个同名位置。
 
+已经从本地文件确认的 `#SUBSCRIBED` 初始来源会持久保存。后续从 `originalURL` 下载的上游原生模块即使不再包含该标记，也不会覆盖已经确认的来源。启动时 App 会优先用本地物理文件修复缺失的订阅元数据，并在登记文件名与磁盘文件名仅存在空格/连字符差异时纠正本地相对路径。
+
 左侧模块列表按维护状态分组：
 
 - “需要处理”：最近更新失败或本地编辑与上游更新发生冲突。
 - “本地模块”：独立输出只写入本地模块根目录，初始来源可以是订阅来源或自写模块。
 - “GitHub 模块”：独立输出只写入 GitHub 模块目录，初始来源可以是订阅来源或自写模块。
 - “未分类”：`#SUBSCRIBED` 来源记录无效，需要检查模块内容或更新地址。
+
+未开启“发布为独立模块”只表示转换结果保存在 App 缓存，不会产生第三种“远程模块”存放类型；模块仍按配置归入“本地模块”或“GitHub 模块”。
 
 模块详情页和 Web 管理端都会优先显示“管理关系”：模块存放、初始来源、订阅原始地址、更新地址、登记地址和本地相对路径会按需分开展示。订阅模块从 `originalURL` 更新；如果用户最初登记的是另一个转换后地址，则额外显示为“登记地址”，避免把它误认为实际更新地址。判断独立文件写到哪里时看“模块存放”；判断它是否由订阅转换而来时看“初始来源”；判断后续从哪里读取内容时看“更新地址”或“订阅原始地址”。
 
@@ -176,7 +180,7 @@ xcodebuild build-for-testing \
 发布前可先运行无需证书和 GitHub secret 的配置预检，确认版本号、Sparkle 配置、Web 资源语法和行为/DOM 测试、appcast、entitlement、发布脚本和 GitHub Actions 入口保持一致：
 
 ```bash
-VERSION=1.3.16 BUILD=65 ./script/check_release_configuration.sh
+VERSION=1.3.17 BUILD=66 ./script/check_release_configuration.sh
 ```
 
 ```bash
@@ -196,10 +200,10 @@ EXPECT_ADHOC_SIGNATURE=0 \
 EXPECTED_CODESIGN_AUTHORITY="Surge Relay Self-Signed Code Signing" \
 ./script/verify_github_release_assets.sh \
   --repo junchan0412/SurgeRelay-macOS \
-  --tag v1.3.16
+  --tag v1.3.17
 ```
 
-本轮深度调研和优化路线图见 [PROJECT_AUDIT_2026-07-04.md](./PROJECT_AUDIT_2026-07-04.md)。当前已完成工作、待完成工作和发布核对入口见 [DEVELOPMENT_STATUS.md](./DEVELOPMENT_STATUS.md)。
+当前已完成工作、待完成工作和发布核对入口见 [DEVELOPMENT_STATUS.md](./DEVELOPMENT_STATUS.md)。
 
 ## 开源协议
 

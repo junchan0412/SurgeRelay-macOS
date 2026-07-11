@@ -463,13 +463,12 @@ final class ModulePlanningTests: XCTestCase {
 
         let sections = ModuleSidebarSectionPlanner.sections(for: [failed, conflicted, local, github, remote, invalid])
 
-        XCTAssertEqual(sections.map(\.id), ["attention", "local", "remote", "github", "uncategorized"])
-        XCTAssertEqual(sections.map(\.title), ["需要处理", "本地模块", "远程模块", "GitHub 模块", "未分类"])
+        XCTAssertEqual(sections.map(\.id), ["attention", "local", "github", "uncategorized"])
+        XCTAssertEqual(sections.map(\.title), ["需要处理", "本地模块", "GitHub 模块", "未分类"])
         XCTAssertEqual(sections[0].modules.map(\.name), ["Failed", "Conflicted"])
         XCTAssertEqual(sections[1].modules.map(\.name), ["Local"])
-        XCTAssertEqual(sections[2].modules.map(\.name), ["Remote"])
-        XCTAssertEqual(sections[3].modules.map(\.name), ["GitHub"])
-        XCTAssertEqual(sections[4].modules.map(\.name), ["Invalid"])
+        XCTAssertEqual(sections[2].modules.map(\.name), ["GitHub", "Remote"])
+        XCTAssertEqual(sections[3].modules.map(\.name), ["Invalid"])
         XCTAssertTrue(ModuleSidebarSectionPlanner.sections(for: []).isEmpty)
     }
 

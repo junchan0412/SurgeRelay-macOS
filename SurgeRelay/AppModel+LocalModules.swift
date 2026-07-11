@@ -28,17 +28,6 @@ extension AppModel {
         return report
     }
 
-    func importExistingLocalModules() async {
-        guard !isWorking else { return }
-        do {
-            let report = try await scanExistingLocalModules()
-            await importLocalModules(report.candidates)
-        } catch {
-            presentedError = "扫描本地模块失败：\(error.localizedDescription)"
-            statusMessage = LocalModuleImportPlanner.scanFailedStatus
-        }
-    }
-
     func importLocalModules(_ candidates: [LocalModuleScanCandidate]) async {
         guard !isWorking else { return }
         guard !candidates.isEmpty else {

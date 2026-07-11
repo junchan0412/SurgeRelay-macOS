@@ -25,6 +25,7 @@ enum ModuleMetadataRefreshPlanner {
         module: RelayModule,
         cachedContent: String,
         convertedContent: String?,
+        authoritativeSubscription: ScriptHubSubscriptionInfo? = nil,
         hasOverride: Bool,
         detectedIconURL: URL?
     ) -> ModuleMetadataRefreshPlan {
@@ -37,8 +38,11 @@ enum ModuleMetadataRefreshPlanner {
         }
 
         let metadataContent = convertedContent ?? cachedContent
-        let subscription = ModuleMetadataParser.scriptHubSubscription(in: metadataContent)
-        isChanged = module.reconcileScriptHubSubscriptionMetadata(subscription) || isChanged
+        let subscription = authoritativeSubscription
+            ?? ModuleMetadataParser.scriptHubSubscription(in: metadataContent)
+        if let subscription {
+            isChanged = module.reconcileScriptHubSubscriptionMetadata(subscription) || isChanged
+        }
 
         let preferredIconURL = module.customIconURL.flatMap(URL.init(string:)) ?? detectedIconURL
         let nextIconValue = preferredIconURL?.absoluteString
@@ -94,8 +98,9 @@ enum ModuleMetadataRefreshPlanner {
             module.hasOverrideConflict = false
         }
 
-        let subscription = ModuleMetadataParser.scriptHubSubscription(in: convertedContent)
-        _ = module.reconcileScriptHubSubscriptionMetadata(subscription)
+        if let subscription = ModuleMetadataParser.scriptHubSubscription(in: convertedContent) {
+            _ = module.reconcileScriptHubSubscriptionMetadata(subscription)
+        }
 
         let preferredIconURL = module.customIconURL.flatMap(URL.init(string:)) ?? detectedIconURL
         module.iconURL = preferredIconURL?.absoluteString

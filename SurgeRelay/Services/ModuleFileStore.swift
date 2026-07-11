@@ -78,11 +78,6 @@ actor ModuleFileStore {
         )
     }
 
-    func restoreComponent(id: UUID) throws -> String {
-        try removeComponentOverride(id: id)
-        return try readConvertedComponent(id: id)
-    }
-
     func removeComponentOverride(id: UUID) throws {
         let url = componentOverrideURL(for: id)
         if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
@@ -103,14 +98,6 @@ actor ModuleFileStore {
     func readCombined() throws -> Data {
         let url = FileManager.default.fileExists(atPath: combinedOverrideURL.path) ? combinedOverrideURL : combinedCacheURL
         return try Data(contentsOf: url)
-    }
-
-    /// Exports the merged module to a user-visible `.sgmodule` file in the given
-    /// directory (used by local storage mode so Surge can load it directly).
-    func exportCombined(_ content: String, toDirectory directoryPath: String, fileName: String) throws {
-        let directory = URL(filePath: directoryPath, directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        try Data(content.utf8).write(to: directory.appending(path: fileName), options: .atomic)
     }
 
     func exportPublishedFiles(
@@ -148,18 +135,6 @@ actor ModuleFileStore {
             )
         }
         return removedPaths
-    }
-
-    func writeCombinedOverride(_ content: String) throws {
-        try FileManager.default.createDirectory(at: combinedOverrideURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try Data(content.utf8).write(to: combinedOverrideURL, options: .atomic)
-    }
-
-    func restoreCombined() throws -> String {
-        if FileManager.default.fileExists(atPath: combinedOverrideURL.path) {
-            try FileManager.default.removeItem(at: combinedOverrideURL)
-        }
-        return try decodeText(at: combinedCacheURL)
     }
 
     func removeCombined() throws {

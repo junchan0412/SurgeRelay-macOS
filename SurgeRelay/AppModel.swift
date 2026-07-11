@@ -28,7 +28,6 @@ final class AppModel {
     var githubTokenStorageStatus: CredentialStorageStatus
     var webAccessTokenStorageStatus: CredentialStorageStatus
     var keychainAccessProbe: KeychainAccessProbeSnapshot
-    var navigationRequest: SidebarDestination?
     /// Set to true to ask the main window to present the in-app settings sheet
     /// (used by the menu bar, the ⌘, command, and the toolbar gear button).
     var presentsSettings = false

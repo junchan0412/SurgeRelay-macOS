@@ -92,24 +92,17 @@ final class ModelAndCoordinatorTests: XCTestCase {
         XCTAssertNil(module.conversionEngineRevision)
     }
 
-    func testRelayModuleTreatsMissingSubscriptionAsSelfAuthoredAndClearsStaleMetadata() throws {
-        let subscription = try XCTUnwrap(ModuleMetadataParser.scriptHubSubscription(in: """
-        #SUBSCRIBED http://script.hub/file/_start_/https://example.com/demo.conf/_end_/Demo.sgmodule?type=qx-rewrite&target=surge-module
-        """))
-        var module = RelayModule(
+    func testRelayModuleWithoutSubscriptionIsSelfAuthored() {
+        let module = RelayModule(
             name: "Demo",
             sourceURL: "https://example.com/demo.sgmodule",
             sourceFormat: .surge,
-            outputFileName: "Demo",
-            scriptHubSubscription: subscription
+            outputFileName: "Demo"
         )
 
-        XCTAssertEqual(module.initialSource, .subscribed(.quantumultX))
-        XCTAssertTrue(module.reconcileScriptHubSubscriptionMetadata(nil))
         XCTAssertEqual(module.initialSource, .selfAuthored)
         XCTAssertNil(module.initialSourceURL)
         XCTAssertEqual(module.updateSourceURL, module.sourceURL)
-        XCTAssertFalse(module.reconcileScriptHubSubscriptionMetadata(nil))
     }
 
     func testModuleArgumentMaterializePreservesSemanticComments() {
@@ -187,6 +180,38 @@ final class ModelAndCoordinatorTests: XCTestCase {
         XCTAssertNil(candidate.sourceContentHash)
         XCTAssertEqual(candidate.scriptHubSubscription?.sourceType, "qx-rewrite")
         XCTAssertFalse(candidate.scriptHubOptions.removeCommentedRewrites)
+    }
+
+    func testLocalModuleMetadataReaderRestoresSubscriptionFromManagedPhysicalFile() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: "SurgeRelayMetadataReader-\(UUID().uuidString)", directoryHint: .isDirectory)
+        let directory = root.appending(path: "Modules", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = directory.appending(path: "Demo Module.sgmodule")
+        try Data("""
+        #!name=Demo
+        #SUBSCRIBED http://script.hub/file/_start_/https://example.com/original.sgmodule/_end_/Demo.sgmodule?type=surge-module&target=surge-module
+        [General]
+        """.utf8).write(to: file)
+        let module = RelayModule(
+            name: "Demo",
+            sourceURL: "https://example.com/original.sgmodule",
+            sourceFormat: .surge,
+            outputFileName: "Demo-Module.sgmodule",
+            storageLocation: .local,
+            localStorageRelativePath: "Modules/Demo-Module.sgmodule"
+        )
+
+        let snapshot = try XCTUnwrap(LocalModuleMetadataReader.snapshot(
+            for: module,
+            rootDirectoryPath: root.path
+        ))
+        let subscription = try XCTUnwrap(snapshot.scriptHubSubscription)
+
+        XCTAssertEqual(snapshot.localStorageRelativePath, "Modules/Demo Module.sgmodule")
+        XCTAssertEqual(subscription.originalURL, "https://example.com/original.sgmodule")
+        XCTAssertEqual(subscription.sourceFormat, .surge)
     }
 
     func testPublishedAddressResolverBuildsOnlyAvailableAddresses() throws {

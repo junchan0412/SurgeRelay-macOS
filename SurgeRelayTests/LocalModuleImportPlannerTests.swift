@@ -186,6 +186,31 @@ final class LocalModuleImportPlannerTests: XCTestCase {
         XCTAssertNil(imported.detectedSourceFormat)
     }
 
+    func testSuccessfulImportPreservesSubscriptionDiscoveredFromPhysicalFile() throws {
+        let subscription = try XCTUnwrap(ModuleMetadataParser.scriptHubSubscription(in: """
+        #SUBSCRIBED http://script.hub/file/_start_/https://example.com/original.sgmodule/_end_/Demo.sgmodule?type=surge-module&target=surge-module
+        """))
+        let module = RelayModule(
+            name: "Imported",
+            sourceURL: subscription.originalURL,
+            sourceFormat: .surge,
+            outputFileName: "Demo.sgmodule",
+            storageLocation: .local,
+            localStorageRelativePath: "Demo.sgmodule",
+            scriptHubSubscription: subscription
+        )
+
+        let imported = LocalModuleImportPlanner.successfulImportModule(
+            module,
+            convertedContent: "#!name=Native upstream without wrapper metadata\n[General]",
+            contentHash: "new-hash"
+        )
+
+        XCTAssertEqual(imported.scriptHubSubscription, subscription)
+        XCTAssertEqual(imported.initialSource, .subscribed(.surge))
+        XCTAssertEqual(imported.updateSourceURL, subscription.originalURL)
+    }
+
     private func scanCandidate(
         relativePath: String,
         localStorageRelativePath: String? = nil,

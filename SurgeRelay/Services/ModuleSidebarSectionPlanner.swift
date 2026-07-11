@@ -11,7 +11,6 @@ enum ModuleSidebarSectionPlanner {
     static func sections(for modules: [RelayModule]) -> [ModuleSidebarSection] {
         var attention: [RelayModule] = []
         var local: [RelayModule] = []
-        var remote: [RelayModule] = []
         var github: [RelayModule] = []
         var uncategorized: [RelayModule] = []
 
@@ -22,10 +21,8 @@ enum ModuleSidebarSectionPlanner {
                 uncategorized.append(module)
             } else if module.storageLocation == .local {
                 local.append(module)
-            } else if module.publishesStandalone {
-                github.append(module)
             } else {
-                remote.append(module)
+                github.append(module)
             }
         }
 
@@ -41,12 +38,6 @@ enum ModuleSidebarSectionPlanner {
                 title: "本地模块",
                 systemImage: "folder",
                 modules: local
-            ),
-            ModuleSidebarSection(
-                id: "remote",
-                title: "远程模块",
-                systemImage: "link",
-                modules: remote
             ),
             ModuleSidebarSection(
                 id: "github",

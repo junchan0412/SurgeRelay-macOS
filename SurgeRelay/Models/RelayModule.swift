@@ -65,8 +65,9 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         lastError: String? = nil
     ) {
         let normalizedLocalStorageRelativePath = Self.normalizedOptionalRelativePath(localStorageRelativePath)
-        let inferredStorageLocation = storageLocation
-            ?? (normalizedLocalStorageRelativePath != nil || URL(string: sourceURL)?.isFileURL == true ? .local : .gitHub)
+        let inferredStorageLocation = normalizedLocalStorageRelativePath != nil
+            ? ModuleStorageLocation.local
+            : storageLocation ?? (URL(string: sourceURL)?.isFileURL == true ? .local : .gitHub)
         let shouldPreserveOutputFileName = preservesOutputFileName
             ?? (inferredStorageLocation == .local || URL(string: sourceURL)?.isFileURL == true)
         self.id = id
@@ -121,8 +122,10 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         localStorageRelativePath = Self.normalizedOptionalRelativePath(
             try container.decodeIfPresent(String.self, forKey: .localStorageRelativePath)
         )
-        storageLocation = try container.decodeIfPresent(ModuleStorageLocation.self, forKey: .storageLocation)
-            ?? (localStorageRelativePath != nil || URL(string: sourceURL)?.isFileURL == true ? .local : .gitHub)
+        let decodedStorageLocation = try container.decodeIfPresent(ModuleStorageLocation.self, forKey: .storageLocation)
+        storageLocation = localStorageRelativePath != nil
+            ? .local
+            : decodedStorageLocation ?? (URL(string: sourceURL)?.isFileURL == true ? .local : .gitHub)
         preservesOutputFileName = try container.decodeIfPresent(Bool.self, forKey: .preservesOutputFileName)
             ?? (storageLocation == .local || URL(string: sourceURL)?.isFileURL == true)
         let decodedOutputFileName = try container.decodeIfPresent(String.self, forKey: .outputFileName)
@@ -184,17 +187,11 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     }
 
     var displayStorageLocationTitle: String {
-        if storageLocation == .gitHub, !publishesStandalone {
-            return "远程模块"
-        }
-        return storageLocation.title
+        storageLocation.title
     }
 
     var displayStorageLocationSystemImage: String {
-        if storageLocation == .gitHub, !publishesStandalone {
-            return "link"
-        }
-        return storageLocation.systemImage
+        storageLocation.systemImage
     }
 
     var standaloneStorageDetail: String {
@@ -233,13 +230,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         return scheme == "http" || scheme == "https"
     }
 
-    mutating func reconcileScriptHubSubscriptionMetadata(_ subscription: ScriptHubSubscriptionInfo?) -> Bool {
-        guard let subscription else {
-            guard scriptHubSubscription != nil else { return false }
-            scriptHubSubscription = nil
-            return true
-        }
-
+    mutating func reconcileScriptHubSubscriptionMetadata(_ subscription: ScriptHubSubscriptionInfo) -> Bool {
         var changed = false
         let sourceWasFile = URL(string: sourceURL)?.isFileURL == true
         let sourceWasScriptHub = sourceURL.hasPrefix("http://script.hub/") || sourceURL.hasPrefix("https://script.hub/")

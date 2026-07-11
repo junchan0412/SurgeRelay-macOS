@@ -2,7 +2,7 @@
 
 Updated: 2026-07-11
 
-This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.16 (65)`.
+This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.17 (66)`.
 
 ## Completed Work
 
@@ -12,7 +12,8 @@ This document tracks the optimization work completed after the deep audit and th
 - Draft modules remain in a pending-source state until their first successful update. A valid subscription uses `originalURL` as the resolved update source, while registration URLs and local storage paths retain separate responsibilities.
 - Standalone publishing is destination-specific: local modules publish only locally, GitHub modules publish only to GitHub, and cache-backed modules can still contribute to the combined module without producing a standalone file.
 - The macOS and Web editors share the same default-storage decision, destination-specific folder options, disabled-target warnings, and source/storage terminology.
-- Module sidebar sections can be collapsed or expanded, and remote modules that are not independently published are labeled as remote/cache-backed instead of GitHub-stored.
+- Module sidebar sections can be collapsed or expanded. Storage grouping always follows the persisted local/GitHub destination; disabling standalone publishing is shown as cache-backed output behavior instead of inventing a third remote storage category.
+- Local physical modules repair missing `#SUBSCRIBED` provenance and stale relative filenames at startup. Confirmed subscription metadata survives later native upstream/cache payloads that omit the Script-Hub marker.
 - Source-name autofill now uses a shared bounded remote fetcher across the macOS editor and Web API, with private-address blocking, response-size limits, and timeout enforcement.
 - The release workflow pins external actions to full commit SHAs, and release preflight rejects mutable action references before signing assets.
 - The Cloudflare Worker example now pins Wrangler with a committed npm lockfile and documents `npm ci` based deployment.

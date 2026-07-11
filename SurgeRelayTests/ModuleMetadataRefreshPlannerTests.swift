@@ -104,7 +104,7 @@ final class ModuleMetadataRefreshPlannerTests: XCTestCase {
         XCTAssertTrue(plan.shouldRefreshIconCache)
     }
 
-    func testPlanClearsStaleSubscriptionWhenConvertedContentHasNoSubscribedMetadata() throws {
+    func testPlanPreservesKnownSubscriptionWhenCacheHasNoSubscribedMetadata() throws {
         let subscription = try XCTUnwrap(ModuleMetadataParser.scriptHubSubscription(in: """
         #SUBSCRIBED http://script.hub/file/_start_/https://example.com/demo.conf/_end_/Demo.sgmodule?type=qx-rewrite&target=surge-module
         """))
@@ -124,10 +124,37 @@ final class ModuleMetadataRefreshPlannerTests: XCTestCase {
             detectedIconURL: nil
         )
 
+        XCTAssertEqual(plan.module.scriptHubSubscription, subscription)
+        XCTAssertEqual(plan.module.initialSource, .subscribed(.quantumultX))
+        XCTAssertEqual(plan.module.updateSourceURL, subscription.originalURL)
+    }
+
+    func testPlanRestoresSubscriptionFromAuthoritativeLocalModuleWhenCacheHasNoMetadata() throws {
+        let subscription = try XCTUnwrap(ModuleMetadataParser.scriptHubSubscription(in: """
+        #SUBSCRIBED http://script.hub/file/_start_/https://example.com/original.sgmodule/_end_/Demo.sgmodule?type=surge-module&target=surge-module
+        """))
+        let module = RelayModule(
+            name: "Local subscribed",
+            sourceURL: subscription.originalURL,
+            sourceFormat: .surge,
+            outputFileName: "Demo.sgmodule",
+            storageLocation: .local,
+            localStorageRelativePath: "Modules/Demo.sgmodule"
+        )
+
+        let plan = ModuleMetadataRefreshPlanner.plan(
+            module: module,
+            cachedContent: "#!name=Upstream without metadata\n[General]",
+            convertedContent: nil,
+            authoritativeSubscription: subscription,
+            hasOverride: false,
+            detectedIconURL: nil
+        )
+
         XCTAssertTrue(plan.isChanged)
-        XCTAssertNil(plan.module.scriptHubSubscription)
-        XCTAssertEqual(plan.module.initialSource, .selfAuthored)
-        XCTAssertEqual(plan.module.updateSourceURL, module.sourceURL)
+        XCTAssertEqual(plan.module.storageLocation, .local)
+        XCTAssertEqual(plan.module.scriptHubSubscription, subscription)
+        XCTAssertEqual(plan.module.initialSource, .subscribed(.surge))
     }
 
     func testSuccessfulConversionPlanRecordsRevisionAndOverrideConflict() throws {
@@ -240,6 +267,37 @@ final class ModuleMetadataRefreshPlannerTests: XCTestCase {
         XCTAssertEqual(plan.module.lastUpdatedAt, updatedAt)
         XCTAssertTrue(plan.contentChanged)
         XCTAssertEqual(plan.historyMessage, "转换完成")
+    }
+
+    func testSuccessfulConversionPreservesKnownSubscriptionWhenUpstreamOmitsMarker() throws {
+        let subscription = try XCTUnwrap(ModuleMetadataParser.scriptHubSubscription(in: """
+        #SUBSCRIBED http://script.hub/file/_start_/https://example.com/original.sgmodule/_end_/Demo.sgmodule?type=surge-module&target=surge-module
+        """))
+        let module = RelayModule(
+            name: "Subscribed",
+            sourceURL: subscription.originalURL,
+            sourceFormat: .surge,
+            outputFileName: "Demo.sgmodule",
+            storageLocation: .local,
+            localStorageRelativePath: "Modules/Demo.sgmodule",
+            scriptHubSubscription: subscription
+        )
+
+        let plan = ModuleMetadataRefreshPlanner.successfulConversionPlan(
+            module: module,
+            revisionSnapshot: nil,
+            nativeModule: true,
+            engineRevision: nil,
+            convertedContent: "#!name=Upstream without metadata\n[General]",
+            effectiveContent: "#!name=Upstream without metadata\n[General]",
+            hasOverride: false,
+            detectedIconURL: nil,
+            nextContentHash: "hash"
+        )
+
+        XCTAssertEqual(plan.module.scriptHubSubscription, subscription)
+        XCTAssertEqual(plan.module.initialSource, .subscribed(.surge))
+        XCTAssertEqual(plan.module.storageLocation, .local)
     }
 
     func testUnchangedCachedContentPlanOnlyRefreshesSourceRevisionAndState() {

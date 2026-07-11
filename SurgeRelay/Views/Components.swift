@@ -149,39 +149,6 @@ extension RelayModule {
     }
 }
 
-struct StatCard: View {
-    let title: String
-    let value: String
-    let detail: String
-    let systemImage: String
-    let tint: Color
-
-    var body: some View {
-        RelayCard {
-            HStack(alignment: .top, spacing: 16) {
-                Image(systemName: systemImage)
-                    .font(.title2)
-                    .foregroundStyle(tint)
-                    .frame(width: 42, height: 42)
-                    .background(tint.opacity(0.14), in: .rect(cornerRadius: 12))
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(value).font(.system(size: 30, weight: .semibold, design: .rounded))
-                    Text(title).font(.headline)
-                    Text(detail).font(.caption).foregroundStyle(.secondary)
-                }
-            }
-        }
-    }
-}
-
-struct URLCopyButton: View {
-    let url: URL
-
-    var body: some View {
-        TextCopyButton(text: url.absoluteString, title: "拷贝地址")
-    }
-}
-
 struct TextCopyButton: View {
     let text: String
     var title = "拷贝"

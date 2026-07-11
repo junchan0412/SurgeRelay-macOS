@@ -13,3 +13,5 @@ dist/
 xcuserdata/
 *.xcuserstate
 .wrangler/
+.claude/audits/
+audit-report-*.html
