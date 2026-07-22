@@ -3,6 +3,25 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.3.19</title>
+            <pubDate>Thu, 23 Jul 2026 04:01:07 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.19</link>
+            <sparkle:version>68</sparkle:version>
+            <sparkle:shortVersionString>1.3.19</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.3.19
+
+
+- 搜索索引新增 metadata 缓存与 `filterPlan`，侧边栏过滤在批量更新时复用已构建的检索文本，避免反复拼接大字符串。
+- 侧边栏改为缓存分组结果，进度/状态高频字段不再强制整树重建；模块行继续保持纯值渲染，减少 Observation 扩散。
+- 批量更新路径延迟 `modules.json` 落盘，并跳过无变化的 `setState`，降低主线程磁盘与状态抖动。
+- `moduleSummary` 增加签名缓存，菜单栏与状态卡重复读取时不再每次全量扫描模块列表。
+- 详情页模块切换补齐非对称过渡，详情/预览 tab 使用更顺滑的 snappy + 轻微位移动画，同时继续保留预览编辑状态。
+- 分组折叠、状态卡与进度百分比动画进一步细化，列表空状态与模块状态点过渡更连贯。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.3.19/Surge-Relay-1.3.19.app.zip" length="8720319" type="application/zip" sparkle:edSignature="g+ZXM2fHGuzy4OY7V6vT+0tXZVvTWBhIAFproVI/rwWqPn/0P6dY/Iaje1BIrzR9lr95ovYB45SC8VKGPci6CA=="/>
+        </item>
+        <item>
             <title>1.3.18</title>
             <pubDate>Thu, 23 Jul 2026 03:44:17 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.18</link>
