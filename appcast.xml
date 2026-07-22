@@ -3,6 +3,25 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.3.18</title>
+            <pubDate>Thu, 23 Jul 2026 03:44:17 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.18</link>
+            <sparkle:version>67</sparkle:version>
+            <sparkle:shortVersionString>1.3.18</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.3.18
+
+
+- 修复 Surge `.sgmodule` 被错误识别为 Quantumult X 重写的问题；扩展名强信号优先于错误的 Script-Hub `type=qx-rewrite`，更新时直接走原生模块路径。
+- 启动/元数据刷新/导入路径会自动纠正已误标的来源格式，并同步修复订阅记录中的 `sourceType`。
+- 侧边栏模块行不再绑定整个 AppModel，降低批量更新时的全局重绘；状态点与开关切换更轻量流畅。
+- 详情/预览分段切换补齐 snappy 过渡动画；分组折叠 chevron 使用 symbol replace 过渡。
+- 状态卡减少高频进度更新时的多层合成开销；模块图标刷新时保留上一帧，避免列表闪烁。
+- 搜索过滤路径减少重复索引访问，状态 pill 状态变化过渡更顺滑。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.3.18/Surge-Relay-1.3.18.app.zip" length="8713149" type="application/zip" sparkle:edSignature="ttxTyCEjlCtBWFoCLtQVx+bJNdWspLIgQ6YDAyf7owwxPhiKGmD0DXtvpFiDPfWD/upkautE8UOkPoAmsDb0Dg=="/>
+        </item>
+        <item>
             <title>1.3.17</title>
             <pubDate>Sat, 11 Jul 2026 20:57:24 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.17</link>
