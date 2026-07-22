@@ -189,3 +189,49 @@ final class ModuleSearchIndexTests: XCTestCase {
         XCTAssertEqual(plan.modulesToLoad.map(\.id), [id])
     }
 }
+
+    func testModuleSearchIndexFilterPlanReusesMetadataCache() {
+        let module = RelayModule(
+            name: "Video Enhancer",
+            sourceURL: "https://example.com/video.sgmodule",
+            sourceFormat: .surge,
+            outputFileName: "Video.sgmodule",
+            category: "Streaming",
+            contentHash: "hash-1"
+        )
+        let first = ModuleSearchIndex.filterPlan(
+            modules: [module],
+            query: "streaming",
+            contentState: .empty,
+            metadataState: .empty
+        )
+        XCTAssertEqual(first.matches.map(\.id), [module.id])
+        XCTAssertEqual(first.metadataState.metadataIndexCacheKeys[module.id], ModuleSearchIndex.metadataCacheKey(for: module))
+        XCTAssertEqual(first.metadataState.metadataIndex[module.id]?.contains("streaming"), true)
+
+        let second = ModuleSearchIndex.filterPlan(
+            modules: [module],
+            query: "missing-token",
+            contentState: .empty,
+            metadataState: first.metadataState
+        )
+        XCTAssertTrue(second.matches.isEmpty)
+        XCTAssertEqual(second.metadataState.metadataIndexCacheKeys[module.id], first.metadataState.metadataIndexCacheKeys[module.id])
+        XCTAssertEqual(second.metadataState.metadataIndex[module.id], first.metadataState.metadataIndex[module.id])
+    }
+
+    func testModuleSearchIndexMetadataCacheKeyChangesWithState() {
+        let base = RelayModule(
+            name: "Video Enhancer",
+            sourceURL: "https://example.com/video.sgmodule",
+            outputFileName: "Video.sgmodule",
+            state: .current
+        )
+        var failed = base
+        failed.state = .failed
+        failed.lastError = "404"
+        XCTAssertNotEqual(
+            ModuleSearchIndex.metadataCacheKey(for: base),
+            ModuleSearchIndex.metadataCacheKey(for: failed)
+        )
+    }

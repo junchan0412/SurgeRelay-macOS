@@ -180,7 +180,7 @@ xcodebuild build-for-testing \
 发布前可先运行无需证书和 GitHub secret 的配置预检，确认版本号、Sparkle 配置、Web 资源语法和行为/DOM 测试、appcast、entitlement、发布脚本和 GitHub Actions 入口保持一致：
 
 ```bash
-VERSION=1.3.18 BUILD=67 ./script/check_release_configuration.sh
+VERSION=1.3.19 BUILD=68 ./script/check_release_configuration.sh
 ```
 
 ```bash
@@ -200,7 +200,7 @@ EXPECT_ADHOC_SIGNATURE=0 \
 EXPECTED_CODESIGN_AUTHORITY="Surge Relay Self-Signed Code Signing" \
 ./script/verify_github_release_assets.sh \
   --repo junchan0412/SurgeRelay-macOS \
-  --tag v1.3.18
+  --tag v1.3.19
 ```
 
 当前已完成工作、待完成工作和发布核对入口见 [DEVELOPMENT_STATUS.md](./DEVELOPMENT_STATUS.md)。

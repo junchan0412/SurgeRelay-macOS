@@ -18,8 +18,10 @@ extension AppModel {
         synchronizationCompletedCount = 0
         synchronizationTotalCount = updateModules.count
         synchronizingModuleID = nil
+        defersModulePersistence = true
         defer {
             synchronizingModuleID = nil
+            defersModulePersistence = false
             endWork(.updatingModules)
         }
 
@@ -54,7 +56,13 @@ extension AppModel {
             var sourceCheckFailure: (any Error)?
             synchronizingModuleID = module.id
             setState(id: module.id, state: .updating, error: nil)
-            statusMessage = "正在检查 \(module.name)…"
+            // Avoid rewriting identical high-frequency status strings for every module
+            // when the UI already shows per-module progress.
+            if synchronizationTotalCount <= 1 {
+                statusMessage = "正在检查 \(module.name)…"
+            } else if synchronizationCompletedCount == 0 {
+                statusMessage = "正在更新 \(updateModules.count) 个模块…"
+            }
             do {
                 let hasCache = await fileStore.hasComponent(id: module.id)
                 let sourceURL = URL(string: module.updateSourceURL)
@@ -98,7 +106,9 @@ extension AppModel {
                     }
                 }
                 guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
-                statusMessage = "正在内置转换 \(module.name)…"
+                if synchronizationTotalCount <= 1 {
+                    statusMessage = "正在内置转换 \(module.name)…"
+                }
                 let result = try await scriptHubClient.convert(
                     module: module,
                     github: settings.github.isConfigured ? settings.github : nil
@@ -217,7 +227,8 @@ extension AppModel {
             await Task.yield()
         }
         recordHistory(newHistory)
-        try? persistModules()
+        defersModulePersistence = false
+        try? persistModulesIfNeeded(force: true)
 
         guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
 

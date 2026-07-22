@@ -13,16 +13,16 @@ struct ModuleDetailPaneView: View {
         case preview
     }
 
-    private enum SelectionKind {
+    private enum SelectionKind: Equatable {
         case combined
-        case module(RelayModule)
+        case module(UUID)
     }
 
     private var selectedTabBinding: Binding<DetailTab> {
         Binding(
             get: { selectedTab },
             set: { newValue in
-                withAnimation(.snappy(duration: 0.2)) {
+                withAnimation(.snappy(duration: 0.22, extraBounce: 0.02)) {
                     selectedTab = newValue
                     if newValue == .preview {
                         hasPresentedPreview = true
@@ -38,21 +38,33 @@ struct ModuleDetailPaneView: View {
             return .combined
         }
         if let id = model.selectedModuleID,
-           let module = model.modules.first(where: { $0.id == id }) {
-            return .module(module)
+           model.modules.contains(where: { $0.id == id }) {
+            return .module(id)
         }
         return nil
+    }
+
+    private var selectedModule: RelayModule? {
+        guard case let .module(id) = selectionKind else { return nil }
+        return model.modules.first(where: { $0.id == id })
     }
 
     var body: some View {
         Group {
             if let kind = selectionKind {
                 detailContent(for: kind)
+                    .id(kindID(kind))
+                    .transition(.asymmetric(
+                        insertion: .opacity.combined(with: .move(edge: .trailing)).combined(with: .offset(x: 8)),
+                        removal: .opacity.combined(with: .offset(x: -6))
+                    ))
             } else {
                 ContentUnavailableView("选择一个模块", systemImage: "sidebar.right")
+                    .transition(.opacity)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .animation(.snappy(duration: 0.22), value: selectionKind.map(kindID))
         .searchable(text: $searchText, prompt: "搜索")
         .toolbar {
             ToolbarSpacer(.flexible)
@@ -68,6 +80,7 @@ struct ModuleDetailPaneView: View {
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
+                    .frame(width: 88)
                 }
             }
             ToolbarItem {
@@ -87,6 +100,13 @@ struct ModuleDetailPaneView: View {
         }
     }
 
+    private func kindID(_ kind: SelectionKind) -> String {
+        switch kind {
+        case .combined: "combined"
+        case let .module(id): id.uuidString
+        }
+    }
+
     @ViewBuilder
     private func detailContent(for kind: SelectionKind) -> some View {
         // Keep both panes mounted after preview has been opened so unsaved
@@ -96,29 +116,29 @@ struct ModuleDetailPaneView: View {
             case .combined:
                 CombinedModuleDetailView()
                     .opacity(selectedTab == .info ? 1 : 0)
-                    .scaleEffect(selectedTab == .info ? 1 : 0.992, anchor: .top)
+                    .offset(y: selectedTab == .info ? 0 : 6)
                     .allowsHitTesting(selectedTab == .info)
                 if hasPresentedPreview {
                     CombinedPreviewPane()
                         .opacity(selectedTab == .preview ? 1 : 0)
-                        .scaleEffect(selectedTab == .preview ? 1 : 0.992, anchor: .top)
+                        .offset(y: selectedTab == .preview ? 0 : 6)
                         .allowsHitTesting(selectedTab == .preview)
                 }
-            case let .module(module):
-                ModuleDetailView(module: module, onEdit: { editModule(module) })
-                    .id("info-\(module.id.uuidString)")
-                    .opacity(selectedTab == .info ? 1 : 0)
-                    .scaleEffect(selectedTab == .info ? 1 : 0.992, anchor: .top)
-                    .allowsHitTesting(selectedTab == .info)
-                if hasPresentedPreview {
-                    ModulePreviewPane(module: module)
-                        .id("preview-\(module.id.uuidString)")
-                        .opacity(selectedTab == .preview ? 1 : 0)
-                        .scaleEffect(selectedTab == .preview ? 1 : 0.992, anchor: .top)
-                        .allowsHitTesting(selectedTab == .preview)
+            case .module:
+                if let module = selectedModule {
+                    ModuleDetailView(module: module, onEdit: { editModule(module) })
+                        .opacity(selectedTab == .info ? 1 : 0)
+                        .offset(y: selectedTab == .info ? 0 : 6)
+                        .allowsHitTesting(selectedTab == .info)
+                    if hasPresentedPreview {
+                        ModulePreviewPane(module: module)
+                            .opacity(selectedTab == .preview ? 1 : 0)
+                            .offset(y: selectedTab == .preview ? 0 : 6)
+                            .allowsHitTesting(selectedTab == .preview)
+                    }
                 }
             }
         }
-        .animation(.snappy(duration: 0.2), value: selectedTab)
+        .animation(.snappy(duration: 0.22, extraBounce: 0.02), value: selectedTab)
     }
 }

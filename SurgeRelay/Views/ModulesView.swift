@@ -6,6 +6,7 @@ struct ModulesView: View {
     @State private var editorRoute: ModuleEditorRoute?
     @State private var deleteCandidate: RelayModule?
     @State private var contentIndexState = ModuleSearchContentIndexState()
+    @State private var metadataIndexState = ModuleSearchMetadataIndexState()
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var isScanningLocalModules = false
     @State private var showsLocalImportPreview = false
@@ -14,29 +15,10 @@ struct ModulesView: View {
     @State private var selectedLocalImportCandidateIDs = Set<String>()
     @State private var isBatchSelecting = false
     @State private var batchSelectedModuleIDs = Set<UUID>()
+    @State private var sidebarPresentation = SidebarPresentation.empty
 
     private var normalizedSearchText: String {
         ModuleSearchIndex.normalizedQuery(searchText)
-    }
-
-    private var filteredModules: [RelayModule] {
-        let query = normalizedSearchText
-        let modules = model.modules
-        guard !query.isEmpty else { return modules }
-        let contentIndex = contentIndexState.contentIndex
-        let contentKeys = contentIndexState.contentIndexCacheKeys
-        return modules.filter { module in
-            let cachedContent = ModuleSearchIndex.cachedContent(
-                for: module,
-                contentIndex: contentIndex,
-                contentIndexCacheKeys: contentKeys
-            )
-            return ModuleSearchIndex.text(for: module, cachedContent: cachedContent).contains(query)
-        }
-    }
-
-    private var sidebarSections: [ModuleSidebarSection] {
-        ModuleSidebarSectionPlanner.sections(for: filteredModules)
     }
 
     private var contentIndexToken: String {
@@ -44,6 +26,36 @@ struct ModulesView: View {
             for: model.modules,
             query: normalizedSearchText
         )
+    }
+
+    private var sidebarRefreshToken: String {
+        // Include fields that affect grouping/filtering, but not high-frequency
+        // progress counters that should not rebuild the entire section tree.
+        let modulesSignature = model.modules.map { module in
+            [
+                module.id.uuidString,
+                module.name,
+                module.state.rawValue,
+                module.isEnabled ? "1" : "0",
+                module.publishesStandalone ? "1" : "0",
+                module.storageLocation.rawValue,
+                module.category,
+                module.outputFolder,
+                module.hasOverrideConflict ? "1" : "0",
+                module.contentHash ?? "",
+                module.lastError.map { String($0.hashValue) } ?? "",
+                module.initialSource.title,
+            ].joined(separator: ":")
+        }.joined(separator: "|")
+        return [
+            normalizedSearchText,
+            model.settings.combinedModuleEnabled ? "1" : "0",
+            contentIndexState.contentIndexCacheKeys
+                .map { "\($0.key.uuidString)=\($0.value)" }
+                .sorted()
+                .joined(separator: ","),
+            modulesSignature,
+        ].joined(separator: "\u{1e}")
     }
 
     private func rebuildContentIndex() async {
@@ -70,13 +82,33 @@ struct ModulesView: View {
         contentIndexState = nextState
     }
 
+    private func rebuildSidebarPresentation() {
+        let filterPlan = ModuleSearchIndex.filterPlan(
+            modules: model.modules,
+            query: normalizedSearchText,
+            contentState: contentIndexState,
+            metadataState: metadataIndexState
+        )
+        metadataIndexState = filterPlan.metadataState
+        let sections = ModuleSidebarSectionPlanner.sections(for: filterPlan.matches)
+        let next = SidebarPresentation(
+            sections: sections,
+            filteredModulesAreEmpty: filterPlan.matches.isEmpty,
+            allModulesAreEmpty: model.modules.isEmpty,
+            combinedModuleEnabled: model.settings.combinedModuleEnabled
+        )
+        guard next != sidebarPresentation else { return }
+        sidebarPresentation = next
+    }
+
     var body: some View {
         @Bindable var model = model
         NavigationSplitView(columnVisibility: $columnVisibility) {
             ModuleSidebarView(
-                sections: sidebarSections,
-                filteredModulesAreEmpty: filteredModules.isEmpty,
-                allModulesAreEmpty: model.modules.isEmpty,
+                sections: sidebarPresentation.sections,
+                filteredModulesAreEmpty: sidebarPresentation.filteredModulesAreEmpty,
+                allModulesAreEmpty: sidebarPresentation.allModulesAreEmpty,
+                combinedModuleEnabled: sidebarPresentation.combinedModuleEnabled,
                 isBatchSelecting: $isBatchSelecting,
                 batchSelectedModuleIDs: $batchSelectedModuleIDs,
                 deleteCandidate: $deleteCandidate,
@@ -99,6 +131,9 @@ struct ModulesView: View {
             ModuleDetailPaneView(searchText: $searchText, editModule: presentEditor)
         }
         .task(id: contentIndexToken) { await rebuildContentIndex() }
+        .onChange(of: sidebarRefreshToken, initial: true) { _, _ in
+            rebuildSidebarPresentation()
+        }
         .sheet(item: $editorRoute) { route in
             ModuleEditorView(
                 module: route.module,
@@ -175,6 +210,20 @@ struct ModulesView: View {
         }
     }
 
+}
+
+private struct SidebarPresentation: Equatable {
+    var sections: [ModuleSidebarSection]
+    var filteredModulesAreEmpty: Bool
+    var allModulesAreEmpty: Bool
+    var combinedModuleEnabled: Bool
+
+    static let empty = SidebarPresentation(
+        sections: [],
+        filteredModulesAreEmpty: true,
+        allModulesAreEmpty: true,
+        combinedModuleEnabled: false
+    )
 }
 
 private struct ModuleEditorRoute: Identifiable {

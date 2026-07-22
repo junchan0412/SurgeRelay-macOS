@@ -65,6 +65,11 @@ final class AppModel {
     @ObservationIgnored var localModuleOutputFoldersRootPath: String?
     @ObservationIgnored var localModuleOutputFoldersLastRefreshedAt: Date?
     @ObservationIgnored static let automaticPublishDelaySeconds = 30
+    @ObservationIgnored var cachedModuleSummary: ModuleCollectionSummary?
+    @ObservationIgnored var cachedModuleSummaryToken: String?
+    /// When true, module mutations during a bulk update skip intermediate disk writes
+    /// and high-frequency status text churn that would force full-tree observation.
+    @ObservationIgnored var defersModulePersistence = false
 
     init() {
         var loadedSettings = PersistenceStore.loadSettings()

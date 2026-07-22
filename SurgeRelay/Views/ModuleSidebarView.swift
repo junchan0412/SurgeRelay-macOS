@@ -7,6 +7,7 @@ struct ModuleSidebarView: View {
     let sections: [ModuleSidebarSection]
     let filteredModulesAreEmpty: Bool
     let allModulesAreEmpty: Bool
+    let combinedModuleEnabled: Bool
     @Binding var isBatchSelecting: Bool
     @Binding var batchSelectedModuleIDs: Set<UUID>
     @Binding var deleteCandidate: RelayModule?
@@ -16,7 +17,7 @@ struct ModuleSidebarView: View {
         @Bindable var model = model
 
         List(selection: $model.selectedModuleID) {
-            if model.settings.combinedModuleEnabled {
+            if combinedModuleEnabled {
                 Section {
                     CombinedModuleRow()
                         .tag(AppModel.combinedModuleSelectionID)
@@ -27,6 +28,9 @@ struct ModuleSidebarView: View {
                 moduleSection(section)
             }
         }
+        .listStyle(.sidebar)
+        .animation(.snappy(duration: 0.2), value: sections.map(\.id))
+        .animation(.snappy(duration: 0.2), value: collapsedSectionIDsRaw)
         .overlay {
             if filteredModulesAreEmpty {
                 ContentUnavailableView(
@@ -34,6 +38,7 @@ struct ModuleSidebarView: View {
                     systemImage: "shippingbox",
                     description: Text(allModulesAreEmpty ? "添加第一个更新地址，或扫描现有本地模块。" : "换个关键词试试。")
                 )
+                .transition(.opacity.combined(with: .scale(scale: 0.98)))
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -59,6 +64,10 @@ struct ModuleSidebarView: View {
             if isExpanded {
                 ForEach(section.modules) { module in
                     moduleRow(module)
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .move(edge: .top)),
+                            removal: .opacity
+                        ))
                 }
             }
         }
@@ -76,7 +85,10 @@ struct ModuleSidebarView: View {
             }
             ModuleRow(
                 module: module,
-                combinedModuleEnabled: model.settings.combinedModuleEnabled
+                combinedModuleEnabled: combinedModuleEnabled,
+                onEnabledChange: { enabled in
+                    model.setModuleEnabled(id: module.id, enabled: enabled)
+                }
             )
         }
         .tag(module.id)
@@ -151,6 +163,7 @@ private struct ModuleSidebarSectionHeader: View {
                 Label("\(title) \(count)", systemImage: systemImage)
                     .font(.caption.weight(.medium))
                     .labelStyle(.titleAndIcon)
+                    .contentTransition(.opacity)
                 Spacer(minLength: 0)
             }
             .foregroundStyle(.secondary)
@@ -186,6 +199,7 @@ private struct ModuleSidebarStatusCard: View {
                     }
                     .buttonStyle(.plain)
                 }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
                 Divider()
             }
 
@@ -217,6 +231,7 @@ private struct ModuleSidebarStatusCard: View {
                         Text(workActivityStatusText)
                             .font(.caption)
                             .lineLimit(2)
+                            .contentTransition(.opacity)
                     }
                 }
                 if model.workActivity.canCancel {
@@ -241,6 +256,7 @@ private struct ModuleSidebarStatusCard: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                .transition(.opacity)
                 Divider()
             }
 
@@ -250,6 +266,7 @@ private struct ModuleSidebarStatusCard: View {
                 Text(latestUpdateText)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                    .contentTransition(.opacity)
             }
         }
         .padding(12)
@@ -259,7 +276,6 @@ private struct ModuleSidebarStatusCard: View {
             statusCardShape
                 .strokeBorder(Color(nsColor: .separatorColor).opacity(0.24), lineWidth: 0.5)
         }
-        // Prefer material over layered glass during frequent progress updates.
         .padding(.horizontal, 10)
         .padding(.bottom, 10)
         .animation(.snappy(duration: 0.22), value: model.workActivity.kind)
@@ -307,10 +323,12 @@ private struct ModuleSidebarStatusCard: View {
     }
 }
 
+/// Pure value row: no AppModel observation in body reads, so bulk update progress
+/// ticks only re-render rows whose module identity/content actually changed.
 private struct ModuleRow: View {
-    @Environment(AppModel.self) private var model
     let module: RelayModule
     let combinedModuleEnabled: Bool
+    let onEnabledChange: (Bool) -> Void
 
     var body: some View {
         HStack(spacing: 10) {
@@ -326,23 +344,24 @@ private struct ModuleRow: View {
                     .contentTransition(.opacity)
             }
             Spacer(minLength: 4)
-            if module.state == .updating {
-                ProgressView()
-                    .controlSize(.small)
-                    .transition(.opacity.combined(with: .scale(scale: 0.85)))
-            } else {
-                Circle()
-                    .fill(statusColor)
-                    .frame(width: 7, height: 7)
-                    .help(statusHelp)
-                    .transition(.opacity.combined(with: .scale(scale: 0.85)))
+            ZStack {
+                if module.state == .updating {
+                    ProgressView()
+                        .controlSize(.small)
+                        .transition(.opacity.combined(with: .scale(scale: 0.85)))
+                } else {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: 7, height: 7)
+                        .help(statusHelp)
+                        .transition(.opacity.combined(with: .scale(scale: 0.85)))
+                }
             }
+            .frame(width: 14, height: 14)
             if combinedModuleEnabled {
-                // Read only `module` in body; touch AppModel only inside the setter so
-                // progress updates do not re-render every row through Observation.
                 Toggle("包含", isOn: Binding(
                     get: { module.isEnabled },
-                    set: { model.setModuleEnabled(id: module.id, enabled: $0) }
+                    set: onEnabledChange
                 ))
                 .labelsHidden()
                 .toggleStyle(.switch)

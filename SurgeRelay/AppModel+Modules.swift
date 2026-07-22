@@ -12,6 +12,7 @@ extension AppModel {
         let module = plan.module
         registerLocalChange()
         modules.append(module)
+        invalidateModuleSummaryCache()
         selectedModuleID = module.id
         if let customIconURL = plan.customIconURL, let url = URL(string: customIconURL) {
             Task { try? await iconStore.cacheIcon(from: url, for: module.id, force: true) }
@@ -40,6 +41,7 @@ extension AppModel {
         }
         registerLocalChange()
         modules[index] = plan.module
+        invalidateModuleSummaryCache()
         if plan.sourceChanged || plan.customIconChanged {
             if let customIconURL = plan.customIconURL, let url = URL(string: customIconURL) {
                 Task { try? await iconStore.cacheIcon(from: url, for: id, force: true) }
@@ -70,6 +72,7 @@ extension AppModel {
         guard modules[index].isEnabled != enabled else { return }
         registerLocalChange()
         modules[index].isEnabled = enabled
+        invalidateModuleSummaryCache()
         try? persistModules()
         if settings.combinedModuleEnabled {
             statusMessage = enabled ? "已将 \(modules[index].name) 加入总模块" : "已将 \(modules[index].name) 从总模块移除"
@@ -87,6 +90,7 @@ extension AppModel {
         guard let index = modules.firstIndex(where: { $0.id == id }) else { return }
         registerLocalChange()
         let module = modules.remove(at: index)
+        invalidateModuleSummaryCache()
         try? await fileStore.removeComponent(id: id)
         try? await fileStore.removeAssets(id: id)
         try? await iconStore.removeIcon(for: id)
@@ -183,15 +187,27 @@ extension AppModel {
     func replace(_ module: RelayModule) {
         guard let index = modules.firstIndex(where: { $0.id == module.id }) else { return }
         modules[index] = module
+        invalidateModuleSummaryCache()
     }
 
     func setState(id: UUID, state: ModuleUpdateState, error: String?) {
         guard let index = modules.firstIndex(where: { $0.id == id }) else { return }
+        // Skip no-op writes so Observation does not fan out identical list updates.
+        if modules[index].state == state, modules[index].lastError == error {
+            return
+        }
         modules[index].state = state
         modules[index].lastError = error
+        invalidateModuleSummaryCache()
     }
 
     func persistModules() throws {
+        if defersModulePersistence { return }
+        try PersistenceStore.saveModules(modules)
+    }
+
+    func persistModulesIfNeeded(force: Bool = false) throws {
+        if defersModulePersistence, !force { return }
         try PersistenceStore.saveModules(modules)
     }
 
