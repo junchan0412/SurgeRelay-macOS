@@ -43,6 +43,7 @@ enum ModuleMetadataRefreshPlanner {
         if let subscription {
             isChanged = module.reconcileScriptHubSubscriptionMetadata(subscription) || isChanged
         }
+        isChanged = module.repairSourceFormatFromUpdateSource() || isChanged
 
         let preferredIconURL = module.customIconURL.flatMap(URL.init(string:)) ?? detectedIconURL
         let nextIconValue = preferredIconURL?.absoluteString
@@ -101,6 +102,7 @@ enum ModuleMetadataRefreshPlanner {
         if let subscription = ModuleMetadataParser.scriptHubSubscription(in: convertedContent) {
             _ = module.reconcileScriptHubSubscriptionMetadata(subscription)
         }
+        _ = module.repairSourceFormatFromUpdateSource()
 
         let preferredIconURL = module.customIconURL.flatMap(URL.init(string:)) ?? detectedIconURL
         module.iconURL = preferredIconURL?.absoluteString

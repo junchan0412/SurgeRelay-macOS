@@ -27,6 +27,8 @@ enum ModuleNamingPlanner {
     }
 
     static func detectedFormat(for format: ModuleSourceFormat, source: String) -> ModuleSourceFormat? {
+        // detectedSourceFormat is only meaningful for automatic recognition UI.
+        // Explicit mislabels are repaired into sourceFormat itself.
         guard format == .automatic, let url = URL(string: source) else { return nil }
         return format.resolvedFormat(for: url)
     }

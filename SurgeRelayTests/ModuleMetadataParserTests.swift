@@ -60,4 +60,14 @@ final class ModuleMetadataParserTests: XCTestCase {
         XCTAssertFalse(result.localizedCaseInsensitiveContains("#!icon"))
         XCTAssertFalse(result.contains("https://example.com/source.png"))
     }
+
+    func testSubscriptionSourceFormatRepairsConflictingQxTypeForSgmodule() throws {
+        let content = """
+        #SUBSCRIBED http://script.hub/file/_start_/https://example.com/modules/demo.sgmodule/_end_/Demo.sgmodule?type=qx-rewrite&target=surge-module
+        """
+        let subscription = try XCTUnwrap(ModuleMetadataParser.scriptHubSubscription(in: content))
+        XCTAssertEqual(subscription.sourceType, "qx-rewrite")
+        XCTAssertEqual(subscription.sourceFormat, .surge)
+        XCTAssertEqual(subscription.originalURL, "https://example.com/modules/demo.sgmodule")
+    }
 }

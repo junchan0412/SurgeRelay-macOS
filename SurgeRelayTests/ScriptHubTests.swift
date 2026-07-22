@@ -3,6 +3,18 @@ import XCTest
 @testable import SurgeRelay
 
 final class ScriptHubTests: XCTestCase {
+    func testNativeSurgeModuleBypassesConverterEvenWhenFormatIsMislabeled() async throws {
+        let module = RelayModule(
+            name: "Block HTTPDNS",
+            sourceURL: "https://example.com/HTTPDNS.sgmodule",
+            sourceFormat: .quantumultX,
+            outputFileName: "HTTPDNS"
+        )
+        let sourceURL = try XCTUnwrap(URL(string: module.updateSourceURL))
+        XCTAssertTrue(module.sourceFormat.isNativeSurgeModule(for: sourceURL))
+        XCTAssertEqual(module.sourceFormat.scriptHubType(for: sourceURL), "surge-module")
+    }
+
     func testScriptHubConversionURLPreservesOriginalAddress() async throws {
         let module = RelayModule(
             name: "Test",

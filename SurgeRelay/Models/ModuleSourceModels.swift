@@ -56,30 +56,60 @@ enum ModuleSourceFormat: String, Codable, CaseIterable, Identifiable, Sendable {
 
     func resolvedFormat(for sourceURL: URL) -> ModuleSourceFormat {
         guard self == .automatic else { return self }
-        let path = sourceURL.path.lowercased()
+        return Self.inferredFormat(for: sourceURL) ?? .quantumultX
+    }
+
+    /// Extension-based signals that should win over a conflicting declared type or Script-Hub query.
+    /// `.sgmodule` is always a Surge module; `.plugin` / `.lpx` are always Loon plugins.
+    static func definitiveFormat(for sourceURL: URL) -> ModuleSourceFormat? {
         switch sourceURL.pathExtension.lowercased() {
         case "sgmodule": return .surge
         case "plugin", "lpx": return .loon
-        default: break
+        default: return nil
         }
+    }
+
+    /// Best-effort format inference from the source URL path and extension.
+    static func inferredFormat(for sourceURL: URL) -> ModuleSourceFormat? {
+        if let definitive = definitiveFormat(for: sourceURL) {
+            return definitive
+        }
+        let path = sourceURL.path.lowercased()
         if path.contains("/loon/") { return .loon }
         if path.contains("/quantumultx/") || path.contains("/quantumult-x/") || path.contains("/qx/") {
             return .quantumultX
         }
-        return .quantumultX
+        if path.contains("/sgmodule/") || path.contains("/surge/") {
+            return .surge
+        }
+        return nil
     }
 
     func scriptHubType(for sourceURL: URL) -> String {
-        switch resolvedFormat(for: sourceURL) {
-        case .quantumultX: "qx-rewrite"
-        case .loon: "loon-plugin"
-        case .surge: "surge-module"
-        case .automatic: "qx-rewrite"
+        let format = Self.definitiveFormat(for: sourceURL) ?? resolvedFormat(for: sourceURL)
+        switch format {
+        case .quantumultX: return "qx-rewrite"
+        case .loon: return "loon-plugin"
+        case .surge: return "surge-module"
+        case .automatic: return "qx-rewrite"
         }
     }
 
     func isNativeSurgeModule(for sourceURL: URL) -> Bool {
-        resolvedFormat(for: sourceURL) == .surge
+        // A `.sgmodule` source must never be sent through the Script-Hub rewrite converter,
+        // even when the stored sourceFormat was incorrectly recorded as Quantumult X / Loon.
+        if Self.definitiveFormat(for: sourceURL) == .surge {
+            return true
+        }
+        return resolvedFormat(for: sourceURL) == .surge
+    }
+
+    /// Correct an explicitly stored format when the source URL has a definitive, conflicting extension.
+    static func repairedFormat(current: ModuleSourceFormat, sourceURL: URL) -> ModuleSourceFormat? {
+        guard let definitive = definitiveFormat(for: sourceURL), current != definitive else {
+            return nil
+        }
+        return definitive
     }
 }
 

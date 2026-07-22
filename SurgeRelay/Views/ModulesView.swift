@@ -21,23 +21,22 @@ struct ModulesView: View {
 
     private var filteredModules: [RelayModule] {
         let query = normalizedSearchText
-        guard !query.isEmpty else { return model.modules }
-        return model.modules.filter { searchableText(for: $0).contains(query) }
+        let modules = model.modules
+        guard !query.isEmpty else { return modules }
+        let contentIndex = contentIndexState.contentIndex
+        let contentKeys = contentIndexState.contentIndexCacheKeys
+        return modules.filter { module in
+            let cachedContent = ModuleSearchIndex.cachedContent(
+                for: module,
+                contentIndex: contentIndex,
+                contentIndexCacheKeys: contentKeys
+            )
+            return ModuleSearchIndex.text(for: module, cachedContent: cachedContent).contains(query)
+        }
     }
 
     private var sidebarSections: [ModuleSidebarSection] {
         ModuleSidebarSectionPlanner.sections(for: filteredModules)
-    }
-
-    private func searchableText(for module: RelayModule) -> String {
-        ModuleSearchIndex.text(
-            for: module,
-            cachedContent: ModuleSearchIndex.cachedContent(
-                for: module,
-                contentIndex: contentIndexState.contentIndex,
-                contentIndexCacheKeys: contentIndexState.contentIndexCacheKeys
-            )
-        )
     }
 
     private var contentIndexToken: String {

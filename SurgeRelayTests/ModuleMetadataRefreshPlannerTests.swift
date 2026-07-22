@@ -300,6 +300,34 @@ final class ModuleMetadataRefreshPlannerTests: XCTestCase {
         XCTAssertEqual(plan.module.storageLocation, .local)
     }
 
+    func testPlanRepairsMislabeledQuantumultXForSgmoduleSource() throws {
+        let subscription = try XCTUnwrap(ModuleMetadataParser.scriptHubSubscription(in: """
+        #SUBSCRIBED http://script.hub/file/_start_/https://example.com/original.sgmodule/_end_/Demo.sgmodule?type=qx-rewrite&target=surge-module
+        """))
+        let module = RelayModule(
+            name: "Mislabeled",
+            sourceURL: "https://example.com/original.sgmodule",
+            sourceFormat: .quantumultX,
+            outputFileName: "Demo.sgmodule",
+            scriptHubSubscription: subscription
+        )
+
+        let plan = ModuleMetadataRefreshPlanner.plan(
+            module: module,
+            cachedContent: "#!name=Demo\n[General]",
+            convertedContent: nil,
+            authoritativeSubscription: subscription,
+            hasOverride: false,
+            detectedIconURL: nil
+        )
+
+        XCTAssertTrue(plan.isChanged)
+        XCTAssertEqual(plan.module.sourceFormat, .surge)
+        XCTAssertNil(plan.module.detectedSourceFormat)
+        XCTAssertEqual(plan.module.scriptHubSubscription?.sourceType, "surge-module")
+        XCTAssertEqual(plan.module.initialSource, .subscribed(.surge))
+    }
+
     func testUnchangedCachedContentPlanOnlyRefreshesSourceRevisionAndState() {
         let lastUpdatedAt = Date(timeIntervalSince1970: 10)
         let checkedAt = Date(timeIntervalSince1970: 20)

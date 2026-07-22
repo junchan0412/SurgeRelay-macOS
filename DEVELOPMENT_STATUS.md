@@ -1,13 +1,14 @@
 # Surge Relay Development Status
 
-Updated: 2026-07-11
+Updated: 2026-07-23
 
-This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.17 (66)`.
+This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.18 (67)`.
 
 ## Completed Work
 
 ### Product Behavior
 
+- Source format recognition treats `.sgmodule` / `.plugin` / `.lpx` as definitive, repairing mislabeled Quantumult X records and keeping native Surge updates on the direct fetch path.
 - Local and GitHub standalone destinations are modeled separately from initial source provenance. Initial source now comes only from converted `#SUBSCRIBED originalURL` metadata; modules without it are self-authored.
 - Draft modules remain in a pending-source state until their first successful update. A valid subscription uses `originalURL` as the resolved update source, while registration URLs and local storage paths retain separate responsibilities.
 - Standalone publishing is destination-specific: local modules publish only locally, GitHub modules publish only to GitHub, and cache-backed modules can still contribute to the combined module without producing a standalone file.
@@ -50,6 +51,8 @@ This document tracks the optimization work completed after the deep audit and th
 
 ### Performance And Memory
 
+- Sidebar module rows no longer observe the full AppModel graph, reducing list thrash during mass updates; status-card compositing and icon reloads were lightened for smoother progress animation.
+- Detail/preview segmented control and section collapse use short snappy transitions while keeping the preview editor mounted after first open.
 - Module metadata parsing is line-based and avoids recompiling regular expressions during refreshes.
 - Local output-folder discovery runs off the main actor and reuses a bounded cache instead of recursively scanning during SwiftUI redraws.
 - Module icons load and decode on utility tasks keyed by icon revision; hidden preview editors are mounted only after the preview tab is used and are released when the selected module changes.

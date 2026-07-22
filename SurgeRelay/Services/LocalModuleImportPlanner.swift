@@ -102,6 +102,7 @@ enum LocalModuleImportPlanner {
         if let subscription = ModuleMetadataParser.scriptHubSubscription(in: convertedContent) {
             _ = module.reconcileScriptHubSubscriptionMetadata(subscription)
         }
+        _ = module.repairSourceFormatFromUpdateSource()
         module.detectedSourceFormat = ModuleNamingPlanner.detectedFormat(
             for: module.sourceFormat,
             source: module.updateSourceURL

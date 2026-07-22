@@ -74,7 +74,10 @@ struct ModuleSidebarView: View {
                     .disabled(!isGitHubPublishable(module))
                     .help(gitHubPublishHelp(for: module))
             }
-            ModuleRow(module: module)
+            ModuleRow(
+                module: module,
+                combinedModuleEnabled: model.settings.combinedModuleEnabled
+            )
         }
         .tag(module.id)
         .contextMenu {
@@ -135,7 +138,7 @@ private struct ModuleSidebarSectionHeader: View {
 
     var body: some View {
         Button {
-            withAnimation(.snappy) {
+            withAnimation(.snappy(duration: 0.22, extraBounce: 0.05)) {
                 toggle()
             }
         } label: {
@@ -144,6 +147,7 @@ private struct ModuleSidebarSectionHeader: View {
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.tertiary)
                     .frame(width: 10)
+                    .contentTransition(.symbolEffect(.replace))
                 Label("\(title) \(count)", systemImage: systemImage)
                     .font(.caption.weight(.medium))
                     .labelStyle(.titleAndIcon)
@@ -255,12 +259,13 @@ private struct ModuleSidebarStatusCard: View {
             statusCardShape
                 .strokeBorder(Color(nsColor: .separatorColor).opacity(0.24), lineWidth: 0.5)
         }
-        .glassEffect(.regular, in: statusCardShape)
+        // Prefer material over layered glass during frequent progress updates.
         .padding(.horizontal, 10)
         .padding(.bottom, 10)
-        .animation(.snappy, value: model.workActivity)
-        .animation(.snappy, value: model.presentedError)
-        .animation(.snappy, value: model.automaticPublishRunsAt)
+        .animation(.snappy(duration: 0.22), value: model.workActivity.kind)
+        .animation(.snappy(duration: 0.22), value: model.workActivity.isActive)
+        .animation(.snappy(duration: 0.22), value: model.presentedError != nil)
+        .animation(.snappy(duration: 0.22), value: model.automaticPublishRunsAt)
     }
 
     private var statusCardShape: RoundedRectangle {
@@ -305,6 +310,7 @@ private struct ModuleSidebarStatusCard: View {
 private struct ModuleRow: View {
     @Environment(AppModel.self) private var model
     let module: RelayModule
+    let combinedModuleEnabled: Bool
 
     var body: some View {
         HStack(spacing: 10) {
@@ -317,18 +323,23 @@ private struct ModuleRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .contentTransition(.opacity)
             }
             Spacer(minLength: 4)
             if module.state == .updating {
                 ProgressView()
                     .controlSize(.small)
+                    .transition(.opacity.combined(with: .scale(scale: 0.85)))
             } else {
                 Circle()
                     .fill(statusColor)
                     .frame(width: 7, height: 7)
                     .help(statusHelp)
+                    .transition(.opacity.combined(with: .scale(scale: 0.85)))
             }
-            if model.settings.combinedModuleEnabled {
+            if combinedModuleEnabled {
+                // Read only `module` in body; touch AppModel only inside the setter so
+                // progress updates do not re-render every row through Observation.
                 Toggle("包含", isOn: Binding(
                     get: { module.isEnabled },
                     set: { model.setModuleEnabled(id: module.id, enabled: $0) }
@@ -339,7 +350,9 @@ private struct ModuleRow: View {
             }
         }
         .padding(.vertical, 5)
-        .opacity(model.settings.combinedModuleEnabled && !module.isEnabled ? 0.55 : 1)
+        .opacity(combinedModuleEnabled && !module.isEnabled ? 0.55 : 1)
+        .animation(.snappy(duration: 0.18), value: module.state)
+        .animation(.snappy(duration: 0.18), value: module.isEnabled)
     }
 
     private var subtitle: String {

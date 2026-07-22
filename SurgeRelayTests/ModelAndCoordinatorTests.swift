@@ -11,6 +11,16 @@ final class ModelAndCoordinatorTests: XCTestCase {
         XCTAssertTrue(ModuleSourceFormat.automatic.isNativeSurgeModule(for: try XCTUnwrap(URL(string: "https://example.com/test.sgmodule?x=1"))))
         XCTAssertTrue(ModuleSourceFormat.surge.isNativeSurgeModule(for: try XCTUnwrap(URL(string: "https://example.com/no-extension"))))
 
+        // Definitive extensions must win over a mis-recorded explicit format.
+        let mislabeledSgmodule = try XCTUnwrap(URL(string: "https://raw.githubusercontent.com/example/repo/main/sgmodule/Block.HTTPDNS.sgmodule"))
+        XCTAssertEqual(ModuleSourceFormat.definitiveFormat(for: mislabeledSgmodule), .surge)
+        XCTAssertTrue(ModuleSourceFormat.quantumultX.isNativeSurgeModule(for: mislabeledSgmodule))
+        XCTAssertEqual(ModuleSourceFormat.quantumultX.scriptHubType(for: mislabeledSgmodule), "surge-module")
+        XCTAssertEqual(
+            ModuleSourceFormat.repairedFormat(current: .quantumultX, sourceURL: mislabeledSgmodule),
+            .surge
+        )
+
         let detected = RelayModule(
             name: "Detected",
             sourceURL: "https://example.com/demo.lpx",
@@ -18,6 +28,44 @@ final class ModelAndCoordinatorTests: XCTestCase {
             detectedSourceFormat: .loon
         )
         XCTAssertEqual(detected.sourceFormatDisplayTitle, "自动识别（Loon）")
+    }
+
+    func testSubscriptionFormatPrefersDefinitiveSgmoduleExtensionOverQxType() throws {
+        let content = """
+        #SUBSCRIBED http://script.hub/file/_start_/https://raw.githubusercontent.com/VirgilClyne/GetSomeFries/refs/heads/beta/sgmodule/HTTPDNS.Block.beta.sgmodule/_end_/HTTPDNS.sgmodule?type=qx-rewrite&target=surge-module
+        """
+        let subscription = try XCTUnwrap(ModuleMetadataParser.scriptHubSubscription(in: content))
+        XCTAssertEqual(subscription.sourceType, "qx-rewrite")
+        XCTAssertEqual(subscription.sourceFormat, .surge)
+
+        var module = RelayModule(
+            name: "Block HTTPDNS",
+            sourceURL: subscription.originalURL,
+            sourceFormat: .quantumultX,
+            outputFileName: "HTTPDNS.sgmodule",
+            scriptHubSubscription: subscription
+        )
+
+        XCTAssertTrue(module.reconcileScriptHubSubscriptionMetadata(subscription))
+        XCTAssertEqual(module.sourceFormat, .surge)
+        XCTAssertEqual(module.scriptHubSubscription?.sourceType, "surge-module")
+        XCTAssertEqual(module.scriptHubSubscription?.sourceFormat, .surge)
+        XCTAssertEqual(module.initialSource, .subscribed(.surge))
+        XCTAssertTrue(module.scriptHubSubscription?.subscriptionURL.contains("type=surge-module") == true)
+    }
+
+    func testRepairSourceFormatFromUpdateSourceFixesMislabeledSgmodule() {
+        var module = RelayModule(
+            name: "Block HTTPDNS",
+            sourceURL: "https://raw.githubusercontent.com/VirgilClyne/GetSomeFries/refs/heads/beta/sgmodule/HTTPDNS.Block.beta.sgmodule",
+            sourceFormat: .quantumultX,
+            outputFileName: "HTTPDNS.sgmodule"
+        )
+
+        XCTAssertTrue(module.repairSourceFormatFromUpdateSource())
+        XCTAssertEqual(module.sourceFormat, .surge)
+        XCTAssertNil(module.detectedSourceFormat)
+        XCTAssertFalse(module.repairSourceFormatFromUpdateSource())
     }
 
     func testModuleSourceIdentityPreventsEquivalentDuplicates() {

@@ -234,6 +234,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         var changed = false
         let sourceWasFile = URL(string: sourceURL)?.isFileURL == true
         let sourceWasScriptHub = sourceURL.hasPrefix("http://script.hub/") || sourceURL.hasPrefix("https://script.hub/")
+        var subscription = Self.repairedSubscription(subscription)
 
         if scriptHubSubscription != subscription {
             scriptHubSubscription = subscription
@@ -254,12 +255,19 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
                 changed = true
             }
         }
-        if let subscriptionSourceFormat = subscription.sourceFormat,
-           sourceWasFile || sourceFormat == .automatic || sourceFormat == .surge {
-            if sourceFormat != subscriptionSourceFormat {
-                sourceFormat = subscriptionSourceFormat
-                changed = true
-            }
+        // Prefer subscription format for imported/automatic modules, then repair any
+        // explicit format that conflicts with a definitive source-URL extension.
+        let originalURL = URL(string: subscription.originalURL)
+        let preferredSourceFormat = subscription.sourceFormat
+            ?? originalURL.flatMap { ModuleSourceFormat.inferredFormat(for: $0) }
+        let hasConflictingExplicitFormat = originalURL.flatMap {
+            ModuleSourceFormat.repairedFormat(current: sourceFormat, sourceURL: $0)
+        } != nil
+        if let preferredSourceFormat,
+           sourceWasFile || sourceFormat == .automatic || sourceFormat == .surge || hasConflictingExplicitFormat,
+           sourceFormat != preferredSourceFormat {
+            sourceFormat = preferredSourceFormat
+            changed = true
         }
         if sourceWasFile || scriptHubOptions == ScriptHubOptions() {
             if scriptHubOptions != subscription.options {
@@ -274,7 +282,55 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         return changed
     }
 
+    private static func repairedSubscription(_ subscription: ScriptHubSubscriptionInfo) -> ScriptHubSubscriptionInfo {
+        var subscription = subscription
+        guard let originalURL = URL(string: subscription.originalURL),
+              let definitive = ModuleSourceFormat.definitiveFormat(for: originalURL) else {
+            return subscription
+        }
+        let expectedType: String
+        switch definitive {
+        case .surge: expectedType = "surge-module"
+        case .loon: expectedType = "loon-plugin"
+        case .quantumultX: expectedType = "qx-rewrite"
+        case .automatic: return subscription
+        }
+        if subscription.sourceType?.lowercased() != expectedType {
+            subscription.sourceType = expectedType
+        }
+        if let repairedURL = repairedSubscriptionURL(subscription.subscriptionURL, expectedType: expectedType) {
+            subscription.subscriptionURL = repairedURL
+        }
+        return subscription
+    }
+
+    private static func repairedSubscriptionURL(_ value: String, expectedType: String) -> String? {
+        guard let typeRange = value.range(of: #"[?&]type=[^&#]*"#, options: .regularExpression) else {
+            return nil
+        }
+        let current = String(value[typeRange])
+        let separator = current.prefix(1)
+        let replacement = "\(separator)type=\(expectedType)"
+        guard current != replacement else { return nil }
+        return value.replacingCharacters(in: typeRange, with: replacement)
+    }
+
+    /// Repair a mis-recorded sourceFormat when the update source URL has a definitive extension.
+    mutating func repairSourceFormatFromUpdateSource() -> Bool {
+        guard let url = URL(string: updateSourceURL),
+              let repaired = ModuleSourceFormat.repairedFormat(current: sourceFormat, sourceURL: url) else {
+            return false
+        }
+        sourceFormat = repaired
+        // Clear stale automatic detection once the explicit format has been corrected.
+        if detectedSourceFormat != nil {
+            detectedSourceFormat = nil
+        }
+        return true
+    }
+
     var publishedRelativePath: String {
+
         ModuleOutputFolder.relativePath(
             fileName: outputFileName,
             folder: outputFolder,

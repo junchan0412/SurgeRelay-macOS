@@ -33,14 +33,20 @@ struct ModuleIconView: View {
         .frame(width: size, height: size)
         .accessibilityHidden(true)
         .task(id: cacheIdentity) {
-            cachedImage = nil
+            // Keep the previous image visible while reloading so sidebar rows
+            // do not flash placeholders during background status updates.
+            let previousImage = cachedImage
             hasLoadedCachedImage = false
             let url = ModuleIconStore.cachedURL(for: module.id)
             let data = await Task.detached(priority: .utility) {
                 try? Data(contentsOf: url, options: .mappedIfSafe)
             }.value
             guard !Task.isCancelled else { return }
-            cachedImage = data.flatMap(NSImage.init(data:))
+            if let image = data.flatMap(NSImage.init(data:)) {
+                cachedImage = image
+            } else if previousImage == nil {
+                cachedImage = nil
+            }
             hasLoadedCachedImage = true
         }
     }
@@ -80,17 +86,6 @@ struct ModuleIconView: View {
     static let cornerRadiusRatio: CGFloat = 0.26
 }
 
-struct RelayCard<Content: View>: View {
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        content
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .glassEffect(.regular, in: .rect(cornerRadius: 20))
-    }
-}
-
 struct StatusPill: View {
     let state: ModuleUpdateState
     var detail: String?
@@ -107,6 +102,8 @@ struct StatusPill: View {
             .padding(.horizontal, 9)
             .padding(.vertical, 5)
             .background(color.opacity(0.12), in: Capsule())
+            .contentTransition(.opacity)
+            .animation(.snappy(duration: 0.18), value: state)
             .help(title)
     }
 

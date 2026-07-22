@@ -3,34 +3,6 @@ import XCTest
 @testable import SurgeRelay
 
 final class ConfigurationMigrationTests: XCTestCase {
-    func testConfigurationMigrationCopiesOverridesWithoutRemovingDestinationFiles() throws {
-        let root = FileManager.default.temporaryDirectory
-            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        defer { try? FileManager.default.removeItem(at: root) }
-        let source = root.appending(path: "Source", directoryHint: .isDirectory)
-        let destination = root.appending(path: "Destination", directoryHint: .isDirectory)
-        let sourceOverride = source.appending(path: "Overrides/nested/module.cache")
-        let existingOverride = destination.appending(path: "Overrides/keep.cache")
-        try FileManager.default.createDirectory(
-            at: sourceOverride.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try FileManager.default.createDirectory(
-            at: existingOverride.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try Data("edited module".utf8).write(to: sourceOverride)
-        try Data("keep me".utf8).write(to: existingOverride)
-
-        try PersistenceStore.migrateOverrides(from: source, to: destination)
-
-        XCTAssertEqual(
-            try String(contentsOf: destination.appending(path: "Overrides/nested/module.cache"), encoding: .utf8),
-            "edited module"
-        )
-        XCTAssertEqual(try String(contentsOf: existingOverride, encoding: .utf8), "keep me")
-    }
-
     func testConfigurationMigrationCopiesRegistryHistoryBackupsAndOverrides() throws {
         let root = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)

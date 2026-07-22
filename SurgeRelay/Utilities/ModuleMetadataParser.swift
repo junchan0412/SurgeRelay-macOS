@@ -10,11 +10,21 @@ struct ScriptHubSubscriptionInfo: Codable, Hashable, Sendable {
     var options: ScriptHubOptions
 
     var sourceFormat: ModuleSourceFormat? {
+        // Prefer definitive URL extension signals over a conflicting Script-Hub type query.
+        // Some historical conversions store type=qx-rewrite even when originalURL is a .sgmodule.
+        if let original = URL(string: originalURL),
+           let definitive = ModuleSourceFormat.definitiveFormat(for: original) {
+            return definitive
+        }
         switch sourceType?.lowercased() {
-        case "qx-rewrite": .quantumultX
-        case "loon-plugin": .loon
-        case "surge-module": .surge
-        default: nil
+        case "qx-rewrite": return .quantumultX
+        case "loon-plugin": return .loon
+        case "surge-module": return .surge
+        default:
+            if let original = URL(string: originalURL) {
+                return ModuleSourceFormat.inferredFormat(for: original)
+            }
+            return nil
         }
     }
 

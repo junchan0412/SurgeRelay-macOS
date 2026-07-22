@@ -170,14 +170,6 @@ enum PersistenceStore {
         }
     }
 
-    static func migrateOverrides(from sourceDirectory: URL, to destinationDirectory: URL) throws {
-        try copyConfigurationDirectoryIfNeeded(
-            named: "Overrides",
-            from: sourceDirectory.standardizedFileURL,
-            to: destinationDirectory.standardizedFileURL
-        )
-    }
-
     private static func copyConfigurationFileIfNeeded(
         named fileName: String,
         from sourceDirectory: URL,
