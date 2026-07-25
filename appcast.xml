@@ -3,6 +3,25 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.3.20</title>
+            <pubDate>Sat, 25 Jul 2026 12:12:49 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.20</link>
+            <sparkle:version>69</sparkle:version>
+            <sparkle:shortVersionString>1.3.20</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.3.20
+
+
+- Web 管理新增轻量 `GET /api/activity`，更新过程可高频轮询 completed/total 进度；SSE 短暂断开时保留进度投影并 soft reconnect。
+- 新增 `NetworkPathMonitor`：网络恢复后自动重启本机 Web 管理服务，并在启用时重新排队 GitHub 自动发布。
+- Web PWA/favicon 改为透明 PNG/ICO 资源集（favicon、apple-touch、192/512 brand icons），manifest 补充 any/maskable。
+- 设置页增加轻量历史返回/前进，切换分类时保留导航栈。
+- 详情工具栏增加侧边栏显隐切换（macOS NavigationSplitView），便于宽屏专注内容。
+- 更新 `docs/UPSTREAM_SYNC.md`：5 项 adapt 候选已落地。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.3.20/Surge-Relay-1.3.20.app.zip" length="8777889" type="application/zip" sparkle:edSignature="GFVD3bdE7CWPlZAbYrbmesC5D1J+E3DJdfsRA245CTFkOwU+322v2KcmpviZjbO2ciRur5uyGIeVpfrah3UkDQ=="/>
+        </item>
+        <item>
             <title>1.3.19</title>
             <pubDate>Thu, 23 Jul 2026 04:01:07 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.19</link>
