@@ -190,6 +190,7 @@
 		A44A44A44A44A44A44A44A44 /* LocalModuleImportPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B44B44B44B44B44B44B44B44 /* LocalModuleImportPreviewView.swift */; };
 		A55A55A55A55A55A55A55A55 /* ModuleDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B55B55B55B55B55B55B55B55 /* ModuleDetailView.swift */; };
 		A80A80A80A80A80A80A80A80 /* ModuleSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80B80B80B80B80B80B80B80 /* ModuleSidebarView.swift */; };
+		F91F91F91F91F91F91F91F91 /* MainWindowCloseBehavior.swift in Sources */ = {isa = PBXBuildFile; fileRef = C91C91C91C91C91C91C91C91 /* MainWindowCloseBehavior.swift */; };
 		A81A81A81A81A81A81A81A81 /* ModuleDetailSummaryHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B81B81B81B81B81B81B81B81 /* ModuleDetailSummaryHeader.swift */; };
 		A66A66A66A66A66A66A66A66 /* SettingsCredentialsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B96B96B96B96B96B96B96B96 /* SettingsCredentialsView.swift */; };
 		A77A77A77A77A77A77A77A77 /* SettingsWebManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B97B97B97B97B97B97B97B97 /* SettingsWebManagementView.swift */; };
@@ -385,6 +386,7 @@
 		B44B44B44B44B44B44B44B44 /* LocalModuleImportPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModuleImportPreviewView.swift; sourceTree = "<group>"; };
 		B55B55B55B55B55B55B55B55 /* ModuleDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleDetailView.swift; sourceTree = "<group>"; };
 		B80B80B80B80B80B80B80B80 /* ModuleSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleSidebarView.swift; sourceTree = "<group>"; };
+		C91C91C91C91C91C91C91C91 /* MainWindowCloseBehavior.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowCloseBehavior.swift; sourceTree = "<group>"; };
 		B81B81B81B81B81B81B81B81 /* ModuleDetailSummaryHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleDetailSummaryHeader.swift; sourceTree = "<group>"; };
 		B92B92B92B92B92B92B92B92 /* LocalModuleScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModuleScanner.swift; sourceTree = "<group>"; };
 		B93B93B93B93B93B93B93B93 /* LocalModuleImportPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModuleImportPlanner.swift; sourceTree = "<group>"; };
@@ -528,6 +530,7 @@
 				E105E105E105E105E105E105 /* ModuleCodeTextView.swift */,
 				B21B21B21B21B21B21B21B21 /* ModulePreviewViews.swift */,
 				B80B80B80B80B80B80B80B80 /* ModuleSidebarView.swift */,
+				C91C91C91C91C91C91C91C91 /* MainWindowCloseBehavior.swift */,
 				B27B27B27B27B27B27B27B27 /* ModuleSidebarToolbarContent.swift */,
 				F02309DE998787F453FD1166 /* ModulesView.swift */,
 				BDD7A6C8082510469A2FA843 /* RootView.swift */,
@@ -1064,6 +1067,7 @@
 				709FF80593ADF6216AF25D9D /* RelayModule.swift in Sources */,
 				AA8F7B5F28379ACDB4DDEDB9 /* RootView.swift in Sources */,
 				A80A80A80A80A80A80A80A80 /* ModuleSidebarView.swift in Sources */,
+				F91F91F91F91F91F91F91F91 /* MainWindowCloseBehavior.swift in Sources */,
 				A27A27A27A27A27A27A27A27 /* ModuleSidebarToolbarContent.swift in Sources */,
 				A81A81A81A81A81A81A81A81 /* ModuleDetailSummaryHeader.swift in Sources */,
 				089528920AE30C1DC82F1C30 /* ScriptHubAdvancedOptionsView.swift in Sources */,

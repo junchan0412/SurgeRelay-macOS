@@ -286,3 +286,7 @@ When changing behavior, update:
 - `CHANGELOG.md` for release notes
 - `DEVELOPMENT.md` when architecture, release, or safety invariants change
 - `DEVELOPMENT_STATUS.md` or a newer audit file when completing a broad optimization pass
+
+## Upstream Sync
+
+本 fork 相对 `EEliberto/SurgeRelay-macOS` 的分叉审查、可移植清单与同步流程见 [`docs/UPSTREAM_SYNC.md`](./docs/UPSTREAM_SYNC.md)。默认不要无过滤 merge upstream；按主题挑选补丁并更新该文档。

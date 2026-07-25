@@ -67,7 +67,7 @@ This document tracks the optimization work completed after the deep audit and th
 - Add automated UI screenshot or interaction coverage for the macOS settings window, module editor, module detail page, and Web management page.
 - Continue shrinking `WebResources/app.js` by extracting detail-action routing or module-editor orchestration if those sections keep growing.
 - Continue shrinking the largest Swift files that still exceed roughly 300 lines, especially `EmbeddedScriptHubEngine.swift`, `ModuleFileStore.swift`, `PersistenceStore.swift`, `ModuleDetailView.swift`, and larger focused test files.
-- Keep comparing upstream `EEliberto/SurgeRelay-macOS:main` changes and selectively port fixes that improve stability without undoing this fork's storage/publishing model.
+- Keep comparing upstream `EEliberto/SurgeRelay-macOS:main` using `docs/UPSTREAM_SYNC.md`; selectively port fixes that improve stability without undoing this fork's storage/publishing model.
 
 ### Release And Distribution
 

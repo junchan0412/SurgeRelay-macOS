@@ -79,7 +79,7 @@ xattr -dr com.apple.quarantine "/Applications/Surge Relay.app"
 
 GitHub 发布需要配置 owner、repository、branch、目录和 Token。模块的输出文件夹逻辑与本地发布一致：根目录表示仓库配置的模块目录本身，子文件夹表示该目录下的相对路径。
 
-公开仓库会直接生成 GitHub Raw 订阅地址。私有仓库需要配合 Cloudflare Worker 转发访问，相关 Worker 示例在 [Deployment/CloudflareWorker](./Deployment/CloudflareWorker)。
+公开仓库会直接生成 GitHub Raw 订阅地址。私有仓库需要配合 Cloudflare Worker 转发访问，相关 Worker 示例在 [Deployment/CloudflareWorker](./Deployment/CloudflareWorker)。更完整的私有仓库与 Worker 配置步骤见 [docs/GitHub-Cloudflare-Guide.md](./docs/GitHub-Cloudflare-Guide.md)。
 
 发布前可以生成预览，查看将新增、更新和删除的文件。若检测到需要删除旧路径，App 会要求确认；自动发布也会在需要删除时暂停等待确认。发布时会校验同一次提交中是否存在重复目标路径，并在更新 Git ref 后确认远端指向本次 commit。
 

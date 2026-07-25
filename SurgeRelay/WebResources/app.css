@@ -288,6 +288,19 @@ button { color: inherit; }
 .button.primary { background: var(--accent); color: #fff; }
 .button.copy-success { color: var(--green); }
 .button.destructive { color: var(--red); }
+.copy-button,
+.detail-row.action-row .button:not(.primary) {
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--accent) 11%, transparent);
+  color: var(--accent);
+}
+.copy-button:hover,
+.detail-row.action-row .button:not(.primary):hover { background: color-mix(in srgb, var(--accent) 17%, transparent); }
+.copy-button.copy-success,
+.detail-row.action-row .button.copy-success {
+  background: rgba(52, 199, 89, .14) !important;
+  color: var(--green) !important;
+}
 .button:disabled { opacity: .38; cursor: default; transform: none; }
 .button .symbol { width: 15px; height: 15px; }
 .segmented-control { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--fill); }
@@ -460,7 +473,16 @@ dialog.is-closing::backdrop { animation: backdrop-out 160ms ease forwards; }
 .confirm-icon { width: 28px; height: 28px; color: var(--orange); }
 .confirm-content h2 { margin: 10px 0 5px; font-size: 18px; }
 .confirm-content p { margin: 0; color: var(--secondary-label); white-space: pre-wrap; }
-.toast { position: fixed; left: 50%; bottom: max(24px, env(safe-area-inset-bottom)); z-index: 20; max-width: min(480px, calc(100vw - 32px)); padding: 10px 16px; border-radius: 999px; background: rgba(30,30,32,.88); color: #fff; box-shadow: var(--shadow); backdrop-filter: blur(20px); transform: translate(-50%, 24px); opacity: 0; pointer-events: none; transition: opacity 180ms ease, transform 180ms ease; }
+.toast {
+  position: fixed; left: 50%; bottom: max(24px, env(safe-area-inset-bottom)); z-index: 20;
+  width: max-content; max-width: min(480px, calc(100vw - 32px)); min-height: 40px; padding: 10px 15px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 14px; background: rgba(30,30,32,.88); color: #fff; box-shadow: var(--shadow);
+  font-size: 14px; line-height: 1.38; text-align: center; white-space: normal; overflow-wrap: anywhere;
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  transform: translate(-50%, 24px); opacity: 0; pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
 .toast.visible { opacity: 1; transform: translate(-50%, 0); }
 .toast.error { background: color-mix(in srgb, var(--red) 86%, #111); }
 :focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 42%, transparent); outline-offset: 2px; }
@@ -547,12 +569,20 @@ dialog.is-closing::backdrop { animation: backdrop-out 160ms ease forwards; }
   .argument-row { grid-template-columns: 1fr; }
   .argument-control { justify-content: stretch; }
   .argument-control input[type="text"] { max-width: none; text-align: left; }
-  .preview-shell { min-height: calc(100dvh - 100px); margin: 0 -16px -42px; border-left: 0; border-right: 0; border-radius: 0; }
-  .code-view, .code-editor { min-height: calc(100dvh - 150px); padding: 18px 16px; font-size: 11px; }
+  .preview-shell { min-height: calc(100svh - 100px); margin: 0 -16px -42px; border-left: 0; border-right: 0; border-radius: 0; }
+  .code-view, .code-editor { min-height: calc(100svh - 150px); padding: 18px 16px; font-size: 11px; }
   .sheet-dialog { width: 100vw; max-width: none; max-height: 92dvh; margin: auto 0 0; border-radius: 28px 28px 0 0; }
   .form-row { grid-template-columns: 1fr; gap: 6px; }
   .switch-row { grid-template-columns: minmax(0,1fr) 34px; }
   .dialog-actions { padding-bottom: max(14px, env(safe-area-inset-bottom)); }
+  .arguments-footer { margin: 0 14px; padding: 12px 0 14px; align-items: flex-start; }
+  .arguments-footer small { display: block; line-height: 1.45; }
+  .toast {
+    bottom: max(18px, calc(env(safe-area-inset-bottom) + 10px));
+    max-width: calc(100vw - 40px);
+    padding: 10px 14px;
+    border-radius: 13px;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
