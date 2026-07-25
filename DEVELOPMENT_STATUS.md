@@ -1,13 +1,17 @@
 # Surge Relay Development Status
 
-Updated: 2026-07-23
+Updated: 2026-07-25
 
-This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.19 (68)`.
+This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.20 (69)`.
 
 ## Completed Work
 
 ### Product Behavior
 
+- Web management exposes a lightweight `/api/activity` progress endpoint and polls it during bulk updates, with soft reconnect across brief SSE drops.
+- Network recovery restarts the local Web server when needed and re-queues automatic GitHub publish after connectivity returns.
+- Settings tabs keep a small back/forward history; the module detail toolbar can hide or show the sidebar.
+- Web favicon/PWA icons ship as transparent multi-size assets with maskable manifest entries.
 - Source format recognition treats `.sgmodule` / `.plugin` / `.lpx` as definitive, repairing mislabeled Quantumult X records and keeping native Surge updates on the direct fetch path.
 - Local and GitHub standalone destinations are modeled separately from initial source provenance. Initial source now comes only from converted `#SUBSCRIBED originalURL` metadata; modules without it are self-authored.
 - Draft modules remain in a pending-source state until their first successful update. A valid subscription uses `originalURL` as the resolved update source, while registration URLs and local storage paths retain separate responsibilities.
@@ -51,6 +55,7 @@ This document tracks the optimization work completed after the deep audit and th
 
 ### Performance And Memory
 
+- Activity polling uses a compact payload instead of full `/api/state` snapshots during long update runs.
 - Search metadata and module-summary signatures are cached across bulk updates; module persistence is deferred during updateAll so progress ticks no longer rewrite modules.json on every source.
 - Sidebar presentation is rebuilt from a stable signature instead of every AppModel field change; detail selection uses asymmetric transitions while preview editors stay mounted after first open.
 - Sidebar module rows no longer observe the full AppModel graph, reducing list thrash during mass updates; status-card compositing and icon reloads were lightened for smoother progress animation.

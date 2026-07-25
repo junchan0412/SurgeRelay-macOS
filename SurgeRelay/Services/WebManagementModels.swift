@@ -79,6 +79,8 @@ struct WebActivityPayload: Encodable {
     let title: String?
     let status: String
     let progress: Double?
+    let completedCount: Int?
+    let totalCount: Int?
     let currentModuleID: String?
     let startedAt: Date?
     let blocksUpdates: Bool

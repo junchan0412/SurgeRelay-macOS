@@ -142,9 +142,13 @@ const stateEventController = webState.createStateEventController({
   EventSource: window.EventSource,
   document,
   setInterval: window.setInterval.bind(window),
+  clearInterval: window.clearInterval.bind(window),
   setTimeout: window.setTimeout.bind(window),
   loadState: (...args) => loadState(...args),
   applyState: (...args) => applyState(...args),
+  applyActivity: activity => applyActivity(activity),
+  fetchActivity: () => api('/api/activity'),
+  isWorking: () => Boolean(state?.activity?.isWorking),
   establishSession: () => apiClient.establishSession()
 });
 
@@ -245,6 +249,20 @@ function applyState(next, initial = false, renderCurrentDetail = false) {
       patchLiveState(previous, next);
       activityController.render();
     }
+    stateEventController.syncActivityPolling?.();
+}
+
+function applyActivity(activity) {
+  if (!state || !activity) return;
+  const previousWorking = Boolean(state.activity?.isWorking);
+  state = { ...state, activity };
+  activityController.render();
+  // When a bulk update finishes, refresh module rows/details once.
+  if (previousWorking && !activity.isWorking) {
+    loadState(false, true);
+  } else {
+    stateEventController.syncActivityPolling?.();
+  }
 }
 
 function combinedEnabled(snapshot = state) {
@@ -508,8 +526,12 @@ async function saveModule(event) {
 }
 
 async function updateAll() {
-  try { const result = await api('/api/update-all', { method: 'POST' }); showToast(result.message); await loadState(false, false); }
-  catch (error) { showToast(error.message, true); }
+  try {
+    const result = await api('/api/update-all', { method: 'POST' });
+    showToast(result.message);
+    await loadState(false, false);
+    stateEventController.syncActivityPolling?.();
+  } catch (error) { showToast(error.message, true); }
 }
 
 async function cancelCurrentWork() {

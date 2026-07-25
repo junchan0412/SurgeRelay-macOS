@@ -115,4 +115,36 @@ extension AppModel {
     var webManagementAccessModeTitle: String {
         WebManagementController.accessModeTitle(settings: settings)
     }
+
+    func startNetworkRecoveryMonitor() {
+        networkPathMonitor.onBecameReachable = { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.handleNetworkBecameReachable()
+            }
+        }
+        networkPathMonitor.start()
+    }
+
+    func handleNetworkBecameReachable() {
+        // Recover local Web management if it failed after a network drop, and
+        // re-queue automatic GitHub publish when connectivity returns.
+        if settings.webServerEnabled {
+            switch webServerState {
+            case .failed, .stopped:
+                applyWebServerSettings(persist: false)
+                if case .running = webServerState {
+                    statusMessage = "网络已恢复，Web 管理服务已重新启动"
+                }
+            case .starting, .running:
+                break
+            }
+        }
+        if settings.publishToGitHub,
+           settings.automaticallyPublish,
+           !isWorking,
+           automaticPublishRunsAt == nil {
+            statusMessage = "网络已恢复，已重新排队自动发布"
+            scheduleAutomaticPublish()
+        }
+    }
 }

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 1.3.20
+
+- Web 管理新增轻量 `GET /api/activity`，更新过程可高频轮询 completed/total 进度；SSE 短暂断开时保留进度投影并 soft reconnect。
+- 新增 `NetworkPathMonitor`：网络恢复后自动重启本机 Web 管理服务，并在启用时重新排队 GitHub 自动发布。
+- Web PWA/favicon 改为透明 PNG/ICO 资源集（favicon、apple-touch、192/512 brand icons），manifest 补充 any/maskable。
+- 设置页增加轻量历史返回/前进，切换分类时保留导航栈。
+- 详情工具栏增加侧边栏显隐切换（macOS NavigationSplitView），便于宽屏专注内容。
+- 更新 `docs/UPSTREAM_SYNC.md`：5 项 adapt 候选已落地。
+
 ## 1.3.19
 
 - 搜索索引新增 metadata 缓存与 `filterPlan`，侧边栏过滤在批量更新时复用已构建的检索文本，避免反复拼接大字符串。

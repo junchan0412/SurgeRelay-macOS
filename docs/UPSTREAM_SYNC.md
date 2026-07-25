@@ -230,20 +230,17 @@ node script/test_web_dom_resources.mjs
 - 只改 `appcast.xml` / 版本号 / 图标 asset 来回
 - 依赖 upstream 的 iCloud-only 或 Ponte 设置字段
 
-## 7. 下次优先观察的 adapt 候选
+## 7. adapt 候选跟进状态
 
-按收益/风险排序：
+| # | 主题 | 状态 | 本 fork 落地 |
+| --- | --- | --- | --- |
+| 1 | Web `/api/activity` 进度 | **done (1.3.20)** | `WebManagementAPI` + `WebActivityPayload.completedCount/totalCount` + `web-state` 轮询/`app.js` soft reconnect |
+| 2 | 网络恢复重连 | **done (1.3.20)** | `NetworkPathMonitor` → 重启 Web server / 重排队自动发布 |
+| 3 | favicon / PWA 透明图标 | **done (1.3.20)** | `favicon.ico/png`、`apple-touch*`、`brand-icon*` + manifest any/maskable |
+| 4 | 设置页历史返回/前进 | **done (1.3.20)** | `SettingsView` back/forward stack |
+| 5 | toolbar 侧边栏显隐 | **done (1.3.20)** | `ModuleDetailPaneView` navigation toolbar toggle |
 
-1. **Web 更新进度 API**（`feeb3cd` 的 `/api/activity` 思路）  
-   对接到本 fork 已有 `WebManagementStateBuilder` / `web-activity.js`，不要引入 Ponte。
-2. **网络恢复重连**（`NetworkPathMonitor`）  
-   仅服务本机 Web server / GitHub 发布重试，不做客户端模式。
-3. **favicon / PWA 透明图标**（`cbad896`）  
-   在本 fork 现有 `WebResources` 图标集上重导出，勿覆盖整包。
-4. **设置页历史返回/前进**（`5cdc38e` 的 settings navigation）  
-   本 fork 设置已分文件，可做轻量导航栈，不搬 iCloud 专用 UI。
-5. **macOS 26/27 toolbar 侧边栏切换**（`5c7845a` 中 sidebar toggle 部分）  
-   在 `ModulesView`/`ModuleDetailPaneView` 现有 toolbar 上评估，忽略被 revert 的 segmented 实验。
+后续若 upstream 继续演进，优先复查 Ponte 之外的局部增强，而不是整提交合入。
 
 ## 8. 相关文件
 
@@ -257,3 +254,4 @@ node script/test_web_dom_resources.mjs
 | 日期 | upstream tip 已审查到 | 动作 |
 | --- | --- | --- |
 | 2026-07-25 | `a3e667c` | 首份分叉审查；移植 MainWindowCloseBehavior、Web toast/copy 样式、Cloudflare 指南；明确跳过 Ponte 与 Deployment 删除 |
+| 2026-07-25 | `a3e667c` | 完成 5 项 adapt：`/api/activity`、NetworkPathMonitor、PWA 图标、设置历史、侧边栏切换；发布 1.3.20 |

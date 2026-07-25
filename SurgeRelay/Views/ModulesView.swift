@@ -128,7 +128,11 @@ struct ModulesView: View {
                 }
             }
         } detail: {
-            ModuleDetailPaneView(searchText: $searchText, editModule: presentEditor)
+            ModuleDetailPaneView(
+                searchText: $searchText,
+                columnVisibility: $columnVisibility,
+                editModule: presentEditor
+            )
         }
         .task(id: contentIndexToken) { await rebuildContentIndex() }
         .onChange(of: sidebarRefreshToken, initial: true) { _, _ in

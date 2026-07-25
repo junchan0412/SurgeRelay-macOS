@@ -153,6 +153,8 @@ enum WebManagementStateBuilder {
             title: workActivity.isActive ? workActivity.title : nil,
             status: statusMessage,
             progress: progress(completedCount: completedCount, totalCount: totalCount),
+            completedCount: totalCount > 0 ? completedCount : nil,
+            totalCount: totalCount > 0 ? totalCount : nil,
             currentModuleID: currentModuleID?.uuidString.lowercased(),
             startedAt: workActivity.startedAt,
             blocksUpdates: workActivity.blocksUpdates,

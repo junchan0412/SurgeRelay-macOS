@@ -53,6 +53,7 @@ final class AppModel {
     @ObservationIgnored let iconStore = ModuleIconStore()
     @ObservationIgnored let processingWorker = ModuleProcessingWorker()
     @ObservationIgnored let webServer = WebManagementServer()
+    @ObservationIgnored let networkPathMonitor = NetworkPathMonitor()
     @ObservationIgnored var foregroundWorkTask: Task<Void, Never>?
     @ObservationIgnored var foregroundWorkIdentifier = UUID()
     @ObservationIgnored var schedulerTask: Task<Void, Never>?
@@ -142,6 +143,7 @@ final class AppModel {
             return
         }
         applyWebServerSettings(persist: false)
+        startNetworkRecoveryMonitor()
         restartScheduler()
         Task {
             await cleanupLegacyOutputFiles()

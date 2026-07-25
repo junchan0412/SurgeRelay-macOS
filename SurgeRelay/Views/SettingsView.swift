@@ -7,6 +7,9 @@ struct SettingsView: View {
     @Environment(AppModel.self) private var model
     @State private var showsWebQRCode = false
     @State private var selectedTab: SettingsTab = .general
+    @State private var backStack: [SettingsTab] = []
+    @State private var forwardStack: [SettingsTab] = []
+    @State private var isHistoryNavigation = false
 
     private enum SettingsTab: String, CaseIterable, Identifiable {
         case general
@@ -76,14 +79,87 @@ struct SettingsView: View {
     }
 
     private var settingsHeader: some View {
-        HStack {
+        HStack(spacing: 12) {
+            settingsHistoryButtons
             Spacer(minLength: 0)
             settingsTabSelector
             Spacer(minLength: 0)
+            // Keep the segmented control visually centered.
+            Color.clear.frame(width: 72, height: 32)
         }
         .frame(maxWidth: .infinity)
+        .padding(.horizontal, 16)
         .padding(.top, 18)
         .padding(.bottom, 10)
+        .onChange(of: selectedTab) { oldValue, newValue in
+            guard oldValue != newValue else { return }
+            if isHistoryNavigation {
+                isHistoryNavigation = false
+                return
+            }
+            backStack.append(oldValue)
+            forwardStack.removeAll()
+        }
+    }
+
+    private var settingsHistoryButtons: some View {
+        HStack(spacing: 0) {
+            historyButton(
+                systemImage: "chevron.left",
+                isEnabled: !backStack.isEmpty,
+                help: "返回上一个设置页",
+                action: goBack
+            )
+            Rectangle()
+                .fill(Color(nsColor: .separatorColor).opacity(0.22))
+                .frame(width: 1, height: 17)
+            historyButton(
+                systemImage: "chevron.right",
+                isEnabled: !forwardStack.isEmpty,
+                help: "前进到下一个设置页",
+                action: goForward
+            )
+        }
+        .frame(width: 72, height: 32)
+        .glassEffect(.regular, in: Capsule())
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("设置页历史")
+    }
+
+    private func historyButton(
+        systemImage: String,
+        isEnabled: Bool,
+        help: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 14, weight: .semibold))
+                .frame(width: 35, height: 32)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .foregroundStyle(isEnabled ? Color.primary.opacity(0.72) : Color.secondary.opacity(0.28))
+        .disabled(!isEnabled)
+    }
+
+    private func goBack() {
+        guard let previous = backStack.popLast() else { return }
+        forwardStack.append(selectedTab)
+        isHistoryNavigation = true
+        withAnimation(.snappy(duration: 0.18)) {
+            selectedTab = previous
+        }
+    }
+
+    private func goForward() {
+        guard let next = forwardStack.popLast() else { return }
+        backStack.append(selectedTab)
+        isHistoryNavigation = true
+        withAnimation(.snappy(duration: 0.18)) {
+            selectedTab = next
+        }
     }
 
     private var settingsTabSelector: some View {

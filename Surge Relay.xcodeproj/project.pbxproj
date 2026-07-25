@@ -79,6 +79,7 @@
 		D93D93D93D93D93D93D93D93 /* PublishCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E93E93E93E93E93E93E93E93 /* PublishCoordinator.swift */; };
 		D9BDD9BDD9BDD9BDD9BDD9BD /* GitHubRESTClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9BEE9BEE9BEE9BEE9BEE9BE /* GitHubRESTClient.swift */; };
 		D91D91D91D91D91D91D91D91 /* ModuleRefreshPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E91E91E91E91E91E91E91E91 /* ModuleRefreshPlanner.swift */; };
+		B71B71B71B71B71B71B71B71 /* NetworkPathMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A71A71A71A71A71A71A71A71 /* NetworkPathMonitor.swift */; };
 		D92D92D92D92D92D92D92D92 /* ModuleMetadataRefreshPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E92E92E92E92E92E92E92E92 /* ModuleMetadataRefreshPlanner.swift */; };
 		D99D99D99D99D99D99D99D99 /* WebManagementController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E99E99E99E99E99E99E99E99 /* WebManagementController.swift */; };
 		D9AD9AD9AD9AD9AD9AD9AD9A /* SurgeModuleSanitizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9AE9AE9AE9AE9AE9AE9AE9A /* SurgeModuleSanitizer.swift */; };
@@ -427,6 +428,7 @@
 		E93E93E93E93E93E93E93E93 /* PublishCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishCoordinator.swift; sourceTree = "<group>"; };
 		E9BEE9BEE9BEE9BEE9BEE9BE /* GitHubRESTClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubRESTClient.swift; sourceTree = "<group>"; };
 		E91E91E91E91E91E91E91E91 /* ModuleRefreshPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleRefreshPlanner.swift; sourceTree = "<group>"; };
+		A71A71A71A71A71A71A71A71 /* NetworkPathMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPathMonitor.swift; sourceTree = "<group>"; };
 		E92E92E92E92E92E92E92E92 /* ModuleMetadataRefreshPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleMetadataRefreshPlanner.swift; sourceTree = "<group>"; };
 		E99E99E99E99E99E99E99E99 /* WebManagementController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebManagementController.swift; sourceTree = "<group>"; };
 		E9AE9AE9AE9AE9AE9AE9AE9A /* SurgeModuleSanitizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurgeModuleSanitizer.swift; sourceTree = "<group>"; };
@@ -580,6 +582,7 @@
 				E21E21E21E21E21E21E21E21 /* ModulePreviewEditPlanner.swift */,
 				E92E92E92E92E92E92E92E92 /* ModuleMetadataRefreshPlanner.swift */,
 				E91E91E91E91E91E91E91E91 /* ModuleRefreshPlanner.swift */,
+				A71A71A71A71A71A71A71A71 /* NetworkPathMonitor.swift */,
 				B94B94B94B94B94B94B94B94 /* ModuleSearchIndex.swift */,
 				B82B82B82B82B82B82B82B82 /* ModuleSidebarSectionPlanner.swift */,
 				DA24D7A4AEF1770EAB7A055B /* ModuleMerger.swift */,
@@ -1053,6 +1056,7 @@
 				A21A21A21A21A21A21A21A21 /* ModulePreviewViews.swift in Sources */,
 				D92D92D92D92D92D92D92D92 /* ModuleMetadataRefreshPlanner.swift in Sources */,
 				D91D91D91D91D91D91D91D91 /* ModuleRefreshPlanner.swift in Sources */,
+				B71B71B71B71B71B71B71B71 /* NetworkPathMonitor.swift in Sources */,
 				94D94D94D94D94D94D94D94D /* ModuleSearchIndex.swift in Sources */,
 				A19A19A19A19A19A19A19A19 /* ModuleDraft.swift in Sources */,
 				A29A29A29A29A29A29A29A29 /* ModuleSourceModels.swift in Sources */,
@@ -1155,7 +1159,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 68;
+				CURRENT_PROJECT_VERSION = 69;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1169,7 +1173,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.3.19;
+				MARKETING_VERSION = 1.3.20;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1253,7 +1257,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 68;
+				CURRENT_PROJECT_VERSION = 69;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -1273,7 +1277,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.3.19;
+				MARKETING_VERSION = 1.3.20;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

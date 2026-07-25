@@ -115,17 +115,54 @@
     const EventSourceImpl = dependencies.EventSource || global.EventSource;
     const documentRef = dependencies.document || global.document;
     const setIntervalImpl = dependencies.setInterval || global.setInterval;
+    const clearIntervalImpl = dependencies.clearInterval || global.clearInterval;
     const setTimeoutImpl = dependencies.setTimeout || global.setTimeout;
     const loadState = dependencies.loadState;
     const applyState = dependencies.applyState;
+    const applyActivity = dependencies.applyActivity || null;
+    const fetchActivity = dependencies.fetchActivity || null;
+    const isWorking = dependencies.isWorking || (() => false);
     const establishSession = dependencies.establishSession || (() => Promise.resolve());
     const reconnectDelay = dependencies.reconnectDelay ?? 3000;
+    const activityPollInterval = dependencies.activityPollInterval ?? 1000;
     let stateEvents = null;
     let pollingTimer = null;
+    let activityTimer = null;
+    let softReconnectUntil = 0;
 
     function close() {
       stateEvents?.close?.();
       stateEvents = null;
+    }
+
+    function stopActivityPolling() {
+      if (activityTimer != null) {
+        clearIntervalImpl(activityTimer);
+        activityTimer = null;
+      }
+    }
+
+    function startActivityPolling() {
+      if (!fetchActivity || !applyActivity || activityTimer != null) return;
+      activityTimer = setIntervalImpl(() => {
+        if (documentRef?.hidden) return;
+        if (!isWorking()) {
+          stopActivityPolling();
+          return;
+        }
+        Promise.resolve(fetchActivity())
+          .then(activity => {
+            if (activity) applyActivity(activity);
+          })
+          .catch(() => {
+            // Soft-reconnect window: keep last progress projection briefly.
+          });
+      }, activityPollInterval);
+    }
+
+    function syncActivityPolling() {
+      if (isWorking()) startActivityPolling();
+      else stopActivityPolling();
     }
 
     function start() {
@@ -135,6 +172,7 @@
             if (!documentRef?.hidden) loadState(false, false);
           }, 5000);
         }
+        syncActivityPolling();
         return;
       }
 
@@ -143,12 +181,18 @@
       stateEvents.addEventListener('state', event => {
         try {
           applyState(JSON.parse(event.data), false, false);
+          softReconnectUntil = 0;
+          syncActivityPolling();
         } catch (_) {
           // The next event contains a complete state snapshot.
         }
       });
       stateEvents.onerror = () => {
+        // Soft reconnect: keep current projection for a short window while
+        // activity polling continues, then re-establish the stream.
+        softReconnectUntil = Date.now() + 8000;
         close();
+        syncActivityPolling();
         if (!documentRef?.hidden) {
           Promise.resolve(establishSession())
             .catch(() => {})
@@ -158,13 +202,19 @@
             });
         }
       };
+      syncActivityPolling();
     }
 
     return {
       start,
       close,
+      syncActivityPolling,
+      stopActivityPolling,
       get currentEventSource() {
         return stateEvents;
+      },
+      get isSoftReconnecting() {
+        return Date.now() < softReconnectUntil;
       }
     };
   }

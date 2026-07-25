@@ -113,6 +113,8 @@ final class WebManagementStateBuilderTests: XCTestCase {
         XCTAssertEqual(payload.kind, WorkActivityKind.updatingModules.rawValue)
         XCTAssertEqual(payload.title, "更新测试")
         XCTAssertEqual(payload.progress, 0.5)
+        XCTAssertEqual(payload.completedCount, 2)
+        XCTAssertEqual(payload.totalCount, 4)
         XCTAssertEqual(payload.currentModuleID, moduleID.uuidString.lowercased())
         XCTAssertTrue(payload.blocksUpdates)
         XCTAssertTrue(payload.canCancel)
