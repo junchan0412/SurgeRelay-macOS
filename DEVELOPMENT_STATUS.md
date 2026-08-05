@@ -1,13 +1,27 @@
 # Surge Relay Development Status
 
-Updated: 2026-07-25
+Updated: 2026-08-05
 
-This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.20 (69)`.
+This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.21 (70)`.
+
+## 当前状态
+
+- `1.3.21 (70)` 的 Unreleased 变更已记录在 `CHANGELOG.md`，包含本地加密凭据、自定义图标写入输出、订阅初始地址恢复和重复边栏按钮清理；发布预检、Web 测试与 macOS 单元测试均通过。
+- 凭据存储已从系统钥匙串迁移到配置目录内的 AES-256-GCM 本地加密文件，无开发者账户签名也能正常保存；凭据诊断、设置页、README 和测试已同步。
+- 自定义图标会重写模块输出中的 `#!icon`，来源缺失或不匹配时自动补齐/替换；未填写时保留来源图标，桌面端、Web 管理端和发布产物使用同一个值。
+- 订阅模块可以从登记的 Script-Hub 转换地址恢复内嵌 `originalURL`，即使转换内容缺少 `#SUBSCRIBED` 标记，也能按订阅初始地址继续更新。
+- 详情工具栏重复的自定义侧边栏切换按钮已移除，只保留 `NavigationSplitView` 系统自带的边栏开关。
+- 发布链路仍为固定自签名 + Sparkle EdDSA；ATS 全局放宽与 App Sandbox 关闭状态与 `docs/RELEASE_HARDENING.md` 保持一致。
 
 ## Completed Work
 
 ### Product Behavior
 
+- GitHub Token 与 Web 管理令牌改存到配置目录内的本地加密文件；启动、设置保存和 Web 管理令牌重置都不再访问系统钥匙串。
+- 自定义图标会写入模块输出的 `#!icon`，来源图标缺失或不匹配时自动替换，未填写自定义图标时保留来源图标。
+- 登记地址是 Script-Hub 转换 URL 的模块可以从地址本身恢复内嵌 `originalURL`，并在缺少 `#SUBSCRIBED` 标记时按订阅初始地址更新。
+- 模块详情始终显示“更新地址”，只有在原始地址或登记地址与更新地址不同时才额外展示对应行，减少重复信息。
+- 通用设置页的配置储存目录旁新增 Finder 快捷入口。
 - Web management exposes a lightweight `/api/activity` progress endpoint and polls it during bulk updates, with soft reconnect across brief SSE drops.
 - Network recovery restarts the local Web server when needed and re-queues automatic GitHub publish after connectivity returns.
 - Settings tabs keep a small back/forward history; the module detail toolbar can hide or show the sidebar.
@@ -39,6 +53,7 @@ This document tracks the optimization work completed after the deep audit and th
 
 ### Safety Boundaries
 
+- 凭据文件使用 AES-256-GCM 加密并限制为当前用户可读写；诊断报告只导出存储位置和检查状态，不导出密钥或令牌内容。
 - Local publish continues to rely on managed-file markers and explicit cleanup previews; generated outputs must not silently overwrite user-owned original modules.
 - Local source self-export protection is centralized in `PublishCoordinator`.
 - GitHub publish planning validates duplicate paths, selected publish sets, stale deletes, and no-op publishes before writing.
@@ -46,6 +61,7 @@ This document tracks the optimization work completed after the deep audit and th
 
 ### Testing And Release Tooling
 
+- Release preflight 会校验 `SurgeRelay/` 与 `SurgeRelayTests/` 下所有 Swift 源文件都已登记到 Xcode 工程，避免新增文件后忘记同步 `project.pbxproj`。
 - `script/build_and_run.sh` is the shared Debug build, launch, log, telemetry, verification, and isolated UI-QA entrypoint; `.codex/environments/environment.toml` and the shared Xcode scheme use the same project configuration.
 - Unit tests have been split into focused files for publishing, GitHub releases, Web management, Web HTTP security, settings, diagnostics, Script-Hub, local publishing, local import, ordering, search, metadata refresh, update failures, and task activity.
 - Web resources now have Node syntax checks, split behavior tests, a small aggregate entrypoint, and a lightweight DOM regression harness.
@@ -64,6 +80,14 @@ This document tracks the optimization work completed after the deep audit and th
 - Local output-folder discovery runs off the main actor and reuses a bounded cache instead of recursively scanning during SwiftUI redraws.
 - Module icons load and decode on utility tasks keyed by icon revision; hidden preview editors are mounted only after the preview tab is used and are released when the selected module changes.
 - Sidebar grouping performs one classification pass over modules, and code-highlighting patterns are reused across editor updates.
+
+## 目标
+
+- 发布 `1.3.21 (70)`，随后继续推进 macOS 设置窗口、模块编辑器、详情页和 Web 管理端的自动化 UI 截图/交互覆盖。
+- 为 Web 管理端补充 Playwright 冒烟测试；继续拆分 `WebResources/app.js` 和较大的 Swift 文件。
+- 持续对照 `docs/UPSTREAM_SYNC.md` 选择性移植 upstream 修复，不合并与本 fork 存储/发布模型冲突的改动。
+- 在 Apple Developer ID 可用前维持固定自签名 + Sparkle 更新；可用后补充 Developer ID 签名、公证、stapling 与验证。
+- 逐步收敛全局 ATS 放宽与 App Sandbox 关闭状态：先引入用户来源网络策略或显式例外模型，再补 security-scoped bookmark 与迁移测试。
 
 ## Pending Work
 
@@ -95,13 +119,15 @@ Use the Xcode beta toolchain explicitly:
 DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer"
 ```
 
-Before publishing:
+Before publishing (当前目标版本为 `1.3.21 (70)`):
 
 ```bash
 git diff --check
 node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs
-DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" ./script/check_release_configuration.sh
+VERSION=1.3.21 BUILD=70 \
+DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
+./script/check_release_configuration.sh
 ```
 
 For a signed release asset build:

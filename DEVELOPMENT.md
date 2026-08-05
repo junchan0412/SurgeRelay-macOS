@@ -112,6 +112,8 @@ User-visible publish addresses belong in `PublishedAddressResolver`. Keep GitHub
 
 Credential loading and token migration belong in `CredentialTokenCoordinator`. Keep GitHub Token legacy-settings migration, local-encrypted-storage-unavailable fallback, Web management access-token generation, and memory-only degradation there. `AppModel` should apply the returned token, storage status, status message, and persistence side effects rather than duplicating credential storage decision branches inline.
 
+Credential storage belongs in `LocalCredentialStore`. Keep AES-256-GCM encryption, the configuration-directory key/data file layout, account read/write/delete, and the temporary diagnostic probe there. Do not reintroduce `KeychainStore`, `SecItem`, or any system-keychain entitlement dependency; unsigned and ad-hoc builds must keep the same save/load behavior. The credential file must never be written to iCloud-synced user settings.
+
 ## Existing Module Safety
 
 Do not overwrite or delete user-owned modules unless the file is known to be managed by Surge Relay.
@@ -218,6 +220,8 @@ node script/test_web_dom_resources.mjs
 ./script/check_release_configuration.sh
 ```
 
+`Surge Relay.xcodeproj/project.pbxproj` is maintained alongside `project.yml`. When adding a Swift source file, also add its file reference/build file entries to the Xcode project, or regenerate the project with the project's preferred tooling; `script/check_release_configuration.sh` fails the release preflight if any Swift file under `SurgeRelay/` or `SurgeRelayTests/` is missing from the project.
+
 ```bash
 DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
 xcodebuild test \
@@ -251,7 +255,7 @@ Release builds require:
 Before importing signing certificates or calling GitHub, run the local release preflight:
 
 ```bash
-VERSION=1.3.20 BUILD=69 ./script/check_release_configuration.sh
+VERSION=1.3.21 BUILD=70 ./script/check_release_configuration.sh
 ```
 
 The preflight checks version/build consistency, Sparkle feed and public key metadata, Web resource syntax and behavior/DOM tests, the latest appcast entry, the release entitlement, shell syntax for release scripts, and the GitHub Actions release entrypoint.

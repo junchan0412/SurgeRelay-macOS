@@ -16,10 +16,21 @@ struct SettingsGeneralView: View {
     private var generalSection: some View {
         SettingsSection("通用") {
             SettingsControlRow("配置储存目录", icon: "folder") {
-                SettingsPathSelectionControl(
-                    path: model.configurationDirectoryPath,
-                    chooseAction: chooseDirectory
-                )
+                HStack(spacing: 8) {
+                    SettingsPathSelectionControl(
+                        path: model.configurationDirectoryPath,
+                        chooseAction: chooseDirectory
+                    )
+                    Button {
+                        NSWorkspace.shared.activateFileViewerSelecting([
+                            URL(filePath: model.configurationDirectoryPath, directoryHint: .isDirectory)
+                        ])
+                    } label: {
+                        Image(systemName: "folder")
+                    }
+                    .help("在 Finder 中显示")
+                    .buttonStyle(.borderless)
+                }
             }
             SettingsToggleRow("使用总模块功能", icon: "square.stack.3d.up", isOn: Binding(
                 get: { model.settings.combinedModuleEnabled },

@@ -3,6 +3,27 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.3.21</title>
+            <pubDate>Wed, 05 Aug 2026 17:37:00 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.21</link>
+            <sparkle:version>70</sparkle:version>
+            <sparkle:shortVersionString>1.3.21</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.3.21
+
+
+- 取消系统钥匙串依赖：GitHub Token 与 Web 管理令牌改为配置目录内的 AES-256-GCM 本地加密文件，无开发者账户签名也能保存；凭据诊断同步改为本地加密读写检查。
+- 删除详情工具栏中重复的自定义侧边栏切换按钮，只保留 `NavigationSplitView` 系统自带的边栏开关。
+- 重构自定义图标：填写自定义图标时会在模块输出中重写 `#!icon`，来源图标缺失或不匹配时自动补齐/替换；未填写时保留来源图标，图标地址同时写入模块基本信息。
+- 修复订阅更新：从登记的 Script-Hub 转换地址中恢复内嵌 `originalURL`，即使转换内容缺少 `#SUBSCRIBED` 标记，也能按订阅初始地址继续更新。
+- 模块详情始终显示实际“更新地址”，订阅原始地址或登记地址只在与更新地址不同时额外展示。
+- 通用设置页为配置储存目录增加“在 Finder 中显示”入口。
+- 发布预检新增 Swift 源文件引用校验，新增源文件漏同步 `project.pbxproj` 时会在发布前失败。
+- 更新 `DEVELOPMENT_STATUS.md`：补充当前状态、`1.3.21` 目标和后续优化清单。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.3.21/Surge-Relay-1.3.21.app.zip" length="8799577" type="application/zip" sparkle:edSignature="3dxUG9DG564WVf/FzfRtx2poMoPE3q9YXRODEl8Pd5m7ZEhywlvQnfqSOQFy4yDK+vmKG0WlExBdvh/AuAu+AA=="/>
+        </item>
+        <item>
             <title>1.3.20</title>
             <pubDate>Sat, 25 Jul 2026 12:12:49 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.20</link>

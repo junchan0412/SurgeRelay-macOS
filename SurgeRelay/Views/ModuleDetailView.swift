@@ -43,15 +43,15 @@ struct ModuleDetailView: View {
                 icon: module.standaloneStorageSystemImage
             )
             detailRow("初始来源", value: module.initialSource.title, icon: module.initialSource.systemImage)
-            if let initialSourceURL = module.initialSourceURL {
+            if let initialSourceURL = module.initialSourceURL,
+               !ModuleSourceIdentity.matches(initialSourceURL, module.updateSourceURL) {
                 detailRow("订阅原始地址", value: initialSourceURL, icon: "link", monospaced: true, copyValue: initialSourceURL)
             }
             if let localStoragePath {
                 detailRow("本地相对路径", value: localStoragePath, icon: "folder", monospaced: true, copyValue: localStoragePath)
             }
-            if module.initialSourceURL == nil {
-                detailRow("更新地址", value: sourceAddressDisplay, icon: "link", monospaced: true, copyValue: sourceAddressCopyValue)
-            } else if let registeredSourceAddress {
+            detailRow("更新地址", value: sourceAddressDisplay, icon: "link", monospaced: true, copyValue: sourceAddressCopyValue)
+            if let registeredSourceAddress {
                 detailRow("登记地址", value: registeredSourceAddress.display, icon: "link", monospaced: true, copyValue: registeredSourceAddress.copyValue)
             }
             detailRow("来源格式", value: module.sourceFormatDisplayTitle, icon: "doc.text")

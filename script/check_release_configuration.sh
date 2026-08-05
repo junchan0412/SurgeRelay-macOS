@@ -110,6 +110,23 @@ verify_pinned_workflow_actions() {
   done < "$WORKFLOW_PATH"
 }
 
+verify_swift_sources_referenced() {
+  local source_root="$1"
+  local project="$2"
+  local missing=0
+  local file
+  local name
+  while IFS= read -r file; do
+    name="$(basename "$file")"
+    if ! grep -Fq "path = \"$name\";" "$project" \
+      && ! grep -Fq "path = $name;" "$project"; then
+      echo "error: Swift source '$file' is not referenced in $project" >&2
+      missing=1
+    fi
+  done < <(find "$source_root" -name '*.swift' -type f | sort)
+  [[ "$missing" == 0 ]] || fail "Swift sources are missing from the Xcode project"
+}
+
 project_value() {
   local key="$1"
   awk -F': *' -v key="$key" '$1 ~ key { gsub(/"/, "", $2); print $2; exit }' "$PROJECT_FILE"
@@ -255,5 +272,9 @@ require_contains "$WORKFLOW_PATH" 'REQUIRE_STABLE_CODESIGN=1' "release workflow"
 require_contains "$WORKFLOW_PATH" 'REQUIRE_SPARKLE_SIGNATURES=1' "release workflow"
 verify_pinned_workflow_actions
 ok "verified release workflow references"
+
+verify_swift_sources_referenced "$ROOT_DIR/SurgeRelay" "$XCODE_PROJECT"
+verify_swift_sources_referenced "$ROOT_DIR/SurgeRelayTests" "$XCODE_PROJECT"
+ok "verified Swift sources are referenced in the Xcode project"
 
 ok "release configuration preflight passed for $VERSION ($BUILD)"
