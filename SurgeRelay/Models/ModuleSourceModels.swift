@@ -148,6 +148,7 @@ enum ModuleStorageLocation: String, Codable, CaseIterable, Identifiable, Sendabl
 enum ModuleInitialSource: Equatable, Sendable {
     case pending
     case selfAuthored
+    case remote(ModuleSourceFormat)
     case subscribed(ModuleSourceFormat)
     case invalid
 
@@ -157,6 +158,17 @@ enum ModuleInitialSource: Equatable, Sendable {
             "待更新识别"
         case .selfAuthored:
             "自写模块"
+        case .remote(let format):
+            switch format {
+            case .automatic:
+                "远程来源"
+            case .quantumultX:
+                "远程 Quantumult X"
+            case .loon:
+                "远程 Loon"
+            case .surge:
+                "远程 Surge 模块"
+            }
         case .subscribed(let format):
             switch format {
             case .automatic:
@@ -177,6 +189,7 @@ enum ModuleInitialSource: Equatable, Sendable {
         switch self {
         case .pending: "clock.arrow.circlepath"
         case .selfAuthored: "pencil.and.outline"
+        case .remote: "link"
         case .subscribed: "link"
         case .invalid: "exclamationmark.triangle"
         }
@@ -185,6 +198,37 @@ enum ModuleInitialSource: Equatable, Sendable {
     var isSubscribed: Bool {
         if case .subscribed = self { return true }
         return false
+    }
+
+    var isRemote: Bool {
+        if case .remote = self { return true }
+        return false
+    }
+
+    static func resolved(
+        subscription: ScriptHubSubscriptionInfo?,
+        sourceURL: String,
+        detectedSourceFormat: ModuleSourceFormat? = nil,
+        sourceFormat: ModuleSourceFormat
+    ) -> ModuleInitialSource {
+        if let subscription {
+            guard let url = URL(string: subscription.originalURL),
+                  ["http", "https"].contains(url.scheme?.lowercased()) else {
+                return .invalid
+            }
+            let resolved = subscription.sourceFormat
+                ?? detectedSourceFormat
+                ?? sourceFormat.resolvedFormat(for: url)
+            return .subscribed(resolved)
+        }
+        guard let url = URL(string: sourceURL) else { return .invalid }
+        if url.isFileURL { return .selfAuthored }
+        guard ["http", "https"].contains(url.scheme?.lowercased()),
+              url.host?.isEmpty == false else {
+            return .invalid
+        }
+        let resolved = detectedSourceFormat ?? sourceFormat.resolvedFormat(for: url)
+        return .remote(resolved)
     }
 }
 

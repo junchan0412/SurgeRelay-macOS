@@ -82,13 +82,17 @@ enum ModuleDraftRelationshipPlanner {
         }
         return switch (draft.storageLocation, initialSource) {
         case (_, .pending):
-            "保存并更新后会解析转换内容中的 #SUBSCRIBED originalURL，确认模块的初始来源。"
+            "保存并更新后会解析转换内容中的 #SUBSCRIBED originalURL；没有该记录时，远程地址归类为远程来源，本地文件归类为自写模块。"
         case (.local, .selfAuthored):
             "自写模块：未检测到 #SUBSCRIBED originalURL，文件由本地根目录管理。"
+        case (.local, .remote):
+            "远程来源：从更新地址更新，转换结果保存在本地模块根目录。"
         case (.local, .subscribed):
             "订阅模块：从 originalURL 更新，转换结果保存在本地模块根目录。"
         case (.gitHub, .selfAuthored):
             "自写模块：未检测到 #SUBSCRIBED originalURL，独立输出发布到 GitHub。"
+        case (.gitHub, .remote):
+            "远程来源：从更新地址更新，转换结果发布到 GitHub 模块目录。"
         case (.gitHub, .subscribed):
             "订阅模块：从 originalURL 更新，转换结果发布到 GitHub 模块目录。"
         case (_, .invalid):

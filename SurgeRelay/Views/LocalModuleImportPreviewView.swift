@@ -35,6 +35,10 @@ struct LocalModuleImportPreviewView: View {
         candidates.filter { $0.initialSource.isSubscribed }.count
     }
 
+    private var remoteCandidateCount: Int {
+        candidates.filter { $0.initialSource.isRemote }.count
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 6) {
@@ -132,6 +136,9 @@ struct LocalModuleImportPreviewView: View {
         }
         if subscribedCandidateCount > 0 {
             importPill("\(subscribedCandidateCount) 个订阅来源", systemImage: "link")
+        }
+        if remoteCandidateCount > 0 {
+            importPill("\(remoteCandidateCount) 个远程来源", systemImage: "globe")
         }
         importPill("\(selectedCandidates.count) 个已选择", systemImage: "checkmark.circle")
         if !skippedFiles.isEmpty {

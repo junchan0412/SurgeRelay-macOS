@@ -20,6 +20,24 @@ final class ModuleDraftPlannerTests: XCTestCase {
         XCTAssertEqual(plan.module.initialSource, .subscribed(.quantumultX))
     }
 
+    func testAddPlanClassifiesPlainRemoteAddressAsRemoteSource() throws {
+        var draft = ModuleDraft()
+        draft.name = "Remote"
+        draft.sourceURL = "https://example.com/demo.conf"
+
+        let plan = try ModuleDraftPlanner.addPlan(
+            from: draft,
+            modules: [],
+            combinedModuleFileName: "Surge Relay",
+            localModuleDirectory: ""
+        )
+
+        XCTAssertNil(plan.module.scriptHubSubscription)
+        XCTAssertNil(plan.module.initialSourceURL)
+        XCTAssertEqual(plan.module.updateSourceURL, draft.sourceURL)
+        XCTAssertEqual(plan.module.initialSource, .remote(.quantumultX))
+    }
+
     func testModuleDraftRelationshipPlannerUsesSubscriptionMetadataAndWarnsForDisabledDestination() throws {
         let subscription = try XCTUnwrap(ModuleMetadataParser.scriptHubSubscription(in: """
         #SUBSCRIBED http://script.hub/file/_start_/https://example.com/demo.conf/_end_/Demo.sgmodule?type=qx-rewrite&target=surge-module

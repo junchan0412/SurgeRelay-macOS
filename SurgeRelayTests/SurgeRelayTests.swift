@@ -28,18 +28,18 @@ final class SurgeRelayTests: XCTestCase {
         )
 
         XCTAssertEqual(githubModule.storageLocation, .gitHub)
-        XCTAssertEqual(githubModule.initialSource, .selfAuthored)
+        XCTAssertEqual(githubModule.initialSource, .remote(.loon))
         XCTAssertEqual(githubModule.publishedRelativePath, "Plugin-Demo.sgmodule")
         XCTAssertEqual(githubModule.displayStorageLocationTitle, "GitHub 模块")
         XCTAssertEqual(localModule.storageLocation, .local)
-        XCTAssertEqual(localModule.initialSource, .selfAuthored)
+        XCTAssertEqual(localModule.initialSource, .remote(.quantumultX))
         XCTAssertEqual(localModule.publishedRelativePath, "Rewrite Demo.sgmodule")
-        XCTAssertEqual(localModule.relationshipSummary, "本地模块 · 自写模块")
+        XCTAssertEqual(localModule.relationshipSummary, "本地模块 · 远程 Quantumult X")
         XCTAssertEqual(localModule.standaloneStorageDetail, "储存在本地模块根目录")
         XCTAssertEqual(remoteOnlyModule.displayStorageLocationTitle, "GitHub 模块")
         XCTAssertEqual(remoteOnlyModule.displayStorageLocationSystemImage, "cloud")
         XCTAssertEqual(remoteOnlyModule.standaloneStorageDetail, "未开启独立发布；转换结果保存在本地缓存")
-        XCTAssertEqual(remoteOnlyModule.relationshipSummary, "GitHub 模块 · 自写模块")
+        XCTAssertEqual(remoteOnlyModule.relationshipSummary, "GitHub 模块 · 远程 Surge 模块")
     }
 
     func testRefreshPolicyDoesNotRefreshAgainBeforeInterval() {

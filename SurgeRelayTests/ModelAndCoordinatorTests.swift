@@ -140,12 +140,26 @@ final class ModelAndCoordinatorTests: XCTestCase {
         XCTAssertNil(module.conversionEngineRevision)
     }
 
-    func testRelayModuleWithoutSubscriptionIsSelfAuthored() {
+    func testRelayModuleWithoutSubscriptionIsRemoteWhenSourceIsRemote() {
         let module = RelayModule(
             name: "Demo",
             sourceURL: "https://example.com/demo.sgmodule",
             sourceFormat: .surge,
             outputFileName: "Demo"
+        )
+
+        XCTAssertEqual(module.initialSource, .remote(.surge))
+        XCTAssertNil(module.initialSourceURL)
+        XCTAssertEqual(module.updateSourceURL, module.sourceURL)
+    }
+
+    func testRelayModuleLocalFileWithoutSubscriptionIsSelfAuthored() {
+        let module = RelayModule(
+            name: "Local Demo",
+            sourceURL: URL(filePath: "/Users/example/Surge/Local Demo.sgmodule").absoluteString,
+            sourceFormat: .surge,
+            outputFileName: "Local Demo.sgmodule",
+            storageLocation: .local
         )
 
         XCTAssertEqual(module.initialSource, .selfAuthored)

@@ -91,7 +91,7 @@ final class DiagnosticReportTests: XCTestCase {
         XCTAssertEqual(snapshot.sourceURL, "https://example.com/path/module.sgmodule")
         XCTAssertNil(snapshot.initialSourceURL)
         XCTAssertEqual(snapshot.updateSourceURL, "https://example.com/path/module.sgmodule")
-        XCTAssertEqual(snapshot.initialSourceTitle, "自写模块")
+        XCTAssertEqual(snapshot.initialSourceTitle, "远程 Surge 模块")
 
         let json = try XCTUnwrap(String(data: DiagnosticReportBuilder.data(for: request), encoding: .utf8))
         XCTAssertFalse(json.contains("token=secret"))

@@ -119,12 +119,11 @@ struct LocalModuleScanCandidate: Identifiable, Hashable, Sendable {
     var id: String { relativePath }
 
     var initialSource: ModuleInitialSource {
-        guard let scriptHubSubscription else { return .selfAuthored }
-        guard let url = URL(string: scriptHubSubscription.originalURL),
-              ["http", "https"].contains(url.scheme?.lowercased()) else {
-            return .invalid
-        }
-        return .subscribed(scriptHubSubscription.sourceFormat ?? sourceFormat.resolvedFormat(for: url))
+        ModuleInitialSource.resolved(
+            subscription: scriptHubSubscription,
+            sourceURL: sourceURL,
+            sourceFormat: sourceFormat
+        )
     }
 
     var relationshipSummary: String {

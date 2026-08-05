@@ -45,9 +45,9 @@ Both can be enabled at the same time. Local export and GitHub publishing share `
 Keep these two axes separate:
 
 - `RelayModule.storageLocation`: which destination owns the standalone output (`local` or `gitHub`).
-- `RelayModule.initialSource`: whether converted content contains a valid Script-Hub `#SUBSCRIBED originalURL`; missing metadata means a self-authored module.
+- `RelayModule.initialSource`: whether converted content contains a valid Script-Hub `#SUBSCRIBED originalURL` (subscribed), whether the module is updated from an HTTP/HTTPS remote address without that marker (remote), or whether a local file has no subscription metadata (self-authored).
 
-Do not infer initial source from `sourceURL`. Parse it from converted content, never from a user override; a local file can restore a remote `originalURL` while still being managed as a local module. During first discovery, missing `#SUBSCRIBED` metadata classifies the module as self-authored. For local modules, preserve `localStorageRelativePath` whenever it is known.
+Resolve `#SUBSCRIBED` metadata from converted content, never from a user override. When it is present and valid, classify the module as subscribed and use `originalURL` for updates. When it is absent, classify an HTTP/HTTPS source as a remote source and only classify a local file as self-authored; do not label a remote update address as self-authored. A local file can restore a remote `originalURL` while still being managed as a local module. For local modules, preserve `localStorageRelativePath` whenever it is known.
 
 Treat local physical module metadata as authoritative for initial-source discovery and repair. Once a valid `#SUBSCRIBED originalURL` has been discovered, a later upstream/cache payload without that marker must not erase it: native upstream modules commonly omit the Script-Hub wrapper comment. Clear persisted subscription metadata only when the user changes the registered source. When `localStorageRelativePath` conflicts with a persisted GitHub storage value, the local path wins; when the exact path is missing, metadata recovery may uniquely match a sibling `.sgmodule` after normalizing spaces and hyphens, then persist the real relative path.
 
@@ -255,7 +255,7 @@ Release builds require:
 Before importing signing certificates or calling GitHub, run the local release preflight:
 
 ```bash
-VERSION=1.3.21 BUILD=70 ./script/check_release_configuration.sh
+VERSION=1.3.22 BUILD=71 ./script/check_release_configuration.sh
 ```
 
 The preflight checks version/build consistency, Sparkle feed and public key metadata, Web resource syntax and behavior/DOM tests, the latest appcast entry, the release entitlement, shell syntax for release scripts, and the GitHub Actions release entrypoint.

@@ -253,7 +253,7 @@ final class ModulePlanningTests: XCTestCase {
         )
 
         XCTAssertEqual(module.storageLocation, .local)
-        XCTAssertEqual(module.initialSource, .selfAuthored)
+        XCTAssertEqual(module.initialSource, .remote(.quantumultX))
         XCTAssertEqual(module.publishedRelativePath, "Converted/Remote Backed.sgmodule")
         XCTAssertTrue(PublishCoordinator.shouldSkipStandaloneLocalExport(
             module,

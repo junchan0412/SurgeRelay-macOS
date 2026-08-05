@@ -127,7 +127,7 @@ struct ModuleEditorSourceSection: View {
                 .frame(maxWidth: 220, alignment: .leading)
             }
             ModuleEditorInfoRow("初始来源规则", icon: "info.circle") {
-                Text("更新后解析模块中的 #SUBSCRIBED originalURL；存在时显示订阅来源，缺失时归类为自写模块。")
+                Text("更新后解析模块中的 #SUBSCRIBED originalURL；存在时显示订阅来源，没有该记录时远程地址归类为远程来源，仅本地文件归类为自写模块。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

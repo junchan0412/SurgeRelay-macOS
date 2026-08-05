@@ -171,18 +171,13 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     }
 
     var initialSource: ModuleInitialSource {
-        guard let subscription = scriptHubSubscription
-            ?? ModuleMetadataParser.scriptHubSubscription(from: sourceURL) else {
-            return .selfAuthored
-        }
-        guard let url = URL(string: subscription.originalURL),
-              ["http", "https"].contains(url.scheme?.lowercased()) else {
-            return .invalid
-        }
-        let resolved = subscription.sourceFormat
-            ?? detectedSourceFormat
-            ?? sourceFormat.resolvedFormat(for: url)
-        return .subscribed(resolved)
+        ModuleInitialSource.resolved(
+            subscription: scriptHubSubscription
+                ?? ModuleMetadataParser.scriptHubSubscription(from: sourceURL),
+            sourceURL: sourceURL,
+            detectedSourceFormat: detectedSourceFormat,
+            sourceFormat: sourceFormat
+        )
     }
 
     var relationshipSummary: String {
