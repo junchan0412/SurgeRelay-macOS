@@ -117,7 +117,7 @@
     const combinedSubscription = combined.subscriptionURL || '';
     const combinedRow = combined.isEnabled ? detailRow('square.stack.3d.up.fill', '汇总订阅', combinedSubscription || '等待发布配置', false, combinedSubscription || null) : '';
     const iconURL = module.customIconURL || module.iconURL;
-    const iconSource = module.customIconURL ? '自定义图标（仅展示）' : (module.iconURL ? '来源元数据（仅展示）' : '默认图标');
+    const iconSource = module.customIconURL ? '自定义图标（写入输出）' : (module.iconURL ? '来源图标' : '默认图标');
     const iconAddressRow = iconURL ? detailRow('link', '图标地址', `<a href="${escapeAttribute(iconURL)}" target="_blank" rel="noreferrer">${escapeHTML(iconURL)}</a>`, true, iconURL) : '';
     const sourceHashRow = module.sourceContentHash ? detailRow('curlybraces', '来源 hash', module.sourceContentHash.slice(0, 12), false, module.sourceContentHash) : '';
     const sourceETagRow = module.sourceETag ? detailRow('tag', '来源 ETag', module.sourceETag, false, module.sourceETag) : '';
