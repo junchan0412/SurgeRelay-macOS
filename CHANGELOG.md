@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- 取消系统钥匙串依赖：GitHub Token 与 Web 管理令牌改为配置目录内的 AES-256-GCM 本地加密文件，无开发者账户签名也能保存；凭据诊断同步改为本地加密读写检查。
+- 删除详情工具栏中重复的自定义侧边栏切换按钮，只保留 `NavigationSplitView` 系统自带的边栏开关。
+- 重构自定义图标：填写自定义图标时会在模块输出中重写 `#!icon`，来源图标缺失或不匹配时自动补齐/替换；未填写时保留来源图标，图标地址同时写入模块基本信息。
+- 修复订阅更新：从登记的 Script-Hub 转换地址中恢复内嵌 `originalURL`，即使转换内容缺少 `#SUBSCRIBED` 标记，也能按订阅初始地址继续更新。
+
 ## 1.3.20
 
 - Web 管理新增轻量 `GET /api/activity`，更新过程可高频轮询 completed/total 进度；SSE 短暂断开时保留进度投影并 soft reconnect。

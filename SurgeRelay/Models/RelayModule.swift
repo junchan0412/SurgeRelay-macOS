@@ -171,7 +171,10 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     }
 
     var initialSource: ModuleInitialSource {
-        guard let subscription = scriptHubSubscription else { return .selfAuthored }
+        guard let subscription = scriptHubSubscription
+            ?? ModuleMetadataParser.scriptHubSubscription(from: sourceURL) else {
+            return .selfAuthored
+        }
         guard let url = URL(string: subscription.originalURL),
               ["http", "https"].contains(url.scheme?.lowercased()) else {
             return .invalid
@@ -206,11 +209,11 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     }
 
     var initialSourceURL: String? {
-        guard let value = scriptHubSubscription?.originalURL.trimmingCharacters(in: .whitespacesAndNewlines),
-              !value.isEmpty else {
-            return nil
+        if let value = scriptHubSubscription?.originalURL.trimmingCharacters(in: .whitespacesAndNewlines),
+           !value.isEmpty {
+            return value
         }
-        return value
+        return ModuleMetadataParser.scriptHubSubscription(from: sourceURL)?.originalURL
     }
 
     var updateSourceURL: String {
@@ -234,7 +237,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         var changed = false
         let sourceWasFile = URL(string: sourceURL)?.isFileURL == true
         let sourceWasScriptHub = sourceURL.hasPrefix("http://script.hub/") || sourceURL.hasPrefix("https://script.hub/")
-        var subscription = Self.repairedSubscription(subscription)
+        let subscription = Self.repairedSubscription(subscription)
 
         if scriptHubSubscription != subscription {
             scriptHubSubscription = subscription

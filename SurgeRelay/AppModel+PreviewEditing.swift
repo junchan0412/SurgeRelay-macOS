@@ -7,6 +7,7 @@ extension AppModel {
         let namedContent = await processingWorker.applyingModuleMetadata(
             name: module.name,
             category: module.category,
+            iconURL: module.customIconURL,
             to: content
         )
         let currentContent = try? await modulePreviewProvider.componentContent(for: module)
@@ -64,6 +65,7 @@ extension AppModel {
         return await processingWorker.applyingModuleMetadata(
             name: module.name,
             category: module.category,
+            iconURL: module.customIconURL,
             to: materialized
         )
     }

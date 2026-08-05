@@ -10,27 +10,27 @@ extension AppModel {
         CredentialDiagnosticSnapshot.current(
             githubTokenStatus: githubTokenStorageStatus,
             webAccessTokenStatus: webAccessTokenStorageStatus,
-            keychainAccessProbe: keychainAccessProbe
+            credentialProbe: credentialProbe
         )
     }
 
-    func refreshKeychainAccessProbe() {
-        keychainAccessProbe = .checking
+    func refreshCredentialProbe() {
+        credentialProbe = .checking
         let tracksActivity = !workActivity.blocksUpdates
         if tracksActivity {
-            beginWork(.checkingKeychain, blocksUpdates: false)
+            beginWork(.checkingLocalCredentials, blocksUpdates: false)
         }
         Task { @MainActor in
             let snapshot = await Task.detached(priority: .utility) {
-                KeychainAccessProbeSnapshot.current()
+                LocalCredentialProbeSnapshot.current()
             }.value
-            keychainAccessProbe = snapshot
+            credentialProbe = snapshot
             if tracksActivity {
-                endWork(.checkingKeychain)
+                endWork(.checkingLocalCredentials)
             }
             statusMessage = snapshot.state == .available
-                ? "钥匙串读写检查通过"
-                : "钥匙串读写检查失败"
+                ? "本地加密读写检查通过"
+                : "本地加密读写检查失败"
         }
     }
 

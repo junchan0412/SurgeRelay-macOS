@@ -9,7 +9,7 @@ Surge Relay 是一款用于集中管理、转换、编辑和发布 Surge 模块�
 - 管理远程 HTTP/HTTPS 模块和本地 `file://` Surge 模块。
 - 使用内置 Script-Hub 引擎转换 Quantumult X、Loon 和 Surge 模块。
 - Script-Hub 上游默认固定到明确 commit；更新时会记录上游 revision 与脚本 SHA-256 hash。
-- 为每个模块配置 Surge `category` 标签、输出文件名、输出文件夹、自定义展示图标和 Script-Hub 参数。
+- 为每个模块配置 Surge `category` 标签、输出文件名、输出文件夹、自定义图标和 Script-Hub 参数。
 - 模块关系明确分为“模块存放位置”和“初始来源”：模块可以存放在本地或 GitHub；初始来源只由模块中的 `#SUBSCRIBED originalURL` 判定，缺失该记录即视为自写模块。
 - 本地发布和 GitHub 发布可以同时开启；每个独立模块只写入自己选择的存放位置，本地根目录和 GitHub 模块目录共用一套相对输出路径逻辑。
 - 本地发布根目录可配置，例如 iCloud Surge 目录；输出文件夹菜单会读取根目录下已有文件夹，也可以新建文件夹。
@@ -17,7 +17,7 @@ Surge Relay 是一款用于集中管理、转换、编辑和发布 Surge 模块�
 - 总模块功能默认关闭，可在设置中手动开启；关闭后相关界面和“包含在总模块中”开关会隐藏，独立模块仍可转换和发布。
 - 支持扫描本地根目录已有 `.sgmodule`，在确认预览后纳入管理。
 - 支持 App 内 Web 管理、菜单栏操作、后台更新状态、任务取消、发布预览和删除确认。
-- GitHub Token 与 Web 管理令牌保存到 macOS 钥匙串，并按需读取。
+- GitHub Token 与 Web 管理令牌使用配置目录内的 AES-256-GCM 本地加密文件保存，不依赖系统钥匙串，无开发者账户签名也可正常保存。
 - 使用 Sparkle 2 App 内自动更新，Release 产物包含 `.app.zip` 和 `.pkg` 安装包。
 
 ## 安装与更新
@@ -59,7 +59,7 @@ xattr -dr com.apple.quarantine "/Applications/Surge Relay.app"
 
 如果你看到清理提示，请先看清楚“将删除的旧文件”列表。App 的目标是清理自己生成过的输出，而不是删除手动维护的原模块、`Surge.conf`、分类文件夹或 `assets` 目录。
 
-自定义图标 URL 只用于 Surge Relay 桌面端和 Web 管理端展示。App 会读取来源中的 `#!icon` 作为展示回退，但转换后的 Surge 输出会移除 `#!icon` 元数据，不会把展示图标写入最终订阅文件。
+自定义图标会重写模块输出中的 `#!icon`：来源里的图标缺失或不匹配时自动补齐/替换，未填写自定义图标时保留来源图标。图标地址同时写入模块基本信息，桌面端、Web 管理端和发布产物使用同一个值。
 
 ## 发布目标
 
@@ -112,15 +112,15 @@ Surge Relay 1.3.x 对 Web 管理、Script-Hub 引擎和 GitHub 发布做了安�
 
 当前工程仍保留 `NSAllowsArbitraryLoads=true` 和关闭 App Sandbox。原因是 Surge Relay 需要转换用户添加的任意 HTTP/HTTPS 模块来源，并写入用户选择的本地 Surge/iCloud 目录或执行 GitHub 发布；若开启沙盒，需要进一步引入 security-scoped bookmark 并迁移现有本地目录访问模型。发布预检会确认这些取舍仍在文档中明确记录；后续收敛路线见 [Release Hardening](./docs/RELEASE_HARDENING.md)。
 
-## 钥匙串与权限
+## 凭据与本地加密
 
-Surge Relay 只在需要时访问钥匙串：
+Surge Relay 不再访问系统钥匙串：
 
-- 保存和读取 GitHub Token。
-- 保存和读取 Web 管理令牌。
-- 用户手动触发钥匙串诊断时写入、读取并清理临时测试项。
-
-为了减少更新后反复弹出钥匙串授权，Release 构建使用同一个固定自签名 Code Signing 证书，并保持 `CFBundleIdentifier` 为 `com.allenmiao.SurgeRelay`。从旧的未签名或 ad-hoc 版本升级到自签名版本时，首次访问钥匙串仍可能需要重新允许一次。
+- GitHub Token 与 Web 管理令牌保存到配置目录的 `credentials.encrypted`。
+- 加密密钥保存在同目录的 `credentials.key`，使用 AES-256-GCM 加密，两个文件权限都限制为当前用户可读写。
+- 无开发者账户、未签名或 ad-hoc 签名构建同样可以正常保存和读取凭据。
+- 本地加密存储不可用时，App 会暂时沿用旧同步配置中的 GitHub Token，或仅在本次运行内存中保留 Web 管理令牌。
+- “凭据”设置页可以主动执行本地加密读写检查，检查会写入并立即删除临时诊断项。
 
 ## 开发
 

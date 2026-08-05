@@ -8,7 +8,7 @@ struct ModulePreviewContentProvider {
     typealias CombinedReader = () async throws -> Data
     typealias Materializer = (String, [String: String]) async -> String
     typealias ArgumentInfoReader = (String) async -> ModuleArgumentInfo
-    typealias MetadataApplier = (String, String, String) async -> String
+    typealias MetadataApplier = (String, String, String?, String) async -> String
 
     let hasComponent: ComponentExists
     let readComponent: ComponentReader
@@ -22,7 +22,7 @@ struct ModulePreviewContentProvider {
     func previewContent(for module: RelayModule) async throws -> String {
         let content = try await componentContent(for: module)
         let materialized = await materialize(content, module.argumentOverrides)
-        return await applyingModuleMetadata(module.name, module.category, materialized)
+        return await applyingModuleMetadata(module.name, module.category, module.customIconURL, materialized)
     }
 
     func moduleArgumentInfo(for module: RelayModule) async -> ModuleArgumentInfo {

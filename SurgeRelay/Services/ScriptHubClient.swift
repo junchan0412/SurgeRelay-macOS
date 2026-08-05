@@ -64,6 +64,7 @@ actor ScriptHubClient {
             let namedContent = ModuleMetadataParser.applyingModuleMetadata(
                 name: module.name,
                 category: module.category,
+                iconURL: module.customIconURL,
                 to: content
             )
             let sanitized = SurgeModuleSanitizer.sanitize(namedContent)
@@ -87,6 +88,7 @@ actor ScriptHubClient {
         let namedContent = ModuleMetadataParser.applyingModuleMetadata(
             name: module.name,
             category: module.category,
+            iconURL: module.customIconURL,
             to: materialized.content
         )
         let sanitized = SurgeModuleSanitizer.sanitize(namedContent)

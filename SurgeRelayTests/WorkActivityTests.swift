@@ -16,11 +16,11 @@ final class WorkActivityTests: XCTestCase {
             "Surge Relay 正在执行“GitHub 发布”任务：正在生成 GitHub 发布预览…"
         )
 
-        let keychain = WorkActivity(kind: .checkingKeychain)
-        XCTAssertTrue(keychain.isActive)
-        XCTAssertFalse(keychain.blocksUpdates)
-        XCTAssertFalse(keychain.canCancel)
-        XCTAssertNil(keychain.updateBlockedReason(statusMessage: "正在写入、读取并清理临时诊断项。"))
+        let credentialCheck = WorkActivity(kind: .checkingLocalCredentials)
+        XCTAssertTrue(credentialCheck.isActive)
+        XCTAssertFalse(credentialCheck.blocksUpdates)
+        XCTAssertFalse(credentialCheck.canCancel)
+        XCTAssertNil(credentialCheck.updateBlockedReason(statusMessage: "正在写入、读取并清理临时诊断项。"))
         XCTAssertFalse(WorkActivity.idle.isActive)
         XCTAssertFalse(WorkActivity.idle.canCancel)
     }
@@ -92,11 +92,11 @@ final class WorkActivityTests: XCTestCase {
             "Surge Relay 正在执行“发布预览”任务：正在生成 GitHub 发布预览…"
         )
 
-        let checkingKeychain = UpdateAdmission.allModules(
-            activity: WorkActivity(kind: .checkingKeychain),
+        let checkingCredentials = UpdateAdmission.allModules(
+            activity: WorkActivity(kind: .checkingLocalCredentials),
             updateableModuleCount: 1,
             statusMessage: "正在写入、读取并清理临时诊断项。"
         )
-        XCTAssertTrue(checkingKeychain.isAccepted)
+        XCTAssertTrue(checkingCredentials.isAccepted)
     }
 }

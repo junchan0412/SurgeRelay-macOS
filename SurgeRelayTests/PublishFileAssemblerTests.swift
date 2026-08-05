@@ -48,15 +48,15 @@ final class PublishFileAssemblerTests: XCTestCase {
             materialize: { content, overrides in
                 "\(content):\(overrides["mode"] ?? "")"
             },
-            applyingModuleMetadata: { name, category, content in
-                "\(name)|\(category)|\(content)"
+            applyingModuleMetadata: { name, category, iconURL, content in
+                "\(name)|\(category)|\(iconURL ?? "nil")|\(content)"
             },
             cancellationCheckpoint: {}
         )
 
         XCTAssertEqual(files.map(\.name), ["Combined.sgmodule", "Folder/Standalone.sgmodule", "assets/icon.png"])
         XCTAssertEqual(String(data: files[0].data, encoding: .utf8), "combined")
-        XCTAssertEqual(String(data: files[1].data, encoding: .utf8), "Standalone|Rules|source:strict")
+        XCTAssertEqual(String(data: files[1].data, encoding: .utf8), "Standalone|Rules|nil|source:strict")
         XCTAssertEqual(String(data: files[2].data, encoding: .utf8), "asset")
         XCTAssertEqual(requestedAssetIDs, [standaloneID, combinedID])
     }
@@ -88,7 +88,7 @@ final class PublishFileAssemblerTests: XCTestCase {
             readComponent: { _ in "source" },
             generatedAssetFiles: { _ in [] },
             materialize: { content, _ in content },
-            applyingModuleMetadata: { _, _, content in content },
+            applyingModuleMetadata: { _, _, _, content in content },
             cancellationCheckpoint: {}
         )
         let gitHubFiles = try await PublishFileAssembler.files(
@@ -103,7 +103,7 @@ final class PublishFileAssemblerTests: XCTestCase {
             readComponent: { _ in "source" },
             generatedAssetFiles: { _ in [] },
             materialize: { content, _ in content },
-            applyingModuleMetadata: { _, _, content in content },
+            applyingModuleMetadata: { _, _, _, content in content },
             cancellationCheckpoint: {}
         )
 

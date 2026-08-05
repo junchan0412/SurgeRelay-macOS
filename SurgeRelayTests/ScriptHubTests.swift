@@ -212,7 +212,7 @@ final class ScriptHubTests: XCTestCase {
         XCTAssertTrue(result.content.contains("loglevel = notify"))
     }
 
-    func testScriptHubClientDoesNotWriteIconMetadataToNativeSurgeOutput() async throws {
+    func testScriptHubClientWritesCustomIconToNativeSurgeOutput() async throws {
         let root = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -237,9 +237,35 @@ final class ScriptHubTests: XCTestCase {
 
         XCTAssertTrue(result.content.contains("#!name=Managed"))
         XCTAssertTrue(result.content.contains("#!category=Imported"))
-        XCTAssertFalse(result.content.localizedCaseInsensitiveContains("#!icon"))
+        XCTAssertTrue(result.content.contains("#!icon=https://example.com/custom-icon.png"))
         XCTAssertFalse(result.content.contains("https://example.com/source-icon.png"))
-        XCTAssertFalse(result.content.contains("https://example.com/custom-icon.png"))
+    }
+
+    func testScriptHubClientPreservesSourceIconWithoutCustomIcon() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let file = root.appending(path: "Icon.sgmodule")
+        try Data("""
+        #!name=Original
+        #!icon=https://example.com/source-icon.png
+        [General]
+        loglevel = notify
+        """.utf8).write(to: file)
+        let module = RelayModule(
+            name: "Managed",
+            sourceURL: file.absoluteString,
+            sourceFormat: .surge,
+            outputFileName: "Icon",
+            category: "Imported"
+        )
+
+        let result = try await ScriptHubClient().convert(module: module)
+
+        XCTAssertTrue(result.content.contains("#!name=Managed"))
+        XCTAssertTrue(result.content.contains("#!category=Imported"))
+        XCTAssertTrue(result.content.contains("#!icon=https://example.com/source-icon.png"))
     }
 
     func testModuleArgumentsAreMaterializedAndArgumentMetadataIsRemoved() {

@@ -27,7 +27,7 @@ final class AppModel {
     var webAccessToken: String
     var githubTokenStorageStatus: CredentialStorageStatus
     var webAccessTokenStorageStatus: CredentialStorageStatus
-    var keychainAccessProbe: KeychainAccessProbeSnapshot
+    var credentialProbe: LocalCredentialProbeSnapshot
     /// Set to true to ask the main window to present the in-app settings sheet
     /// (used by the menu bar, the ⌘, command, and the toolbar gear button).
     var presentsSettings = false
@@ -109,7 +109,7 @@ final class AppModel {
         webAccessToken = ""
         githubTokenStorageStatus = legacyGitHubToken.isEmpty ? .notChecked : .legacyConfigurationFallback
         webAccessTokenStorageStatus = .notChecked
-        keychainAccessProbe = .notChecked
+        credentialProbe = .notChecked
         selectedModuleID = loadedSettings.combinedModuleEnabled
             ? Self.combinedModuleSelectionID
             : loadedModules.first?.id
@@ -214,10 +214,11 @@ final class AppModel {
             argumentInfo: { [processingWorker] content in
                 await processingWorker.argumentInfo(in: content)
             },
-            applyingModuleMetadata: { [processingWorker] name, category, content in
+            applyingModuleMetadata: { [processingWorker] name, category, iconURL, content in
                 await processingWorker.applyingModuleMetadata(
                     name: name,
                     category: category,
+                    iconURL: iconURL,
                     to: content
                 )
             }

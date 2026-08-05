@@ -46,7 +46,27 @@ final class ModuleMetadataParserTests: XCTestCase {
         XCTAssertNil(ModuleMetadataParser.category(in: "#!name=Demo\n[General]"))
     }
 
-    func testRemovesIconWhenApplyingSurgeMetadata() {
+    func testAppliesCustomIconWhenApplyingSurgeMetadata() {
+        let content = """
+        #!name=Demo
+        #!icon=https://example.com/source.png
+        [General]
+        loglevel = notify
+        """
+        let result = ModuleMetadataParser.applyingModuleMetadata(
+            name: "Managed",
+            category: "Ads",
+            iconURL: "https://example.com/custom.png",
+            to: content
+        )
+
+        XCTAssertTrue(result.contains("#!name=Managed"))
+        XCTAssertTrue(result.contains("#!category=Ads"))
+        XCTAssertTrue(result.contains("#!icon=https://example.com/custom.png"))
+        XCTAssertFalse(result.contains("https://example.com/source.png"))
+    }
+
+    func testPreservesSourceIconWithoutCustomIcon() {
         let content = """
         #!name=Demo
         #!icon=https://example.com/source.png
@@ -57,8 +77,7 @@ final class ModuleMetadataParserTests: XCTestCase {
 
         XCTAssertTrue(result.contains("#!name=Managed"))
         XCTAssertTrue(result.contains("#!category=Ads"))
-        XCTAssertFalse(result.localizedCaseInsensitiveContains("#!icon"))
-        XCTAssertFalse(result.contains("https://example.com/source.png"))
+        XCTAssertTrue(result.contains("#!icon=https://example.com/source.png"))
     }
 
     func testSubscriptionSourceFormatRepairsConflictingQxTypeForSgmodule() throws {
@@ -69,5 +88,20 @@ final class ModuleMetadataParserTests: XCTestCase {
         XCTAssertEqual(subscription.sourceType, "qx-rewrite")
         XCTAssertEqual(subscription.sourceFormat, .surge)
         XCTAssertEqual(subscription.originalURL, "https://example.com/modules/demo.sgmodule")
+    }
+
+    func testRecoversSubscriptionInitialAddressFromRegisteredScriptHubURL() throws {
+        let source = """
+        https://script.hub/file/_start_/https://raw.githubusercontent.com/example/repo/main/QuantumultX/demo.conf/_end_/Demo.sgmodule?type=qx-rewrite&target=surge-module&category=%23%E5%B7%A5%E5%85%B7&del=false&jqEnabled=true
+        """
+        let subscription = try XCTUnwrap(ModuleMetadataParser.scriptHubSubscription(from: source))
+        XCTAssertEqual(
+            subscription.originalURL,
+            "https://raw.githubusercontent.com/example/repo/main/QuantumultX/demo.conf"
+        )
+        XCTAssertEqual(subscription.sourceFormat, .quantumultX)
+        XCTAssertEqual(subscription.category, "#工具")
+        XCTAssertTrue(subscription.options.enableJQ)
+        XCTAssertNil(ModuleMetadataParser.scriptHubSubscription(from: "https://example.com/demo.sgmodule"))
     }
 }

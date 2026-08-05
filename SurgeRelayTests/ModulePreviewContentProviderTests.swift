@@ -36,8 +36,13 @@ final class ModulePreviewContentProviderTests: XCTestCase {
             argumentInfo: { content in
                 ModuleArgumentProcessor.info(in: content)
             },
-            applyingModuleMetadata: { name, category, content in
-                ModuleMetadataParser.applyingModuleMetadata(name: name, category: category, to: content)
+            applyingModuleMetadata: { name, category, iconURL, content in
+                ModuleMetadataParser.applyingModuleMetadata(
+                    name: name,
+                    category: category,
+                    iconURL: iconURL,
+                    to: content
+                )
             }
         )
         let module = RelayModule(
@@ -69,7 +74,7 @@ final class ModulePreviewContentProviderTests: XCTestCase {
             readCombined: { Data() },
             materialize: { content, _ in content },
             argumentInfo: { _ in ModuleArgumentInfo() },
-            applyingModuleMetadata: { _, _, content in content }
+            applyingModuleMetadata: { _, _, _, content in content }
         )
         let module = RelayModule(
             name: "Remote",

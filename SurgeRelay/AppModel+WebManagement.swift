@@ -29,9 +29,9 @@ extension AppModel {
             return
         }
         do {
-            try KeychainStore.saveWebAccessToken(webAccessToken)
-            webAccessTokenStorageStatus = .keychain
-            statusMessage = "Web 管理访问令牌已保存到系统钥匙串"
+            try LocalCredentialStore.saveWebAccessToken(webAccessToken)
+            webAccessTokenStorageStatus = .encrypted
+            statusMessage = "Web 管理访问令牌已保存到本地加密文件"
         } catch {
             webAccessTokenStorageStatus = .memoryOnly
             presentedError = "无法保存 Web 管理访问令牌：\(error.localizedDescription)"
@@ -44,8 +44,8 @@ extension AppModel {
         let token = CredentialTokenCoordinator.generateWebAccessToken()
         webAccessToken = token
         do {
-            try KeychainStore.saveWebAccessToken(token)
-            webAccessTokenStorageStatus = .keychain
+            try LocalCredentialStore.saveWebAccessToken(token)
+            webAccessTokenStorageStatus = .encrypted
             statusMessage = "Web 管理访问令牌已重置"
         } catch {
             webAccessTokenStorageStatus = .memoryOnly

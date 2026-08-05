@@ -137,10 +137,10 @@ extension RelayModule {
 
     var iconSourceDescription: String {
         if customIconURL != nil {
-            return "自定义图标（仅展示）"
+            return "自定义图标（写入输出）"
         }
         if iconURL != nil {
-            return "来源元数据（仅展示）"
+            return "来源图标"
         }
         return "默认图标"
     }

@@ -1,5 +1,4 @@
 import Foundation
-import Security
 
 enum CredentialTokenCoordinator {
     typealias TokenLoader = () throws -> String
@@ -21,8 +20,8 @@ enum CredentialTokenCoordinator {
 
     static func loadGitHubToken(
         migratingLegacyToken legacyToken: String,
-        loadStoredToken: TokenLoader = { try KeychainStore.loadGitHubToken() },
-        saveStoredToken: TokenSaver = { try KeychainStore.saveGitHubToken($0) }
+        loadStoredToken: TokenLoader = { try LocalCredentialStore.loadGitHubToken() },
+        saveStoredToken: TokenSaver = { try LocalCredentialStore.saveGitHubToken($0) }
     ) -> GitHubTokenLoadResult {
         let legacyToken = legacyToken.trimmingCharacters(in: .whitespacesAndNewlines)
         do {
@@ -30,9 +29,9 @@ enum CredentialTokenCoordinator {
             if !storedToken.isEmpty {
                 return GitHubTokenLoadResult(
                     token: storedToken,
-                    storageStatus: .keychain,
+                    storageStatus: .encrypted,
                     shouldClearLegacyToken: true,
-                    statusMessage: legacyToken.isEmpty ? nil : "GitHub Token 已改由系统钥匙串管理"
+                    statusMessage: legacyToken.isEmpty ? nil : "GitHub Token 已改由本地加密存储管理"
                 )
             }
             guard !legacyToken.isEmpty else {
@@ -45,9 +44,9 @@ enum CredentialTokenCoordinator {
             try saveStoredToken(legacyToken)
             return GitHubTokenLoadResult(
                 token: legacyToken,
-                storageStatus: .keychain,
+                storageStatus: .encrypted,
                 shouldClearLegacyToken: true,
-                statusMessage: "GitHub Token 已从同步配置迁移到系统钥匙串"
+                statusMessage: "GitHub Token 已从同步配置迁移到本地加密存储"
             )
         } catch {
             guard !legacyToken.isEmpty else {
@@ -61,29 +60,29 @@ enum CredentialTokenCoordinator {
                 token: legacyToken,
                 storageStatus: .legacyConfigurationFallback,
                 shouldClearLegacyToken: false,
-                statusMessage: "无法访问系统钥匙串，暂时沿用旧同步配置中的 GitHub Token"
+                statusMessage: "无法访问本地加密存储，暂时沿用旧同步配置中的 GitHub Token"
             )
         }
     }
 
     static func loadWebAccessToken(
-        loadStoredToken: TokenLoader = { try KeychainStore.loadWebAccessToken() },
-        saveStoredToken: TokenSaver = { try KeychainStore.saveWebAccessToken($0) },
+        loadStoredToken: TokenLoader = { try LocalCredentialStore.loadWebAccessToken() },
+        saveStoredToken: TokenSaver = { try LocalCredentialStore.saveWebAccessToken($0) },
         generateToken: () -> String = { generateWebAccessToken() }
     ) -> WebAccessTokenLoadResult {
         do {
             let storedToken = try loadStoredToken().trimmingCharacters(in: .whitespacesAndNewlines)
             if !storedToken.isEmpty {
-                return WebAccessTokenLoadResult(token: storedToken, storageStatus: .keychain)
+                return WebAccessTokenLoadResult(token: storedToken, storageStatus: .encrypted)
             }
             let token = generateToken()
             try saveStoredToken(token)
-            return WebAccessTokenLoadResult(token: token, storageStatus: .keychain)
+            return WebAccessTokenLoadResult(token: token, storageStatus: .encrypted)
         } catch {
             return WebAccessTokenLoadResult(
                 token: generateToken(),
                 storageStatus: .memoryOnly,
-                statusMessage: "无法访问系统钥匙串，Web 管理访问令牌仅在本次运行中有效"
+                statusMessage: "无法访问本地加密存储，Web 管理访问令牌仅在本次运行中有效"
             )
         }
     }
@@ -100,10 +99,9 @@ enum CredentialTokenCoordinator {
 
     private static func secureRandomBytes(count: Int) -> [UInt8]? {
         var bytes = [UInt8](repeating: 0, count: count)
-        let status = bytes.withUnsafeMutableBytes { buffer in
-            guard let baseAddress = buffer.baseAddress else { return errSecAllocate }
-            return SecRandomCopyBytes(kSecRandomDefault, buffer.count, baseAddress)
+        for index in bytes.indices {
+            bytes[index] = UInt8.random(in: .min ... .max)
         }
-        return status == errSecSuccess ? bytes : nil
+        return bytes
     }
 }

@@ -17,9 +17,9 @@ final class CredentialTokenCoordinatorTests: XCTestCase {
         )
 
         XCTAssertEqual(result.token, "ghp_stored")
-        XCTAssertEqual(result.storageStatus, .keychain)
+        XCTAssertEqual(result.storageStatus, .encrypted)
         XCTAssertTrue(result.shouldClearLegacyToken)
-        XCTAssertEqual(result.statusMessage, "GitHub Token 已改由系统钥匙串管理")
+        XCTAssertEqual(result.statusMessage, "GitHub Token 已改由本地加密存储管理")
         XCTAssertTrue(savedTokens.isEmpty)
     }
 
@@ -33,9 +33,9 @@ final class CredentialTokenCoordinatorTests: XCTestCase {
         )
 
         XCTAssertEqual(result.token, "ghp_legacy")
-        XCTAssertEqual(result.storageStatus, .keychain)
+        XCTAssertEqual(result.storageStatus, .encrypted)
         XCTAssertTrue(result.shouldClearLegacyToken)
-        XCTAssertEqual(result.statusMessage, "GitHub Token 已从同步配置迁移到系统钥匙串")
+        XCTAssertEqual(result.statusMessage, "GitHub Token 已从同步配置迁移到本地加密存储")
         XCTAssertEqual(savedToken, "ghp_legacy")
     }
 
@@ -52,7 +52,7 @@ final class CredentialTokenCoordinatorTests: XCTestCase {
         XCTAssertNil(result.statusMessage)
     }
 
-    func testCredentialTokenCoordinatorFallsBackToLegacyGitHubTokenWhenKeychainFails() {
+    func testCredentialTokenCoordinatorFallsBackToLegacyGitHubTokenWhenLocalStorageFails() {
         let result = CredentialTokenCoordinator.loadGitHubToken(
             migratingLegacyToken: " ghp_legacy ",
             loadStoredToken: { throw CredentialTestError.unavailable },
@@ -62,7 +62,7 @@ final class CredentialTokenCoordinatorTests: XCTestCase {
         XCTAssertEqual(result.token, "ghp_legacy")
         XCTAssertEqual(result.storageStatus, .legacyConfigurationFallback)
         XCTAssertFalse(result.shouldClearLegacyToken)
-        XCTAssertEqual(result.statusMessage, "无法访问系统钥匙串，暂时沿用旧同步配置中的 GitHub Token")
+        XCTAssertEqual(result.statusMessage, "无法访问本地加密存储，暂时沿用旧同步配置中的 GitHub Token")
     }
 
     func testCredentialTokenCoordinatorMarksGitHubTokenUnavailableWithoutLegacyFallback() {
@@ -89,7 +89,7 @@ final class CredentialTokenCoordinatorTests: XCTestCase {
         )
 
         XCTAssertEqual(result.token, "web-token")
-        XCTAssertEqual(result.storageStatus, .keychain)
+        XCTAssertEqual(result.storageStatus, .encrypted)
         XCTAssertNil(result.statusMessage)
     }
 
@@ -103,7 +103,7 @@ final class CredentialTokenCoordinatorTests: XCTestCase {
         )
 
         XCTAssertEqual(result.token, "generated-web-token")
-        XCTAssertEqual(result.storageStatus, .keychain)
+        XCTAssertEqual(result.storageStatus, .encrypted)
         XCTAssertNil(result.statusMessage)
         XCTAssertEqual(savedToken, "generated-web-token")
     }
@@ -124,7 +124,7 @@ final class CredentialTokenCoordinatorTests: XCTestCase {
         XCTAssertEqual(attemptedSave, "token-for-failed-save")
         XCTAssertEqual(result.token, "memory-token")
         XCTAssertEqual(result.storageStatus, .memoryOnly)
-        XCTAssertEqual(result.statusMessage, "无法访问系统钥匙串，Web 管理访问令牌仅在本次运行中有效")
+        XCTAssertEqual(result.statusMessage, "无法访问本地加密存储，Web 管理访问令牌仅在本次运行中有效")
         XCTAssertTrue(generatedTokens.isEmpty)
     }
 

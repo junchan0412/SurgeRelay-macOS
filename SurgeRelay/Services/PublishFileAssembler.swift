@@ -13,7 +13,7 @@ enum PublishFileAssembler {
     typealias ComponentReader = (UUID) async -> String?
     typealias AssetReader = (Set<UUID>) async throws -> [PublishFile]
     typealias Materializer = (String, [String: String]) async -> String
-    typealias MetadataApplier = (String, String, String) async -> String
+    typealias MetadataApplier = (String, String, String?, String) async -> String
     typealias CancellationCheckpoint = @MainActor () async throws -> Void
 
     @MainActor
@@ -44,7 +44,12 @@ enum PublishFileAssembler {
             }
             guard let content = await readComponent(module.id) else { continue }
             let materialized = await materialize(content, module.argumentOverrides)
-            let namedContent = await applyingModuleMetadata(module.name, module.category, materialized)
+            let namedContent = await applyingModuleMetadata(
+                module.name,
+                module.category,
+                module.customIconURL,
+                materialized
+            )
             files.append(PublishFile(name: module.publishedRelativePath, data: Data(namedContent.utf8)))
         }
         if request.includeAssets {

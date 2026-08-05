@@ -45,7 +45,7 @@ git log --oneline origin/main..upstream/main
 | 模块关系模型 | `storageLocation` × `initialSource(#SUBSCRIBED)` | 把 iCloud/GitHub/远程来源揉成单一 `storageMode` 语义 |
 | 发布模型 | `publishToLocal` + `publishToGitHub` 可并存；独立模块按 `storageLocation` 输出 | 仅 iCloud 或仅 GitHub 的旧路径假设 |
 | 架构 | AppModel 扩展拆分、planner/service 化、Web 资源拆分（`web-*.js`） | 重新塞回巨大 `AppModel.swift` / 单体 `RootView` / 单体 `app.js` |
-| 远程管理 | 本机 Web 管理 + 钥匙串 token | Surge Ponte 服务端/客户端整套模式（除非明确立项） |
+| 远程管理 | 本机 Web 管理 + 本地加密 token | Surge Ponte 服务端/客户端整套模式（除非明确立项） |
 | 发布产物 | 固定自签名 + Sparkle EdDSA + `script/build_release_assets.sh` | upstream 自己的 build 号、appcast 私钥、误提交图标/README 回滚链 |
 | Worker 示例 | 保留 `Deployment/CloudflareWorker` | upstream `2dbd992` 删除 Deployment 目录 |
 

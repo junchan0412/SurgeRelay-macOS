@@ -38,7 +38,7 @@ struct ModuleEditorView: View {
         if customIconInputIsInvalid {
             return "请输入完整的 HTTP/HTTPS 图标地址。"
         }
-        return "留空时优先展示来源里的 #!icon；自定义图标只用于 Surge Relay 与 Web 管理，不写入 Surge 输出。"
+        return "留空时保留来源里的 #!icon；填写后会在输出中重写 #!icon，来源缺失或不匹配时自动补齐。"
     }
 
     init(module: RelayModule?, defaultStorageLocation: ModuleStorageLocation = .gitHub) {

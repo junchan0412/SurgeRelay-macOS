@@ -130,7 +130,6 @@ struct ModulesView: View {
         } detail: {
             ModuleDetailPaneView(
                 searchText: $searchText,
-                columnVisibility: $columnVisibility,
                 editModule: presentEditor
             )
         }

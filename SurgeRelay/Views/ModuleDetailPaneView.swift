@@ -3,7 +3,6 @@ import SwiftUI
 struct ModuleDetailPaneView: View {
     @Environment(AppModel.self) private var model
     @Binding var searchText: String
-    @Binding var columnVisibility: NavigationSplitViewVisibility
     let editModule: (RelayModule) -> Void
 
     @State private var selectedTab: DetailTab = .info
@@ -68,19 +67,6 @@ struct ModuleDetailPaneView: View {
         .animation(.snappy(duration: 0.22), value: selectionKind.map(kindID))
         .searchable(text: $searchText, prompt: "搜索")
         .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Button {
-                    withAnimation(.snappy(duration: 0.2)) {
-                        columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
-                    }
-                } label: {
-                    Label(
-                        columnVisibility == .detailOnly ? "显示边栏" : "隐藏边栏",
-                        systemImage: "sidebar.left"
-                    )
-                }
-                .help(columnVisibility == .detailOnly ? "显示边栏" : "隐藏边栏")
-            }
             ToolbarSpacer(.flexible)
             if selectionKind != nil {
                 ToolbarItem {

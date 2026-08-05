@@ -27,11 +27,11 @@ extension AppModel {
     func saveGitHubToken() {
         githubToken = githubToken.trimmingCharacters(in: .whitespacesAndNewlines)
         do {
-            try KeychainStore.saveGitHubToken(githubToken)
+            try LocalCredentialStore.saveGitHubToken(githubToken)
             settings.githubToken = ""
-            githubTokenStorageStatus = githubToken.isEmpty ? .notConfigured : .keychain
+            githubTokenStorageStatus = githubToken.isEmpty ? .notConfigured : .encrypted
             PersistenceStore.saveSettings(settings)
-            statusMessage = githubToken.isEmpty ? "GitHub Token 已从系统钥匙串移除" : "GitHub Token 已保存到系统钥匙串"
+            statusMessage = githubToken.isEmpty ? "GitHub Token 已从本地加密存储移除" : "GitHub Token 已保存到本地加密文件"
         } catch {
             githubTokenStorageStatus = githubToken.isEmpty ? .unavailable : .memoryOnly
             presentedError = "无法保存 GitHub Token：\(error.localizedDescription)"

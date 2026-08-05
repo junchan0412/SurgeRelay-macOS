@@ -43,9 +43,9 @@ final class DiagnosticReportTests: XCTestCase {
                 updateRecommendation: "App 内更新可用"
             ),
             credentials: CredentialDiagnosticSnapshot.current(
-                githubTokenStatus: .keychain,
+                githubTokenStatus: .encrypted,
                 webAccessTokenStatus: .memoryOnly,
-                keychainAccessProbe: .notChecked
+                credentialProbe: .notChecked
             ),
             localModuleRoot: LocalModuleRootDiagnosticSnapshot(
                 path: "/Users/example/Surge",
@@ -83,7 +83,7 @@ final class DiagnosticReportTests: XCTestCase {
         XCTAssertEqual(report.engineRevision, "abcdef123456")
         XCTAssertEqual(report.webServerState, "running")
         XCTAssertEqual(report.webManagementURL, "http://127.0.0.1:8787/")
-        XCTAssertEqual(report.webAccessTokenStorageStatus, "钥匙串不可用，仅本次运行有效")
+        XCTAssertEqual(report.webAccessTokenStorageStatus, "本地加密存储不可用，仅本次运行有效")
         XCTAssertEqual(report.activeWorkKind, "publishing")
         XCTAssertEqual(report.activeWorkTitle, "GitHub 发布")
         XCTAssertEqual(report.activeWorkStatus, "正在提交 GitHub 发布")

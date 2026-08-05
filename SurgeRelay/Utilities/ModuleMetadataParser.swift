@@ -41,6 +41,15 @@ enum ModuleMetadataParser {
         return parseScriptHubSubscriptionURL(value)
     }
 
+    /// Recovers a subscription record from a registered Script-Hub converter
+    /// address itself, so modules can update from their embedded original URL
+    /// even when the converted content omits the `#SUBSCRIBED` marker.
+    static func scriptHubSubscription(from sourceURL: String) -> ScriptHubSubscriptionInfo? {
+        let value = sourceURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard value.contains("/_start_/") else { return nil }
+        return parseScriptHubSubscriptionURL(value)
+    }
+
     static func iconURL(in content: String, relativeTo source: String? = nil) -> URL? {
         guard let rawValue = ModuleMetadataLineReader.hashBangValue(named: "icon", in: content) else {
             return nil
@@ -124,21 +133,46 @@ enum ModuleMetadataParser {
         return line + "\n" + normalized
     }
 
-    static func removingIconMetadata(from content: String) -> String {
+    static func applyingIcon(_ iconURL: String?, to content: String) -> String {
         let normalized = content.replacingOccurrences(of: "\r\n", with: "\n")
-            .replacingOccurrences(of: "\r", with: "\n")
-        return normalized
-            .components(separatedBy: "\n")
-            .filter { !isIconMetadataLine($0) }
-            .joined(separator: "\n")
+        guard let iconURL = iconURL?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !iconURL.isEmpty else {
+            return normalized
+        }
+        let line = "#!icon=\(iconURL)"
+        let iconPattern = #"(?im)^\s*#!icon\s*=.*$"#
+        guard let expression = try? NSRegularExpression(pattern: iconPattern) else {
+            return line + "\n" + normalized
+        }
+        let range = NSRange(normalized.startIndex..., in: normalized)
+        if expression.firstMatch(in: normalized, range: range) != nil {
+            return expression.stringByReplacingMatches(
+                in: normalized,
+                range: range,
+                withTemplate: NSRegularExpression.escapedTemplate(for: line)
+            )
+        }
+        let namePattern = #"(?im)^\s*#!name\s*=.*$"#
+        if let nameExpression = try? NSRegularExpression(pattern: namePattern),
+           let match = nameExpression.firstMatch(in: normalized, range: range),
+           let nameRange = Range(match.range, in: normalized) {
+            var updated = normalized
+            updated.insert(contentsOf: "\n\(line)", at: nameRange.upperBound)
+            return updated
+        }
+        return line + "\n" + normalized
     }
 
-    static func applyingModuleMetadata(name: String, category: String, to content: String) -> String {
-        removingIconMetadata(from: applyingCategory(category, to: applyingDisplayName(name, to: content)))
-    }
-
-    private static func isIconMetadataLine(_ line: String) -> Bool {
-        ModuleMetadataLineReader.hashBangName(in: line)?.caseInsensitiveCompare("icon") == .orderedSame
+    static func applyingModuleMetadata(
+        name: String,
+        category: String,
+        iconURL: String? = nil,
+        to content: String
+    ) -> String {
+        applyingIcon(
+            iconURL,
+            to: applyingCategory(category, to: applyingDisplayName(name, to: content))
+        )
     }
 
     private static func parseScriptHubSubscriptionURL(_ value: String) -> ScriptHubSubscriptionInfo? {

@@ -3,6 +3,23 @@ import XCTest
 @testable import SurgeRelay
 
 final class ModuleDraftPlannerTests: XCTestCase {
+    func testAddPlanRecoversSubscriptionFromRegisteredScriptHubAddress() throws {
+        var draft = ModuleDraft()
+        draft.name = "Subscribed"
+        draft.sourceURL = "https://script.hub/file/_start_/https://example.com/demo.conf/_end_/Demo.sgmodule?type=qx-rewrite&target=surge-module"
+
+        let plan = try ModuleDraftPlanner.addPlan(
+            from: draft,
+            modules: [],
+            combinedModuleFileName: "Surge Relay",
+            localModuleDirectory: ""
+        )
+
+        XCTAssertEqual(plan.module.initialSourceURL, "https://example.com/demo.conf")
+        XCTAssertEqual(plan.module.updateSourceURL, "https://example.com/demo.conf")
+        XCTAssertEqual(plan.module.initialSource, .subscribed(.quantumultX))
+    }
+
     func testModuleDraftRelationshipPlannerUsesSubscriptionMetadataAndWarnsForDisabledDestination() throws {
         let subscription = try XCTUnwrap(ModuleMetadataParser.scriptHubSubscription(in: """
         #SUBSCRIBED http://script.hub/file/_start_/https://example.com/demo.conf/_end_/Demo.sgmodule?type=qx-rewrite&target=surge-module

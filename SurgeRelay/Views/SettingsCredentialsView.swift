@@ -26,8 +26,8 @@ struct SettingsCredentialsView: View {
         SettingsForm {
             githubTokenSection
             webAccessTokenSection
-            SettingsSection("钥匙串状态") {
-                keychainDiagnosticsContent
+            SettingsSection("本地加密存储状态") {
+                localCredentialDiagnosticsContent
             }
         }
         .onAppear {
@@ -61,7 +61,7 @@ struct SettingsCredentialsView: View {
             SettingsControlRow("操作", icon: "ellipsis.circle") {
                 HStack(spacing: 8) {
                     Link("创建 Token", destination: URL(string: "https://github.com/settings/personal-access-tokens/new")!)
-                    Button("保存到钥匙串", systemImage: "key.fill") { model.saveGitHubToken() }
+                    Button("保存到本地", systemImage: "lock.fill") { model.saveGitHubToken() }
                     Button("测试连接", systemImage: "network") { testGitHubConnection() }
                         .disabled(model.githubToken.isEmpty || !model.settings.github.isConfigured || isTesting)
                     if isTesting {
@@ -101,7 +101,7 @@ struct SettingsCredentialsView: View {
             }
             SettingsControlRow("操作", icon: "ellipsis.circle") {
                 HStack(spacing: 8) {
-                    Button("保存到钥匙串", systemImage: "key.fill") { model.saveWebAccessToken() }
+                    Button("保存到本地", systemImage: "lock.fill") { model.saveWebAccessToken() }
                     Button("生成新令牌", systemImage: "arrow.triangle.2.circlepath") { model.resetWebAccessToken() }
                     Button("拷贝令牌", systemImage: "doc.on.doc") {
                         NSPasteboard.general.clearContents()
@@ -113,41 +113,33 @@ struct SettingsCredentialsView: View {
         }
     }
 
-    private var keychainDiagnosticsContent: some View {
+    private var localCredentialDiagnosticsContent: some View {
         let credentials = model.credentialDiagnostics()
         return Group {
             SettingsCopyableInfoRow(
-                title: "服务",
-                value: credentials.keychainService,
-                icon: "key.fill",
+                title: "存储位置",
+                value: credentials.storageLocation,
+                icon: "lock.fill",
                 monospaced: true,
-                copyValue: credentials.keychainService
+                copyValue: credentials.storageLocation
             )
-            SettingsInfoRow("访问检查", icon: "checkmark.shield") {
+            SettingsInfoRow("读写检查", icon: "checkmark.shield") {
                 VStack(alignment: .leading, spacing: 2) {
-                    Label(credentials.keychainAccessStatus, systemImage: credentials.keychainAccessState.systemImage)
-                        .foregroundStyle(keychainAccessProbeColor(credentials.keychainAccessState))
-                    if let checkedAt = credentials.keychainAccessCheckedAt {
+                    Label(credentials.probeStatus, systemImage: credentials.probeState.systemImage)
+                        .foregroundStyle(credentialProbeColor(credentials.probeState))
+                    if let checkedAt = credentials.probeCheckedAt {
                         Text(checkedAt.formatted(date: .abbreviated, time: .shortened))
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }
                 }
             }
-            Text(credentials.keychainAccessMessage)
+            Text(credentials.probeMessage)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
-            if let statusCode = credentials.keychainAccessStatusCode {
-                SettingsInfoRow("错误码", icon: "number") {
-                    Text("OSStatus \(statusCode)")
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                }
-            }
-            if !credentials.keychainAccessRecoverySuggestion.isEmpty {
-                Label(credentials.keychainAccessRecoverySuggestion, systemImage: "wrench.and.screwdriver")
+            if !credentials.probeRecoverySuggestion.isEmpty {
+                Label(credentials.probeRecoverySuggestion, systemImage: "wrench.and.screwdriver")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
@@ -162,19 +154,19 @@ struct SettingsCredentialsView: View {
                 account: credentials.webAccessTokenAccount,
                 status: credentials.webAccessTokenStatus
             )
-            Label(credentials.note, systemImage: "key.fill")
+            Label(credentials.note, systemImage: "lock.fill")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Button("重新检查", systemImage: "arrow.clockwise") {
-                model.refreshKeychainAccessProbe()
+                model.refreshCredentialProbe()
             }
-            .disabled(credentials.keychainAccessState == .checking)
+            .disabled(credentials.probeState == .checking)
         }
     }
 
     private var githubTokenStorageImage: String {
         switch model.githubTokenStorageStatus {
-        case .keychain: "checkmark.circle.fill"
+        case .encrypted: "checkmark.circle.fill"
         case .notChecked, .notConfigured: "questionmark.circle"
         case .legacyConfigurationFallback, .memoryOnly, .unavailable: "exclamationmark.triangle.fill"
         }
@@ -182,7 +174,7 @@ struct SettingsCredentialsView: View {
 
     private var githubTokenStorageColor: Color {
         switch model.githubTokenStorageStatus {
-        case .keychain: .green
+        case .encrypted: .green
         case .notChecked, .notConfigured: .secondary
         case .legacyConfigurationFallback, .memoryOnly, .unavailable: .orange
         }
@@ -190,7 +182,7 @@ struct SettingsCredentialsView: View {
 
     private var webAccessTokenStorageImage: String {
         switch model.webAccessTokenStorageStatus {
-        case .keychain: "key.fill"
+        case .encrypted: "lock.fill"
         case .notChecked, .notConfigured: "questionmark.circle"
         case .legacyConfigurationFallback, .memoryOnly, .unavailable: "exclamationmark.triangle.fill"
         }
@@ -198,13 +190,13 @@ struct SettingsCredentialsView: View {
 
     private var webAccessTokenStorageColor: Color {
         switch model.webAccessTokenStorageStatus {
-        case .keychain: .green
+        case .encrypted: .green
         case .notChecked, .notConfigured: .secondary
         case .legacyConfigurationFallback, .memoryOnly, .unavailable: .orange
         }
     }
 
-    private func keychainAccessProbeColor(_ state: KeychainAccessProbeState) -> Color {
+    private func credentialProbeColor(_ state: LocalCredentialProbeState) -> Color {
         switch state {
         case .available: .green
         case .unavailable: .orange
@@ -213,18 +205,18 @@ struct SettingsCredentialsView: View {
     }
 
     private func credentialLabel(_ title: String, account: String, status: String) -> some View {
-        let storedInKeychain = status == CredentialStorageStatus.keychain.title
+        let storedLocally = status == CredentialStorageStatus.encrypted.title
         let neutral = status == CredentialStorageStatus.notConfigured.title ||
             status == CredentialStorageStatus.notChecked.title
-        return SettingsInfoRow(title, icon: storedInKeychain ? "checkmark.circle.fill" : (neutral ? "questionmark.circle" : "exclamationmark.triangle.fill")) {
+        return SettingsInfoRow(title, icon: storedLocally ? "checkmark.circle.fill" : (neutral ? "questionmark.circle" : "exclamationmark.triangle.fill")) {
             VStack(alignment: .leading, spacing: 2) {
                 Label(
                     status,
-                    systemImage: storedInKeychain
+                    systemImage: storedLocally
                         ? "checkmark.circle.fill"
                         : (neutral ? "questionmark.circle" : "exclamationmark.triangle.fill")
                 )
-                .foregroundStyle(storedInKeychain ? .green : (neutral ? .secondary : .orange))
+                .foregroundStyle(storedLocally ? .green : (neutral ? .secondary : .orange))
                 Text(account)
                     .font(.caption2)
                     .foregroundStyle(.tertiary)

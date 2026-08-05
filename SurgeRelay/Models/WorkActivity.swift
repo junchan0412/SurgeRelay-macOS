@@ -13,7 +13,7 @@ enum WorkActivityKind: String, Codable, Equatable, Sendable {
     case confirmingPublish
     case savingPreview
     case restoringPreview
-    case checkingKeychain
+    case checkingLocalCredentials
 
     var title: String {
         switch self {
@@ -29,13 +29,13 @@ enum WorkActivityKind: String, Codable, Equatable, Sendable {
         case .confirmingPublish: "确认发布"
         case .savingPreview: "预览内容写入"
         case .restoringPreview: "预览内容恢复"
-        case .checkingKeychain: "钥匙串检查"
+        case .checkingLocalCredentials: "本地加密存储检查"
         }
     }
 
     var blocksUpdatesByDefault: Bool {
         switch self {
-        case .idle, .checkingKeychain:
+        case .idle, .checkingLocalCredentials:
             false
         case .updatingModules, .scanningLocalModules, .importingLocalModules, .refreshingScriptHub,
              .testingGitHub, .publishing, .automaticPublishing, .previewingPublish, .confirmingPublish,
@@ -49,7 +49,7 @@ enum WorkActivityKind: String, Codable, Equatable, Sendable {
         case .updatingModules, .scanningLocalModules, .importingLocalModules, .refreshingScriptHub,
              .testingGitHub, .publishing, .automaticPublishing, .previewingPublish, .confirmingPublish:
             true
-        case .idle, .savingPreview, .restoringPreview, .checkingKeychain:
+        case .idle, .savingPreview, .restoringPreview, .checkingLocalCredentials:
             false
         }
     }

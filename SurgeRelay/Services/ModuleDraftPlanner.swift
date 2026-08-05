@@ -116,7 +116,7 @@ enum ModuleDraftPlanner {
         }) else {
             throw RelayError.duplicateSourceURL
         }
-        let module = RelayModule(
+        var module = RelayModule(
             name: normalizedDraft.name,
             sourceURL: normalizedDraft.source,
             sourceFormat: draft.sourceFormat,
@@ -133,6 +133,11 @@ enum ModuleDraftPlanner {
             customIconURL: normalizedDraft.customIconURL,
             detectedSourceFormat: normalizedDraft.detectedSourceFormat
         )
+        if module.scriptHubSubscription == nil {
+            module.scriptHubSubscription = ModuleMetadataParser.scriptHubSubscription(
+                from: normalizedDraft.source
+            )
+        }
         return ModuleDraftAddPlan(module: module)
     }
 
@@ -202,6 +207,11 @@ enum ModuleDraftPlanner {
         module.detectedSourceFormat = normalizedDraft.detectedSourceFormat
         if sourceChanged {
             clearSourceRevisionState(&module)
+        }
+        if module.scriptHubSubscription == nil {
+            module.scriptHubSubscription = ModuleMetadataParser.scriptHubSubscription(
+                from: normalizedDraft.source
+            )
         }
         if sourceChanged || customIconChanged {
             module.iconURL = normalizedDraft.customIconURL

@@ -1,25 +1,44 @@
-import Security
 import XCTest
 @testable import SurgeRelay
 
 final class SecurityDiagnosticsTests: XCTestCase {
-    func testKeychainStoreRoundTripsPasswordWithCustomService() throws {
-        let service = "com.allenmiao.SurgeRelayTests.\(UUID().uuidString)"
+    func testLocalCredentialStoreRoundTripsPasswordInTemporaryDirectory() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let fileURL = root.appending(path: "credentials.encrypted")
+        let keyURL = root.appending(path: "credentials.key")
         let account = "github-token"
-        defer { try? KeychainStore.deletePassword(account: account, service: service) }
 
-        do {
-            XCTAssertNil(try KeychainStore.readPassword(account: account, service: service))
-            try KeychainStore.savePassword("ghp_first", account: account, service: service)
-            XCTAssertEqual(try KeychainStore.readPassword(account: account, service: service), "ghp_first")
-            try KeychainStore.savePassword("ghp_second", account: account, service: service)
-            XCTAssertEqual(try KeychainStore.readPassword(account: account, service: service), "ghp_second")
-            try KeychainStore.deletePassword(account: account, service: service)
-            XCTAssertNil(try KeychainStore.readPassword(account: account, service: service))
-        } catch let error as KeychainStoreError
-            where [errSecNotAvailable, errSecInteractionNotAllowed, errSecAuthFailed].contains(error.status) {
-            throw XCTSkip("Keychain is unavailable in this test environment: \(error.localizedDescription)")
-        }
+        XCTAssertNil(try LocalCredentialStore.readPassword(account: account, fileURL: fileURL, keyURL: keyURL))
+        try LocalCredentialStore.savePassword("ghp_first", account: account, fileURL: fileURL, keyURL: keyURL)
+        XCTAssertEqual(
+            try LocalCredentialStore.readPassword(account: account, fileURL: fileURL, keyURL: keyURL),
+            "ghp_first"
+        )
+        try LocalCredentialStore.savePassword("ghp_second", account: account, fileURL: fileURL, keyURL: keyURL)
+        XCTAssertEqual(
+            try LocalCredentialStore.readPassword(account: account, fileURL: fileURL, keyURL: keyURL),
+            "ghp_second"
+        )
+        try LocalCredentialStore.deletePassword(account: account, fileURL: fileURL, keyURL: keyURL)
+        XCTAssertNil(try LocalCredentialStore.readPassword(account: account, fileURL: fileURL, keyURL: keyURL))
+    }
+
+    func testLocalCredentialStoreProbeRoundTripsTemporaryDiagnosticEntry() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let fileURL = root.appending(path: "credentials.encrypted")
+        let keyURL = root.appending(path: "credentials.key")
+
+        let result = LocalCredentialStore.probeAccess(fileURL: fileURL, keyURL: keyURL)
+
+        XCTAssertTrue(result.isAvailable)
+        XCTAssertTrue(result.message.contains("正常"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fileURL.path))
     }
 
     func testInstallationDiagnosticsClassifiesAdHocGatekeeperAndQuarantine() {
@@ -85,25 +104,24 @@ final class SecurityDiagnosticsTests: XCTestCase {
         )
     }
 
-    func testCredentialDiagnosticsDescribeKeychainAccountsWithoutSecrets() {
+    func testCredentialDiagnosticsDescribeLocalEncryptedAccountsWithoutSecrets() {
         let checkedAt = Date(timeIntervalSince1970: 1_800)
         let diagnostics = CredentialDiagnosticSnapshot.current(
-            githubTokenStatus: .keychain,
+            githubTokenStatus: .encrypted,
             webAccessTokenStatus: .memoryOnly,
-            keychainAccessProbe: .from(
-                result: KeychainAccessProbeResult(isAvailable: true, message: "钥匙串读写正常。"),
+            credentialProbe: .from(
+                result: LocalCredentialProbeResult(isAvailable: true, message: "本地加密读写正常。"),
                 checkedAt: checkedAt
             )
         )
-        XCTAssertEqual(diagnostics.keychainService, KeychainStore.defaultService)
-        XCTAssertEqual(diagnostics.keychainAccessState, .available)
-        XCTAssertEqual(diagnostics.keychainAccessStatus, "可用")
-        XCTAssertEqual(diagnostics.keychainAccessMessage, "钥匙串读写正常。")
-        XCTAssertNil(diagnostics.keychainAccessStatusCode)
-        XCTAssertEqual(diagnostics.keychainAccessRecoverySuggestion, "")
-        XCTAssertEqual(diagnostics.keychainAccessCheckedAt, checkedAt)
-        XCTAssertEqual(diagnostics.githubTokenAccount, KeychainStore.githubTokenAccount)
-        XCTAssertEqual(diagnostics.webAccessTokenAccount, KeychainStore.webAccessTokenAccount)
+        XCTAssertEqual(diagnostics.storageLocation, LocalCredentialStore.defaultFileURL.path)
+        XCTAssertEqual(diagnostics.probeState, .available)
+        XCTAssertEqual(diagnostics.probeStatus, "可用")
+        XCTAssertEqual(diagnostics.probeMessage, "本地加密读写正常。")
+        XCTAssertEqual(diagnostics.probeRecoverySuggestion, "")
+        XCTAssertEqual(diagnostics.probeCheckedAt, checkedAt)
+        XCTAssertEqual(diagnostics.githubTokenAccount, LocalCredentialStore.githubTokenAccount)
+        XCTAssertEqual(diagnostics.webAccessTokenAccount, LocalCredentialStore.webAccessTokenAccount)
         XCTAssertFalse(diagnostics.note.contains("ghp_"))
         XCTAssertFalse(diagnostics.note.contains("Bearer"))
     }
@@ -112,43 +130,36 @@ final class SecurityDiagnosticsTests: XCTestCase {
         let diagnostics = CredentialDiagnosticSnapshot.current(
             githubTokenStatus: .notChecked,
             webAccessTokenStatus: .notChecked,
-            keychainAccessProbe: .notChecked
+            credentialProbe: .notChecked
         )
 
         XCTAssertEqual(diagnostics.githubTokenStatus, "尚未检查")
         XCTAssertEqual(diagnostics.webAccessTokenStatus, "尚未检查")
-        XCTAssertEqual(diagnostics.keychainAccessStatus, "尚未检查")
+        XCTAssertEqual(diagnostics.probeStatus, "尚未检查")
     }
 
-    func testKeychainProbeSnapshotDescribesUnavailableAccess() {
+    func testLocalCredentialProbeSnapshotDescribesUnavailableAccess() {
         let checkedAt = Date(timeIntervalSince1970: 2_400)
-        let snapshot = KeychainAccessProbeSnapshot.from(
-            result: KeychainAccessProbeResult(
+        let snapshot = LocalCredentialProbeSnapshot.from(
+            result: LocalCredentialProbeResult(
                 isAvailable: false,
-                message: "钥匙串保存失败：User interaction is not allowed.",
-                statusCode: errSecInteractionNotAllowed,
-                recoverySuggestion: "请解锁登录钥匙串。"
+                message: "本地加密存储读取失败。",
+                recoverySuggestion: "请检查配置目录读写权限。"
             ),
             checkedAt: checkedAt
         )
 
         XCTAssertEqual(snapshot.state, .unavailable)
         XCTAssertEqual(snapshot.state.title, "不可用")
-        XCTAssertEqual(snapshot.message, "钥匙串保存失败：User interaction is not allowed.")
-        XCTAssertEqual(snapshot.statusCode, errSecInteractionNotAllowed)
-        XCTAssertEqual(snapshot.recoverySuggestion, "请解锁登录钥匙串。")
+        XCTAssertEqual(snapshot.message, "本地加密存储读取失败。")
+        XCTAssertEqual(snapshot.recoverySuggestion, "请检查配置目录读写权限。")
         XCTAssertEqual(snapshot.checkedAt, checkedAt)
     }
 
-    func testKeychainStoreErrorProvidesActionableRecoverySuggestion() {
-        let interactionError = KeychainStoreError(operation: "保存", status: errSecInteractionNotAllowed)
-        XCTAssertEqual(Int32(interactionError.status), errSecInteractionNotAllowed)
-        XCTAssertTrue(interactionError.localizedDescription.contains("钥匙串保存失败"))
-        XCTAssertTrue(interactionError.recoverySuggestion?.contains("登录") == true)
-        XCTAssertTrue(interactionError.recoverySuggestion?.contains("允许") == true)
-
-        let entitlementError = KeychainStoreError(operation: "读取", status: errSecMissingEntitlement)
-        XCTAssertTrue(entitlementError.recoverySuggestion?.contains("pkg") == true)
-        XCTAssertTrue(entitlementError.recoverySuggestion?.contains("重新保存 Token") == true)
+    func testLocalCredentialStoreErrorProvidesActionableRecoverySuggestion() {
+        let error = LocalCredentialStoreError(operation: "保存", detail: "加密失败。")
+        XCTAssertTrue(error.localizedDescription.contains("本地加密存储保存失败"))
+        XCTAssertTrue(error.recoverySuggestion?.contains("凭据") == true)
+        XCTAssertTrue(error.recoverySuggestion?.contains("重新保存 Token") == true)
     }
 }

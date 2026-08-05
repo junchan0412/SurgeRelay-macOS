@@ -2,7 +2,7 @@ import Foundation
 
 enum CredentialStorageStatus: String, Codable, Equatable, Sendable {
     case notChecked
-    case keychain
+    case encrypted
     case notConfigured
     case legacyConfigurationFallback
     case memoryOnly
@@ -11,16 +11,16 @@ enum CredentialStorageStatus: String, Codable, Equatable, Sendable {
     var title: String {
         switch self {
         case .notChecked: "尚未检查"
-        case .keychain: "已保存到系统钥匙串"
+        case .encrypted: "已保存到本地加密文件"
         case .notConfigured: "未配置"
-        case .legacyConfigurationFallback: "钥匙串不可用，暂用旧配置"
-        case .memoryOnly: "钥匙串不可用，仅本次运行有效"
-        case .unavailable: "钥匙串不可用"
+        case .legacyConfigurationFallback: "本地加密存储不可用，暂用旧配置"
+        case .memoryOnly: "本地加密存储不可用，仅本次运行有效"
+        case .unavailable: "本地加密存储不可用"
         }
     }
 }
 
-enum KeychainAccessProbeState: String, Codable, Equatable, Sendable {
+enum LocalCredentialProbeState: String, Codable, Equatable, Sendable {
     case notChecked
     case checking
     case available
@@ -45,44 +45,41 @@ enum KeychainAccessProbeState: String, Codable, Equatable, Sendable {
     }
 }
 
-struct KeychainAccessProbeSnapshot: Codable, Equatable, Sendable {
-    var state: KeychainAccessProbeState
+struct LocalCredentialProbeSnapshot: Codable, Equatable, Sendable {
+    var state: LocalCredentialProbeState
     var message: String
-    var statusCode: Int32?
     var recoverySuggestion: String
     var checkedAt: Date?
 
-    static let notChecked = KeychainAccessProbeSnapshot(
+    static let notChecked = LocalCredentialProbeSnapshot(
         state: .notChecked,
-        message: "尚未主动检查钥匙串读写权限。",
-        statusCode: nil,
+        message: "尚未主动检查本地加密存储读写权限。",
         recoverySuggestion: "",
         checkedAt: nil
     )
 
-    static let checking = KeychainAccessProbeSnapshot(
+    static let checking = LocalCredentialProbeSnapshot(
         state: .checking,
         message: "正在写入、读取并清理临时诊断项。",
-        statusCode: nil,
         recoverySuggestion: "",
         checkedAt: nil
     )
 
     static func current(
-        service: String = KeychainStore.defaultService,
+        fileURL: URL = LocalCredentialStore.defaultFileURL,
+        keyURL: URL = LocalCredentialStore.defaultKeyURL,
         checkedAt: Date = .now
-    ) -> KeychainAccessProbeSnapshot {
-        from(result: KeychainStore.probeAccess(service: service), checkedAt: checkedAt)
+    ) -> LocalCredentialProbeSnapshot {
+        from(result: LocalCredentialStore.probeAccess(fileURL: fileURL, keyURL: keyURL), checkedAt: checkedAt)
     }
 
     static func from(
-        result: KeychainAccessProbeResult,
+        result: LocalCredentialProbeResult,
         checkedAt: Date
-    ) -> KeychainAccessProbeSnapshot {
-        KeychainAccessProbeSnapshot(
+    ) -> LocalCredentialProbeSnapshot {
+        LocalCredentialProbeSnapshot(
             state: result.isAvailable ? .available : .unavailable,
             message: result.message,
-            statusCode: result.statusCode,
             recoverySuggestion: result.recoverySuggestion,
             checkedAt: checkedAt
         )
@@ -90,13 +87,12 @@ struct KeychainAccessProbeSnapshot: Codable, Equatable, Sendable {
 }
 
 struct CredentialDiagnosticSnapshot: Codable, Equatable, Sendable {
-    var keychainService: String
-    var keychainAccessState: KeychainAccessProbeState
-    var keychainAccessStatus: String
-    var keychainAccessMessage: String
-    var keychainAccessStatusCode: Int32?
-    var keychainAccessRecoverySuggestion: String
-    var keychainAccessCheckedAt: Date?
+    var storageLocation: String
+    var probeState: LocalCredentialProbeState
+    var probeStatus: String
+    var probeMessage: String
+    var probeRecoverySuggestion: String
+    var probeCheckedAt: Date?
     var githubTokenAccount: String
     var githubTokenStatus: String
     var webAccessTokenAccount: String
@@ -106,21 +102,20 @@ struct CredentialDiagnosticSnapshot: Codable, Equatable, Sendable {
     static func current(
         githubTokenStatus: CredentialStorageStatus,
         webAccessTokenStatus: CredentialStorageStatus,
-        keychainAccessProbe: KeychainAccessProbeSnapshot = .notChecked
+        credentialProbe: LocalCredentialProbeSnapshot = .notChecked
     ) -> CredentialDiagnosticSnapshot {
         CredentialDiagnosticSnapshot(
-            keychainService: KeychainStore.defaultService,
-            keychainAccessState: keychainAccessProbe.state,
-            keychainAccessStatus: keychainAccessProbe.state.title,
-            keychainAccessMessage: keychainAccessProbe.message,
-            keychainAccessStatusCode: keychainAccessProbe.statusCode,
-            keychainAccessRecoverySuggestion: keychainAccessProbe.recoverySuggestion,
-            keychainAccessCheckedAt: keychainAccessProbe.checkedAt,
-            githubTokenAccount: KeychainStore.githubTokenAccount,
+            storageLocation: LocalCredentialStore.defaultFileURL.path,
+            probeState: credentialProbe.state,
+            probeStatus: credentialProbe.state.title,
+            probeMessage: credentialProbe.message,
+            probeRecoverySuggestion: credentialProbe.recoverySuggestion,
+            probeCheckedAt: credentialProbe.checkedAt,
+            githubTokenAccount: LocalCredentialStore.githubTokenAccount,
             githubTokenStatus: githubTokenStatus.title,
-            webAccessTokenAccount: KeychainStore.webAccessTokenAccount,
+            webAccessTokenAccount: LocalCredentialStore.webAccessTokenAccount,
             webAccessTokenStatus: webAccessTokenStatus.title,
-            note: "Surge Relay 只使用系统钥匙串保存 GitHub Token 和 Web 管理访问令牌；主动检查会创建一个临时诊断项并立即删除，诊断报告会导出错误码和修复建议，但不会导出令牌内容。"
+            note: "Surge Relay 使用配置目录中的本地加密文件保存 GitHub Token 和 Web 管理访问令牌，不依赖系统钥匙串，无开发者账户签名也可正常保存；主动检查会写入并立即删除临时诊断项，诊断报告不会导出密钥或令牌内容。"
         )
     }
 }

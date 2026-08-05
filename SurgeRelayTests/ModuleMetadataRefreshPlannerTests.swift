@@ -328,6 +328,28 @@ final class ModuleMetadataRefreshPlannerTests: XCTestCase {
         XCTAssertEqual(plan.module.initialSource, .subscribed(.surge))
     }
 
+    func testPlanRecoversSubscriptionFromRegisteredScriptHubAddress() throws {
+        let module = RelayModule(
+            name: "Recovered",
+            sourceURL: "https://script.hub/file/_start_/https://example.com/QuantumultX/demo.conf/_end_/Demo.sgmodule?type=qx-rewrite&target=surge-module",
+            sourceFormat: .automatic,
+            outputFileName: "Demo.sgmodule"
+        )
+
+        let plan = ModuleMetadataRefreshPlanner.plan(
+            module: module,
+            cachedContent: "#!name=Upstream without metadata\n[General]",
+            convertedContent: nil,
+            hasOverride: false,
+            detectedIconURL: nil
+        )
+
+        XCTAssertTrue(plan.isChanged)
+        XCTAssertEqual(plan.module.scriptHubSubscription?.originalURL, "https://example.com/QuantumultX/demo.conf")
+        XCTAssertEqual(plan.module.updateSourceURL, "https://example.com/QuantumultX/demo.conf")
+        XCTAssertEqual(plan.module.initialSource, .subscribed(.quantumultX))
+    }
+
     func testUnchangedCachedContentPlanOnlyRefreshesSourceRevisionAndState() {
         let lastUpdatedAt = Date(timeIntervalSince1970: 10)
         let checkedAt = Date(timeIntervalSince1970: 20)

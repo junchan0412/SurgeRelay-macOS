@@ -42,6 +42,10 @@ enum ModuleMetadataRefreshPlanner {
             ?? ModuleMetadataParser.scriptHubSubscription(in: metadataContent)
         if let subscription {
             isChanged = module.reconcileScriptHubSubscriptionMetadata(subscription) || isChanged
+        } else if module.scriptHubSubscription == nil,
+                  let embedded = ModuleMetadataParser.scriptHubSubscription(from: module.sourceURL) {
+            module.scriptHubSubscription = embedded
+            isChanged = true
         }
         isChanged = module.repairSourceFormatFromUpdateSource() || isChanged
 
@@ -101,6 +105,9 @@ enum ModuleMetadataRefreshPlanner {
 
         if let subscription = ModuleMetadataParser.scriptHubSubscription(in: convertedContent) {
             _ = module.reconcileScriptHubSubscriptionMetadata(subscription)
+        } else if module.scriptHubSubscription == nil,
+                  let embedded = ModuleMetadataParser.scriptHubSubscription(from: module.sourceURL) {
+            module.scriptHubSubscription = embedded
         }
         _ = module.repairSourceFormatFromUpdateSource()
 
@@ -131,6 +138,10 @@ enum ModuleMetadataRefreshPlanner {
         revisionSnapshot: SourceRevisionSnapshot
     ) -> ModuleUnchangedCachedContentPlan {
         var module = module
+        if module.scriptHubSubscription == nil,
+           let embedded = ModuleMetadataParser.scriptHubSubscription(from: module.sourceURL) {
+            module.scriptHubSubscription = embedded
+        }
         module.sourceETag = revisionSnapshot.etag
         module.sourceLastModified = revisionSnapshot.lastModified
         module.sourceContentHash = revisionSnapshot.contentHash
