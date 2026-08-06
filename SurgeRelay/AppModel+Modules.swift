@@ -67,19 +67,19 @@ extension AppModel {
         }
     }
 
-    func setModuleEnabled(id: UUID, enabled: Bool) {
+    func setModuleIncludedInCombined(id: UUID, included: Bool) {
         guard let index = modules.firstIndex(where: { $0.id == id }) else { return }
-        guard modules[index].isEnabled != enabled else { return }
+        guard modules[index].isIncludedInCombined != included else { return }
         registerLocalChange()
-        modules[index].isEnabled = enabled
+        modules[index].isIncludedInCombined = included
         invalidateModuleSummaryCache()
         try? persistModules()
         if settings.combinedModuleEnabled {
-            statusMessage = enabled ? "已将 \(modules[index].name) 加入总模块" : "已将 \(modules[index].name) 从总模块移除"
+            statusMessage = included ? "已将 \(modules[index].name) 加入总模块" : "已将 \(modules[index].name) 从总模块移除"
         } else {
-            statusMessage = enabled ? "已记录 \(modules[index].name) 将在开启总模块后加入" : "已记录 \(modules[index].name) 不加入总模块"
+            statusMessage = included ? "已记录 \(modules[index].name) 将在开启总模块后加入" : "已记录 \(modules[index].name) 不加入总模块"
         }
-        if enabled, shouldUpdateModule(modules[index]) {
+        if included, shouldUpdateModule(modules[index]) {
             scheduleAutomaticUpdate()
         } else {
             Task { await rebuildCombinedFromCache() }

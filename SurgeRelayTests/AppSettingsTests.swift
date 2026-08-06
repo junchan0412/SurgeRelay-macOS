@@ -113,8 +113,8 @@ final class AppSettingsTests: XCTestCase {
             outputFileName: "Demo.sgmodule",
             storageLocation: .local
         )
-        XCTAssertEqual(ModuleFilter.updatable.matches(module, combinedModuleEnabled: true), false)
-        XCTAssertEqual(ModuleFilter.nonUpdatable.matches(module, combinedModuleEnabled: true), true)
+        XCTAssertEqual(ModuleFilter.updatable.matches(module, combinedModuleEnabled: true), true)
+        XCTAssertEqual(ModuleFilter.nonUpdatable.matches(module, combinedModuleEnabled: true), false)
         XCTAssertEqual(ModuleFilter.local.matches(module, combinedModuleEnabled: true), true)
         XCTAssertEqual(ModuleFilter.github.matches(module, combinedModuleEnabled: true), false)
 
@@ -124,7 +124,17 @@ final class AppSettingsTests: XCTestCase {
             outputFileName: "Demo",
             isEnabled: true
         )
-        XCTAssertEqual(ModuleFilter.enabled.matches(module, combinedModuleEnabled: true), true)
-        XCTAssertEqual(ModuleFilter.disabled.matches(module, combinedModuleEnabled: true), false)
+        XCTAssertEqual(ModuleFilter.includedInCombined.matches(module, combinedModuleEnabled: true), true)
+        XCTAssertEqual(ModuleFilter.excludedFromCombined.matches(module, combinedModuleEnabled: true), false)
+
+        XCTAssertEqual(ModuleFilter.includedInCombined.matches(module, combinedModuleEnabled: false), false)
+        XCTAssertEqual(ModuleFilter.excludedFromCombined.matches(module, combinedModuleEnabled: false), true)
+
+        let counts = ModuleFilter.counts(
+            for: [module],
+            combinedModuleEnabled: true
+        )
+        XCTAssertEqual(counts[.includedInCombined], 1)
+        XCTAssertEqual(counts[.excludedFromCombined], 0)
     }
 }

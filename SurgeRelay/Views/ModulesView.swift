@@ -37,7 +37,7 @@ struct ModulesView: View {
                 module.id.uuidString,
                 module.name,
                 module.state.rawValue,
-                module.isEnabled ? "1" : "0",
+                module.isIncludedInCombined ? "1" : "0",
                 module.publishesStandalone ? "1" : "0",
                 module.storageLocation.rawValue,
                 module.category,
@@ -97,12 +97,17 @@ struct ModulesView: View {
             : filterPlan.matches.filter {
                 sidebarFilter.matches($0, combinedModuleEnabled: model.settings.combinedModuleEnabled)
             }
+        let filterCounts = ModuleFilter.counts(
+            for: filterPlan.matches,
+            combinedModuleEnabled: model.settings.combinedModuleEnabled
+        )
         let sections = ModuleSidebarSectionPlanner.sections(for: filteredBySidebar)
         let next = SidebarPresentation(
             sections: sections,
             filteredModulesAreEmpty: filteredBySidebar.isEmpty,
             allModulesAreEmpty: model.modules.isEmpty,
-            combinedModuleEnabled: model.settings.combinedModuleEnabled
+            combinedModuleEnabled: model.settings.combinedModuleEnabled,
+            filterCounts: filterCounts
         )
         guard next != sidebarPresentation else { return }
         sidebarPresentation = next
@@ -116,6 +121,8 @@ struct ModulesView: View {
                 filteredModulesAreEmpty: sidebarPresentation.filteredModulesAreEmpty,
                 allModulesAreEmpty: sidebarPresentation.allModulesAreEmpty,
                 combinedModuleEnabled: sidebarPresentation.combinedModuleEnabled,
+                filterCounts: sidebarPresentation.filterCounts,
+                hasSearchQuery: !normalizedSearchText.isEmpty,
                 sidebarFilter: $sidebarFilter,
                 isBatchSelecting: $isBatchSelecting,
                 batchSelectedModuleIDs: $batchSelectedModuleIDs,
@@ -228,12 +235,14 @@ private struct SidebarPresentation: Equatable {
     var filteredModulesAreEmpty: Bool
     var allModulesAreEmpty: Bool
     var combinedModuleEnabled: Bool
+    var filterCounts: [ModuleFilter: Int]
 
     static let empty = SidebarPresentation(
         sections: [],
         filteredModulesAreEmpty: true,
         allModulesAreEmpty: true,
-        combinedModuleEnabled: false
+        combinedModuleEnabled: false,
+        filterCounts: [:]
     )
 }
 

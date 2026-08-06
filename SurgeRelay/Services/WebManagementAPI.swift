@@ -127,7 +127,7 @@ enum WebManagementAPI {
         switch (request.method, components[3]) {
         case ("POST", "enabled"):
             let payload = try request.decodeBody(WebEnabledRequest.self)
-            model.setModuleEnabled(id: id, enabled: payload.enabled)
+            model.setModuleIncludedInCombined(id: id, included: payload.enabled)
             return .json(ActionPayload(ok: true, message: model.statusMessage))
         case ("POST", "update"):
             let admission = model.updateAdmission(for: module)

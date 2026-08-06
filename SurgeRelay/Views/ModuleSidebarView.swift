@@ -8,6 +8,8 @@ struct ModuleSidebarView: View {
     let filteredModulesAreEmpty: Bool
     let allModulesAreEmpty: Bool
     let combinedModuleEnabled: Bool
+    let filterCounts: [ModuleFilter: Int]
+    let hasSearchQuery: Bool
     @Binding var sidebarFilter: ModuleFilter
     @Binding var isBatchSelecting: Bool
     @Binding var batchSelectedModuleIDs: Set<UUID>
@@ -18,7 +20,7 @@ struct ModuleSidebarView: View {
         @Bindable var model = model
 
         VStack(spacing: 0) {
-            ModuleSidebarFilterBar(selection: $sidebarFilter)
+            ModuleSidebarFilterBar(selection: $sidebarFilter, counts: filterCounts)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
 
@@ -40,9 +42,9 @@ struct ModuleSidebarView: View {
             .overlay {
                 if filteredModulesAreEmpty {
                     ContentUnavailableView(
-                        allModulesAreEmpty ? "还没有模块" : "没有搜索结果",
+                        emptyStateTitle,
                         systemImage: "shippingbox",
-                        description: Text(allModulesAreEmpty ? "添加第一个更新地址，或扫描现有本地模块。" : "换个关键词试试。")
+                        description: Text(emptyStateDescription)
                     )
                     .transition(.opacity.combined(with: .scale(scale: 0.98)))
                 }
@@ -52,6 +54,19 @@ struct ModuleSidebarView: View {
             ModuleSidebarStatusCard()
                 .background(.bar)
         }
+    }
+
+    private var emptyStateTitle: String {
+        if allModulesAreEmpty { return "还没有模块" }
+        if hasSearchQuery && sidebarFilter != .all { return "没有符合筛选条件的模块" }
+        if hasSearchQuery { return "没有搜索结果" }
+        return "没有符合筛选条件的模块"
+    }
+
+    private var emptyStateDescription: String {
+        if allModulesAreEmpty { return "添加第一个更新地址，或扫描现有本地模块。" }
+        if sidebarFilter != .all { return "可切换“全部”或其他筛选条件。" }
+        return "换个关键词试试。"
     }
 
     @ViewBuilder
@@ -93,8 +108,8 @@ struct ModuleSidebarView: View {
             ModuleRow(
                 module: module,
                 combinedModuleEnabled: combinedModuleEnabled,
-                onEnabledChange: { enabled in
-                    model.setModuleEnabled(id: module.id, enabled: enabled)
+                onIncludedChange: { included in
+                    model.setModuleIncludedInCombined(id: module.id, included: included)
                 }
             )
         }
@@ -150,6 +165,7 @@ struct ModuleSidebarView: View {
 
 private struct ModuleSidebarFilterBar: View {
     @Binding var selection: ModuleFilter
+    let counts: [ModuleFilter: Int]
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -160,7 +176,11 @@ private struct ModuleSidebarFilterBar: View {
                             selection = filter
                         }
                     } label: {
-                        Label(filter.title, systemImage: filter.systemImage)
+                        Label {
+                            Text("\(filter.title) \(counts[filter, default: 0])")
+                        } icon: {
+                            Image(systemName: filter.systemImage)
+                        }
                             .font(.caption)
                             .lineLimit(1)
                             .padding(.horizontal, 9)
@@ -374,7 +394,7 @@ private struct ModuleSidebarStatusCard: View {
 private struct ModuleRow: View {
     let module: RelayModule
     let combinedModuleEnabled: Bool
-    let onEnabledChange: (Bool) -> Void
+    let onIncludedChange: (Bool) -> Void
 
     var body: some View {
         HStack(spacing: 10) {
@@ -406,8 +426,8 @@ private struct ModuleRow: View {
             .frame(width: 14, height: 14)
             if combinedModuleEnabled {
                 Toggle("包含", isOn: Binding(
-                    get: { module.isEnabled },
-                    set: onEnabledChange
+                    get: { module.isIncludedInCombined },
+                    set: onIncludedChange
                 ))
                 .labelsHidden()
                 .toggleStyle(.switch)
@@ -415,9 +435,9 @@ private struct ModuleRow: View {
             }
         }
         .padding(.vertical, 5)
-        .opacity(combinedModuleEnabled && !module.isEnabled ? 0.55 : 1)
+        .opacity(combinedModuleEnabled && !module.isIncludedInCombined ? 0.55 : 1)
         .animation(.snappy(duration: 0.18), value: module.state)
-        .animation(.snappy(duration: 0.18), value: module.isEnabled)
+        .animation(.snappy(duration: 0.18), value: module.isIncludedInCombined)
     }
 
     private var subtitle: String {

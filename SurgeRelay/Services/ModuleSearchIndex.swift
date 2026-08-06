@@ -60,7 +60,7 @@ enum ModuleSearchIndex {
             module.storageLocation.rawValue,
             module.localStorageRelativePath ?? "",
             module.publishesStandalone ? "1" : "0",
-            module.isEnabled ? "1" : "0",
+            module.isIncludedInCombined ? "1" : "0",
             module.state.rawValue,
             module.iconURL ?? "",
             module.customIconURL ?? "",
@@ -127,6 +127,7 @@ enum ModuleSearchIndex {
             module.standaloneStorageDetail,
             module.initialSource.title,
             module.relationshipSummary,
+            module.isIncludedInCombined ? "参与总模块 包含在总模块" : "不参与总模块",
             module.publishesStandalone ? "独立模块" : "不发布独立模块",
             module.state.title,
         ]

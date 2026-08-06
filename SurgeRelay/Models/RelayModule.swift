@@ -32,6 +32,13 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     var state: ModuleUpdateState
     var lastError: String?
 
+    /// Compatibility-backed name for the persisted `isEnabled` field.
+    /// The value controls whether this source is included in the combined module.
+    var isIncludedInCombined: Bool {
+        get { isEnabled }
+        set { isEnabled = newValue }
+    }
+
     init(
         id: UUID = UUID(),
         name: String,
