@@ -57,7 +57,7 @@ extension AppModel {
         modules.map { module in
             [
                 module.id.uuidString,
-                module.isEnabled ? "1" : "0",
+                module.isIncludedInCombined ? "1" : "0",
                 module.publishesStandalone ? "1" : "0",
                 module.state.rawValue,
                 module.hasOverrideConflict ? "1" : "0",

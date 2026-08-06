@@ -5,7 +5,7 @@ enum ModuleRefreshPlanner {
         _ module: RelayModule,
         combinedModuleEnabled: Bool
     ) -> Bool {
-        combinedModuleEnabled && module.isEnabled
+        combinedModuleEnabled && module.isIncludedInCombined
     }
 
     static func combinedContributorModules(

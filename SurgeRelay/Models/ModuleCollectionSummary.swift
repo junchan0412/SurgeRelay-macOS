@@ -23,7 +23,7 @@ struct ModuleCollectionSummary: Equatable, Sendable {
     ) {
         for module in modules {
             totalCount += 1
-            if module.isEnabled { enabledCount += 1 }
+            if module.isIncludedInCombined { enabledCount += 1 }
             if module.publishesStandalone { standaloneCount += 1 }
             if module.state == .failed { failedCount += 1 }
             if module.hasOverrideConflict { overrideConflictCount += 1 }

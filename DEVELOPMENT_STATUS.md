@@ -2,17 +2,17 @@
 
 Updated: 2026-08-05
 
-This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.24 (73)`.
+This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.25 (74)`.
 
 ## 当前状态
 
-- `1.3.24 (73)` 的变更已记录在 `CHANGELOG.md`，包含侧边栏筛选体系、批量更新进度 `n/total` 展示和“启动时更新模块”设置，以及此前版本的 `.module` 识别修复、`#SUBSCRIBED` 自动写入、远程来源分类和本地加密凭据等改进；发布预检、Web 测试与 macOS 单元测试均通过。
+- `1.3.25 (74)` 的变更已记录在 `CHANGELOG.md`，包含总模块参与筛选语义、筛选计数和空状态优化，以及与实际更新计划统一的“可更新”筛选；此前版本的 `.module` 识别修复、`#SUBSCRIBED` 自动写入、远程来源分类和本地加密凭据等改进仍然保留。
 - 凭据存储已从系统钥匙串迁移到配置目录内的 AES-256-GCM 本地加密文件，无开发者账户签名也能正常保存；凭据诊断、设置页、README 和测试已同步。
 - 自定义图标会重写模块输出中的 `#!icon`，来源缺失或不匹配时自动补齐/替换；未填写时保留来源图标，桌面端、Web 管理端和发布产物使用同一个值。
 - 订阅模块可以从登记的 Script-Hub 转换地址恢复内嵌 `originalURL`，即使转换内容缺少 `#SUBSCRIBED` 标记，也能按订阅初始地址继续更新。
 - 初始来源恢复“远程来源”分类：有有效 `#SUBSCRIBED` 记录时归为订阅来源；没有该记录但更新地址为 HTTP/HTTPS 时归为远程来源；只有本地文件且无记录时才归为自写模块。
 - 详情工具栏重复的自定义侧边栏切换按钮已移除，只保留 `NavigationSplitView` 系统自带的边栏开关。
-- 侧边栏新增“全部 / 可更新 / 不可更新 / 已启用 / 已禁用 / 本地 / GitHub / 需要处理 / 未分类”筛选，可与搜索叠加使用。
+- 侧边栏提供“全部 / 可更新 / 不可更新 / 参与总模块 / 不参与总模块 / 本地 / GitHub / 需要处理 / 未分类”筛选，可与搜索叠加使用；筛选按钮显示当前结果计数，空状态区分搜索无结果和筛选无匹配。
 - 模块批量更新进度改为 `完成数/总数`（例如 `1/88`）展示，桌面端和 Web 管理端同步；进度条仍保留。
 - “设置 > 通用 > 自动化”新增“启动时更新模块”开关，关闭后启动不再触发全量模块更新。
 - 发布链路仍为固定自签名 + Sparkle EdDSA；ATS 全局放宽与 App Sandbox 关闭状态与 `docs/RELEASE_HARDENING.md` 保持一致。
