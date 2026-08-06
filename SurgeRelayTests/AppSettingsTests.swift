@@ -86,4 +86,45 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertFalse(settings.combinedModuleEnabled)
         XCTAssertNil(PublishedAddressResolver.combinedLocalFileURL(settings: settings))
     }
+
+    func testAppSettingsDefaultEnablesLaunchUpdate() throws {
+        let settings = try JSONDecoder().decode(AppSettings.self, from: Data("{}".utf8))
+        XCTAssertTrue(settings.automaticallyUpdateOnLaunch)
+    }
+
+    func testAppSettingsDecodeLaunchUpdateFalse() throws {
+        let settings = try JSONDecoder().decode(AppSettings.self, from: Data(#"{"automaticallyUpdateOnLaunch":false}"#.utf8))
+        XCTAssertFalse(settings.automaticallyUpdateOnLaunch)
+    }
+
+    func testModuleFilterMatching() {
+        var module = RelayModule(
+            name: "Demo",
+            sourceURL: "https://example.com/test.sgmodule",
+            outputFileName: "Demo"
+        )
+        XCTAssertEqual(ModuleFilter.all.matches(module, combinedModuleEnabled: true), true)
+        XCTAssertEqual(ModuleFilter.updatable.matches(module, combinedModuleEnabled: true), true)
+        XCTAssertEqual(ModuleFilter.nonUpdatable.matches(module, combinedModuleEnabled: true), false)
+
+        module = RelayModule(
+            name: "Local Demo",
+            sourceURL: URL(filePath: "/tmp/demo.sgmodule").absoluteString,
+            outputFileName: "Demo.sgmodule",
+            storageLocation: .local
+        )
+        XCTAssertEqual(ModuleFilter.updatable.matches(module, combinedModuleEnabled: true), false)
+        XCTAssertEqual(ModuleFilter.nonUpdatable.matches(module, combinedModuleEnabled: true), true)
+        XCTAssertEqual(ModuleFilter.local.matches(module, combinedModuleEnabled: true), true)
+        XCTAssertEqual(ModuleFilter.github.matches(module, combinedModuleEnabled: true), false)
+
+        module = RelayModule(
+            name: "Enabled",
+            sourceURL: "https://example.com/test.sgmodule",
+            outputFileName: "Demo",
+            isEnabled: true
+        )
+        XCTAssertEqual(ModuleFilter.enabled.matches(module, combinedModuleEnabled: true), true)
+        XCTAssertEqual(ModuleFilter.disabled.matches(module, combinedModuleEnabled: true), false)
+    }
 }

@@ -129,6 +129,11 @@
     const progressPercent = activity.isWorking && Number.isFinite(rawProgress)
       ? Math.min(100, Math.max(0, Math.round(rawProgress * 100)))
       : null;
+    const completedCount = activity.completedCount ?? null;
+    const totalCount = activity.totalCount ?? null;
+    const progressCountText = progressPercent !== null && completedCount != null && totalCount != null
+      ? `${completedCount}/${totalCount}`
+      : null;
     const showCancel = activity.canCancel === true && activity.kind !== 'idle';
     const canCancel = showCancel && activity.cancellationRequested !== true;
     return {
@@ -140,6 +145,7 @@
       canCancel,
       cancelLabel: activity.cancellationRequested ? '正在取消' : '取消',
       progressPercent,
+      progressCountText,
       progressVisible: progressPercent !== null,
       progressWidth: progressPercent === null ? '0%' : `${progressPercent}%`
     };

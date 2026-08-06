@@ -76,6 +76,13 @@ struct SettingsGeneralView: View {
                 get: { model.settings.launchAtLogin },
                 set: { model.setLaunchAtLogin($0) }
             ))
+            SettingsToggleRow("启动时更新模块", icon: "arrow.triangle.2.circlepath", isOn: Binding(
+                get: { model.settings.automaticallyUpdateOnLaunch },
+                set: {
+                    model.settings.automaticallyUpdateOnLaunch = $0
+                    model.saveSettings()
+                }
+            ))
             SettingsToggleRow("自动发布", icon: "arrow.up.doc", isOn: Binding(
                 get: { model.settings.automaticallyPublish },
                 set: {

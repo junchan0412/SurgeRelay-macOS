@@ -8,6 +8,7 @@ struct ModuleSidebarView: View {
     let filteredModulesAreEmpty: Bool
     let allModulesAreEmpty: Bool
     let combinedModuleEnabled: Bool
+    @Binding var sidebarFilter: ModuleFilter
     @Binding var isBatchSelecting: Bool
     @Binding var batchSelectedModuleIDs: Set<UUID>
     @Binding var deleteCandidate: RelayModule?
@@ -16,29 +17,35 @@ struct ModuleSidebarView: View {
     var body: some View {
         @Bindable var model = model
 
-        List(selection: $model.selectedModuleID) {
-            if combinedModuleEnabled {
-                Section {
-                    CombinedModuleRow()
-                        .tag(AppModel.combinedModuleSelectionID)
+        VStack(spacing: 0) {
+            ModuleSidebarFilterBar(selection: $sidebarFilter)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+
+            List(selection: $model.selectedModuleID) {
+                if combinedModuleEnabled {
+                    Section {
+                        CombinedModuleRow()
+                            .tag(AppModel.combinedModuleSelectionID)
+                    }
+                }
+
+                ForEach(sections) { section in
+                    moduleSection(section)
                 }
             }
-
-            ForEach(sections) { section in
-                moduleSection(section)
-            }
-        }
-        .listStyle(.sidebar)
-        .animation(.snappy(duration: 0.2), value: sections.map(\.id))
-        .animation(.snappy(duration: 0.2), value: collapsedSectionIDsRaw)
-        .overlay {
-            if filteredModulesAreEmpty {
-                ContentUnavailableView(
-                    allModulesAreEmpty ? "还没有模块" : "没有搜索结果",
-                    systemImage: "shippingbox",
-                    description: Text(allModulesAreEmpty ? "添加第一个更新地址，或扫描现有本地模块。" : "换个关键词试试。")
-                )
-                .transition(.opacity.combined(with: .scale(scale: 0.98)))
+            .listStyle(.sidebar)
+            .animation(.snappy(duration: 0.2), value: sections.map(\.id))
+            .animation(.snappy(duration: 0.2), value: collapsedSectionIDsRaw)
+            .overlay {
+                if filteredModulesAreEmpty {
+                    ContentUnavailableView(
+                        allModulesAreEmpty ? "还没有模块" : "没有搜索结果",
+                        systemImage: "shippingbox",
+                        description: Text(allModulesAreEmpty ? "添加第一个更新地址，或扫描现有本地模块。" : "换个关键词试试。")
+                    )
+                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                }
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -141,6 +148,48 @@ struct ModuleSidebarView: View {
     }
 }
 
+private struct ModuleSidebarFilterBar: View {
+    @Binding var selection: ModuleFilter
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(ModuleFilter.allCases) { filter in
+                    Button {
+                        withAnimation(.snappy(duration: 0.2)) {
+                            selection = filter
+                        }
+                    } label: {
+                        Label(filter.title, systemImage: filter.systemImage)
+                            .font(.caption)
+                            .lineLimit(1)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 4)
+                            .background(
+                                selection == filter
+                                    ? Color.accentColor.opacity(0.18)
+                                    : Color.primary.opacity(0.06),
+                                in: Capsule()
+                            )
+                            .overlay {
+                                Capsule()
+                                    .strokeBorder(
+                                        selection == filter
+                                            ? Color.accentColor.opacity(0.5)
+                                            : Color.primary.opacity(0.08),
+                                        lineWidth: 1
+                                    )
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(selection == filter ? .isSelected : [])
+                }
+            }
+            .padding(.horizontal, 2)
+        }
+    }
+}
+
 private struct ModuleSidebarSectionHeader: View {
     let title: String
     let count: Int
@@ -213,10 +262,10 @@ private struct ModuleSidebarStatusCard: View {
                                 .lineLimit(1)
                                 .contentTransition(.identity)
                             Spacer(minLength: 4)
-                            Text("\(synchronizationPercentage)%")
+                            Text("\(model.synchronizationCompletedCount)/\(model.synchronizationTotalCount)")
                                 .monospacedDigit()
-                                .contentTransition(.numericText(value: Double(synchronizationPercentage)))
-                                .animation(.smooth(duration: 0.25), value: synchronizationPercentage)
+                                .contentTransition(.numericText(value: Double(model.synchronizationCompletedCount)))
+                                .animation(.smooth(duration: 0.25), value: model.synchronizationCompletedCount)
                         }
                         .font(.caption)
                         ProgressView(value: synchronizationProgress)
@@ -318,9 +367,6 @@ private struct ModuleSidebarStatusCard: View {
         )
     }
 
-    private var synchronizationPercentage: Int {
-        Int((synchronizationProgress * 100).rounded())
-    }
 }
 
 /// Pure value row: no AppModel observation in body reads, so bulk update progress

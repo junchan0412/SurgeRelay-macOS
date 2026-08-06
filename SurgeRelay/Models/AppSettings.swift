@@ -129,6 +129,7 @@ struct AppSettings: Codable, Equatable, Sendable {
     var managedEngineFileName = "Script-Hub-Relay.sgmodule"
     var automaticallyUpdateScriptHub = true
     var refreshIntervalMinutes = 60
+    var automaticallyUpdateOnLaunch = true
     var automaticallyPublish = true
     var launchAtLogin = false
     var github = GitHubSettings()
@@ -160,6 +161,7 @@ struct AppSettings: Codable, Equatable, Sendable {
         managedEngineFileName = try container.decodeIfPresent(String.self, forKey: .managedEngineFileName) ?? "Script-Hub-Relay.sgmodule"
         automaticallyUpdateScriptHub = try container.decodeIfPresent(Bool.self, forKey: .automaticallyUpdateScriptHub) ?? true
         refreshIntervalMinutes = try container.decodeIfPresent(Int.self, forKey: .refreshIntervalMinutes) ?? 60
+        automaticallyUpdateOnLaunch = try container.decodeIfPresent(Bool.self, forKey: .automaticallyUpdateOnLaunch) ?? true
         automaticallyPublish = try container.decodeIfPresent(Bool.self, forKey: .automaticallyPublish) ?? true
         launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
         github = try container.decodeIfPresent(GitHubSettings.self, forKey: .github) ?? GitHubSettings()

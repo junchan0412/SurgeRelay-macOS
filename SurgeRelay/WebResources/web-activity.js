@@ -22,7 +22,7 @@
       ui.cancelActivity.disabled = !activity.canCancel;
       ui.cancelActivity.querySelector('span:last-child').textContent = activity.cancelLabel;
       if (activity.progressVisible) {
-        ui.percent.textContent = `${activity.progressPercent}%`;
+        ui.percent.textContent = activity.progressCountText || `${activity.progressPercent}%`;
         ui.progressTrack.hidden = false;
         ui.progressFill.style.width = activity.progressWidth;
       } else {

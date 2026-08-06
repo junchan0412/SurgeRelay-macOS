@@ -159,56 +159,61 @@ assert.deepEqual(
     canCancel: false,
     cancelLabel: '取消',
     progressPercent: null,
+    progressCountText: null,
     progressVisible: false,
     progressWidth: '0%'
   }
-);
-assert.deepEqual(
-  JSON.parse(JSON.stringify(logic.activityPresentation({
-    kind: 'idle',
-    status: '等待本地模块根目录',
-    canStartUpdate: false,
-    updateBlockedReason: '请先配置本地模块根目录',
-    automaticPublishRunsAt: '2026-07-04T12:00:00Z'
-  }, {
-    formatAutomaticPublish: value => `formatted ${value}`
-  }))),
-  {
-    statusText: '等待本地模块根目录 · 自动发布 formatted 2026-07-04T12:00:00Z',
-    refreshDisabled: true,
-    refreshTitle: '请先配置本地模块根目录',
-    refreshAriaLabel: '无法更新：请先配置本地模块根目录',
-    showCancel: false,
-    canCancel: false,
-    cancelLabel: '取消',
-    progressPercent: null,
-    progressVisible: false,
-    progressWidth: '0%'
-  }
-);
-assert.deepEqual(
-  JSON.parse(JSON.stringify(logic.activityPresentation({
-    kind: 'updating',
-    title: '更新',
-    status: '正在转换模块',
-    canStartUpdate: false,
-    canCancel: true,
-    cancellationRequested: false,
-    isWorking: true,
-    progress: 1.4
-  }))),
-  {
-    statusText: '更新 · 正在转换模块',
-    refreshDisabled: true,
-    refreshTitle: '当前无法开始更新',
-    refreshAriaLabel: '无法更新：当前无法开始更新',
-    showCancel: true,
-    canCancel: true,
-    cancelLabel: '取消',
-    progressPercent: 100,
-    progressVisible: true,
-    progressWidth: '100%'
-  }
+  );
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(logic.activityPresentation({
+      kind: 'idle',
+      status: '等待本地模块根目录',
+      canStartUpdate: false,
+      updateBlockedReason: '请先配置本地模块根目录',
+      automaticPublishRunsAt: '2026-07-04T12:00:00Z'
+    }, {
+      formatAutomaticPublish: value => `formatted ${value}`
+    }))),
+    {
+      statusText: '等待本地模块根目录 · 自动发布 formatted 2026-07-04T12:00:00Z',
+      refreshDisabled: true,
+      refreshTitle: '请先配置本地模块根目录',
+      refreshAriaLabel: '无法更新：请先配置本地模块根目录',
+      showCancel: false,
+      canCancel: false,
+      cancelLabel: '取消',
+      progressPercent: null,
+      progressCountText: null,
+      progressVisible: false,
+      progressWidth: '0%'
+    }
+  );
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(logic.activityPresentation({
+      kind: 'updating',
+      title: '更新',
+      status: '正在转换模块',
+      canStartUpdate: false,
+      canCancel: true,
+      cancellationRequested: false,
+      isWorking: true,
+      progress: 1.4,
+      completedCount: 3,
+      totalCount: 5
+    }))),
+    {
+      statusText: '更新 · 正在转换模块',
+      refreshDisabled: true,
+      refreshTitle: '当前无法开始更新',
+      refreshAriaLabel: '无法更新：当前无法开始更新',
+      showCancel: true,
+      canCancel: true,
+      cancelLabel: '取消',
+      progressPercent: 100,
+      progressCountText: '3/5',
+      progressVisible: true,
+      progressWidth: '100%'
+    }
 );
 assert.equal(
   logic.activityPresentation({

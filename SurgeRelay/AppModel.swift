@@ -149,14 +149,15 @@ final class AppModel {
             await cleanupLegacyOutputFiles()
             await refreshModuleMetadataFromCache()
             let missingEngine = !(await engineStore.hasScript(named: "Rewrite-Parser.js"))
-            if await ModuleRefreshPlanner.shouldUpdateOnLaunch(
-                modules: modules,
-                combinedModuleEnabled: settings.combinedModuleEnabled,
-                refreshIntervalMinutes: settings.refreshIntervalMinutes,
-                componentExists: { [fileStore] id in
-                    await fileStore.hasComponent(id: id)
-                }
-            ) {
+            if settings.automaticallyUpdateOnLaunch,
+               await ModuleRefreshPlanner.shouldUpdateOnLaunch(
+                   modules: modules,
+                   combinedModuleEnabled: settings.combinedModuleEnabled,
+                   refreshIntervalMinutes: settings.refreshIntervalMinutes,
+                   componentExists: { [fileStore] id in
+                       await fileStore.hasComponent(id: id)
+                   }
+               ) {
                 await updateAll()
             } else if UpdateCoordinator.shouldRefreshScriptHub(
                 missingEngine: missingEngine,

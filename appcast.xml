@@ -3,6 +3,22 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.3.24</title>
+            <pubDate>Thu, 06 Aug 2026 19:53:51 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.24</link>
+            <sparkle:version>73</sparkle:version>
+            <sparkle:shortVersionString>1.3.24</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.3.24
+
+
+- 左侧边栏新增模块筛选体系：可按“全部 / 可更新 / 不可更新 / 已启用 / 已禁用 / 本地 / GitHub / 需要处理 / 未分类”快速过滤模块列表。
+- 模块批量更新进度由百分比改为 `1/88`、`2/88` 的完成数/总数形式，桌面端和 Web 管理端同步更新。
+- 新增“启动时更新模块”设置项，可在“设置 > 通用 > 自动化”中关闭打开软件时的自动更新；关闭后启动只会恢复元数据，不会触发全量更新。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.3.24/Surge-Relay-1.3.24.app.zip" length="8836189" type="application/zip" sparkle:edSignature="fAoejuVb+SZrrCd9OY6/BOWJVkuy/YGZP1fuc3+8koWfdmQo40qEoufNZP8yrpQV68kW5/4Tsk/spDI2pQF0DA=="/>
+        </item>
+        <item>
             <title>1.3.23</title>
             <pubDate>Thu, 06 Aug 2026 17:32:49 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.23</link>

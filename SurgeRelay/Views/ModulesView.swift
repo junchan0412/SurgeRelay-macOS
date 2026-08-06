@@ -16,6 +16,7 @@ struct ModulesView: View {
     @State private var isBatchSelecting = false
     @State private var batchSelectedModuleIDs = Set<UUID>()
     @State private var sidebarPresentation = SidebarPresentation.empty
+    @State private var sidebarFilter: ModuleFilter = .all
 
     private var normalizedSearchText: String {
         ModuleSearchIndex.normalizedQuery(searchText)
@@ -49,6 +50,7 @@ struct ModulesView: View {
         }.joined(separator: "|")
         return [
             normalizedSearchText,
+            sidebarFilter.rawValue,
             model.settings.combinedModuleEnabled ? "1" : "0",
             contentIndexState.contentIndexCacheKeys
                 .map { "\($0.key.uuidString)=\($0.value)" }
@@ -90,10 +92,15 @@ struct ModulesView: View {
             metadataState: metadataIndexState
         )
         metadataIndexState = filterPlan.metadataState
-        let sections = ModuleSidebarSectionPlanner.sections(for: filterPlan.matches)
+        let filteredBySidebar = sidebarFilter == .all
+            ? filterPlan.matches
+            : filterPlan.matches.filter {
+                sidebarFilter.matches($0, combinedModuleEnabled: model.settings.combinedModuleEnabled)
+            }
+        let sections = ModuleSidebarSectionPlanner.sections(for: filteredBySidebar)
         let next = SidebarPresentation(
             sections: sections,
-            filteredModulesAreEmpty: filterPlan.matches.isEmpty,
+            filteredModulesAreEmpty: filteredBySidebar.isEmpty,
             allModulesAreEmpty: model.modules.isEmpty,
             combinedModuleEnabled: model.settings.combinedModuleEnabled
         )
@@ -109,6 +116,7 @@ struct ModulesView: View {
                 filteredModulesAreEmpty: sidebarPresentation.filteredModulesAreEmpty,
                 allModulesAreEmpty: sidebarPresentation.allModulesAreEmpty,
                 combinedModuleEnabled: sidebarPresentation.combinedModuleEnabled,
+                sidebarFilter: $sidebarFilter,
                 isBatchSelecting: $isBatchSelecting,
                 batchSelectedModuleIDs: $batchSelectedModuleIDs,
                 deleteCandidate: $deleteCandidate,
