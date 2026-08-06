@@ -2,11 +2,11 @@
 
 Updated: 2026-08-05
 
-This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.22 (71)`.
+This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.23 (72)`.
 
 ## 当前状态
 
-- `1.3.22 (71)` 的变更已记录在 `CHANGELOG.md`，包含远程来源分类修复以及此前 `1.3.21` 的本地加密凭据、自定义图标写入输出、订阅初始地址恢复和重复边栏按钮清理；发布预检、Web 测试与 macOS 单元测试均通过。
+- `1.3.23 (72)` 的变更已记录在 `CHANGELOG.md`，包含 Surge `.module` 识别修复、`#SUBSCRIBED` 标记自动写入与内容界面高亮，以及此前版本的远程来源分类、本地加密凭据和自定义图标等改进；发布预检、Web 测试与 macOS 单元测试均通过。
 - 凭据存储已从系统钥匙串迁移到配置目录内的 AES-256-GCM 本地加密文件，无开发者账户签名也能正常保存；凭据诊断、设置页、README 和测试已同步。
 - 自定义图标会重写模块输出中的 `#!icon`，来源缺失或不匹配时自动补齐/替换；未填写时保留来源图标，桌面端、Web 管理端和发布产物使用同一个值。
 - 订阅模块可以从登记的 Script-Hub 转换地址恢复内嵌 `originalURL`，即使转换内容缺少 `#SUBSCRIBED` 标记，也能按订阅初始地址继续更新。
@@ -84,7 +84,7 @@ This document tracks the optimization work completed after the deep audit and th
 
 ## 目标
 
-- 发布 `1.3.22 (71)`，随后继续推进 macOS 设置窗口、模块编辑器、详情页和 Web 管理端的自动化 UI 截图/交互覆盖。
+- 发布 `1.3.23 (72)`，随后继续推进 macOS 设置窗口、模块编辑器、详情页和 Web 管理端的自动化 UI 截图/交互覆盖。
 - 为 Web 管理端补充 Playwright 冒烟测试；继续拆分 `WebResources/app.js` 和较大的 Swift 文件。
 - 持续对照 `docs/UPSTREAM_SYNC.md` 选择性移植 upstream 修复，不合并与本 fork 存储/发布模型冲突的改动。
 - 在 Apple Developer ID 可用前维持固定自签名 + Sparkle 更新；可用后补充 Developer ID 签名、公证、stapling 与验证。
@@ -120,13 +120,13 @@ Use the Xcode beta toolchain explicitly:
 DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer"
 ```
 
-Before publishing (当前目标版本为 `1.3.22 (71)`):
+Before publishing (当前目标版本为 `1.3.23 (72)`):
 
 ```bash
 git diff --check
 node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs
-VERSION=1.3.22 BUILD=71 \
+VERSION=1.3.23 BUILD=72 \
 DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
 ./script/check_release_configuration.sh
 ```

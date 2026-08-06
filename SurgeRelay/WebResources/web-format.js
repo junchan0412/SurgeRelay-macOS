@@ -35,7 +35,8 @@
       const trimmed = line.trim();
       let value = escapeHTML(line);
       if (/^\[[^\]]+\]$/.test(trimmed)) return `<span class="code-line code-section">${value}</span>`;
-      if (/^(#|\/\/|;)/.test(trimmed)) return `<span class="code-line code-comment">${value}</span>`;
+      if (/^(?:#|\/\/|;)SUBSCRIBED\b/.test(trimmed)) return `<span class="code-line code-subscribed">${value}</span>`;
+      if (/^(?:#|\/\/|;)/.test(trimmed)) return `<span class="code-line code-comment">${value}</span>`;
       value = value.replace(/(https?:\/\/[^\s,&lt;&gt;]+)/g, '<span class="code-url">$1</span>');
       value = value.replace(/^([A-Za-z][A-Za-z0-9_-]*)(\s*=)/, '<span class="code-key">$1</span>$2');
       value = value.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="code-number">$1</span>');

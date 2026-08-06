@@ -60,10 +60,10 @@ enum ModuleSourceFormat: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 
     /// Extension-based signals that should win over a conflicting declared type or Script-Hub query.
-    /// `.sgmodule` is always a Surge module; `.plugin` / `.lpx` are always Loon plugins.
+    /// `.sgmodule` / `.module` are Surge modules; `.plugin` / `.lpx` are Loon plugins.
     static func definitiveFormat(for sourceURL: URL) -> ModuleSourceFormat? {
         switch sourceURL.pathExtension.lowercased() {
-        case "sgmodule": return .surge
+        case "sgmodule", "module": return .surge
         case "plugin", "lpx": return .loon
         default: return nil
         }

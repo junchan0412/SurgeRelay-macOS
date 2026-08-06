@@ -64,6 +64,10 @@ struct ModuleCodeTextView: NSViewRepresentable {
             pattern: #"^(?:#|//|;).*$"#,
             options: [.anchorsMatchLines]
         )
+        private static let subscribedExpression = try! NSRegularExpression(
+            pattern: #"^(?:#|//|;)SUBSCRIBED\b.*$"#,
+            options: [.anchorsMatchLines]
+        )
         private static let sectionExpression = try! NSRegularExpression(
             pattern: #"^\[[^\n]+\]$"#,
             options: [.anchorsMatchLines]
@@ -118,6 +122,10 @@ struct ModuleCodeTextView: NSViewRepresentable {
 
             apply(expression: Self.commentExpression, attributes: [
                 .foregroundColor: NSColor.secondaryLabelColor,
+            ], to: textStorage)
+            apply(expression: Self.subscribedExpression, attributes: [
+                .foregroundColor: NSColor.systemBlue,
+                .font: NSFont.monospacedSystemFont(ofSize: 13, weight: .semibold),
             ], to: textStorage)
             apply(expression: Self.sectionExpression, attributes: [
                 .foregroundColor: NSColor.systemPurple,

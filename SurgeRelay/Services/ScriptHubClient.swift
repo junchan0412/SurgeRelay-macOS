@@ -67,7 +67,9 @@ actor ScriptHubClient {
                 iconURL: module.customIconURL,
                 to: content
             )
-            let sanitized = SurgeModuleSanitizer.sanitize(namedContent)
+        let subscription = scriptHubSubscription(for: module)
+            let subscribedContent = ModuleMetadataParser.applyingScriptHubSubscription(subscription, to: namedContent)
+            let sanitized = SurgeModuleSanitizer.sanitize(subscribedContent)
             try validate(sanitized)
             return ConversionResult(content: sanitized, requestURL: sourceURL)
         }
@@ -91,7 +93,9 @@ actor ScriptHubClient {
             iconURL: module.customIconURL,
             to: materialized.content
         )
-        let sanitized = SurgeModuleSanitizer.sanitize(namedContent)
+            let subscription = scriptHubSubscription(for: module)
+        let subscribedContent = ModuleMetadataParser.applyingScriptHubSubscription(subscription, to: namedContent)
+        let sanitized = SurgeModuleSanitizer.sanitize(subscribedContent)
         try validate(sanitized)
         return ConversionResult(content: sanitized, requestURL: url, assets: materialized.assets)
     }
@@ -106,6 +110,10 @@ actor ScriptHubClient {
         guard markers.contains(where: trimmed.contains) else {
             throw RelayError.invalidOutput("没有检测到 Surge 模块标记或可用配置段。")
         }
+    }
+
+    private func scriptHubSubscription(for module: RelayModule) -> ScriptHubSubscriptionInfo? {
+        ModuleMetadataParser.scriptHubSubscription(for: module)
     }
 
     private func materializeConvertedScripts(

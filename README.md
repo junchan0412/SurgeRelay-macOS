@@ -1,6 +1,6 @@
 # Surge Relay for macOS
 
-Surge Relay 是一款用于集中管理、转换、编辑和发布 Surge 模块的 macOS 应用。它适合需要长期维护大量 `.sgmodule`、从 Loon/Quantumult X 等格式转换到 Surge、并把最终模块同步到本地 Surge 目录或 GitHub 仓库的用户。
+Surge Relay 是一款用于集中管理、转换、编辑和发布 Surge 模块的 macOS 应用。它适合需要长期维护大量 `.sgmodule` / `.module`、从 Loon/Quantumult X 等格式转换到 Surge、并把最终模块同步到本地 Surge 目录或 GitHub 仓库的用户。
 
 本 fork 基于 [EEliberto/SurgeRelay-macOS](https://github.com/EEliberto/SurgeRelay-macOS) 修改，继续遵守 Apache License 2.0。转换能力基于 [Script-Hub](https://github.com/Script-Hub-Org) 的本地引擎。
 
@@ -8,6 +8,7 @@ Surge Relay 是一款用于集中管理、转换、编辑和发布 Surge 模块�
 
 - 管理远程 HTTP/HTTPS 模块和本地 `file://` Surge 模块。
 - 使用内置 Script-Hub 引擎转换 Quantumult X、Loon 和 Surge 模块。
+- `.sgmodule` 与 `.module` 都按 Surge 模块识别，远程 Surge 模块直接抓取并自动写入 `#SUBSCRIBED` 标记，便于 Script-Hub 解析更新。
 - Script-Hub 上游默认固定到明确 commit；更新时会记录上游 revision 与脚本 SHA-256 hash。
 - 为每个模块配置 Surge `category` 标签、输出文件名、输出文件夹、自定义图标和 Script-Hub 参数。
 - 模块关系明确分为“模块存放位置”和“初始来源”：模块可以存放在本地或 GitHub；初始来源优先由 `#SUBSCRIBED originalURL` 判定，存在该记录时归类为订阅来源，没有该记录但更新地址为 HTTP/HTTPS 时归类为远程来源，只有本地文件且无记录时归类为自写模块。
@@ -40,7 +41,7 @@ xattr -dr com.apple.quarantine "/Applications/Surge Relay.app"
 
 扫描本地根目录时，App 会读取已有 `.sgmodule` 的 `#!name`、`#!category` 和 Script-Hub `#SUBSCRIBED` 来源记录，并在导入前展示预览。存在可解析的 `originalURL` 时，初始来源显示为对应的订阅格式，并恢复更新地址、Script-Hub 参数和模块标签；没有该记录但更新地址为远程地址时归类为“远程来源”，只有本地文件且无记录时归类为“自写模块”。原文件仍留在原位置，不会被复制到另一个同名位置。
 
-已经从本地文件确认的 `#SUBSCRIBED` 初始来源会持久保存。后续从 `originalURL` 下载的上游原生模块即使不再包含该标记，也不会覆盖已经确认的来源。启动时 App 会优先用本地物理文件修复缺失的订阅元数据，并在登记文件名与磁盘文件名仅存在空格/连字符差异时纠正本地相对路径。
+已经从本地文件确认的 `#SUBSCRIBED` 初始来源会持久保存。转换输出会自动写入或更新 `#SUBSCRIBED` 标记，内容界面会醒目显示该行，方便 Script-Hub 解析更新；后续从 `originalURL` 下载的上游原生模块即使不再包含该标记，也不会覆盖已经确认的来源。启动时 App 会优先用本地物理文件修复缺失的订阅元数据，并在登记文件名与磁盘文件名仅存在空格/连字符差异时纠正本地相对路径。
 
 左侧模块列表按维护状态分组：
 

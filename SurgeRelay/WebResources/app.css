@@ -372,6 +372,7 @@ input:focus, select:focus, textarea:focus { border-color: color-mix(in srgb, var
 .code-line { display: block; }
 .code-section { color: #af52de; font-weight: 600; }
 .code-comment { color: var(--tertiary-label); }
+.code-subscribed { color: var(--accent); font-weight: 600; }
 .code-url { color: var(--accent); }
 .code-key { color: #d12f89; }
 .code-number { color: #ff7a00; }

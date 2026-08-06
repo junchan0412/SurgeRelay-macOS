@@ -50,6 +50,38 @@ enum ModuleMetadataParser {
         return parseScriptHubSubscriptionURL(value)
     }
 
+    /// Builds a Script-Hub subscription record from the module's registered
+    /// update source, output name, format, category, and conversion options.
+    static func scriptHubSubscription(for module: RelayModule) -> ScriptHubSubscriptionInfo? {
+        guard module.hasRemoteUpdateSource,
+              let sourceURL = URL(string: module.updateSourceURL) else {
+            return nil
+        }
+        let source = sourceURL.absoluteString.components(separatedBy: "#").first ?? sourceURL.absoluteString
+        let fileName = FilenameSanitizer.baseName(from: module.outputFileName)
+            .addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? "module"
+        let type = module.sourceFormat.scriptHubType(for: sourceURL)
+        var components = URLComponents()
+        components.queryItems = [
+            URLQueryItem(name: "type", value: type),
+            URLQueryItem(name: "target", value: "surge-module")
+        ] + module.scriptHubOptions.queryItems()
+        guard let query = components.percentEncodedQuery,
+              let subscriptionURL = URL(string: "http://script.hub/file/_start_/\(source)/_end_/\(fileName).sgmodule?\(query)") else {
+            return nil
+        }
+        let baseName = FilenameSanitizer.baseName(from: module.outputFileName)
+        return ScriptHubSubscriptionInfo(
+            subscriptionURL: subscriptionURL.absoluteString,
+            originalURL: sourceURL.absoluteString,
+            outputName: baseName.isEmpty ? module.outputFileName : baseName,
+            sourceType: type,
+            target: "surge-module",
+            category: module.category.isEmpty ? nil : module.category,
+            options: module.scriptHubOptions
+        )
+    }
+
     static func iconURL(in content: String, relativeTo source: String? = nil) -> URL? {
         guard let rawValue = ModuleMetadataLineReader.hashBangValue(named: "icon", in: content) else {
             return nil
@@ -173,6 +205,42 @@ enum ModuleMetadataParser {
             iconURL,
             to: applyingCategory(category, to: applyingDisplayName(name, to: content))
         )
+    }
+
+    /// Inserts or refreshes a Script-Hub `#SUBSCRIBED` marker so the generated
+    /// content records its original remote address and conversion options.
+    static func applyingScriptHubSubscription(
+        _ subscription: ScriptHubSubscriptionInfo?,
+        to content: String
+    ) -> String {
+        guard let subscription else { return content }
+        let normalized = content.replacingOccurrences(of: "\r\n", with: "\n")
+        let line = "#SUBSCRIBED \(subscription.subscriptionURL)"
+        let pattern = #"(?im)^\s*#SUBSCRIBED\b.*$"#
+        guard let expression = try? NSRegularExpression(pattern: pattern) else {
+            return insertingSubscriptionLine(line, into: normalized)
+        }
+        let range = NSRange(normalized.startIndex..., in: normalized)
+        if expression.firstMatch(in: normalized, range: range) != nil {
+            return expression.stringByReplacingMatches(
+                in: normalized,
+                range: range,
+                withTemplate: NSRegularExpression.escapedTemplate(for: line)
+            )
+        }
+        return insertingSubscriptionLine(line, into: normalized)
+    }
+
+    private static func insertingSubscriptionLine(_ line: String, into content: String) -> String {
+        let namePattern = #"(?im)^\s*#!name\s*=.*$"#
+        if let nameExpression = try? NSRegularExpression(pattern: namePattern),
+           let match = nameExpression.firstMatch(in: content, range: NSRange(content.startIndex..., in: content)),
+           let nameRange = Range(match.range, in: content) {
+            var updated = content
+            updated.insert(contentsOf: "\n\(line)", at: nameRange.upperBound)
+            return updated
+        }
+        return line + "\n" + content
     }
 
     private static func parseScriptHubSubscriptionURL(_ value: String) -> ScriptHubSubscriptionInfo? {

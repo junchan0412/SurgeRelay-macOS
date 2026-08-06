@@ -22,7 +22,14 @@ struct ModulePreviewContentProvider {
     func previewContent(for module: RelayModule) async throws -> String {
         let content = try await componentContent(for: module)
         let materialized = await materialize(content, module.argumentOverrides)
-        return await applyingModuleMetadata(module.name, module.category, module.customIconURL, materialized)
+        let metadataContent = await applyingModuleMetadata(
+            module.name,
+            module.category,
+            module.customIconURL,
+            materialized
+        )
+        let subscription = ModuleMetadataParser.scriptHubSubscription(for: module)
+        return ModuleMetadataParser.applyingScriptHubSubscription(subscription, to: metadataContent)
     }
 
     func moduleArgumentInfo(for module: RelayModule) async -> ModuleArgumentInfo {

@@ -15,6 +15,38 @@ final class ScriptHubTests: XCTestCase {
         XCTAssertEqual(module.sourceFormat.scriptHubType(for: sourceURL), "surge-module")
     }
 
+    func testNativeSurgeModuleConversionWritesSubscribedMarkerForRemoteSource() async throws {
+        let module = RelayModule(
+            name: "Lingo Duo",
+            sourceURL: "https://raw.githubusercontent.com/TAKAGIVEGETA/MyScripts/refs/heads/main/lingoDuo/lingoDuo-xaM.module",
+            sourceFormat: .automatic,
+            outputFileName: "Lingo Duo"
+        )
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GitHubMockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        GitHubMockURLProtocol.reset()
+        defer { GitHubMockURLProtocol.reset() }
+        GitHubMockURLProtocol.handler = { _ in
+            (200, Data("""
+            #!name=Duolingo Max 解锁
+            [MITM]
+            hostname = %APPEND% ios-api-*.duolingo.com
+            [Script]
+            duolingo_max = type=http-response,pattern=^https://example.com/foo,script-path=https://example.com/foo.js
+            """.utf8))
+        }
+
+        let result = try await ScriptHubClient(session: session).convert(module: module)
+
+        XCTAssertTrue(result.content.contains("#SUBSCRIBED"))
+        XCTAssertTrue(result.content.contains(
+            "http://script.hub/file/_start_/https://raw.githubusercontent.com/TAKAGIVEGETA/MyScripts/refs/heads/main/lingoDuo/lingoDuo-xaM.module/_end_/Lingo-Duo.sgmodule"
+        ))
+        XCTAssertTrue(result.content.contains("[MITM]"))
+        XCTAssertTrue(result.content.contains("[Script]"))
+    }
+
     func testScriptHubConversionURLPreservesOriginalAddress() async throws {
         let module = RelayModule(
             name: "Test",

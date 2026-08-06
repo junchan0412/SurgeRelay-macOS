@@ -104,4 +104,44 @@ final class ModuleMetadataParserTests: XCTestCase {
         XCTAssertTrue(subscription.options.enableJQ)
         XCTAssertNil(ModuleMetadataParser.scriptHubSubscription(from: "https://example.com/demo.sgmodule"))
     }
+
+    func testApplyingScriptHubSubscriptionInsertsMarkerAfterName() {
+        let content = "#!name=Demo\n[General]\n"
+        let subscription = ScriptHubSubscriptionInfo(
+            subscriptionURL: "http://script.hub/file/_start_/https://example.com/demo.conf/_end_/Demo.sgmodule?type=surge-module&target=surge-module",
+            originalURL: "https://example.com/demo.conf",
+            outputName: "Demo.sgmodule",
+            sourceType: "surge-module",
+            target: "surge-module",
+            category: nil,
+            options: ScriptHubOptions()
+        )
+        let result = ModuleMetadataParser.applyingScriptHubSubscription(subscription, to: content)
+        XCTAssertTrue(result.hasPrefix("#!name=Demo\n"))
+        XCTAssertTrue(result.contains("#SUBSCRIBED http://script.hub/file/_start_/https://example.com/demo.conf/_end_/Demo.sgmodule"))
+        let nameRange = result.range(of: "#!name=Demo")!
+        let subRange = result.range(of: "#SUBSCRIBED")!
+        XCTAssertTrue(nameRange.upperBound < subRange.lowerBound)
+    }
+
+    func testApplyingScriptHubSubscriptionReplacesExistingMarker() {
+        let content = "#!name=Demo\n#SUBSCRIBED http://script.hub/file/_start_/https://old.com/old.conf/_end_/Demo.sgmodule\n[General]\n"
+        let subscription = ScriptHubSubscriptionInfo(
+            subscriptionURL: "http://script.hub/file/_start_/https://new.com/new.conf/_end_/Demo.sgmodule?type=surge-module&target=surge-module",
+            originalURL: "https://new.com/new.conf",
+            outputName: "Demo.sgmodule",
+            sourceType: "surge-module",
+            target: "surge-module",
+            category: nil,
+            options: ScriptHubOptions()
+        )
+        let result = ModuleMetadataParser.applyingScriptHubSubscription(subscription, to: content)
+        XCTAssertTrue(result.contains("#SUBSCRIBED http://script.hub/file/_start_/https://new.com/new.conf/_end_/Demo.sgmodule"))
+        XCTAssertFalse(result.contains("https://old.com/old.conf"))
+    }
+
+    func testApplyingScriptHubSubscriptionPreservesContentWhenNil() {
+        let content = "#!name=Demo\n[General]\n"
+        XCTAssertEqual(ModuleMetadataParser.applyingScriptHubSubscription(nil, to: content), content)
+    }
 }
