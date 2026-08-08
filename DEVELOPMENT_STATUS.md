@@ -2,11 +2,11 @@
 
 Updated: 2026-08-05
 
-This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.25 (74)`.
+This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.26 (75)`.
 
 ## 当前状态
 
-- `1.3.25 (74)` 的变更已记录在 `CHANGELOG.md`，包含总模块参与筛选语义、筛选计数和空状态优化，以及与实际更新计划统一的“可更新”筛选；此前版本的 `.module` 识别修复、`#SUBSCRIBED` 自动写入、远程来源分类和本地加密凭据等改进仍然保留。
+- `1.3.26 (75)` 的变更已记录在 `CHANGELOG.md`，包含左侧搜索布局和发布/多选工具栏入口优化；此前版本的筛选计数、`.module` 识别修复、`#SUBSCRIBED` 自动写入、远程来源分类和本地加密凭据等改进仍然保留。
 - 凭据存储已从系统钥匙串迁移到配置目录内的 AES-256-GCM 本地加密文件，无开发者账户签名也能正常保存；凭据诊断、设置页、README 和测试已同步。
 - 自定义图标会重写模块输出中的 `#!icon`，来源缺失或不匹配时自动补齐/替换；未填写时保留来源图标，桌面端、Web 管理端和发布产物使用同一个值。
 - 订阅模块可以从登记的 Script-Hub 转换地址恢复内嵌 `originalURL`，即使转换内容缺少 `#SUBSCRIBED` 标记，也能按订阅初始地址继续更新。

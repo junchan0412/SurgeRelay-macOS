@@ -10,6 +10,7 @@ struct ModuleSidebarView: View {
     let combinedModuleEnabled: Bool
     let filterCounts: [ModuleFilter: Int]
     let hasSearchQuery: Bool
+    @Binding var searchText: String
     @Binding var sidebarFilter: ModuleFilter
     @Binding var isBatchSelecting: Bool
     @Binding var batchSelectedModuleIDs: Set<UUID>
@@ -54,6 +55,7 @@ struct ModuleSidebarView: View {
             ModuleSidebarStatusCard()
                 .background(.bar)
         }
+        .searchable(text: $searchText, placement: .sidebar, prompt: "搜索模块")
     }
 
     private var emptyStateTitle: String {

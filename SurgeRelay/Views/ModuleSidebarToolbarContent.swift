@@ -41,12 +41,13 @@ struct ModuleSidebarToolbarContent: ToolbarContent {
 
     private var publishAllButton: some View {
         Button {
-            Task { await model.publishAll() }
+            publishAllAction()
         } label: {
             Label("发布全部", systemImage: "square.and.arrow.up")
         }
-        .disabled(model.isWorking || !model.settings.publishToGitHub || !model.settings.github.isConfigured)
-        .help(model.settings.publishToGitHub ? "发布当前所有输出到 GitHub" : "未开启 GitHub 发布")
+        .disabled(model.isWorking)
+        .help(publishAllHelp)
+        .accessibilityLabel("发布全部模块")
     }
 
     private var batchSelectionButton: some View {
@@ -57,6 +58,8 @@ struct ModuleSidebarToolbarContent: ToolbarContent {
             Label(isBatchSelecting ? "结束选择" : "多选", systemImage: isBatchSelecting ? "checkmark.circle" : "checklist")
         }
         .disabled(model.isWorking)
+        .help(isBatchSelecting ? "结束多选并清除已勾选模块" : "进入多选模式，勾选需要单独发布的 GitHub 模块")
+        .accessibilityLabel(isBatchSelecting ? "结束多选" : "进入多选")
     }
 
     private var publishSelectedButton: some View {
@@ -88,5 +91,19 @@ struct ModuleSidebarToolbarContent: ToolbarContent {
         }
         .disabled(model.isWorking || isScanningLocalModules)
         .help("扫描本地模块根目录下已有的 .sgmodule，并纳入 Surge Relay 管理")
+    }
+
+    private var publishAllHelp: String {
+        if !model.settings.publishToGitHub { return "请在设置中开启 GitHub 发布" }
+        if !model.settings.github.isConfigured { return "请先完成 GitHub 发布配置" }
+        return "发布当前所有输出到 GitHub"
+    }
+
+    private func publishAllAction() {
+        guard model.settings.publishToGitHub, model.settings.github.isConfigured else {
+            model.presentsSettings = true
+            return
+        }
+        Task { await model.publishAll() }
     }
 }

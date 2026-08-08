@@ -2,7 +2,6 @@ import SwiftUI
 
 struct ModuleDetailPaneView: View {
     @Environment(AppModel.self) private var model
-    @Binding var searchText: String
     let editModule: (RelayModule) -> Void
 
     @State private var selectedTab: DetailTab = .info
@@ -65,7 +64,6 @@ struct ModuleDetailPaneView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .animation(.snappy(duration: 0.22), value: selectionKind.map(kindID))
-        .searchable(text: $searchText, prompt: "搜索")
         .toolbar {
             ToolbarSpacer(.flexible)
             if selectionKind != nil {

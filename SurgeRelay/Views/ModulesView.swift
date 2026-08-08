@@ -123,6 +123,7 @@ struct ModulesView: View {
                 combinedModuleEnabled: sidebarPresentation.combinedModuleEnabled,
                 filterCounts: sidebarPresentation.filterCounts,
                 hasSearchQuery: !normalizedSearchText.isEmpty,
+                searchText: $searchText,
                 sidebarFilter: $sidebarFilter,
                 isBatchSelecting: $isBatchSelecting,
                 batchSelectedModuleIDs: $batchSelectedModuleIDs,
@@ -144,7 +145,6 @@ struct ModulesView: View {
             }
         } detail: {
             ModuleDetailPaneView(
-                searchText: $searchText,
                 editModule: presentEditor
             )
         }

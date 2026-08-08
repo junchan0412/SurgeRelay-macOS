@@ -4,6 +4,14 @@ import Foundation
 extension AppModel {
     func publishAll() async {
         guard !isWorking else { return }
+        guard settings.publishToGitHub else {
+            statusMessage = "GitHub 发布未开启，请在设置中开启后重试"
+            return
+        }
+        guard settings.github.isConfigured else {
+            statusMessage = "请先完成 GitHub 发布配置"
+            return
+        }
         cancelAutomaticPublishSchedule()
         beginWork(.publishing)
         defer { endWork(.publishing) }
