@@ -45,26 +45,65 @@ extension AppModel {
 
     func publishModules(moduleIDs: Set<UUID>) async -> Bool {
         guard !isWorking else { return false }
-        guard settings.publishToGitHub else {
-            statusMessage = "GitHub 发布未开启"
-            return false
-        }
         guard !moduleIDs.isEmpty else {
             statusMessage = "请选择要发布的模块"
+            return false
+        }
+        let selected = modules.filter { moduleIDs.contains($0.id) }
+        let hasLocalSelection = selected.contains { $0.storageLocation == .local }
+        let hasGitHubSelection = selected.contains { $0.storageLocation == .gitHub }
+        let publishLocally = settings.publishToLocal && hasLocalSelection
+        let publishToGitHub = settings.publishToGitHub &&
+            settings.github.isConfigured && hasGitHubSelection
+        guard publishLocally || publishToGitHub else {
+            statusMessage = "所选模块没有可发布到本地或 GitHub 的独立模块"
             return false
         }
         cancelAutomaticPublishSchedule()
         beginWork(.publishing)
         defer { endWork(.publishing) }
         do {
-            let report = try await publishSelectedModulesInternal(moduleIDs: moduleIDs)
+            var changedFileCount = 0
+            var publishedDestinations: [String] = []
+
+            if publishLocally {
+                do {
+                    let files = try await selectedLocalPublishedFiles(moduleIDs: moduleIDs)
+                    if !files.isEmpty {
+                        try await publishSelectedLocalFiles(files)
+                        changedFileCount += files.count
+                        publishedDestinations.append("本地")
+                    }
+                } catch {
+                    if isCurrentWorkCancellation(error) { return false }
+                    if GitHubPublishPlanner.isNoFilesToPublish(error) {
+                        // 所选本地模块没有可发布的独立输出，跳过本地发布
+                    } else { throw error }
+                }
+            }
+
             guard shouldContinueCurrentWork() else { return false }
-            statusMessage = GitHubPublishPlanner.reportStatus(
-                for: .publishSelected,
-                report: report,
-                scopeTitle: githubPublishPlan.scopeTitle
-            )
-            recordGitHubPublish(report)
+
+            if publishToGitHub {
+                do {
+                    let report = try await publishSelectedModulesInternal(moduleIDs: moduleIDs)
+                    changedFileCount += report.changedFileCount
+                    recordGitHubPublish(report)
+                    publishedDestinations.append("GitHub")
+                } catch {
+                    if isCurrentWorkCancellation(error) { return false }
+                    if GitHubPublishPlanner.isNoFilesToPublish(error) {
+                        // 所选 GitHub 模块没有可发布的独立输出，跳过 GitHub 发布
+                    } else { throw error }
+                }
+            }
+
+            guard shouldContinueCurrentWork() else { return false }
+            guard changedFileCount > 0 else {
+                statusMessage = "所选模块没有可发布的独立输出"
+                return false
+            }
+            statusMessage = "已将所选模块发布到\(publishedDestinations.joined(separator: " 和 "))（\(changedFileCount) 个文件变更）"
             return true
         } catch {
             if isCurrentWorkCancellation(error) { return false }

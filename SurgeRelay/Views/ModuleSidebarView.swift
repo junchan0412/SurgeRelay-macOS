@@ -104,8 +104,7 @@ struct ModuleSidebarView: View {
                 Toggle("", isOn: batchSelectionBinding(for: module.id))
                     .labelsHidden()
                     .toggleStyle(.checkbox)
-                    .disabled(!isGitHubPublishable(module))
-                    .help(gitHubPublishHelp(for: module))
+                    .help("勾选后随“发布所选”发布到该模块的存放位置")
             }
             ModuleRow(
                 module: module,
@@ -134,16 +133,6 @@ struct ModuleSidebarView: View {
                 }
             }
         )
-    }
-
-    private func isGitHubPublishable(_ module: RelayModule) -> Bool {
-        module.publishesStandalone && module.storageLocation == .gitHub
-    }
-
-    private func gitHubPublishHelp(for module: RelayModule) -> String {
-        if !module.publishesStandalone { return "该模块未开启独立发布" }
-        if module.storageLocation != .gitHub { return "本地模块不会发布为 GitHub 独立模块" }
-        return "选择发布该 GitHub 模块"
     }
 
     private var collapsedSectionIDs: Set<String> {

@@ -77,10 +77,23 @@ struct ModuleSidebarToolbarContent: ToolbarContent {
         .disabled(
             model.isWorking ||
             batchSelectedModuleIDs.isEmpty ||
-            !model.settings.publishToGitHub ||
-            !model.settings.github.isConfigured
+            !canPublishSelected
         )
-        .help(batchSelectedModuleIDs.isEmpty ? "请选择要发布的模块" : "只发布勾选模块，不删除其他已发布文件")
+        .help(publishSelectedHelp)
+    }
+
+    private var canPublishSelected: Bool {
+        model.settings.publishToLocal ||
+        (model.settings.publishToGitHub && model.settings.github.isConfigured)
+    }
+
+    private var publishSelectedHelp: String {
+        if batchSelectedModuleIDs.isEmpty { return "请选择要发布的模块" }
+        if !model.settings.publishToLocal &&
+            !(model.settings.publishToGitHub && model.settings.github.isConfigured) {
+            return "请先在设置中开启本地发布或 GitHub 发布"
+        }
+        return "只发布勾选模块：本地模块写入本地目录，GitHub 模块推送到 GitHub，不删除其他已发布文件"
     }
 
     private var scanLocalModulesButton: some View {

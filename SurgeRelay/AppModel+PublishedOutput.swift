@@ -142,6 +142,36 @@ extension AppModel {
         )
     }
 
+    /// 收集所选本地模块的独立输出文件（不包含总模块）。
+    func selectedLocalPublishedFiles(moduleIDs: Set<UUID>) async throws -> [PublishFile] {
+        let plan = PublishCoordinator.selectedPlan(
+            modules: modules,
+            moduleIDs: moduleIDs,
+            destination: .local
+        )
+        return try await publishedFiles(
+            plan: plan,
+            combinedData: nil,
+            includeAssets: true,
+            destination: .local
+        )
+    }
+
+    /// 将所选本地模块写入本地发布根目录，并把这些文件合并进已发布路径清单，不删除其他已发布文件。
+    func publishSelectedLocalFiles(_ files: [PublishFile]) async throws {
+        let target = settings.localModuleDirectory
+        _ = try await fileStore.exportPublishedFiles(
+            files,
+            toRootDirectory: target,
+            removingObsoleteRelativePaths: [],
+            knownManagedRelativePaths: settings.localPublishedFilePaths
+        )
+        let mergedPaths = Array(Set(settings.localPublishedFilePaths).union(files.map(\.name))).sorted()
+        settings.localPublishedRootDirectory = target
+        settings.localPublishedFilePaths = mergedPaths
+        saveSettings()
+    }
+
     private func legacyOutputCleanupDirectories() -> [String] {
         LegacyOutputCleanupPlanner.cleanupDirectories(
             outputDirectory: settings.outputDirectory,
