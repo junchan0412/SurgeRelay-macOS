@@ -137,4 +137,128 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(counts[.includedInCombined], 1)
         XCTAssertEqual(counts[.excludedFromCombined], 0)
     }
+
+    func testModuleExtendedFilterMatching() {
+        let remote = RelayModule(
+            name: "Remote",
+            sourceURL: "https://example.com/a.sgmodule",
+            outputFileName: "A",
+            publishesStandalone: true
+        )
+        XCTAssertTrue(ModuleFilter.remoteSource.matches(remote, combinedModuleEnabled: true))
+        XCTAssertTrue(ModuleFilter.standalone.matches(remote, combinedModuleEnabled: true))
+        XCTAssertFalse(ModuleFilter.cachedOnly.matches(remote, combinedModuleEnabled: true))
+        XCTAssertFalse(ModuleFilter.selfAuthored.matches(remote, combinedModuleEnabled: true))
+
+        let subscribed = RelayModule(
+            name: "Sub",
+            sourceURL: "https://example.com/sub.sgmodule",
+            outputFileName: "Sub",
+            scriptHubSubscription: ScriptHubSubscriptionInfo(
+                subscriptionURL: "https://script.hub/convert?url=abc",
+                originalURL: "https://raw.githubusercontent.com/owner/repo/main/x.sgmodule",
+                options: ScriptHubOptions()
+            )
+        )
+        XCTAssertTrue(ModuleFilter.subscribed.matches(subscribed, combinedModuleEnabled: true))
+        XCTAssertFalse(ModuleFilter.selfAuthored.matches(subscribed, combinedModuleEnabled: true))
+
+        let selfAuthored = RelayModule(
+            name: "Self",
+            sourceURL: URL(filePath: "/tmp/self.sgmodule").absoluteString,
+            outputFileName: "Self.sgmodule",
+            storageLocation: .local
+        )
+        XCTAssertTrue(ModuleFilter.selfAuthored.matches(selfAuthored, combinedModuleEnabled: true))
+
+        let failed = RelayModule(
+            name: "Fail",
+            sourceURL: "https://example.com/f.sgmodule",
+            outputFileName: "F",
+            state: .failed
+        )
+        XCTAssertTrue(ModuleFilter.failed.matches(failed, combinedModuleEnabled: true))
+        XCTAssertTrue(ModuleFilter.attention.matches(failed, combinedModuleEnabled: true))
+
+        let never = RelayModule(
+            name: "Never",
+            sourceURL: "https://example.com/n.sgmodule",
+            outputFileName: "N",
+            state: .never
+        )
+        XCTAssertTrue(ModuleFilter.neverUpdated.matches(never, combinedModuleEnabled: true))
+
+        let conflict = RelayModule(
+            name: "Conflict",
+            sourceURL: "https://example.com/c.sgmodule",
+            outputFileName: "C",
+            hasOverrideConflict: true
+        )
+        XCTAssertTrue(ModuleFilter.overrideConflict.matches(conflict, combinedModuleEnabled: true))
+        XCTAssertTrue(ModuleFilter.attention.matches(conflict, combinedModuleEnabled: true))
+
+        let cached = RelayModule(
+            name: "Cached",
+            sourceURL: "https://example.com/x.sgmodule",
+            outputFileName: "X",
+            publishesStandalone: false
+        )
+        XCTAssertTrue(ModuleFilter.cachedOnly.matches(cached, combinedModuleEnabled: true))
+        XCTAssertFalse(ModuleFilter.standalone.matches(cached, combinedModuleEnabled: true))
+
+        let github = RelayModule(
+            name: "GH",
+            sourceURL: "https://example.com/gh.sgmodule",
+            outputFileName: "GH",
+            storageLocation: .gitHub
+        )
+        XCTAssertTrue(ModuleFilter.github.matches(github, combinedModuleEnabled: true))
+        XCTAssertFalse(ModuleFilter.local.matches(github, combinedModuleEnabled: true))
+    }
+
+    func testModuleFilterGroupingAndPresets() {
+        XCTAssertEqual(ModuleFilter.quickPresets, [.all, .updatable, .nonUpdatable, .attention])
+        XCTAssertTrue(ModuleFilter.all.isQuickPreset)
+        XCTAssertTrue(ModuleFilter.updatable.isQuickPreset)
+        XCTAssertFalse(ModuleFilter.failed.isQuickPreset)
+        XCTAssertEqual(ModuleFilter.failed.group, .updateState)
+        XCTAssertEqual(ModuleFilter.local.group, .storage)
+        XCTAssertEqual(ModuleFilter.github.group, .storage)
+        XCTAssertEqual(ModuleFilter.subscribed.group, .source)
+        XCTAssertEqual(ModuleFilter.remoteSource.group, .source)
+        XCTAssertEqual(ModuleFilter.selfAuthored.group, .source)
+        XCTAssertEqual(ModuleFilter.standalone.group, .behavior)
+        XCTAssertEqual(ModuleFilter.includedInCombined.group, .combined)
+        XCTAssertEqual(ModuleFilter.attention.group, .status)
+        XCTAssertNil(ModuleFilter.all.group)
+    }
+
+    func testModuleSortOrder() {
+        let alpha = RelayModule(
+            name: "alpha",
+            sourceURL: "https://example.com/alpha.sgmodule",
+            outputFileName: "A",
+            createdAt: Date(timeIntervalSince1970: 100),
+            lastUpdatedAt: Date(timeIntervalSince1970: 300)
+        )
+        let bravo = RelayModule(
+            name: "Bravo",
+            sourceURL: "https://example.com/bravo.sgmodule",
+            outputFileName: "B",
+            createdAt: Date(timeIntervalSince1970: 200),
+            lastUpdatedAt: Date(timeIntervalSince1970: 200)
+        )
+        let charlie = RelayModule(
+            name: "charlie",
+            sourceURL: "https://example.com/charlie.sgmodule",
+            outputFileName: "C",
+            createdAt: Date(timeIntervalSince1970: 300),
+            lastUpdatedAt: Date(timeIntervalSince1970: 100)
+        )
+        let shuffled = [charlie, alpha, bravo]
+        XCTAssertEqual(ModuleSortOrder.nameAsc.sorted(shuffled).map(\.name), ["alpha", "Bravo", "charlie"])
+        XCTAssertEqual(ModuleSortOrder.nameDesc.sorted(shuffled).map(\.name), ["charlie", "Bravo", "alpha"])
+        XCTAssertEqual(ModuleSortOrder.lastUpdated.sorted(shuffled).map(\.name), ["alpha", "Bravo", "charlie"])
+        XCTAssertEqual(ModuleSortOrder.createdAt.sorted(shuffled).map(\.name), ["charlie", "Bravo", "alpha"])
+    }
 }

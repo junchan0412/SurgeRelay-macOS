@@ -9,9 +9,11 @@ struct ModuleSidebarView: View {
     let allModulesAreEmpty: Bool
     let combinedModuleEnabled: Bool
     let filterCounts: [ModuleFilter: Int]
+    let resultCount: Int
     let hasSearchQuery: Bool
     @Binding var searchText: String
     @Binding var sidebarFilter: ModuleFilter
+    @Binding var sortOrder: ModuleSortOrder
     @Binding var isBatchSelecting: Bool
     @Binding var batchSelectedModuleIDs: Set<UUID>
     @Binding var deleteCandidate: RelayModule?
@@ -21,7 +23,12 @@ struct ModuleSidebarView: View {
         @Bindable var model = model
 
         VStack(spacing: 0) {
-            ModuleSidebarFilterBar(selection: $sidebarFilter, counts: filterCounts)
+            ModuleSidebarFilterBar(
+                selection: $sidebarFilter,
+                sortOrder: $sortOrder,
+                counts: filterCounts,
+                resultCount: resultCount
+            )
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
 
@@ -60,15 +67,17 @@ struct ModuleSidebarView: View {
 
     private var emptyStateTitle: String {
         if allModulesAreEmpty { return "还没有模块" }
-        if hasSearchQuery && sidebarFilter != .all { return "没有符合筛选条件的模块" }
+        if hasSearchQuery && sidebarFilter != .all { return "没有符合搜索与筛选条件的模块" }
         if hasSearchQuery { return "没有搜索结果" }
+        if sidebarFilter != .all { return "没有符合“\(sidebarFilter.title)”的模块" }
         return "没有符合筛选条件的模块"
     }
 
     private var emptyStateDescription: String {
         if allModulesAreEmpty { return "添加第一个更新地址，或扫描现有本地模块。" }
-        if sidebarFilter != .all { return "可切换“全部”或其他筛选条件。" }
-        return "换个关键词试试。"
+        if sidebarFilter != .all { return "可点击“清除筛选”或“全部”查看所有模块。" }
+        if hasSearchQuery { return "换个关键词试试。" }
+        return "可切换“全部”或其他筛选条件。"
     }
 
     @ViewBuilder
@@ -156,48 +165,171 @@ struct ModuleSidebarView: View {
 
 private struct ModuleSidebarFilterBar: View {
     @Binding var selection: ModuleFilter
+    @Binding var sortOrder: ModuleSortOrder
     let counts: [ModuleFilter: Int]
+    let resultCount: Int
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                ForEach(ModuleFilter.allCases) { filter in
+                ForEach(ModuleFilter.quickPresets) { filter in
+                    chip(filter)
+                }
+                if !selection.isQuickPreset {
+                    activeChip(selection)
+                }
+                Spacer(minLength: 0)
+                filterMenu
+                sortMenu
+            }
+            .font(.caption)
+            .padding(.horizontal, 2)
+
+            HStack(spacing: 6) {
+                Text("\(resultCount) 个模块")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if selection != .all {
                     Button {
-                        withAnimation(.snappy(duration: 0.2)) {
-                            selection = filter
-                        }
+                        withAnimation(.snappy(duration: 0.2)) { selection = .all }
                     } label: {
-                        Label {
-                            Text("\(filter.title) \(counts[filter, default: 0])")
-                        } icon: {
-                            Image(systemName: filter.systemImage)
-                        }
-                            .font(.caption)
-                            .lineLimit(1)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 4)
-                            .background(
-                                selection == filter
-                                    ? Color.accentColor.opacity(0.18)
-                                    : Color.primary.opacity(0.06),
-                                in: Capsule()
-                            )
-                            .overlay {
-                                Capsule()
-                                    .strokeBorder(
-                                        selection == filter
-                                            ? Color.accentColor.opacity(0.5)
-                                            : Color.primary.opacity(0.08),
-                                        lineWidth: 1
-                                    )
-                            }
+                        Label("清除筛选", systemImage: "xmark.circle.fill")
+                            .font(.caption2)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityAddTraits(selection == filter ? .isSelected : [])
+                    .foregroundStyle(.secondary)
                 }
             }
             .padding(.horizontal, 2)
         }
+    }
+
+    private func chip(_ filter: ModuleFilter) -> some View {
+        Button {
+            withAnimation(.snappy(duration: 0.2)) { selection = filter }
+        } label: {
+            Label {
+                Text("\(filter.title) \(counts[filter, default: 0])")
+            } icon: {
+                Image(systemName: filter.systemImage)
+            }
+            .lineLimit(1)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 4)
+            .background(
+                selection == filter
+                    ? Color.accentColor.opacity(0.18)
+                    : Color.primary.opacity(0.06),
+                in: Capsule()
+            )
+            .overlay {
+                Capsule()
+                    .strokeBorder(
+                        selection == filter
+                            ? Color.accentColor.opacity(0.5)
+                            : Color.primary.opacity(0.08),
+                        lineWidth: 1
+                    )
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selection == filter ? .isSelected : [])
+    }
+
+    private func activeChip(_ filter: ModuleFilter) -> some View {
+        HStack(spacing: 4) {
+            Label(filter.title, systemImage: filter.systemImage)
+                .lineLimit(1)
+            Button {
+                withAnimation(.snappy(duration: 0.2)) { selection = .all }
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("清除筛选")
+        }
+        .padding(.leading, 9)
+        .padding(.trailing, 6)
+        .padding(.vertical, 4)
+        .background(Color.accentColor.opacity(0.18), in: Capsule())
+        .overlay {
+            Capsule().strokeBorder(Color.accentColor.opacity(0.5), lineWidth: 1)
+        }
+        .accessibilityAddTraits(.isSelected)
+    }
+
+    /// “更多筛选”菜单：按分组列出全部筛选，当前选中项带勾选。
+    private var filterMenu: some View {
+        Menu {
+            Button {
+                withAnimation(.snappy(duration: 0.2)) { selection = .all }
+            } label: {
+                Label("全部", systemImage: selection == .all
+                    ? "checkmark"
+                    : ModuleFilter.all.systemImage)
+            }
+            Divider()
+            ForEach(ModuleFilterGroup.allCases) { group in
+                Section(group.title) {
+                    ForEach(ModuleFilter.allCases.filter { $0.group == group }) { filter in
+                        Button {
+                            withAnimation(.snappy(duration: 0.2)) { selection = filter }
+                        } label: {
+                            Label(filter.title, systemImage: selection == filter
+                                ? "checkmark"
+                                : filter.systemImage)
+                        }
+                    }
+                }
+            }
+            Divider()
+            Button(role: .destructive) {
+                withAnimation(.snappy(duration: 0.2)) { selection = .all }
+            } label: {
+                Label("清除筛选", systemImage: "xmark.circle")
+            }
+            .disabled(selection == .all)
+        } label: {
+            Label(selection.isQuickPreset || selection == .all ? "筛选" : selection.title,
+                  systemImage: "line.3.horizontal.decrease.circle")
+                .lineLimit(1)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.primary.opacity(0.06), in: Capsule())
+                .overlay {
+                    Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+                }
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+    }
+
+    private var sortMenu: some View {
+        Menu {
+            ForEach(ModuleSortOrder.allCases) { order in
+                Button {
+                    sortOrder = order
+                } label: {
+                    Label(order.title, systemImage: sortOrder == order
+                        ? "checkmark"
+                        : order.systemImage)
+                }
+            }
+        } label: {
+            Label(sortOrder.title, systemImage: sortOrder.systemImage)
+                .lineLimit(1)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.primary.opacity(0.06), in: Capsule())
+                .overlay {
+                    Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+                }
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
     }
 }
 

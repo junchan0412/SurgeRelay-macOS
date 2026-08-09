@@ -16,7 +16,8 @@ struct ModulesView: View {
     @State private var isBatchSelecting = false
     @State private var batchSelectedModuleIDs = Set<UUID>()
     @State private var sidebarPresentation = SidebarPresentation.empty
-    @State private var sidebarFilter: ModuleFilter = .all
+    @AppStorage("ModulesView.sidebarFilter") private var sidebarFilter = ModuleFilter.all
+    @AppStorage("ModulesView.sortOrder") private var sortOrder = ModuleSortOrder.nameAsc
 
     private var normalizedSearchText: String {
         ModuleSearchIndex.normalizedQuery(searchText)
@@ -51,6 +52,7 @@ struct ModulesView: View {
         return [
             normalizedSearchText,
             sidebarFilter.rawValue,
+            sortOrder.rawValue,
             model.settings.combinedModuleEnabled ? "1" : "0",
             contentIndexState.contentIndexCacheKeys
                 .map { "\($0.key.uuidString)=\($0.value)" }
@@ -97,17 +99,19 @@ struct ModulesView: View {
             : filterPlan.matches.filter {
                 sidebarFilter.matches($0, combinedModuleEnabled: model.settings.combinedModuleEnabled)
             }
+        let sorted = sortOrder.sorted(filteredBySidebar)
         let filterCounts = ModuleFilter.counts(
             for: filterPlan.matches,
             combinedModuleEnabled: model.settings.combinedModuleEnabled
         )
-        let sections = ModuleSidebarSectionPlanner.sections(for: filteredBySidebar)
+        let sections = ModuleSidebarSectionPlanner.sections(for: sorted)
         let next = SidebarPresentation(
             sections: sections,
-            filteredModulesAreEmpty: filteredBySidebar.isEmpty,
+            filteredModulesAreEmpty: sorted.isEmpty,
             allModulesAreEmpty: model.modules.isEmpty,
             combinedModuleEnabled: model.settings.combinedModuleEnabled,
-            filterCounts: filterCounts
+            filterCounts: filterCounts,
+            resultCount: sorted.count
         )
         guard next != sidebarPresentation else { return }
         sidebarPresentation = next
@@ -122,9 +126,11 @@ struct ModulesView: View {
                 allModulesAreEmpty: sidebarPresentation.allModulesAreEmpty,
                 combinedModuleEnabled: sidebarPresentation.combinedModuleEnabled,
                 filterCounts: sidebarPresentation.filterCounts,
+                resultCount: sidebarPresentation.resultCount,
                 hasSearchQuery: !normalizedSearchText.isEmpty,
                 searchText: $searchText,
                 sidebarFilter: $sidebarFilter,
+                sortOrder: $sortOrder,
                 isBatchSelecting: $isBatchSelecting,
                 batchSelectedModuleIDs: $batchSelectedModuleIDs,
                 deleteCandidate: $deleteCandidate,
@@ -236,13 +242,15 @@ private struct SidebarPresentation: Equatable {
     var allModulesAreEmpty: Bool
     var combinedModuleEnabled: Bool
     var filterCounts: [ModuleFilter: Int]
+    var resultCount: Int
 
     static let empty = SidebarPresentation(
         sections: [],
         filteredModulesAreEmpty: true,
         allModulesAreEmpty: true,
         combinedModuleEnabled: false,
-        filterCounts: [:]
+        filterCounts: [:],
+        resultCount: 0
     )
 }
 
