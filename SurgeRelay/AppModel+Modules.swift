@@ -215,7 +215,7 @@ extension AppModel {
         guard !AppRuntimeOptions.isUIQAMode else { return }
         automaticUpdateTask?.cancel()
         automaticUpdateTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(8))
+            try? await Task.sleep(for: .seconds(2))
             guard !Task.isCancelled, let self else { return }
             while self.isWorking, !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(250))

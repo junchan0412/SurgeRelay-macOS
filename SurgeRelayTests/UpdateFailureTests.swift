@@ -197,4 +197,22 @@ final class UpdateFailureTests: XCTestCase {
         ))
         XCTAssertEqual(fallback.presentedError, "以下来源首次转换失败，因此没有覆盖当前总模块：\nA")
     }
+
+    func testUpdateRetryPolicyRetriesOnlyTransientFailures() {
+        // 瞬态 404 / 5xx 应重试
+        XCTAssertTrue(UpdateRetryPolicy.shouldRetryTransientFailure(RelayError.httpFailure(status: 404, message: "Not Found")))
+        XCTAssertTrue(UpdateRetryPolicy.shouldRetryTransientFailure(RelayError.httpFailure(status: 502, message: "Bad Gateway")))
+        XCTAssertTrue(UpdateRetryPolicy.shouldRetryTransientFailure(RelayError.httpFailure(status: 503, message: "Unavailable")))
+        // 客户端错误（4xx 非 404）不应重试
+        XCTAssertFalse(UpdateRetryPolicy.shouldRetryTransientFailure(RelayError.httpFailure(status: 400, message: "Bad Request")))
+        XCTAssertFalse(UpdateRetryPolicy.shouldRetryTransientFailure(RelayError.httpFailure(status: 401, message: "Unauthorized")))
+        XCTAssertFalse(UpdateRetryPolicy.shouldRetryTransientFailure(RelayError.httpFailure(status: 403, message: "Forbidden")))
+        // 网络 / 超时 / DNS 错误应重试
+        XCTAssertTrue(UpdateRetryPolicy.shouldRetryTransientFailure(URLError(.timedOut)))
+        XCTAssertTrue(UpdateRetryPolicy.shouldRetryTransientFailure(URLError(.cannotConnectToHost)))
+        XCTAssertTrue(UpdateRetryPolicy.shouldRetryTransientFailure(URLError(.dnsLookupFailed)))
+        // 非网络错误不应重试
+        XCTAssertFalse(UpdateRetryPolicy.shouldRetryTransientFailure(RelayError.invalidSourceURL))
+        XCTAssertFalse(UpdateRetryPolicy.shouldRetryTransientFailure(RelayError.noFilesToPublish))
+    }
 }

@@ -109,9 +109,10 @@ extension AppModel {
                 if synchronizationTotalCount <= 1 {
                     statusMessage = "正在内置转换 \(module.name)…"
                 }
-                let result = try await scriptHubClient.convert(
+                let result = try await convertModuleWithTransientRetry(
                     module: module,
-                    github: settings.github.isConfigured ? settings.github : nil
+                    hasCache: hasCache,
+                    updateGeneration: updateGeneration
                 )
                 guard shouldContinueCurrentWork(generation: updateGeneration) else { return }
                 guard let currentIndex = modules.firstIndex(where: { $0.id == module.id }),
@@ -242,6 +243,31 @@ extension AppModel {
             ),
             generation: updateGeneration
         )
+    }
+
+    /// 对新模块（尚无缓存内容）的转换做一次瞬态失败重试，避免首次自动更新因
+    /// 瞬时 404 / 5xx / 网络抖动失败后留下空内容，需要用户手动再点一次更新。
+    private func convertModuleWithTransientRetry(
+        module: RelayModule,
+        hasCache: Bool,
+        updateGeneration: Int
+    ) async throws -> ConversionResult {
+        let github = settings.github.isConfigured ? settings.github : nil
+        do {
+            return try await scriptHubClient.convert(module: module, github: github)
+        } catch {
+            guard !hasCache,
+                  UpdateRetryPolicy.shouldRetryTransientFailure(error),
+                  !Task.isCancelled,
+                  !workCancellationRequested else {
+                throw error
+            }
+            try? await Task.sleep(for: .milliseconds(1500))
+            guard shouldContinueCurrentWork(generation: updateGeneration) else {
+                throw CancellationError()
+            }
+            return try await scriptHubClient.convert(module: module, github: github)
+        }
     }
 
     func update(moduleID: UUID) async {
