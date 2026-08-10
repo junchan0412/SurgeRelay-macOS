@@ -239,7 +239,7 @@ final class ModulePlanningTests: XCTestCase {
         ))
     }
 
-    func testLocalRemoteBackedModuleSkipsLocalSelfExport() {
+    func testLocalRemoteBackedModuleDoesNotSkipLocalExport() {
         let module = RelayModule(
             name: "Remote Backed Local",
             sourceURL: "https://raw.githubusercontent.com/example/repo/main/qx.conf",
@@ -255,7 +255,9 @@ final class ModulePlanningTests: XCTestCase {
         XCTAssertEqual(module.storageLocation, .local)
         XCTAssertEqual(module.initialSource, .remote(.quantumultX))
         XCTAssertEqual(module.publishedRelativePath, "Converted/Remote Backed.sgmodule")
-        XCTAssertTrue(PublishCoordinator.shouldSkipStandaloneLocalExport(
+        // 来源是远程 URL，localStorageRelativePath 只是发布输出路径而非来源文件，
+        // 因此本地导出不应被自覆盖保护跳过。
+        XCTAssertFalse(PublishCoordinator.shouldSkipStandaloneLocalExport(
             module,
             isLocalExport: true,
             localModuleDirectory: "/Users/example/Surge"

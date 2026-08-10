@@ -104,6 +104,10 @@ enum LocalSourcePathResolver {
         for module: RelayModule,
         rootDirectoryPath: String
     ) -> String? {
+        // 只有“转换前来源”是本地文件、且该文件位于本地根目录之下的模块，
+        // 才存在需要避免自覆盖的来源文件。远程来源本地模块的
+        // localStorageRelativePath 只是发布输出路径，不是来源，不能当作来源。
+        guard URL(string: module.sourceURL)?.isFileURL == true else { return nil }
         if module.storageLocation == .local, let relativePath = module.localStorageRelativePath {
             return ModuleOutputFolder.normalized(relativePath)
         }
