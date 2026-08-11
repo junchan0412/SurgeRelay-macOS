@@ -1,5 +1,15 @@
 import Foundation
 
+/// 删除本地模块时的处理深度。
+enum ModuleDeletionMode: Sendable {
+    /// 仅从管理列表移除，保留磁盘上的输出文件。
+    case removeFromList
+    /// 移除并清理受 Surge Relay 管理的输出文件（自写源文件保留）。
+    case clearOutput
+    /// 彻底删除：连磁盘上的输出/源文件一并删除（需用户明确确认）。
+    case deleteAll
+}
+
 @MainActor
 extension AppModel {
     func addModule(from draft: ModuleDraft) throws {
@@ -86,7 +96,7 @@ extension AppModel {
         }
     }
 
-    func deleteModule(id: UUID) async {
+    func deleteModule(id: UUID, mode: ModuleDeletionMode = .clearOutput) async {
         guard let index = modules.firstIndex(where: { $0.id == id }) else { return }
         registerLocalChange()
         let module = modules.remove(at: index)
@@ -94,13 +104,24 @@ extension AppModel {
         try? await fileStore.removeComponent(id: id)
         try? await fileStore.removeAssets(id: id)
         try? await iconStore.removeIcon(for: id)
-        // 本地独立模块：如其输出文件带有 Surge Relay 管理标记，则一并真实删除；
-        // 自写模块的用户源文件不属于管理对象，会被安全保留。
-        if module.storageLocation == .local, module.publishesStandalone {
-            try? await fileStore.removePublishedFile(
-                relativePath: module.publishedRelativePath,
-                rootDirectoryPath: settings.localModuleDirectory
-            )
+        // 本地模块按删除模式处理磁盘上的输出文件。
+        if module.storageLocation == .local {
+            switch mode {
+            case .removeFromList:
+                break
+            case .clearOutput:
+                if module.publishesStandalone {
+                    try? await fileStore.removePublishedFile(
+                        relativePath: module.publishedRelativePath,
+                        rootDirectoryPath: settings.localModuleDirectory
+                    )
+                }
+            case .deleteAll:
+                try? await fileStore.removePublishedFileForcing(
+                    relativePath: module.publishedRelativePath,
+                    rootDirectoryPath: settings.localModuleDirectory
+                )
+            }
         }
         try? persistModules()
         selectedModuleID = modules.first?.id

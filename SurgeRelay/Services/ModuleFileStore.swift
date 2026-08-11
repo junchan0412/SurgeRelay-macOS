@@ -232,6 +232,30 @@ actor ModuleFileStore {
         }
     }
 
+    /// 强制删除一个已发布的本地独立文件（无论是否带 Surge Relay 管理标记）。
+    /// 仅用于用户明确确认“彻底删除（含源文件）”的场景。
+    func removePublishedFileForcing(relativePath: String, rootDirectoryPath: String) throws {
+        guard !relativePath.isEmpty,
+              !rootDirectoryPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return
+        }
+        let root = URL(filePath: rootDirectoryPath, directoryHint: .isDirectory)
+        let destination = try exportURL(root: root, relativePath: relativePath)
+        guard FileManager.default.fileExists(atPath: destination.path) else { return }
+        let outcome = CoordinationOutcome<Void>()
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        var coordinationError: NSError?
+        coordinator.coordinate(
+            writingItemAt: destination,
+            options: .forDeleting,
+            error: &coordinationError
+        ) { coordinatedURL in
+            outcome.result = Result { try FileManager.default.removeItem(at: coordinatedURL) }
+        }
+        if let coordinationError { throw coordinationError }
+        try outcome.result?.get()
+    }
+
     private func exportURL(root: URL, relativePath: String) throws -> URL {
         let components = relativePath
             .replacingOccurrences(of: "\\", with: "/")

@@ -4,7 +4,8 @@ struct ModulesView: View {
     @Environment(AppModel.self) private var model
     @State private var searchText = ""
     @State private var editorRoute: ModuleEditorRoute?
-    @State private var deleteCandidate: RelayModule?
+    @State private var deleteCandidate: ModuleDeleteCandidate?
+    @State private var textEditModule: RelayModule?
     @State private var contentIndexState = ModuleSearchContentIndexState()
     @State private var metadataIndexState = ModuleSearchMetadataIndexState()
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
@@ -134,7 +135,8 @@ struct ModulesView: View {
                 isBatchSelecting: $isBatchSelecting,
                 batchSelectedModuleIDs: $batchSelectedModuleIDs,
                 deleteCandidate: $deleteCandidate,
-                editModule: presentEditor
+                editModule: presentEditor,
+                textEditModule: { textEditModule = $0 }
             )
             .navigationSplitViewColumnWidth(min: 280, ideal: 300, max: 380)
             .navigationTitle("模块")
@@ -167,6 +169,10 @@ struct ModulesView: View {
             )
                 .environment(model)
         }
+        .sheet(item: $textEditModule) { module in
+            ModuleTextEditorView(module: module)
+                .environment(model)
+        }
         .sheet(isPresented: $showsLocalImportPreview) {
             LocalModuleImportPreviewView(
                 candidates: localImportCandidates,
@@ -193,27 +199,46 @@ struct ModulesView: View {
                 .frame(width: 560)
         }
         .confirmationDialog(
-            "删除“\(deleteCandidate?.name ?? "")”？",
+            "删除“\(deleteCandidate?.module.name ?? "")”？",
             isPresented: Binding(
                 get: { deleteCandidate != nil },
                 set: { if !$0 { deleteCandidate = nil } }
             )
         ) {
-            Button(model.settings.combinedModuleEnabled ? "删除来源并重新合并" : "删除来源并刷新输出", role: .destructive) {
-                guard let id = deleteCandidate?.id else { return }
+            Button(deleteConfirmTitle, role: .destructive) {
+                guard let candidate = deleteCandidate else { return }
                 deleteCandidate = nil
-                Task { await model.deleteModule(id: id) }
+                Task { await model.deleteModule(id: candidate.module.id, mode: candidate.mode) }
             }
             Button("取消", role: .cancel) { deleteCandidate = nil }
         } message: {
-            Text(model.settings.combinedModuleEnabled
-                ? "该来源会从总模块中移除；本地独立模块的受管输出文件会被一并真实删除，自写模块的用户源文件安全保留。"
-                : "该来源会从 Surge Relay 管理列表中移除；本地独立模块的受管输出文件会被一并真实删除，自写模块的用户源文件安全保留。")
+            Text(deleteConfirmMessage)
         }
     }
 
     private func presentEditor(_ module: RelayModule) {
         editorRoute = ModuleEditorRoute(module: module)
+    }
+
+    private var deleteConfirmTitle: String {
+        guard let mode = deleteCandidate?.mode else { return "删除" }
+        switch mode {
+        case .removeFromList: return "移除"
+        case .clearOutput: return "删除并清理输出"
+        case .deleteAll: return "彻底删除（含源文件）"
+        }
+    }
+
+    private var deleteConfirmMessage: String {
+        guard let mode = deleteCandidate?.mode else { return "" }
+        switch mode {
+        case .removeFromList:
+            return "仅从 Surge Relay 管理列表移除，磁盘上的输出文件保留。"
+        case .clearOutput:
+            return "从管理列表移除，并删除受 Surge Relay 管理的输出文件；自写模块的用户源文件安全保留。"
+        case .deleteAll:
+            return "从管理列表移除，并连同磁盘上的输出 / 源文件一并删除，此操作不可撤销。"
+        }
     }
 
     @MainActor

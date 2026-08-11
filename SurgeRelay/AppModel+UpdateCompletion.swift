@@ -10,7 +10,11 @@ struct ModuleUpdateRunResult {
 
 @MainActor
 extension AppModel {
-    func finishModuleUpdateRun(_ result: ModuleUpdateRunResult, generation: Int) async {
+    func finishModuleUpdateRun(
+        _ result: ModuleUpdateRunResult,
+        generation: Int,
+        rebuildFromCache: Bool = false
+    ) async {
         if let blockage = UpdateFailurePlanner.missingCacheBlockage(
             moduleNames: result.missingCacheModuleNames,
             details: result.missingCacheDetails
@@ -21,7 +25,11 @@ extension AppModel {
         }
 
         do {
-            if settings.combinedModuleEnabled {
+            if rebuildFromCache {
+                // 单模块（过滤）更新：从全部缓存组件重建总模块并发布本地输出，
+                // 避免总模块只包含被更新模块而丢失其他参与者。
+                await rebuildCombinedFromCache()
+            } else if settings.combinedModuleEnabled {
                 try await writeCombinedModule(result.components)
             } else {
                 try? await fileStore.removeCombined()

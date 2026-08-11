@@ -83,6 +83,22 @@ final class LocalPublishedExportTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: userFile.path))
     }
 
+    func testRemovePublishedFileForcingDeletesUnmanagedFile() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let userFile = root.appending(path: "SelfAuthored.sgmodule")
+        try Data("#!name=SelfAuthored\n[Rule]\nFINAL,DIRECT\n".utf8).write(to: userFile)
+
+        let store = ModuleFileStore()
+        try await store.removePublishedFileForcing(
+            relativePath: "SelfAuthored.sgmodule",
+            rootDirectoryPath: root.path
+        )
+        XCTAssertFalse(FileManager.default.fileExists(atPath: userFile.path))
+    }
+
     func testLocalPublishedExportMigratesKnownLegacyManagedFile() async throws {
         let root = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)

@@ -2,7 +2,7 @@ import Foundation
 
 @MainActor
 extension AppModel {
-    func updateAll() async {
+    func updateAll(only moduleIDs: Set<UUID>? = nil) async {
         let admission = updateAdmission
         guard admission.isAccepted else {
             statusMessage = admission.message
@@ -11,7 +11,13 @@ extension AppModel {
         let updateModules = ModuleRefreshPlanner.updateableModules(
             in: modules,
             combinedModuleEnabled: settings.combinedModuleEnabled
-        )
+        ).filter { module in
+            moduleIDs.map { $0.contains(module.id) } ?? true
+        }
+        if moduleIDs != nil, updateModules.isEmpty {
+            statusMessage = "所选模块不可更新或没有可更新的来源"
+            return
+        }
         cancelAutomaticPublishSchedule()
         let updateGeneration = localChangeGeneration
         beginWork(.updatingModules)
@@ -241,7 +247,8 @@ extension AppModel {
                 missingCacheDetails: missingCacheDetails,
                 contentChanged: contentChanged
             ),
-            generation: updateGeneration
+            generation: updateGeneration,
+            rebuildFromCache: moduleIDs != nil
         )
     }
 
@@ -271,14 +278,14 @@ extension AppModel {
     }
 
     func update(moduleID: UUID) async {
-        // 单个来源改变可能影响总模块，也可能触发独立模块输出，因此统一走批量更新路径。
+        // 仅更新指定模块；若总模块开启，会从全部缓存组件重建总模块，避免丢失其他参与者。
         guard let module = modules.first(where: { $0.id == moduleID }) else { return }
         let admission = updateAdmission(for: module)
         guard admission.isAccepted else {
             statusMessage = admission.message
             return
         }
-        await updateAll()
+        await updateAll(only: [moduleID])
     }
 
     private func sourceCheckFailureAfterConversionFailure(

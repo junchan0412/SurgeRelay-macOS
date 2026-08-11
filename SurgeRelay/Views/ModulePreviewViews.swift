@@ -217,3 +217,101 @@ struct CombinedPreviewPane: View {
         }
     }
 }
+
+/// 独立文本编辑器：直接编辑单个模块转换后的文本内容。
+struct ModuleTextEditorView: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    let module: RelayModule
+    @State private var text = ""
+    @State private var savedText = ""
+    @State private var isLoading = true
+    @State private var isWriting = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Text("文本编辑：\(module.name)")
+                    .font(.headline)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                Button("恢复") { restore() }
+                    .disabled(isWriting || isLoading)
+                Button("保存") { write() }
+                    .keyboardShortcut("s", modifiers: .command)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isWriting || isLoading || text == savedText)
+                Button("完成") { dismiss() }
+                    .keyboardShortcut(.defaultAction)
+            }
+            .padding(12)
+            Divider()
+            ModuleCodeTextView(
+                text: $text,
+                isEditable: !isLoading,
+                modules: [module],
+                selectedModuleID: module.id
+            )
+            HStack(spacing: 8) {
+                if !isLoading, text != savedText {
+                    Label("有尚未写入的修改", systemImage: "square.and.pencil")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+        }
+        .frame(minWidth: 680, minHeight: 480)
+        .task(id: module.id) { await load() }
+        .alert("无法完成操作", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button("好", role: .cancel) { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "")
+        }
+    }
+
+    private func load() async {
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let content = try await model.previewContent(for: module)
+            text = content
+            savedText = content
+        } catch {
+            errorMessage = "无法读取模块内容：\(error.localizedDescription)"
+        }
+    }
+
+    private func write() {
+        isWriting = true
+        Task {
+            defer { isWriting = false }
+            do {
+                try await model.savePreviewContent(text, for: module)
+                savedText = text
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func restore() {
+        isWriting = true
+        Task {
+            defer { isWriting = false }
+            do {
+                let restored = try await model.restorePreviewContent(for: module)
+                text = restored
+                savedText = restored
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+}

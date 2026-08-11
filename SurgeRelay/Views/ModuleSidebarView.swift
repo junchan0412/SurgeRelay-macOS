@@ -16,8 +16,9 @@ struct ModuleSidebarView: View {
     @Binding var sortOrder: ModuleSortOrder
     @Binding var isBatchSelecting: Bool
     @Binding var batchSelectedModuleIDs: Set<UUID>
-    @Binding var deleteCandidate: RelayModule?
+    @Binding var deleteCandidate: ModuleDeleteCandidate?
     let editModule: (RelayModule) -> Void
+    let textEditModule: (RelayModule) -> Void
 
     var body: some View {
         @Bindable var model = model
@@ -125,22 +126,42 @@ struct ModuleSidebarView: View {
         }
         .tag(module.id)
         .contextMenu {
-            Button("编辑") { editModule(module) }
+            Menu("编辑") {
+                Button("视图编辑") { editModule(module) }
+                    .help("在表单编辑器中修改模块来源、输出等设置")
+                Button("文本编辑") { textEditModule(module) }
+                    .help("直接编辑转换后的模块文本内容")
+            }
             if module.storageLocation == .local {
                 Button("在访达中显示") { revealModuleInFinder(module) }
             }
             Button("更新") { model.startUpdate(moduleID: module.id) }
             Divider()
-            Button("删除", role: .destructive) { deleteCandidate = module }
+            Menu("删除") {
+                Button("仅从列表移除", role: .destructive) {
+                    deleteCandidate = ModuleDeleteCandidate(module: module, mode: .removeFromList)
+                }
+                Button("删除并清理输出", role: .destructive) {
+                    deleteCandidate = ModuleDeleteCandidate(module: module, mode: .clearOutput)
+                }
+                Button("彻底删除（含源文件）", role: .destructive) {
+                    deleteCandidate = ModuleDeleteCandidate(module: module, mode: .deleteAll)
+                }
+            }
         }
     }
 
     private func revealModuleInFinder(_ module: RelayModule) {
         let root = model.settings.localModuleDirectory
+        guard !root.isEmpty else { return }
         let rootURL = URL(fileURLWithPath: root, isDirectory: true)
         let fileURL = rootURL.appendingPathComponent(module.publishedRelativePath)
+        let folderURL = fileURL.deletingLastPathComponent()
         if FileManager.default.fileExists(atPath: fileURL.path) {
             NSWorkspace.shared.activateFileViewerSelecting([fileURL])
+        } else if FileManager.default.fileExists(atPath: folderURL.path) {
+            // 输出文件尚未生成时，精确定位到其应处的文件夹
+            NSWorkspace.shared.activateFileViewerSelecting([folderURL])
         } else {
             NSWorkspace.shared.activateFileViewerSelecting([rootURL])
         }
@@ -604,4 +625,10 @@ private struct ModuleRow: View {
     private var statusColor: Color {
         module.state.tintColor
     }
+}
+
+/// 待删除模块及其处理深度。
+struct ModuleDeleteCandidate {
+    let module: RelayModule
+    let mode: ModuleDeletionMode
 }
