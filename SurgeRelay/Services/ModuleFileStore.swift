@@ -218,6 +218,20 @@ actor ModuleFileStore {
         overrideDirectory.appending(path: "\(id.uuidString).module")
     }
 
+    /// 安全删除一个已发布的本地独立文件。只有当文件带有 Surge Relay 管理标记时
+    /// 才会被删除；自写模块的用户源文件不属于管理对象，会被保留，避免误删。
+    func removePublishedFile(relativePath: String, rootDirectoryPath: String) throws {
+        guard !relativePath.isEmpty,
+              !rootDirectoryPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return
+        }
+        let root = URL(filePath: rootDirectoryPath, directoryHint: .isDirectory)
+        let destination = try exportURL(root: root, relativePath: relativePath)
+        if FileManager.default.fileExists(atPath: destination.path) {
+            try removeManagedPublishedFile(at: destination, relativePath: relativePath)
+        }
+    }
+
     private func exportURL(root: URL, relativePath: String) throws -> URL {
         let components = relativePath
             .replacingOccurrences(of: "\\", with: "/")

@@ -53,6 +53,36 @@ final class LocalPublishedExportTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: existing, encoding: .utf8), "#!name=Personal\n[Rule]\nFINAL,DIRECT\n")
     }
 
+    func testRemovePublishedFileDeletesManagedButPreservesUnmanaged() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = ModuleFileStore()
+
+        // 受管输出文件：删除
+        _ = try await store.exportPublishedFiles(
+            [PublishFile(name: "Folder/Managed.sgmodule", data: Data("managed".utf8))],
+            toRootDirectory: root.path
+        )
+        try await store.removePublishedFile(
+            relativePath: "Folder/Managed.sgmodule",
+            rootDirectoryPath: root.path
+        )
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appending(path: "Folder/Managed.sgmodule").path))
+
+        // 非受管用户源文件：调用会抛错且文件保留
+        let userFile = root.appending(path: "User.sgmodule")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data("#!name=User\n[Rule]\nFINAL,DIRECT\n".utf8).write(to: userFile)
+        do {
+            try await store.removePublishedFile(relativePath: "User.sgmodule", rootDirectoryPath: root.path)
+            XCTFail("不应删除非受管文件")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("不属于 Surge Relay 管理"))
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: userFile.path))
+    }
+
     func testLocalPublishedExportMigratesKnownLegacyManagedFile() async throws {
         let root = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)

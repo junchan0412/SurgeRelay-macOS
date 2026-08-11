@@ -206,7 +206,9 @@ struct ModulesView: View {
             }
             Button("取消", role: .cancel) { deleteCandidate = nil }
         } message: {
-            Text(model.settings.combinedModuleEnabled ? "该来源会从总模块中移除；下次发布如需删除旧文件，会先显示预览并要求确认。" : "该来源会从 Surge Relay 管理列表中移除；下次发布如需删除旧文件，会先显示预览并要求确认。")
+            Text(model.settings.combinedModuleEnabled
+                ? "该来源会从总模块中移除；本地独立模块的受管输出文件会被一并真实删除，自写模块的用户源文件安全保留。"
+                : "该来源会从 Surge Relay 管理列表中移除；本地独立模块的受管输出文件会被一并真实删除，自写模块的用户源文件安全保留。")
         }
     }
 

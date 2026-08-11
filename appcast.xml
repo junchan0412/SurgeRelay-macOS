@@ -3,6 +3,21 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.3.34</title>
+            <pubDate>Tue, 11 Aug 2026 15:08:32 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.34</link>
+            <sparkle:version>83</sparkle:version>
+            <sparkle:shortVersionString>1.3.34</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.3.34
+
+
+- 右键菜单扩展：新增“更新”与“在访达中显示”入口（本地模块展示输出文件位置），保留“编辑 / 删除”。
+- 删除增强：删除本地独立模块时，会一并真实删除其受 Surge Relay 管理的输出文件；自写模块的用户源文件不属于管理对象，安全保留。删除确认文案同步更新。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.3.34/Surge-Relay-1.3.34.app.zip" length="8950829" type="application/zip" sparkle:edSignature="UH7YlYO4Aj69VUDOR/RGRD3ibecXBWUDc1YdKhzPfU3GDWUsntKDyzpA+bj5Zt3CvlQsV3liqmPEN+UdTywtCQ=="/>
+        </item>
+        <item>
             <title>1.3.33</title>
             <pubDate>Tue, 11 Aug 2026 14:55:25 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.33</link>

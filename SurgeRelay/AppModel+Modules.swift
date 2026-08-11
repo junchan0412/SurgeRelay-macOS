@@ -94,6 +94,14 @@ extension AppModel {
         try? await fileStore.removeComponent(id: id)
         try? await fileStore.removeAssets(id: id)
         try? await iconStore.removeIcon(for: id)
+        // 本地独立模块：如其输出文件带有 Surge Relay 管理标记，则一并真实删除；
+        // 自写模块的用户源文件不属于管理对象，会被安全保留。
+        if module.storageLocation == .local, module.publishesStandalone {
+            try? await fileStore.removePublishedFile(
+                relativePath: module.publishedRelativePath,
+                rootDirectoryPath: settings.localModuleDirectory
+            )
+        }
         try? persistModules()
         selectedModuleID = modules.first?.id
         await rebuildCombinedFromCache()

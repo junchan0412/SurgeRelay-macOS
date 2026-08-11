@@ -126,8 +126,23 @@ struct ModuleSidebarView: View {
         .tag(module.id)
         .contextMenu {
             Button("编辑") { editModule(module) }
+            if module.storageLocation == .local {
+                Button("在访达中显示") { revealModuleInFinder(module) }
+            }
+            Button("更新") { model.startUpdate(moduleID: module.id) }
             Divider()
             Button("删除", role: .destructive) { deleteCandidate = module }
+        }
+    }
+
+    private func revealModuleInFinder(_ module: RelayModule) {
+        let root = model.settings.localModuleDirectory
+        let rootURL = URL(fileURLWithPath: root, isDirectory: true)
+        let fileURL = rootURL.appendingPathComponent(module.publishedRelativePath)
+        if FileManager.default.fileExists(atPath: fileURL.path) {
+            NSWorkspace.shared.activateFileViewerSelecting([fileURL])
+        } else {
+            NSWorkspace.shared.activateFileViewerSelecting([rootURL])
         }
     }
 
