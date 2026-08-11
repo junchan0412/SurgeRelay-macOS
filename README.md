@@ -149,6 +149,14 @@ Surge Relay 不再访问系统钥匙串：
 - 本地加密存储不可用时，App 会暂时沿用旧同步配置中的 GitHub Token，或仅在本次运行内存中保留 Web 管理令牌。
 - “凭据”设置页可以主动执行本地加密读写检查，检查会写入并立即删除临时诊断项。
 
+## ❓ 常见问题
+
+- **添加模块后内容为空？** 添加 / 编辑模块后会自动更新（约 2 秒后）；若首次抓取遇到瞬时 404 / 5xx / 网络抖动，App 会自动重试一次。仍为空可点击“更新全部”或模块右键“更新”手动刷新。
+- **本地模块没写入指定目录？** 确认已在“设置 > 发布”开启“发布到本地”并配置根目录；独立模块需开启“发布为独立模块”，本地发布时才会写出对应 `.sgmodule`。远程来源本地模块的 `localStorageRelativePath` 是输出路径，只要发布就会写入。
+- **GitHub 发布没有反应？** 确认“发布到 GitHub”已开启、仓库与 Token 已配置；未配置时点击“发布全部”会直接打开设置页。“发布所选”支持本地与 GitHub 两种存放位置。
+- **首次打开被系统拦截？** 因为当前使用固定自签名证书，未做 Apple Developer ID 公证。执行 `xattr -dr com.apple.quarantine "/Applications/Surge Relay.app"` 一次即可；后续用 App 内“查看更新…”无需再处理。
+- **更新失败提示 404 / 403 / 429？** 检查来源链接是否已改名 / 删除 / 分支变化，或仓库访问权限与触发频率限制；网络恢复后重试。
+
 ## 📁 项目结构
 
 ```text
@@ -220,7 +228,7 @@ xcodebuild build-for-testing \
 发布前可先运行无需证书和 GitHub secret 的配置预检，确认版本号、Sparkle 配置、Web 资源语法和行为/DOM 测试、appcast、entitlement、发布脚本和 GitHub Actions 入口保持一致：
 
 ```bash
-VERSION=1.3.31 BUILD=80 ./script/check_release_configuration.sh
+VERSION=1.3.32 BUILD=81 ./script/check_release_configuration.sh
 ```
 
 ```bash
@@ -240,7 +248,7 @@ EXPECT_ADHOC_SIGNATURE=0 \
 EXPECTED_CODESIGN_AUTHORITY="Surge Relay Self-Signed Code Signing" \
 ./script/verify_github_release_assets.sh \
   --repo junchan0412/SurgeRelay-macOS \
-  --tag v1.3.31
+  --tag v1.3.32
 ```
 
 当前已完成工作、待完成工作和发布核对入口见 [DEVELOPMENT_STATUS.md](./DEVELOPMENT_STATUS.md)。

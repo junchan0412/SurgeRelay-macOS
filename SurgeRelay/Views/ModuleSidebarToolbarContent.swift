@@ -15,6 +15,8 @@ struct ModuleSidebarToolbarContent: ToolbarContent {
             publishAllButton
             batchSelectionButton
             if isBatchSelecting {
+                selectAllButton
+                clearSelectionButton
                 publishSelectedButton
             }
             scanLocalModulesButton
@@ -85,6 +87,26 @@ struct ModuleSidebarToolbarContent: ToolbarContent {
     private var canPublishSelected: Bool {
         model.settings.publishToLocal ||
         (model.settings.publishToGitHub && model.settings.github.isConfigured)
+    }
+
+    private var selectAllButton: some View {
+        Button {
+            batchSelectedModuleIDs = Set(model.modules.map(\.id))
+        } label: {
+            Label("全选", systemImage: "checkmark.square")
+        }
+        .disabled(model.isWorking || model.modules.isEmpty)
+        .help("勾选全部模块")
+    }
+
+    private var clearSelectionButton: some View {
+        Button {
+            batchSelectedModuleIDs.removeAll()
+        } label: {
+            Label("清空已选", systemImage: "xmark.square")
+        }
+        .disabled(model.isWorking || batchSelectedModuleIDs.isEmpty)
+        .help("清空已勾选模块")
     }
 
     private var publishSelectedHelp: String {

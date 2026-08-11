@@ -2,11 +2,11 @@
 
 Updated: 2026-08-11
 
-This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.31 (80)`.
+This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.32 (81)`.
 
 ## 当前状态
 
-- `1.3.31 (80)` 的变更已记录在 `CHANGELOG.md`，包含本轮全维度优化：修复 Swift 6 并发警告、完善 README 首屏与项目结构、补充更新失败自动重试等稳定性改进。
+- `1.3.32 (81)` 的变更已记录在 `CHANGELOG.md`，包含多选模式“全选 / 清空已选”快捷操作与 README 常见问题章节。
 - 此前版本已落地：多选 / 发布所选按模块存放位置发布、侧边栏多维筛选与排序、远程来源本地模块本地发布、新模块首次更新失败自动重试等。
 - 凭据存储已从系统钥匙串迁移到配置目录内的 AES-256-GCM 本地加密文件，无开发者账户签名也能正常保存。
 - 自定义图标会重写模块输出中的 `#!icon`，桌面端、Web 管理端和发布产物使用同一个值。
