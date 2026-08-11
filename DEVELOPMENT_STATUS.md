@@ -1,20 +1,20 @@
 # Surge Relay Development Status
 
-Updated: 2026-08-05
+Updated: 2026-08-11
 
-This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.26 (75)`.
+This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.31 (80)`.
 
 ## 当前状态
 
-- `1.3.26 (75)` 的变更已记录在 `CHANGELOG.md`，包含左侧搜索布局和发布/多选工具栏入口优化；此前版本的筛选计数、`.module` 识别修复、`#SUBSCRIBED` 自动写入、远程来源分类和本地加密凭据等改进仍然保留。
-- 凭据存储已从系统钥匙串迁移到配置目录内的 AES-256-GCM 本地加密文件，无开发者账户签名也能正常保存；凭据诊断、设置页、README 和测试已同步。
-- 自定义图标会重写模块输出中的 `#!icon`，来源缺失或不匹配时自动补齐/替换；未填写时保留来源图标，桌面端、Web 管理端和发布产物使用同一个值。
+- `1.3.31 (80)` 的变更已记录在 `CHANGELOG.md`，包含本轮全维度优化：修复 Swift 6 并发警告、完善 README 首屏与项目结构、补充更新失败自动重试等稳定性改进。
+- 此前版本已落地：多选 / 发布所选按模块存放位置发布、侧边栏多维筛选与排序、远程来源本地模块本地发布、新模块首次更新失败自动重试等。
+- 凭据存储已从系统钥匙串迁移到配置目录内的 AES-256-GCM 本地加密文件，无开发者账户签名也能正常保存。
+- 自定义图标会重写模块输出中的 `#!icon`，桌面端、Web 管理端和发布产物使用同一个值。
 - 订阅模块可以从登记的 Script-Hub 转换地址恢复内嵌 `originalURL`，即使转换内容缺少 `#SUBSCRIBED` 标记，也能按订阅初始地址继续更新。
 - 初始来源恢复“远程来源”分类：有有效 `#SUBSCRIBED` 记录时归为订阅来源；没有该记录但更新地址为 HTTP/HTTPS 时归为远程来源；只有本地文件且无记录时才归为自写模块。
-- 详情工具栏重复的自定义侧边栏切换按钮已移除，只保留 `NavigationSplitView` 系统自带的边栏开关。
-- 侧边栏提供“全部 / 可更新 / 不可更新 / 参与总模块 / 不参与总模块 / 本地 / GitHub / 需要处理 / 未分类”筛选，可与搜索叠加使用；筛选按钮显示当前结果计数，空状态区分搜索无结果和筛选无匹配。
-- 模块批量更新进度改为 `完成数/总数`（例如 `1/88`）展示，桌面端和 Web 管理端同步；进度条仍保留。
-- “设置 > 通用 > 自动化”新增“启动时更新模块”开关，关闭后启动不再触发全量模块更新。
+- 侧边栏提供“全部 / 可更新 / 不可更新 / 更新失败 / 尚未更新 / 参与总模块 / 不参与总模块 / 本地 / GitHub / 订阅来源 / 远程来源 / 自写模块 / 独立发布 / 仅缓存 / 需要处理 / 覆盖冲突 / 未分类”筛选，并与搜索叠加；支持按名称 / 最近更新 / 最近创建 / 状态优先级排序，筛选与排序选择跨启动持久化。
+- 本地独立模块的自覆盖保护仅在“转换前来源”确实是本地文件时启用，远程来源本地模块会正常写入其输出目录。
+- 新模块首次自动更新遇到瞬时 404 / 5xx / 网络抖动失败时会自动重试一次，无需用户手动再次更新。
 - 发布链路仍为固定自签名 + Sparkle EdDSA；ATS 全局放宽与 App Sandbox 关闭状态与 `docs/RELEASE_HARDENING.md` 保持一致。
 
 ## Completed Work

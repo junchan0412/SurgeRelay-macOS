@@ -3,6 +3,21 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.3.31</title>
+            <pubDate>Tue, 11 Aug 2026 12:34:54 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.31</link>
+            <sparkle:version>80</sparkle:version>
+            <sparkle:shortVersionString>1.3.31</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.3.31
+
+
+- 稳定性：修复侧边栏模块行切换“包含在总模块中”时的 Swift 6 并发（Sendable）编译警告，消除潜在数据竞争。
+- 文档：完善 README 首屏价值主张与徽章、新增“快速上手 / 功能特性 / 项目结构”章节，更新发布示例版本；同步更新 `DEVELOPMENT_STATUS.md` 当前状态与筛选 / 发布 / 重试能力说明。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.3.31/Surge-Relay-1.3.31.app.zip" length="8935105" type="application/zip" sparkle:edSignature="EZeNWhnzFoQbYzSn7L2XJ0NEsHvYXjg7dUpEmdp/GnxKj/io05UtOjPXi7GHSBil8Qt0ISyzMBiwZX35DByUDg=="/>
+        </item>
+        <item>
             <title>1.3.30</title>
             <pubDate>Mon, 10 Aug 2026 21:14:46 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.30</link>

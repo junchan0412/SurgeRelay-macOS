@@ -118,7 +118,7 @@ struct ModuleSidebarView: View {
             ModuleRow(
                 module: module,
                 combinedModuleEnabled: combinedModuleEnabled,
-                onIncludedChange: { included in
+                onIncludedChange: { @MainActor included in
                     model.setModuleIncludedInCombined(id: module.id, included: included)
                 }
             )
@@ -517,7 +517,7 @@ private struct ModuleSidebarStatusCard: View {
 private struct ModuleRow: View {
     let module: RelayModule
     let combinedModuleEnabled: Bool
-    let onIncludedChange: (Bool) -> Void
+    let onIncludedChange: @MainActor (Bool) -> Void
 
     var body: some View {
         HStack(spacing: 10) {

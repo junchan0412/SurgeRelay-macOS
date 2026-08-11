@@ -1,10 +1,36 @@
 # Surge Relay for macOS
 
-Surge Relay 是一款用于集中管理、转换、编辑和发布 Surge 模块的 macOS 应用。它适合需要长期维护大量 `.sgmodule` / `.module`、从 Loon/Quantumult X 等格式转换到 Surge、并把最终模块同步到本地 Surge 目录或 GitHub 仓库的用户。
+> 集中管理、转换、编辑并发布 Surge 模块，把零散的 Loon / Quantumult X / Surge 源同步到本地 Surge 目录或 GitHub 仓库。
 
-本 fork 基于 [EEliberto/SurgeRelay-macOS](https://github.com/EEliberto/SurgeRelay-macOS) 修改，继续遵守 Apache License 2.0。转换能力基于 [Script-Hub](https://github.com/Script-Hub-Org) 的本地引擎。
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
+[![Release](https://img.shields.io/github/v/release/junchan0412/SurgeRelay-macOS?label=最新版本)](https://github.com/junchan0412/SurgeRelay-macOS/releases)
+[![Platform](https://img.shields.io/badge/Platform-macOS-lightgrey)]()
 
-## 当前能力
+Surge Relay 面向需要长期维护大量 `.sgmodule` / `.module`、从 Loon/Quantumult X 等格式转换到 Surge、并把最终模块同步到本地 Surge 目录或 GitHub 仓库的 macOS 用户。本 fork 基于 [EEliberto/SurgeRelay-macOS](https://github.com/EEliberto/SurgeRelay-macOS) 修改，继续遵守 Apache License 2.0；转换能力基于 [Script-Hub](https://github.com/Script-Hub-Org) 的本地引擎。
+
+## 🚀 快速上手
+
+1. 从 [GitHub Releases](https://github.com/junchan0412/SurgeRelay-macOS/releases) 下载最新版 `Surge-Relay-版本.app.zip`，解压后把 `Surge Relay.app` 拖入 `/Applications`。
+2. 首次打开如被 Gatekeeper 拦截，可执行一次去隔离：
+   ```bash
+   xattr -dr com.apple.quarantine "/Applications/Surge Relay.app"
+   ```
+3. 在设置中开启“发布到本地”并选择 Surge 模块根目录（如 iCloud Surge 目录），或开启“发布到 GitHub”并配置仓库与 Token。
+4. 添加模块、扫描本地 `.sgmodule`，或使用“多选 / 发布所选”按模块存放位置发布。
+
+> 后续更新推荐在 App 内使用“查看更新…”，通过 Sparkle 2 自动拉取并校验签名，无需再次执行 `xattr`。
+
+## ✨ 功能特性
+
+- 内置 Script-Hub 本地引擎，转换 Quantumult X、Loon、Surge 模块；远程 Surge 模块直接抓取并自动写入 `#SUBSCRIBED` 标记。
+- 模块“存放位置”与“初始来源”分离建模：本地 / GitHub 存放，订阅 / 远程 / 自写来源，避免混淆。
+- 本地与 GitHub 发布可同时开启，每个独立模块只写入自己选择的存放目标。
+- 侧边栏多维度筛选（更新状态、来源、存放位置、发布行为、状态）+ 排序，筛选与搜索叠加。
+- App 内 Web 管理、菜单栏操作、后台更新、任务取消、发布预览与删除确认。
+- 凭据使用配置目录内 AES-256-GCM 本地加密，不依赖系统钥匙串。
+- Sparkle 2 自动更新，Release 提供 `.app.zip` 与 `.pkg`。
+
+## <a name="capabilities"></a>当前能力
 
 - 管理远程 HTTP/HTTPS 模块和本地 `file://` Surge 模块。
 - 使用内置 Script-Hub 引擎转换 Quantumult X、Loon 和 Surge 模块。
@@ -123,6 +149,19 @@ Surge Relay 不再访问系统钥匙串：
 - 本地加密存储不可用时，App 会暂时沿用旧同步配置中的 GitHub Token，或仅在本次运行内存中保留 Web 管理令牌。
 - “凭据”设置页可以主动执行本地加密读写检查，检查会写入并立即删除临时诊断项。
 
+## 📁 项目结构
+
+```text
+SurgeRelay/            # 应用主代码（Models / Services / Utilities / Views）
+SurgeRelay/WebResources/  # App 内 Web 管理前端（HTML + JS）
+SurgeRelayTests/       # 单元测试（发布、GitHub、Web 安全、本地发布、筛选等）
+Deployment/            # 部署示例（Cloudflare Worker）
+script/                # 构建 / 发布 / 校验脚本
+docs/                  # 进阶文档（GitHub-Cloudflare、发布加固、上游同步）
+appcast.xml            # Sparkle 更新清单
+project.yml            # XcodeGen / 工程版本配置
+```
+
 ## 开发
 
 本项目是 Xcode macOS App。推荐使用命令行构建，当前维护环境使用：
@@ -181,7 +220,7 @@ xcodebuild build-for-testing \
 发布前可先运行无需证书和 GitHub secret 的配置预检，确认版本号、Sparkle 配置、Web 资源语法和行为/DOM 测试、appcast、entitlement、发布脚本和 GitHub Actions 入口保持一致：
 
 ```bash
-VERSION=1.3.20 BUILD=69 ./script/check_release_configuration.sh
+VERSION=1.3.31 BUILD=80 ./script/check_release_configuration.sh
 ```
 
 ```bash
@@ -201,7 +240,7 @@ EXPECT_ADHOC_SIGNATURE=0 \
 EXPECTED_CODESIGN_AUTHORITY="Surge Relay Self-Signed Code Signing" \
 ./script/verify_github_release_assets.sh \
   --repo junchan0412/SurgeRelay-macOS \
-  --tag v1.3.24
+  --tag v1.3.31
 ```
 
 当前已完成工作、待完成工作和发布核对入口见 [DEVELOPMENT_STATUS.md](./DEVELOPMENT_STATUS.md)。
