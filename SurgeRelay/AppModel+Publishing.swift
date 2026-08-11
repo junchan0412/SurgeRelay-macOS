@@ -52,7 +52,9 @@ extension AppModel {
         let selected = modules.filter { moduleIDs.contains($0.id) }
         let hasLocalSelection = selected.contains { $0.storageLocation == .local }
         let hasGitHubSelection = selected.contains { $0.storageLocation == .gitHub }
-        let publishLocally = settings.publishToLocal && hasLocalSelection
+        let publishLocally = settings.publishToLocal &&
+            hasLocalSelection &&
+            !settings.localModuleDirectory.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let publishToGitHub = settings.publishToGitHub &&
             settings.github.isConfigured && hasGitHubSelection
         guard publishLocally || publishToGitHub else {

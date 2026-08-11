@@ -3,6 +3,22 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.3.33</title>
+            <pubDate>Tue, 11 Aug 2026 14:55:25 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.33</link>
+            <sparkle:version>82</sparkle:version>
+            <sparkle:shortVersionString>1.3.33</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.3.33
+
+
+- 桌面端为“添加模块（⌘N）/ 更新全部（⌘R）/ 发布全部（⌘⇧P）”添加键盘快捷键，提升操作效率。
+- 稳定性：多选本地发布前增加本地根目录非空校验，避免空目录时误写入磁盘根路径。
+- 文档：README 新增“快捷键”对照表。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.3.33/Surge-Relay-1.3.33.app.zip" length="8944553" type="application/zip" sparkle:edSignature="xMu1EOY42Gs9QfGmk3YYLDlLfMYhspYZUiW9eOC1XjZuQiINXPTjh+kuMspYJjP44T8Q1snqFScAZJKYQOtJCw=="/>
+        </item>
+        <item>
             <title>1.3.32</title>
             <pubDate>Tue, 11 Aug 2026 12:43:37 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.32</link>

@@ -30,6 +30,14 @@ Surge Relay 面向需要长期维护大量 `.sgmodule` / `.module`、从 Loon/Qu
 - 凭据使用配置目录内 AES-256-GCM 本地加密，不依赖系统钥匙串。
 - Sparkle 2 自动更新，Release 提供 `.app.zip` 与 `.pkg`。
 
+## ⌨️ 快捷键
+
+| 操作 | 快捷键 |
+|------|--------|
+| 添加模块 | <kbd>⌘</kbd> + <kbd>N</kbd> |
+| 更新全部 | <kbd>⌘</kbd> + <kbd>R</kbd> |
+| 发布全部 | <kbd>⌘</kbd> + <kbd>⇧</kbd> + <kbd>P</kbd> |
+
 ## <a name="capabilities"></a>当前能力
 
 - 管理远程 HTTP/HTTPS 模块和本地 `file://` Surge 模块。
@@ -228,7 +236,7 @@ xcodebuild build-for-testing \
 发布前可先运行无需证书和 GitHub secret 的配置预检，确认版本号、Sparkle 配置、Web 资源语法和行为/DOM 测试、appcast、entitlement、发布脚本和 GitHub Actions 入口保持一致：
 
 ```bash
-VERSION=1.3.32 BUILD=81 ./script/check_release_configuration.sh
+VERSION=1.3.33 BUILD=82 ./script/check_release_configuration.sh
 ```
 
 ```bash
@@ -248,7 +256,7 @@ EXPECT_ADHOC_SIGNATURE=0 \
 EXPECTED_CODESIGN_AUTHORITY="Surge Relay Self-Signed Code Signing" \
 ./script/verify_github_release_assets.sh \
   --repo junchan0412/SurgeRelay-macOS \
-  --tag v1.3.32
+  --tag v1.3.33
 ```
 
 当前已完成工作、待完成工作和发布核对入口见 [DEVELOPMENT_STATUS.md](./DEVELOPMENT_STATUS.md)。

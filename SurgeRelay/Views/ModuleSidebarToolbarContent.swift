@@ -29,6 +29,8 @@ struct ModuleSidebarToolbarContent: ToolbarContent {
         } label: {
             Label("添加模块", systemImage: "plus")
         }
+        .keyboardShortcut("n", modifiers: .command)
+        .help("添加模块（⌘N）")
     }
 
     private var updateAllButton: some View {
@@ -37,8 +39,9 @@ struct ModuleSidebarToolbarContent: ToolbarContent {
         } label: {
             Label("更新全部", systemImage: "arrow.clockwise")
         }
+        .keyboardShortcut("r", modifiers: .command)
         .disabled(!model.updateAdmission.isAccepted)
-        .help(model.updateAdmission.isAccepted ? "更新全部模块" : model.updateAdmission.message)
+        .help(model.updateAdmission.isAccepted ? "更新全部模块（⌘R）" : model.updateAdmission.message)
     }
 
     private var publishAllButton: some View {
@@ -47,6 +50,7 @@ struct ModuleSidebarToolbarContent: ToolbarContent {
         } label: {
             Label("发布全部", systemImage: "square.and.arrow.up")
         }
+        .keyboardShortcut("p", modifiers: [.command, .shift])
         .disabled(model.isWorking)
         .help(publishAllHelp)
         .accessibilityLabel("发布全部模块")
