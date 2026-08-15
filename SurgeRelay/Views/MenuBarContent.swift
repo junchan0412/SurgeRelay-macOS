@@ -14,6 +14,9 @@ struct MenuBarContent: View {
             }
             Text("最新更新：\(latestUpdateText)")
             Text(moduleScopeText)
+            if attentionCount > 0 {
+                Text("需要处理：\(attentionCount)")
+            }
         }
 
         Divider()
@@ -77,6 +80,11 @@ struct MenuBarContent: View {
             return "包含来源：\(summary.enabledCount) / \(summary.totalCount)"
         }
         return "独立模块：\(summary.standaloneCount) / \(summary.totalCount)"
+    }
+
+    private var attentionCount: Int {
+        let summary = model.moduleSummary
+        return summary.failedCount + summary.overrideConflictCount
     }
 
     private var workingText: String {

@@ -136,6 +136,9 @@ struct ModuleSidebarView: View {
                 Button("在访达中显示") { revealModuleInFinder(module) }
             }
             Button("更新") { model.startUpdate(moduleID: module.id) }
+            Button("复制模块") { try? model.duplicateModule(id: module.id) }
+            Button("拷贝更新地址") { copyToPasteboard(module.updateSourceURL) }
+            Button("拷贝输出路径") { copyToPasteboard(module.publishedRelativePath) }
             Divider()
             Menu("删除") {
                 Button("仅从列表移除", role: .destructive) {
@@ -149,6 +152,11 @@ struct ModuleSidebarView: View {
                 }
             }
         }
+    }
+
+    private func copyToPasteboard(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 
     private func revealModuleInFinder(_ module: RelayModule) {

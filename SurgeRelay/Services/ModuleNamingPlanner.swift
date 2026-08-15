@@ -1,6 +1,17 @@
 import Foundation
 
 enum ModuleNamingPlanner {
+    /// 为“复制模块”生成不冲突的副本名称：`名称 副本`、`名称 副本 2`…
+    static func duplicateName(base: String, existing: [String]) -> String {
+        let baseName = base.trimmingCharacters(in: .whitespacesAndNewlines)
+        let existingSet = Set(existing)
+        let candidate = "\(baseName) 副本"
+        guard existingSet.contains(candidate) else { return candidate }
+        var suffix = 2
+        while existingSet.contains("\(baseName) 副本 \(suffix)") { suffix += 1 }
+        return "\(baseName) 副本 \(suffix)"
+    }
+
     static func localStorageRelativePath(
         storageLocation: ModuleStorageLocation,
         source: String,

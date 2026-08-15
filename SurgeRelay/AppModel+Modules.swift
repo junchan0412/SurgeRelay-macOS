@@ -129,6 +129,51 @@ extension AppModel {
         statusMessage = "已删除 \(module.name)，输出已刷新"
     }
 
+    /// 复制一个模块：保留来源与全部设置，名称与输出文件名按唯一规则生成副本。
+    func duplicateModule(id: UUID) throws {
+        guard let index = modules.firstIndex(where: { $0.id == id }) else { return }
+        let source = modules[index]
+        var draft = ModuleDraft(module: source)
+        draft.name = ModuleNamingPlanner.duplicateName(base: source.name, existing: modules.map(\.name))
+        let outputFileName = ModuleNamingPlanner.uniqueOutputFileName(
+            for: draft,
+            source: draft.sourceURL,
+            modules: modules,
+            combinedModuleFileName: settings.combinedModuleFileName,
+            excluding: source.id
+        )
+        var copy = source
+        copy.id = UUID()
+        copy.name = draft.name
+        copy.outputFileName = outputFileName
+        copy.createdAt = .now
+        copy.lastUpdatedAt = nil
+        copy.contentHash = nil
+        copy.sourceETag = nil
+        copy.sourceLastModified = nil
+        copy.sourceContentHash = nil
+        copy.sourceCheckedAt = nil
+        copy.state = .never
+        copy.lastError = nil
+        if copy.storageLocation == .local {
+            copy.localStorageRelativePath = try ModuleNamingPlanner.localStorageRelativePath(
+                storageLocation: .local,
+                source: copy.sourceURL,
+                outputFileName: outputFileName,
+                outputFolder: ModuleOutputFolder.normalized(copy.outputFolder),
+                localModuleDirectory: settings.localModuleDirectory
+            )
+            copy.preservesOutputFileName = true
+        }
+        registerLocalChange()
+        modules.append(copy)
+        invalidateModuleSummaryCache()
+        selectedModuleID = copy.id
+        try persistModules()
+        statusMessage = "已复制 \(source.name) 为 \(copy.name)"
+        scheduleAutomaticUpdate()
+    }
+
     func refreshModuleMetadataFromCache() async {
         var changed = false
         for moduleValue in modules {

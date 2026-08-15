@@ -501,3 +501,18 @@ private final class BoundedRemoteDataFetcherURLProtocol: URLProtocol, @unchecked
 
     override func stopLoading() {}
 }
+
+extension ModulePlanningTests {
+    func testModuleNamingPlannerDuplicateNameIsUnique() {
+        XCTAssertEqual(ModuleNamingPlanner.duplicateName(base: "Demo", existing: []), "Demo 副本")
+        XCTAssertEqual(ModuleNamingPlanner.duplicateName(base: "Demo", existing: ["Demo 副本"]), "Demo 副本 2")
+        XCTAssertEqual(
+            ModuleNamingPlanner.duplicateName(base: "Demo", existing: ["Demo 副本", "Demo 副本 2", "Demo 副本 3"]),
+            "Demo 副本 4"
+        )
+        XCTAssertEqual(
+            ModuleNamingPlanner.duplicateName(base: "Demo", existing: ["Demo", "其他"]),
+            "Demo 副本"
+        )
+    }
+}

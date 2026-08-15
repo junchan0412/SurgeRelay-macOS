@@ -94,7 +94,7 @@ xattr -dr com.apple.quarantine "/Applications/Surge Relay.app"
 
 如果你看到清理提示，请先看清楚“将删除的旧文件”列表。App 的目标是清理自己生成过的输出，而不是删除手动维护的原模块、`Surge.conf`、分类文件夹或 `assets` 目录。
 
-模块列表右键菜单提供“编辑（视图编辑 / 文本编辑）/ 在访达中显示（本地模块）/ 更新 / 删除”。“更新”只更新该模块；“删除”提供三档：仅从列表移除、删除并清理受管输出、彻底删除（含自写源文件）。彻底删除会连磁盘上的输出 / 源文件一并删除，需确认；受管输出指带 Surge Relay 管理标记的文件。
+模块列表右键菜单提供“编辑（视图编辑 / 文本编辑）/ 在访达中显示（本地模块）/ 更新 / 复制模块 / 拷贝更新地址 / 拷贝输出路径 / 删除”。“更新”只更新该模块；“复制模块”会以唯一名称生成保留全部设置的副本并自动更新；“删除”提供三档：仅从列表移除、删除并清理受管输出、彻底删除（含自写源文件）。彻底删除会连磁盘上的输出 / 源文件一并删除，需确认；受管输出指带 Surge Relay 管理标记的文件。
 
 自定义图标会重写模块输出中的 `#!icon`：来源里的图标缺失或不匹配时自动补齐/替换，未填写自定义图标时保留来源图标。图标地址同时写入模块基本信息，桌面端、Web 管理端和发布产物使用同一个值。
 
@@ -238,7 +238,7 @@ xcodebuild build-for-testing \
 发布前可先运行无需证书和 GitHub secret 的配置预检，确认版本号、Sparkle 配置、Web 资源语法和行为/DOM 测试、appcast、entitlement、发布脚本和 GitHub Actions 入口保持一致：
 
 ```bash
-VERSION=1.3.36 BUILD=85 ./script/check_release_configuration.sh
+VERSION=1.3.37 BUILD=86 ./script/check_release_configuration.sh
 ```
 
 ```bash
@@ -258,7 +258,7 @@ EXPECT_ADHOC_SIGNATURE=0 \
 EXPECTED_CODESIGN_AUTHORITY="Surge Relay Self-Signed Code Signing" \
 ./script/verify_github_release_assets.sh \
   --repo junchan0412/SurgeRelay-macOS \
-  --tag v1.3.36
+  --tag v1.3.37
 ```
 
 当前已完成工作、待完成工作和发布核对入口见 [DEVELOPMENT_STATUS.md](./DEVELOPMENT_STATUS.md)。

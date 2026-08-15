@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.37
+
+- 右键菜单新增“复制模块”（唯一名称生成保留全部设置的副本并自动更新）、
+  “拷贝更新地址”“拷贝输出路径”等快捷操作。
+- 菜单栏状态新增“需要处理”（更新失败 + 覆盖冲突）计数，便于后台监控。
+- 副本命名规则收敛到 `ModuleNamingPlanner.duplicateName` 并有单元测试。
+
 ## 1.3.36
 
 - 修复 Surge Relay 追加信息插入位置：`#SUBSCRIBED` 与“受管输出”注释块现在统一插入在模块自身 `#!` 头部信息（name/desc/icon/author/homepage/category 等）下方，不再紧跟 `#!name` 把头部截断。
