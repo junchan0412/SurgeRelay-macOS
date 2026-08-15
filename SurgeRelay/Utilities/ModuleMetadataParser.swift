@@ -155,14 +155,7 @@ enum ModuleMetadataParser {
                 withTemplate: NSRegularExpression.escapedTemplate(for: line)
             )
         }
-        if let nameExpression = try? NSRegularExpression(pattern: #"(?im)^\s*#!name\s*=.*$"#),
-           let match = nameExpression.firstMatch(in: normalized, range: range),
-           let nameRange = Range(match.range, in: normalized) {
-            var updated = normalized
-            updated.insert(contentsOf: "\n\(line)", at: nameRange.upperBound)
-            return updated
-        }
-        return line + "\n" + normalized
+        return insertingHeaderLine(line, into: normalized)
     }
 
     static func applyingIcon(_ iconURL: String?, to content: String) -> String {
@@ -184,15 +177,7 @@ enum ModuleMetadataParser {
                 withTemplate: NSRegularExpression.escapedTemplate(for: line)
             )
         }
-        let namePattern = #"(?im)^\s*#!name\s*=.*$"#
-        if let nameExpression = try? NSRegularExpression(pattern: namePattern),
-           let match = nameExpression.firstMatch(in: normalized, range: range),
-           let nameRange = Range(match.range, in: normalized) {
-            var updated = normalized
-            updated.insert(contentsOf: "\n\(line)", at: nameRange.upperBound)
-            return updated
-        }
-        return line + "\n" + normalized
+        return insertingHeaderLine(line, into: normalized)
     }
 
     static func applyingModuleMetadata(
@@ -232,15 +217,24 @@ enum ModuleMetadataParser {
     }
 
     private static func insertingSubscriptionLine(_ line: String, into content: String) -> String {
-        let namePattern = #"(?im)^\s*#!name\s*=.*$"#
-        if let nameExpression = try? NSRegularExpression(pattern: namePattern),
-           let match = nameExpression.firstMatch(in: content, range: NSRange(content.startIndex..., in: content)),
-           let nameRange = Range(match.range, in: content) {
-            var updated = content
-            updated.insert(contentsOf: "\n\(line)", at: nameRange.upperBound)
-            return updated
+        insertingHeaderLine(line, into: content)
+    }
+
+    /// 将一行注释插入模块 `#!` 头部信息块之后，而不是紧跟 `#!name`，
+    /// 保证 Surge Relay 追加信息位于模块自身信息下方。
+    private static func insertingHeaderLine(_ line: String, into content: String) -> String {
+        let normalized = content.replacingOccurrences(of: "\r\n", with: "\n")
+        var lines = normalized.components(separatedBy: "\n")
+        var insertionIndex = 0
+        while insertionIndex < lines.count {
+            let candidate = lines[insertionIndex]
+                .trimmingCharacters(in: .whitespaces)
+                .replacingOccurrences(of: "\r", with: "")
+            guard candidate.hasPrefix("#!") else { break }
+            insertionIndex += 1
         }
-        return line + "\n" + content
+        lines.insert(line, at: insertionIndex)
+        return lines.joined(separator: "\n")
     }
 
     private static func parseScriptHubSubscriptionURL(_ value: String) -> ScriptHubSubscriptionInfo? {

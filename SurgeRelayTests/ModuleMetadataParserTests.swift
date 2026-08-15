@@ -124,6 +124,50 @@ final class ModuleMetadataParserTests: XCTestCase {
         XCTAssertTrue(nameRange.upperBound < subRange.lowerBound)
     }
 
+    func testApplyingScriptHubSubscriptionInsertsAfterFullHeaderBlock() {
+        let content = "#!name=Demo\n#!desc=说明\n#!icon=https://example.com/icon.png\n#!category=Test\n[General]\n"
+        let subscription = ScriptHubSubscriptionInfo(
+            subscriptionURL: "http://script.hub/file/_start_/https://example.com/demo.conf/_end_/Demo.sgmodule?type=surge-module&target=surge-module",
+            originalURL: "https://example.com/demo.conf",
+            outputName: "Demo.sgmodule",
+            sourceType: "surge-module",
+            target: "surge-module",
+            category: nil,
+            options: ScriptHubOptions()
+        )
+        let result = ModuleMetadataParser.applyingScriptHubSubscription(subscription, to: content)
+        let lines = result.components(separatedBy: "\n")
+        XCTAssertEqual(lines[0], "#!name=Demo")
+        XCTAssertEqual(lines[1], "#!desc=说明")
+        XCTAssertEqual(lines[2], "#!icon=https://example.com/icon.png")
+        XCTAssertEqual(lines[3], "#!category=Test")
+        XCTAssertTrue(lines[4].hasPrefix("#SUBSCRIBED"))
+        XCTAssertEqual(lines[5], "[General]")
+    }
+
+    func testSurgeRelayBlockInsertsBelowModuleHeader() {
+        let content = "#!name=Demo\n#!desc=说明\n#!category=Test\n[General]\n"
+        let subscription = ScriptHubSubscriptionInfo(
+            subscriptionURL: "http://script.hub/file/_start_/https://example.com/demo.conf/_end_/Demo.sgmodule?type=surge-module&target=surge-module",
+            originalURL: "https://example.com/demo.conf",
+            outputName: "Demo.sgmodule",
+            sourceType: "surge-module",
+            target: "surge-module",
+            category: nil,
+            options: ScriptHubOptions()
+        )
+        let subscribed = ModuleMetadataParser.applyingScriptHubSubscription(subscription, to: content)
+        let wrapped = ManagedPublishedFile.dataWrapping(Data(subscribed.utf8), relativePath: "Test/Demo.sgmodule")
+        let lines = String(data: wrapped, encoding: .utf8)!.components(separatedBy: "\n")
+        XCTAssertEqual(lines[0], "#!name=Demo")
+        XCTAssertEqual(lines[1], "#!desc=说明")
+        XCTAssertEqual(lines[2], "#!category=Test")
+        XCTAssertEqual(lines[3], "# Surge Relay managed output")
+        XCTAssertEqual(lines[4], "# surge-relay-relative-path: Test/Demo.sgmodule")
+        XCTAssertTrue(lines[5].hasPrefix("#SUBSCRIBED"))
+        XCTAssertEqual(lines[6], "[General]")
+    }
+
     func testApplyingScriptHubSubscriptionReplacesExistingMarker() {
         let content = "#!name=Demo\n#SUBSCRIBED http://script.hub/file/_start_/https://old.com/old.conf/_end_/Demo.sgmodule\n[General]\n"
         let subscription = ScriptHubSubscriptionInfo(

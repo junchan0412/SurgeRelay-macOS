@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.36
+
+- 修复 Surge Relay 追加信息插入位置：`#SUBSCRIBED` 与“受管输出”注释块现在统一插入在模块自身 `#!` 头部信息（name/desc/icon/author/homepage/category 等）下方，不再紧跟 `#!name` 把头部截断。
+- `applyingCategory` / `applyingIcon` 在头部行缺失时的追加位置同步修正为头部块末尾。
+
 ## 1.3.35
 
 - 重构右键菜单：
