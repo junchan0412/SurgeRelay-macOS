@@ -71,9 +71,12 @@ actor ScriptHubUpstreamService {
         return (data, response)
     }
 
+    private static let scriptPathExpression = try? NSRegularExpression(
+        pattern: #"script-path=(https://raw\.githubusercontent\.com/[^,\s?]+)(?:\?[^,\s]*)?"#
+    )
+
     private func scriptURLs(in module: String, source: PinnedScriptHubSource) throws -> [URL] {
-        let pattern = #"script-path=(https://raw\.githubusercontent\.com/[^,\s?]+)(?:\?[^,\s]*)?"#
-        guard let expression = try? NSRegularExpression(pattern: pattern) else { return [] }
+        guard let expression = Self.scriptPathExpression else { return [] }
         let matches = expression.matches(in: module, range: NSRange(module.startIndex..., in: module))
         var seen = Set<String>()
         return try matches.compactMap { match in

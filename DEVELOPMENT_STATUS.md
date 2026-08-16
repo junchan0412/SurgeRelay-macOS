@@ -2,11 +2,12 @@
 
 Updated: 2026-08-16
 
-This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.37 (86)`.
+This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.38 (87)`.
 
 ## 当前状态
 
-- `1.3.37 (86)` 的变更已记录在 `CHANGELOG.md`，包含右键菜单“复制模块 / 拷贝更新地址 / 拷贝输出路径”与菜单栏“需要处理”监控计数。
+- `1.3.38 (87)` 的变更已记录在 `CHANGELOG.md`，包含模块解析/清洗链路的静态正则缓存与 Web 管理端 `web-detail.js` 详情渲染拆分。
+- `1.3.37 (86)` 包含右键菜单“复制模块 / 拷贝更新地址 / 拷贝输出路径”与菜单栏“需要处理”监控计数。
 - 此前版本已落地：多选 / 发布所选按模块存放位置发布、侧边栏多维筛选与排序、远程来源本地模块本地发布、新模块首次更新失败自动重试等。
 - 凭据存储已从系统钥匙串迁移到配置目录内的 AES-256-GCM 本地加密文件，无开发者账户签名也能正常保存。
 - 自定义图标会重写模块输出中的 `#!icon`，桌面端、Web 管理端和发布产物使用同一个值。
@@ -80,14 +81,14 @@ This document tracks the optimization work completed after the deep audit and th
 - Sidebar presentation is rebuilt from a stable signature instead of every AppModel field change; detail selection uses asymmetric transitions while preview editors stay mounted after first open.
 - Sidebar module rows no longer observe the full AppModel graph, reducing list thrash during mass updates; status-card compositing and icon reloads were lightened for smoother progress animation.
 - Detail/preview segmented control and section collapse use short snappy transitions while keeping the preview editor mounted after first open.
-- Module metadata parsing is line-based and avoids recompiling regular expressions during refreshes.
+- Module metadata parsing is line-based and avoids recompiling regular expressions during refreshes; metadata rewrite, sanitizer, Script-Hub and merger regular expressions are static cached literals.
 - Local output-folder discovery runs off the main actor and reuses a bounded cache instead of recursively scanning during SwiftUI redraws.
 - Module icons load and decode on utility tasks keyed by icon revision; hidden preview editors are mounted only after the preview tab is used and are released when the selected module changes.
 - Sidebar grouping performs one classification pass over modules, and code-highlighting patterns are reused across editor updates.
 
 ## 目标
 
-- 发布 `1.3.24 (73)`，随后继续推进 macOS 设置窗口、模块编辑器、详情页和 Web 管理端的自动化 UI 截图/交互覆盖。
+- 发布 `1.3.38 (87)`，随后继续推进 macOS 设置窗口、模块编辑器、详情页和 Web 管理端的自动化 UI 截图/交互覆盖。
 - 为 Web 管理端补充 Playwright 冒烟测试；继续拆分 `WebResources/app.js` 和较大的 Swift 文件。
 - 持续对照 `docs/UPSTREAM_SYNC.md` 选择性移植 upstream 修复，不合并与本 fork 存储/发布模型冲突的改动。
 - 在 Apple Developer ID 可用前维持固定自签名 + Sparkle 更新；可用后补充 Developer ID 签名、公证、stapling 与验证。
@@ -98,7 +99,7 @@ This document tracks the optimization work completed after the deep audit and th
 ### High Priority
 
 - Add automated UI screenshot or interaction coverage for the macOS settings window, module editor, module detail page, and Web management page.
-- Continue shrinking `WebResources/app.js` by extracting detail-action routing or module-editor orchestration if those sections keep growing.
+- Detail rendering and live patching now live in `WebResources/web-detail.js` (with behavior tests and a load-order contract); keep shrinking `app.js` by extracting detail-action routing or module-editor orchestration if those sections keep growing.
 - Continue shrinking the largest Swift files that still exceed roughly 300 lines, especially `EmbeddedScriptHubEngine.swift`, `ModuleFileStore.swift`, `PersistenceStore.swift`, `ModuleDetailView.swift`, and larger focused test files.
 - Keep comparing upstream `EEliberto/SurgeRelay-macOS:main` using `docs/UPSTREAM_SYNC.md`; selectively port fixes that improve stability without undoing this fork's storage/publishing model.
 
@@ -123,13 +124,13 @@ Use the Xcode beta toolchain explicitly:
 DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer"
 ```
 
-Before publishing (当前目标版本为 `1.3.24 (73)`):
+Before publishing (当前目标版本为 `1.3.38 (87)`):
 
 ```bash
 git diff --check
 node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs
-VERSION=1.3.24 BUILD=73 \
+VERSION=1.3.38 BUILD=87 \
 DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
 ./script/check_release_configuration.sh
 ```

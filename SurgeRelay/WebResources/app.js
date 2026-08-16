@@ -50,12 +50,6 @@ const { formatDate, highlightCode } = webFormat;
 
 const webMarkup = window.SurgeRelayWebMarkup;
 if (!webMarkup) throw new Error('web-markup.js must load before app.js');
-const {
-  emptyStateMarkup,
-  combinedDetailMarkup,
-  moduleDetailMarkup,
-  argumentsSectionMarkup
-} = webMarkup;
 
 const webSidebar = window.SurgeRelayWebSidebar;
 if (!webSidebar) throw new Error('web-sidebar.js must load before app.js');
@@ -85,9 +79,11 @@ if (!webFeedback) throw new Error('web-feedback.js must load before app.js');
 const webPreview = window.SurgeRelayWebPreview;
 if (!webPreview) throw new Error('web-preview.js must load before app.js');
 
+const webDetail = window.SurgeRelayWebDetail;
+if (!webDetail) throw new Error('web-detail.js must load before app.js');
+
 let state = null;
 let selectedID = null;
-let detailTab = 'info';
 let editingID = null;
 let showFailuresOnly = false;
 const mobileLayout = window.matchMedia('(max-width: 700px)');
@@ -127,6 +123,19 @@ const previewController = webPreview.createPreviewController({
   askConfirmation,
   showToast
 });
+const detailController = webDetail.createDetailController({
+  ui,
+  markup: webMarkup,
+  logic: webLogic,
+  previewController,
+  api: (...args) => api(...args),
+  document,
+  formatDate,
+  getState: () => state,
+  getSelectedID: () => selectedID,
+  normalizeSelection: () => { normalizeSelection(); }
+});
+const renderDetail = (animate = true) => detailController.renderDetail(animate);
 const sidebarController = webSidebar.createSidebarController({
   ui,
   getState: () => state,
@@ -293,91 +302,7 @@ function patchLiveState(previous, next) {
   const nextList = webLogic.sidebarListSignature(next);
   if (previousList !== nextList) sidebarController.render(); else sidebarController.patchLive();
 
-  if (detailTab !== 'info') return;
-  if (selectedID === 'combined') {
-    if (!next.combined.isEnabled) return;
-    patchDetailValue('包含来源', `${next.combined.enabledCount} / ${next.combined.sourceCount}`);
-    patchDetailValue('最新更新', formatDate(next.combined.lastUpdatedAt, '尚未更新'));
-    return;
-  }
-
-  const module = next.modules.find(item => item.id === selectedID);
-  if (!module) return;
-  const previousModule = previous.modules.find(item => item.id === selectedID);
-  if (webLogic.metadataRowPresenceChanged(previousModule, module)) {
-    renderDetail(false);
-    return;
-  }
-  patchDetailValue('更新状态', webLogic.moduleStatusTitle(module));
-  patchDetailValue('初始来源', module.initialSourceTitle || '自写模块');
-  patchDetailValue('来源格式', module.sourceFormatTitle);
-  if (next.combined.isEnabled) patchDetailValue('汇总订阅', next.combined.subscriptionURL || '等待发布配置');
-  patchDetailValue('创建时间', formatDate(module.createdAt, '—'));
-  patchDetailValue('上次更新', formatDate(module.lastUpdatedAt, '从未更新'));
-  patchDetailValue('来源检查', formatDate(module.sourceCheckedAt, '尚未检查'));
-  patchDetailValue('内容 hash', module.contentHash ? module.contentHash.slice(0, 12) : '尚未生成');
-  patchDetailValue('转换引擎', module.conversionEngineRevision ? module.conversionEngineRevision.slice(0, 12) : '原生 Surge 模块');
-}
-
-function patchDetailValue(label, value) {
-  const row = [...ui.detail.querySelectorAll('.detail-row')]
-    .find(item => item.querySelector('.detail-label span:last-child')?.textContent === label);
-  const target = row?.querySelector('.detail-value');
-  if (target && target.textContent !== value) target.textContent = value;
-}
-
-function renderDetail(animate = true) {
-  if (!state || !selectedID) { setDetailHTML(emptyStateMarkup('sidebar.left', '选择一个模块'), animate); return; }
-  if (selectedID === 'combined') {
-    if (!state.combined.isEnabled) { normalizeSelection(); renderDetail(animate); return; }
-    ui.mobileTitle.textContent = state.combined.name;
-    renderCombinedDetail(animate);
-  }
-  else {
-    const module = state.modules.find(item => item.id === selectedID);
-    if (module) {
-      ui.mobileTitle.textContent = module.name;
-      renderModuleDetail(module, animate);
-    }
-  }
-}
-
-function setDetailHTML(content, animate = true) {
-  ui.detail.innerHTML = `<div class="detail-stage ${animate ? 'page-enter' : ''}">${content}</div>`;
-}
-
-function renderCombinedDetail(animate = true) {
-  const combined = state.combined;
-  setDetailHTML(combinedDetailMarkup(combined, {
-    selectedTab: detailTab,
-    latestGitHubPublish: state.activity?.latestGitHubPublish
-  }), animate);
-  if (!combined.isEnabled) return;
-  if (detailTab === 'preview') {
-    previewController.loadPreview('/api/combined/preview', false);
-  }
-}
-
-function renderModuleDetail(module, animate = true) {
-  setDetailHTML(moduleDetailMarkup(module, {
-    selectedTab: detailTab,
-    combined: state.combined
-  }), animate);
-  if (detailTab === 'preview') {
-    previewController.loadPreview(`/api/modules/${module.id}/preview`, true);
-    return;
-  }
-  loadArguments(module);
-}
-
-async function loadArguments(module) {
-  try {
-    const payload = await api(`/api/modules/${module.id}/arguments`);
-    if (selectedID !== module.id || detailTab !== 'info') return;
-    const target = document.querySelector('#arguments-section');
-    if (!target || !payload.arguments.length) return;
-    target.innerHTML = argumentsSectionMarkup(payload);
-  } catch (_) {}
+  detailController.patchLiveDetail(previous, next);
 }
 
 function updateOutputPathPreview() {
@@ -404,8 +329,8 @@ async function handleDetailClick(event) {
   if (!action) return;
   const module = state.modules.find(item => item.id === selectedID);
   switch (action) {
-  case 'tab-info': detailTab = 'info'; renderDetail(false); break;
-  case 'tab-preview': detailTab = 'preview'; renderDetail(false); break;
+  case 'tab-info': detailController.setTab('info'); renderDetail(false); break;
+  case 'tab-preview': detailController.setTab('preview'); renderDetail(false); break;
   case 'edit': if (module) openEditor(module); break;
   case 'delete': if (module) await deleteModule(module); break;
   case 'copy': await copyText(source.dataset.value, source); break;
@@ -439,7 +364,7 @@ function selectItem(id, pushHistory = true) {
   if (id !== 'combined' && !state.modules.some(module => module.id === id)) id = fallbackSelection();
   if (!id) { showModuleList(pushHistory); return; }
   const cameFromList = mobileLayout.matches && !ui.body.classList.contains('has-selection');
-  selectedID = id; detailTab = 'info'; ui.body.classList.add('has-selection');
+  selectedID = id; detailController.setTab('info'); ui.body.classList.add('has-selection');
   resetHorizontalScroll();
   if (pushHistory) {
     const entry = webState.detailHistoryEntry(location, id, cameFromList);
@@ -457,7 +382,7 @@ function initializeHistoryState() {
 
 function showModuleList(replaceHistory = false) {
   selectedID = null;
-  detailTab = 'info';
+  detailController.setTab('info');
   ui.body.classList.remove('has-selection');
   resetHorizontalScroll();
   if (replaceHistory) {
@@ -555,6 +480,6 @@ async function deleteModule(module) {
 }
 
 async function resetArguments(module) {
-  try { const result = await api(`/api/modules/${module.id}/arguments`, { method: 'DELETE' }); showToast(result.message); renderModuleDetail(module, true); }
+  try { const result = await api(`/api/modules/${module.id}/arguments`, { method: 'DELETE' }); showToast(result.message); detailController.renderModuleDetail(module, true); }
   catch (error) { showToast(error.message, true); }
 }

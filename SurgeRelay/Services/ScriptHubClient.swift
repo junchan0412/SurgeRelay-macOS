@@ -1,6 +1,10 @@
 import Foundation
 
 actor ScriptHubClient {
+    private static let convertPathExpression = try? NSRegularExpression(
+        pattern: #"script-path\s*=\s*(http://script\.hub/convert/_start_/.*?/_end_/[^,\s]+)"#
+    )
+
     private let engineStore: EngineStore
     private let embeddedEngine: EmbeddedScriptHubEngine
     private let session: URLSession
@@ -122,8 +126,7 @@ actor ScriptHubClient {
         converterScript: String,
         github: GitHubSettings?
     ) async throws -> (content: String, assets: [GeneratedAsset]) {
-        let pattern = #"script-path\s*=\s*(http://script\.hub/convert/_start_/.*?/_end_/[^,\s]+)"#
-        guard let expression = try? NSRegularExpression(pattern: pattern) else {
+        guard let expression = Self.convertPathExpression else {
             return (content, [])
         }
         let matches = expression.matches(in: content, range: NSRange(content.startIndex..., in: content))

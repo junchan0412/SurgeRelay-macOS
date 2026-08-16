@@ -12,6 +12,7 @@ const stateScriptIndex = indexHTML.indexOf('/web-state.js');
 const editorScriptIndex = indexHTML.indexOf('/web-editor.js');
 const feedbackScriptIndex = indexHTML.indexOf('/web-feedback.js');
 const previewScriptIndex = indexHTML.indexOf('/web-preview.js');
+const detailScriptIndex = indexHTML.indexOf('/web-detail.js');
 const appScriptIndex = indexHTML.indexOf('/app.js');
 assert.ok(logicScriptIndex >= 0, 'index should load web-logic.js');
 assert.ok(optionsScriptIndex > logicScriptIndex, 'web-options.js must load after web-logic.js');
@@ -24,7 +25,8 @@ assert.ok(stateScriptIndex > apiScriptIndex, 'web-state.js must load after web-a
 assert.ok(editorScriptIndex > stateScriptIndex, 'web-editor.js must load after web-state.js');
 assert.ok(feedbackScriptIndex > editorScriptIndex, 'web-feedback.js must load after web-editor.js');
 assert.ok(previewScriptIndex > feedbackScriptIndex, 'web-preview.js must load after web-feedback.js');
-assert.ok(appScriptIndex > previewScriptIndex, 'web-preview.js must load before app.js');
+assert.ok(detailScriptIndex > previewScriptIndex, 'web-detail.js must load after web-preview.js');
+assert.ok(appScriptIndex > detailScriptIndex, 'web-detail.js must load before app.js');
 assert.match(indexHTML, /name="storageLocation"/);
 assert.match(indexHTML, /name="outputFolder"/);
 assert.match(indexHTML, /id="output-path-preview"/);

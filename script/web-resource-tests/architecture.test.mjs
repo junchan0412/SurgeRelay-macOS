@@ -51,3 +51,8 @@ assert.doesNotMatch(
   /function renderActivity\(/,
   'app.js should use web-activity for update activity rendering'
 );
+assert.doesNotMatch(
+  appSource,
+  /function (renderDetail|renderModuleDetail|renderCombinedDetail|setDetailHTML|patchDetailValue|loadArguments)\(/,
+  'app.js should use web-detail helpers for detail rendering and live patching'
+);

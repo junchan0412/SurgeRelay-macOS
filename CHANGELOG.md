@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.38
+
+- 性能：`ModuleMetadataParser`、`SurgeModuleSanitizer`、`ScriptHubClient`、`ScriptHubUpstreamService`、`ModuleMerger` 中的固定字面量正则改为静态缓存，模块刷新、批量更新与发布不再重复编译正则。
+- 维护性：Web 管理端详情渲染（`renderDetail` / live 字段补丁 / 页签状态）从 `app.js` 拆分到独立的 `web-detail.js` 模块，`app.js` 进一步瘦身；新增 web-detail 行为测试与加载顺序契约。
+
 ## 1.3.37
 
 - 右键菜单新增“复制模块”（唯一名称生成保留全部设置的副本并自动更新）、

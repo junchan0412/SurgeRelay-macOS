@@ -176,11 +176,15 @@ enum ModuleMerger {
         line.hasPrefix("#") || line.hasPrefix("//") || line.hasPrefix(";")
     }
 
+    private static let coreVersionExpression = try? NSRegularExpression(
+        pattern: #"CORE_VERSION\s*(?:>=|<=|==|=|>|<)\s*[0-9]+"#,
+        options: .caseInsensitive
+    )
+
     private static func sanitizeRequirement(_ requirement: String) -> String? {
         let deviceVariables = ["SYSTEM", "SYSTEM_VERSION", "DEVICE_MODEL"]
         guard deviceVariables.contains(where: requirement.contains) else { return requirement }
-        let pattern = #"CORE_VERSION\s*(?:>=|<=|==|=|>|<)\s*[0-9]+"#
-        guard let expression = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else { return nil }
+        guard let expression = coreVersionExpression else { return nil }
         let matches = expression.matches(in: requirement, range: NSRange(requirement.startIndex..., in: requirement))
         let coreClauses = matches.compactMap { Range($0.range, in: requirement).map { String(requirement[$0]) } }
         return coreClauses.isEmpty ? nil : coreClauses.joined(separator: " && ")

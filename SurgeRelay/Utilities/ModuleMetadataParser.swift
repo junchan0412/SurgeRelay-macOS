@@ -36,6 +36,12 @@ struct ScriptHubSubscriptionInfo: Codable, Hashable, Sendable {
 }
 
 enum ModuleMetadataParser {
+    // 头部字段的正则均为固定字面量，缓存编译结果避免每次刷新/发布重复编译。
+    private static let nameExpression = try? NSRegularExpression(pattern: #"(?im)^\s*#!name\s*=.*$"#)
+    private static let categoryExpression = try? NSRegularExpression(pattern: #"(?im)^\s*#!category\s*=.*$"#)
+    private static let iconExpression = try? NSRegularExpression(pattern: #"(?im)^\s*#!icon\s*=.*$"#)
+    private static let subscribedExpression = try? NSRegularExpression(pattern: #"(?im)^\s*#SUBSCRIBED\b.*$"#)
+
     static func scriptHubSubscription(in content: String) -> ScriptHubSubscriptionInfo? {
         guard let value = ModuleMetadataLineReader.subscribedValue(in: content) else { return nil }
         return parseScriptHubSubscriptionURL(value)
@@ -123,7 +129,7 @@ enum ModuleMetadataParser {
     static func applyingDisplayName(_ name: String, to content: String) -> String {
         let normalized = content.replacingOccurrences(of: "\r\n", with: "\n")
         let line = "#!name=\(name.trimmingCharacters(in: .whitespacesAndNewlines))"
-        guard let expression = try? NSRegularExpression(pattern: #"(?im)^\s*#!name\s*=.*$"#) else {
+        guard let expression = nameExpression else {
             return line + "\n" + normalized
         }
         let range = NSRange(normalized.startIndex..., in: normalized)
@@ -144,7 +150,7 @@ enum ModuleMetadataParser {
         }
         let normalized = content.replacingOccurrences(of: "\r\n", with: "\n")
         let line = "#!category=\(value)"
-        guard let expression = try? NSRegularExpression(pattern: #"(?im)^\s*#!category\s*=.*$"#) else {
+        guard let expression = categoryExpression else {
             return line + "\n" + normalized
         }
         let range = NSRange(normalized.startIndex..., in: normalized)
@@ -165,8 +171,7 @@ enum ModuleMetadataParser {
             return normalized
         }
         let line = "#!icon=\(iconURL)"
-        let iconPattern = #"(?im)^\s*#!icon\s*=.*$"#
-        guard let expression = try? NSRegularExpression(pattern: iconPattern) else {
+        guard let expression = iconExpression else {
             return line + "\n" + normalized
         }
         let range = NSRange(normalized.startIndex..., in: normalized)
@@ -201,8 +206,7 @@ enum ModuleMetadataParser {
         guard let subscription else { return content }
         let normalized = content.replacingOccurrences(of: "\r\n", with: "\n")
         let line = "#SUBSCRIBED \(subscription.subscriptionURL)"
-        let pattern = #"(?im)^\s*#SUBSCRIBED\b.*$"#
-        guard let expression = try? NSRegularExpression(pattern: pattern) else {
+        guard let expression = subscribedExpression else {
             return insertingSubscriptionLine(line, into: normalized)
         }
         let range = NSRange(normalized.startIndex..., in: normalized)

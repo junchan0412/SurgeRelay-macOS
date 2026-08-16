@@ -6,6 +6,7 @@ build/
 node_modules/
 DerivedData/
 dist/
+.inscode/
 *.profraw
 *.dmg
 *.pdf

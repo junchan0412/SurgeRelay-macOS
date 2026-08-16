@@ -90,9 +90,13 @@ enum SurgeModuleSanitizer {
         return unquoted.isEmpty
     }
 
+    private static let loonScriptExpression = try? NSRegularExpression(
+        pattern: #"^(.+?)\s+url\s+script-(request|response)-(body|header)\s+(https?://\S+)(?:\s+.*)?$"#,
+        options: .caseInsensitive
+    )
+
     private static func convertedLoonScript(from line: String, existing: [String]) -> String? {
-        let pattern = #"^(.+?)\s+url\s+script-(request|response)-(body|header)\s+(https?://\S+)(?:\s+.*)?$"#
-        guard let expression = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+        guard let expression = loonScriptExpression,
               let match = expression.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),
               let patternRange = Range(match.range(at: 1), in: line),
               let directionRange = Range(match.range(at: 2), in: line),
