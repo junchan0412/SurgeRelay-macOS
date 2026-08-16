@@ -60,23 +60,25 @@ struct ModuleCodeTextView: NSViewRepresentable {
 
     @MainActor
     final class Coordinator: NSObject, NSTextViewDelegate {
-        private static let commentExpression = try! NSRegularExpression(
+        // Regex compilation is deterministic, but keep initialization failure local to
+        // the highlighting pass so a malformed future pattern cannot crash the editor.
+        private static let commentExpression = try? NSRegularExpression(
             pattern: #"^(?:#|//|;).*$"#,
             options: [.anchorsMatchLines]
         )
-        private static let subscribedExpression = try! NSRegularExpression(
+        private static let subscribedExpression = try? NSRegularExpression(
             pattern: #"^(?:#|//|;)SUBSCRIBED\b.*$"#,
             options: [.anchorsMatchLines]
         )
-        private static let sectionExpression = try! NSRegularExpression(
+        private static let sectionExpression = try? NSRegularExpression(
             pattern: #"^\[[^\n]+\]$"#,
             options: [.anchorsMatchLines]
         )
-        private static let metadataExpression = try! NSRegularExpression(
+        private static let metadataExpression = try? NSRegularExpression(
             pattern: #"^#![^\n]*"#,
             options: [.anchorsMatchLines]
         )
-        private static let urlExpression = try! NSRegularExpression(
+        private static let urlExpression = try? NSRegularExpression(
             pattern: #"https?://[^\s,\"]+"#
         )
 
@@ -194,10 +196,11 @@ struct ModuleCodeTextView: NSViewRepresentable {
         }
 
         private func apply(
-            expression: NSRegularExpression,
+            expression: NSRegularExpression?,
             attributes: [NSAttributedString.Key: Any],
             to textStorage: NSTextStorage
         ) {
+            guard let expression else { return }
             let string = textStorage.string
             let range = NSRange(location: 0, length: (string as NSString).length)
             for match in expression.matches(in: string, range: range) {

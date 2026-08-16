@@ -3,6 +3,21 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.3.39</title>
+            <pubDate>Sun, 16 Aug 2026 12:47:12 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.39</link>
+            <sparkle:version>88</sparkle:version>
+            <sparkle:shortVersionString>1.3.39</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.3.39
+
+
+- 稳定性：编辑器语法高亮的正则表达式改为可失败初始化；单个高亮规则异常时会跳过该规则，不再让编辑器初始化触发 `try!` 崩溃。
+- 维护性：同步 `project.yml`、Xcode 工程和发布清单版本至 1.3.39（build 88）。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.3.39/Surge-Relay-1.3.39.app.zip" length="9058626" type="application/zip" sparkle:edSignature="E415le0ebxBliAT6IJAutXnvcLc4nAI5Pr5KTLhMCScDsjfIx4g62zD3WUa41kU4oq5OA39Y1x4NbhOBbMGgAQ=="/>
+        </item>
+        <item>
             <title>1.3.38</title>
             <pubDate>Sun, 16 Aug 2026 12:05:04 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.38</link>

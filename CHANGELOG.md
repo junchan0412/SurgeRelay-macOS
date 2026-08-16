@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.39
+
+- 稳定性：编辑器语法高亮的正则表达式改为可失败初始化；单个高亮规则异常时会跳过该规则，不再让编辑器初始化触发 `try!` 崩溃。
+- 维护性：同步 `project.yml`、Xcode 工程和发布清单版本至 1.3.39（build 88）。
+
 ## 1.3.38
 
 - 性能：`ModuleMetadataParser`、`SurgeModuleSanitizer`、`ScriptHubClient`、`ScriptHubUpstreamService`、`ModuleMerger` 中的固定字面量正则改为静态缓存，模块刷新、批量更新与发布不再重复编译正则。
