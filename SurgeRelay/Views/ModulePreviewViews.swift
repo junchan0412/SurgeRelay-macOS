@@ -10,6 +10,7 @@ struct ModulePreviewPane: View {
     @State private var isLoading = true
     @State private var isWriting = false
     @State private var errorMessage: String?
+    @State private var cursorPosition = ModuleCodeCursorPosition(line: 1, column: 1)
     @State private var showsComparison = false
 
     private var currentModule: RelayModule {
@@ -32,16 +33,27 @@ struct ModulePreviewPane: View {
                 .background(.orange.opacity(0.08))
                 Divider()
             }
-            ModuleCodeTextView(
-                text: $text,
-                isEditable: !isLoading,
-                modules: [module],
-                selectedModuleID: module.id
-            )
-            .ignoresSafeArea(.container, edges: .top)
+            ZStack {
+                ModuleCodeTextView(
+                    text: $text,
+                    isEditable: !isLoading,
+                    modules: [module],
+                    selectedModuleID: module.id,
+                    onCursorPositionChange: { cursorPosition = $0 }
+                )
+                .ignoresSafeArea(.container, edges: .top)
+                if isLoading {
+                    ProgressView("正在载入模块内容…")
+                        .padding(16)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                }
+            }
 
             Divider()
             HStack(spacing: 12) {
+                Label("第 \(cursorPosition.line) 行，第 \(cursorPosition.column) 列", systemImage: "text.cursor")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
                 Button("恢复") { restore() }
                     .disabled(isWriting || isLoading)
                 if !isLoading, text != savedText {
@@ -228,6 +240,7 @@ struct ModuleTextEditorView: View {
     @State private var isLoading = true
     @State private var isWriting = false
     @State private var errorMessage: String?
+    @State private var cursorPosition = ModuleCodeCursorPosition(line: 1, column: 1)
 
     var body: some View {
         VStack(spacing: 0) {
@@ -247,13 +260,24 @@ struct ModuleTextEditorView: View {
             }
             .padding(12)
             Divider()
-            ModuleCodeTextView(
-                text: $text,
-                isEditable: !isLoading,
-                modules: [module],
-                selectedModuleID: module.id
-            )
+            ZStack {
+                ModuleCodeTextView(
+                    text: $text,
+                    isEditable: !isLoading,
+                    modules: [module],
+                    selectedModuleID: module.id,
+                    onCursorPositionChange: { cursorPosition = $0 }
+                )
+                if isLoading {
+                    ProgressView("正在载入模块内容…")
+                        .padding(16)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                }
+            }
             HStack(spacing: 8) {
+                Label("第 \(cursorPosition.line) 行，第 \(cursorPosition.column) 列", systemImage: "text.cursor")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
                 if !isLoading, text != savedText {
                     Label("有尚未写入的修改", systemImage: "square.and.pencil")
                         .font(.caption)
