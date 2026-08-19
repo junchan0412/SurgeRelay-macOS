@@ -242,15 +242,16 @@ enum ModuleMetadataParser {
     }
 
     private static func parseScriptHubSubscriptionURL(_ value: String) -> ScriptHubSubscriptionInfo? {
+        let normalizedValue = decodeHTMLEntities(value)
         let startMarker = "/_start_/"
         let endMarker = "/_end_/"
-        guard let start = value.range(of: startMarker),
-              let end = value.range(of: endMarker, range: start.upperBound..<value.endIndex) else {
+        guard let start = normalizedValue.range(of: startMarker),
+              let end = normalizedValue.range(of: endMarker, range: start.upperBound..<normalizedValue.endIndex) else {
             return nil
         }
 
-        let originalPart = String(value[start.upperBound..<end.lowerBound])
-        let tail = String(value[end.upperBound...])
+        let originalPart = String(normalizedValue[start.upperBound..<end.lowerBound])
+        let tail = String(normalizedValue[end.upperBound...])
         let pieces = tail.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
         let outputName = pieces.first.map(String.init)
             .map { $0.removingPercentEncoding ?? $0 }?
@@ -260,7 +261,7 @@ enum ModuleMetadataParser {
         guard let originalURL = normalizedOriginalURL(originalPart) else { return nil }
         let sourceType = queryItems["type"]?.trimmingCharacters(in: .whitespacesAndNewlines)
         return ScriptHubSubscriptionInfo(
-            subscriptionURL: value,
+            subscriptionURL: normalizedValue,
             originalURL: originalURL,
             outputName: outputName?.isEmpty == false ? outputName : nil,
             sourceType: sourceType?.isEmpty == false ? sourceType : nil,
@@ -271,9 +272,10 @@ enum ModuleMetadataParser {
     }
 
     private static func decodedQueryItems(from query: String) -> [String: String] {
-        guard !query.isEmpty else { return [:] }
+        let normalizedQuery = decodeHTMLEntities(query)
+        guard !normalizedQuery.isEmpty else { return [:] }
         var components = URLComponents()
-        components.percentEncodedQuery = query
+        components.percentEncodedQuery = normalizedQuery
         if let items = components.queryItems {
             var values: [String: String] = [:]
             for item in items {
@@ -284,7 +286,7 @@ enum ModuleMetadataParser {
         }
 
         var values: [String: String] = [:]
-        for pair in query.split(separator: "&") {
+        for pair in normalizedQuery.split(separator: "&") {
             let pieces = pair.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
             guard pieces.count == 2 else { continue }
             let name = String(pieces[0]).removingPercentEncoding ?? String(pieces[0])
@@ -292,6 +294,51 @@ enum ModuleMetadataParser {
             values[name] = value
         }
         return values
+    }
+
+    private static func decodeHTMLEntities(_ value: String) -> String {
+        guard value.contains("&") else { return value }
+        let namedEntities = [
+            "amp": "&",
+            "lt": "<",
+            "gt": ">",
+            "quot": "\"",
+            "apos": "'",
+            "#39": "'"
+        ]
+        var result = ""
+        var index = value.startIndex
+        while index < value.endIndex {
+            guard value[index] == "&",
+                  let semicolon = value[index...].firstIndex(of: ";") else {
+                result.append(value[index])
+                index = value.index(after: index)
+                continue
+            }
+            let entityStart = value.index(after: index)
+            let entity = String(value[entityStart..<semicolon])
+            if let replacement = namedEntities[entity] {
+                result.append(replacement)
+                index = value.index(after: semicolon)
+                continue
+            }
+            let scalar: UInt32?
+            if entity.hasPrefix("#x") || entity.hasPrefix("#X") {
+                scalar = UInt32(entity.dropFirst(2), radix: 16)
+            } else if entity.hasPrefix("#") {
+                scalar = UInt32(entity.dropFirst(), radix: 10)
+            } else {
+                scalar = nil
+            }
+            if let scalar, let unicodeScalar = UnicodeScalar(scalar) {
+                result.unicodeScalars.append(unicodeScalar)
+                index = value.index(after: semicolon)
+            } else {
+                result.append(contentsOf: value[index...semicolon])
+                index = value.index(after: semicolon)
+            }
+        }
+        return result
     }
 
     private static func normalizedOriginalURL(_ value: String) -> String? {

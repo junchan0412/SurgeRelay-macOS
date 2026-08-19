@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.41
+
+- 稳定性：兼容网页或 XML 转义后的 Script-Hub `#SUBSCRIBED` 地址，自动还原 `&amp;` 及常见 numeric entities，避免 `target=surge-module` 等转换参数丢失。
+- 维护性：订阅地址解析和 Script-Hub 转换 URL 新增真实用户地址回归测试，规范化后的地址不再重复携带 HTML entity。
+
 ## 1.3.40
 
 - 编辑器显示：新增行号栏、当前行强调、横向滚动和更舒适的等宽字体行距；长行不再被强制折行。

@@ -90,6 +90,21 @@ final class ModuleMetadataParserTests: XCTestCase {
         XCTAssertEqual(subscription.originalURL, "https://example.com/modules/demo.sgmodule")
     }
 
+    func testReadsHTMLEntitiesInSubscribedURL() throws {
+        let content = """
+        #!name=叮当猫合集
+        #!category=#8会员模块
+        #SUBSCRIBED http://script.hub/file/_start_/https://raw.githubusercontent.com/chxm1023/Rewrite/main/Reheji.js/_end_/%E5%8F%AE%E5%BD%93%E7%8C%AB%E5%90%88%E9%9B%86.sgmodule?type=qx-rewrite&amp;target=surge-module&amp;del
+        """
+
+        let subscription = try XCTUnwrap(ModuleMetadataParser.scriptHubSubscription(in: content))
+        XCTAssertEqual(subscription.sourceType, "qx-rewrite")
+        XCTAssertEqual(subscription.target, "surge-module")
+        XCTAssertFalse(subscription.subscriptionURL.contains("&amp;"))
+        XCTAssertTrue(subscription.subscriptionURL.contains("&target=surge-module"))
+        XCTAssertTrue(subscription.options.removeCommentedRewrites)
+    }
+
     func testRecoversSubscriptionInitialAddressFromRegisteredScriptHubURL() throws {
         let source = """
         https://script.hub/file/_start_/https://raw.githubusercontent.com/example/repo/main/QuantumultX/demo.conf/_end_/Demo.sgmodule?type=qx-rewrite&target=surge-module&category=%23%E5%B7%A5%E5%85%B7&del=false&jqEnabled=true
