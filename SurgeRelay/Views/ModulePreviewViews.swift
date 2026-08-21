@@ -10,11 +10,24 @@ struct ModulePreviewPane: View {
     @State private var isLoading = true
     @State private var isWriting = false
     @State private var errorMessage: String?
+    @State private var loadErrorMessage: String?
     @State private var cursorPosition = ModuleCodeCursorPosition(line: 1, column: 1)
     @State private var showsComparison = false
 
     private var currentModule: RelayModule {
         model.modules.first(where: { $0.id == module.id }) ?? module
+    }
+
+    private var reloadToken: String {
+        let module = currentModule
+        return [
+            module.id.uuidString,
+            module.sourceURL,
+            module.contentHash ?? "",
+            module.state.rawValue,
+            module.lastUpdatedAt.map { String($0.timeIntervalSinceReferenceDate) } ?? "",
+            module.lastError ?? ""
+        ].joined(separator: "|")
     }
 
     var body: some View {
@@ -37,7 +50,7 @@ struct ModulePreviewPane: View {
                 ModuleCodeTextView(
                     text: $text,
                     isEditable: !isLoading,
-                    modules: [module],
+                    modules: [currentModule],
                     selectedModuleID: module.id,
                     onCursorPositionChange: { cursorPosition = $0 }
                 )
@@ -46,6 +59,14 @@ struct ModulePreviewPane: View {
                     ProgressView("正在载入模块内容…")
                         .padding(16)
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                } else if text.isEmpty, let loadErrorMessage {
+                    ContentUnavailableView {
+                        Label("暂时无法显示模块内容", systemImage: "doc.text.magnifyingglass")
+                    } description: {
+                        Text(loadErrorMessage)
+                    } actions: {
+                        Button("重试") { Task { await load(force: true) } }
+                    }
                 }
             }
 
@@ -69,7 +90,7 @@ struct ModulePreviewPane: View {
             }
             .padding(12)
         }
-        .task(id: module.id) { await load() }
+        .task(id: reloadToken) { await load() }
         .alert("无法完成操作", isPresented: Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
@@ -84,15 +105,24 @@ struct ModulePreviewPane: View {
         }
     }
 
-    private func load() async {
+    private func load(force: Bool = false) async {
+        guard force || text == savedText else { return }
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            if !Task.isCancelled { isLoading = false }
+        }
+        let latestModule = currentModule
         do {
-            let content = try await model.previewContent(for: module)
+            let content = try await model.previewContent(for: latestModule)
+            try Task.checkCancellation()
             text = content
             savedText = content
+            loadErrorMessage = nil
         } catch {
-            errorMessage = "无法预览转换结果：\(error.localizedDescription)"
+            guard !Task.isCancelled else { return }
+            loadErrorMessage = latestModule.state == .updating
+                ? "模块正在更新，完成后将自动显示内容。"
+                : "无法预览转换结果：\(error.localizedDescription)"
         }
     }
 
@@ -101,7 +131,7 @@ struct ModulePreviewPane: View {
         Task {
             defer { isWriting = false }
             do {
-                try await model.savePreviewContent(text, for: module)
+                try await model.savePreviewContent(text, for: currentModule)
                 savedText = text
             } catch {
                 errorMessage = error.localizedDescription
@@ -114,9 +144,10 @@ struct ModulePreviewPane: View {
         Task {
             defer { isWriting = false }
             do {
-                let restored = try await model.restorePreviewContent(for: module)
+                let restored = try await model.restorePreviewContent(for: currentModule)
                 text = restored
                 savedText = restored
+                loadErrorMessage = nil
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -240,12 +271,29 @@ struct ModuleTextEditorView: View {
     @State private var isLoading = true
     @State private var isWriting = false
     @State private var errorMessage: String?
+    @State private var loadErrorMessage: String?
     @State private var cursorPosition = ModuleCodeCursorPosition(line: 1, column: 1)
+
+    private var currentModule: RelayModule {
+        model.modules.first(where: { $0.id == module.id }) ?? module
+    }
+
+    private var reloadToken: String {
+        let module = currentModule
+        return [
+            module.id.uuidString,
+            module.sourceURL,
+            module.contentHash ?? "",
+            module.state.rawValue,
+            module.lastUpdatedAt.map { String($0.timeIntervalSinceReferenceDate) } ?? "",
+            module.lastError ?? ""
+        ].joined(separator: "|")
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                Text("文本编辑：\(module.name)")
+                Text("文本编辑：\(currentModule.name)")
                     .font(.headline)
                     .lineLimit(1)
                 Spacer(minLength: 0)
@@ -264,7 +312,7 @@ struct ModuleTextEditorView: View {
                 ModuleCodeTextView(
                     text: $text,
                     isEditable: !isLoading,
-                    modules: [module],
+                    modules: [currentModule],
                     selectedModuleID: module.id,
                     onCursorPositionChange: { cursorPosition = $0 }
                 )
@@ -272,6 +320,14 @@ struct ModuleTextEditorView: View {
                     ProgressView("正在载入模块内容…")
                         .padding(16)
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                } else if text.isEmpty, let loadErrorMessage {
+                    ContentUnavailableView {
+                        Label("暂时无法显示模块内容", systemImage: "doc.text.magnifyingglass")
+                    } description: {
+                        Text(loadErrorMessage)
+                    } actions: {
+                        Button("重试") { Task { await load(force: true) } }
+                    }
                 }
             }
             HStack(spacing: 8) {
@@ -289,7 +345,7 @@ struct ModuleTextEditorView: View {
             .padding(.vertical, 6)
         }
         .frame(minWidth: 680, minHeight: 480)
-        .task(id: module.id) { await load() }
+        .task(id: reloadToken) { await load() }
         .alert("无法完成操作", isPresented: Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
@@ -300,15 +356,24 @@ struct ModuleTextEditorView: View {
         }
     }
 
-    private func load() async {
+    private func load(force: Bool = false) async {
+        guard force || text == savedText else { return }
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            if !Task.isCancelled { isLoading = false }
+        }
+        let latestModule = currentModule
         do {
-            let content = try await model.previewContent(for: module)
+            let content = try await model.previewContent(for: latestModule)
+            try Task.checkCancellation()
             text = content
             savedText = content
+            loadErrorMessage = nil
         } catch {
-            errorMessage = "无法读取模块内容：\(error.localizedDescription)"
+            guard !Task.isCancelled else { return }
+            loadErrorMessage = latestModule.state == .updating
+                ? "模块正在更新，完成后将自动显示内容。"
+                : "无法读取模块内容：\(error.localizedDescription)"
         }
     }
 
@@ -317,7 +382,7 @@ struct ModuleTextEditorView: View {
         Task {
             defer { isWriting = false }
             do {
-                try await model.savePreviewContent(text, for: module)
+                try await model.savePreviewContent(text, for: currentModule)
                 savedText = text
             } catch {
                 errorMessage = error.localizedDescription
@@ -330,9 +395,10 @@ struct ModuleTextEditorView: View {
         Task {
             defer { isWriting = false }
             do {
-                let restored = try await model.restorePreviewContent(for: module)
+                let restored = try await model.restorePreviewContent(for: currentModule)
                 text = restored
                 savedText = restored
+                loadErrorMessage = nil
             } catch {
                 errorMessage = error.localizedDescription
             }

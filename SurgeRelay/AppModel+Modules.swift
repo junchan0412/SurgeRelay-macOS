@@ -51,6 +51,17 @@ extension AppModel {
         }
         registerLocalChange()
         modules[index] = plan.module
+        if let adoptedPath = plan.adoptedLocalPublishedPath {
+            if settings.localPublishedRootDirectory == settings.localModuleDirectory {
+                settings.localPublishedFilePaths = Array(
+                    Set(settings.localPublishedFilePaths).union([adoptedPath])
+                ).sorted()
+            } else {
+                settings.localPublishedRootDirectory = settings.localModuleDirectory
+                settings.localPublishedFilePaths = [adoptedPath]
+            }
+            saveSettings()
+        }
         invalidateModuleSummaryCache()
         if plan.sourceChanged || plan.customIconChanged {
             if let customIconURL = plan.customIconURL, let url = URL(string: customIconURL) {

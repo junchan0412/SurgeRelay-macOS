@@ -13,6 +13,7 @@ struct ModuleDraftUpdatePlan: Equatable, Sendable {
     var hasChanges: Bool
     var sourceChanged: Bool
     var customIconChanged: Bool
+    var adoptedLocalPublishedPath: String?
 
     var customIconURL: String? {
         module.customIconURL
@@ -186,7 +187,8 @@ enum ModuleDraftPlanner {
                 module: current,
                 hasChanges: false,
                 sourceChanged: false,
-                customIconChanged: false
+                customIconChanged: false,
+                adoptedLocalPublishedPath: nil
             )
         }
 
@@ -220,11 +222,23 @@ enum ModuleDraftPlanner {
         if sourceChanged || customIconChanged {
             module.iconURL = normalizedDraft.customIconURL
         }
+        let adoptedLocalPublishedPath: String? = if current.sourceURL != normalizedDraft.source,
+                                                   URL(string: current.sourceURL)?.isFileURL == true,
+                                                   let newSourceURL = URL(string: normalizedDraft.source),
+                                                   ["http", "https"].contains(newSourceURL.scheme?.lowercased()),
+                                                   module.storageLocation == .local,
+                                                   module.localStorageRelativePath != nil,
+                                                   module.publishesStandalone {
+            module.publishedRelativePath
+        } else {
+            nil
+        }
         return ModuleDraftUpdatePlan(
             module: module,
             hasChanges: true,
             sourceChanged: sourceChanged,
-            customIconChanged: customIconChanged
+            customIconChanged: customIconChanged,
+            adoptedLocalPublishedPath: adoptedLocalPublishedPath
         )
     }
 

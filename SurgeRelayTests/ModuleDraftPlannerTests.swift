@@ -239,7 +239,63 @@ final class ModuleDraftPlannerTests: XCTestCase {
         XCTAssertFalse(plan.hasChanges)
         XCTAssertFalse(plan.sourceChanged)
         XCTAssertFalse(plan.customIconChanged)
+        XCTAssertNil(plan.adoptedLocalPublishedPath)
         XCTAssertEqual(plan.module, module)
+    }
+
+    func testModuleDraftPlannerAdoptsLocalOutputWhenSelfAuthoredSourceBecomesRemote() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let source = root.appending(path: "Tools/My Module.sgmodule")
+        let module = RelayModule(
+            name: "My Module",
+            sourceURL: source.absoluteString,
+            sourceFormat: .surge,
+            outputFileName: "My Module.sgmodule",
+            outputFolder: "Tools",
+            storageLocation: .local,
+            localStorageRelativePath: "Tools/My Module.sgmodule"
+        )
+        var draft = ModuleDraft(module: module)
+        draft.sourceURL = "https://example.com/my-module.sgmodule"
+
+        let plan = try XCTUnwrap(ModuleDraftPlanner.updatePlan(
+            id: module.id,
+            from: draft,
+            modules: [module],
+            combinedModuleFileName: "Surge Relay",
+            localModuleDirectory: root.path
+        ))
+
+        XCTAssertTrue(plan.sourceChanged)
+        XCTAssertEqual(plan.module.storageLocation, .local)
+        XCTAssertEqual(plan.module.localStorageRelativePath, "Tools/My Module.sgmodule")
+        XCTAssertEqual(plan.adoptedLocalPublishedPath, "Tools/My Module.sgmodule")
+    }
+
+    func testModuleDraftPlannerDoesNotAdoptUnrelatedSourceChanges() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let module = RelayModule(
+            name: "Remote",
+            sourceURL: "https://example.com/old.sgmodule",
+            sourceFormat: .surge,
+            outputFileName: "Remote.sgmodule",
+            storageLocation: .local,
+            localStorageRelativePath: "Remote.sgmodule"
+        )
+        var draft = ModuleDraft(module: module)
+        draft.sourceURL = "https://example.com/new.sgmodule"
+
+        let plan = try XCTUnwrap(ModuleDraftPlanner.updatePlan(
+            id: module.id,
+            from: draft,
+            modules: [module],
+            combinedModuleFileName: "Surge Relay",
+            localModuleDirectory: root.path
+        ))
+
+        XCTAssertNil(plan.adoptedLocalPublishedPath)
     }
 
     func testModuleDraftPlannerClearsSourceStateWhenSourceChanges() throws {

@@ -2,10 +2,11 @@
 
 Updated: 2026-08-19
 
-This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.41 (90)`.
+This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.42 (91)`.
 
 ## 当前状态
 
+- `1.3.42 (91)` 修复本地自写模块改填远程更新地址后的受管输出路径接管，并修复预览/文本编辑器在缓存更新后的自动重载与可重试错误状态。
 - `1.3.41 (90)` 的变更已记录在 `CHANGELOG.md`，包含 Script-Hub `#SUBSCRIBED` HTML entity 归一化和真实用户地址回归测试。
 - `1.3.40 (89)` 的变更已记录在 `CHANGELOG.md`，包含编辑器行号栏、缩进编辑行为、行列反馈、加载状态和高亮刷新优化。
 - `1.3.37 (86)` 包含右键菜单“复制模块 / 拷贝更新地址 / 拷贝输出路径”与菜单栏“需要处理”监控计数。
@@ -89,7 +90,7 @@ This document tracks the optimization work completed after the deep audit and th
 
 ## 目标
 
-- 发布 `1.3.41 (90)`，随后继续推进 macOS 设置窗口、模块编辑器、详情页和 Web 管理端的自动化 UI 截图/交互覆盖。
+- 发布 `1.3.42 (91)`，随后继续推进 macOS 设置窗口、模块编辑器、详情页和 Web 管理端的自动化 UI 截图/交互覆盖。
 - 为 Web 管理端补充 Playwright 冒烟测试；继续拆分 `WebResources/app.js` 和较大的 Swift 文件。
 - 持续对照 `docs/UPSTREAM_SYNC.md` 选择性移植 upstream 修复，不合并与本 fork 存储/发布模型冲突的改动。
 - 在 Apple Developer ID 可用前维持固定自签名 + Sparkle 更新；可用后补充 Developer ID 签名、公证、stapling 与验证。
@@ -125,13 +126,13 @@ Use the Xcode beta toolchain explicitly:
 DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer"
 ```
 
-Before publishing (当前目标版本为 `1.3.41 (90)`):
+Before publishing (当前目标版本为 `1.3.42 (91)`):
 
 ```bash
 git diff --check
 node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs
-VERSION=1.3.41 BUILD=90 \
+VERSION=1.3.42 BUILD=91 \
 DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
 ./script/check_release_configuration.sh
 ```

@@ -3,6 +3,22 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.3.42</title>
+            <pubDate>Fri, 21 Aug 2026 20:36:51 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.42</link>
+            <sparkle:version>91</sparkle:version>
+            <sparkle:shortVersionString>1.3.42</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.3.42
+
+
+- 修复：本地自写 Surge 模块改填远程更新地址后，用户明确接管的本地输出路径会纳入受管清单，后续更新可覆盖原文件并保持本地发布位置不变；其他未明确接管的自写文件仍不会被覆盖。
+- 修复：模块预览与文本编辑器会跟随模块缓存/更新状态变化自动重载，首次打开缓存尚未生成时显示可重试状态，不再停留在空白编辑区或一次性错误提示。
+- 测试：补充本地来源迁移到远程更新地址的路径接管回归测试，并保留本地发布文件覆盖安全边界测试。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.3.42/Surge-Relay-1.3.42.app.zip" length="9128754" type="application/zip" sparkle:edSignature="N0w70TFbU1d0vXROO7LPHAFCfBM5iBRPnZund9MDN3JhY8CEX7m51I5+pVAmpYzfhSEebyiFXL0EWUCHvpX8Bw=="/>
+        </item>
+        <item>
             <title>1.3.41</title>
             <pubDate>Wed, 19 Aug 2026 20:23:41 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.41</link>
