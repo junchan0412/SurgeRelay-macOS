@@ -39,13 +39,9 @@ struct ModuleDetailSummaryHeader: View {
             }
             summaryMetricLayout
         }
-        .padding(16)
+        .padding(Design.Spacing.xl)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.24), lineWidth: 0.5)
-        }
+        .detailCard(radius: Design.Radius.large)
     }
 
     private var metadataPills: [ModuleDetailMetadataPill] {
@@ -126,9 +122,9 @@ struct ModuleDetailSummaryHeader: View {
 
     private var summaryMetricLayout: some View {
         LazyVGrid(
-            columns: [GridItem(.adaptive(minimum: 152), spacing: 8, alignment: .top)],
+            columns: [GridItem(.adaptive(minimum: 152), spacing: Design.Spacing.md, alignment: .top)],
             alignment: .leading,
-            spacing: 8
+            spacing: Design.Spacing.md
         ) {
             ForEach(summaryMetrics) { metric in
                 summaryMetric(metric)
@@ -142,8 +138,8 @@ struct ModuleDetailSummaryHeader: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(metric.tint)
                 .frame(width: 18, height: 18)
-                .background(metric.tint.opacity(0.14), in: .rect(cornerRadius: 5))
-            VStack(alignment: .leading, spacing: 2) {
+                .background(metric.tint.opacity(0.14), in: .rect(cornerRadius: Design.Spacing.sm - 1))
+            VStack(alignment: .leading, spacing: Design.Spacing.xxs) {
                 Text(metric.title)
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(.tertiary)
@@ -156,36 +152,28 @@ struct ModuleDetailSummaryHeader: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.horizontal, Design.Spacing.md + 2)
+        .padding(.vertical, Design.Spacing.md)
         .frame(maxWidth: .infinity, minHeight: 54, alignment: .topLeading)
-        .background(.quaternary.opacity(0.32), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .background(.quaternary.opacity(0.32), in: RoundedRectangle(cornerRadius: Design.Radius.small, style: .continuous))
     }
 
     private var metadataPillLayout: some View {
         ViewThatFits(in: .horizontal) {
-            HStack(spacing: 8) {
-                StatusPill(state: module.state, detail: failureSummary)
-                ForEach(metadataPills) { pill in
-                    metadataPill(pill.title, systemImage: pill.systemImage)
-                }
+            HStack(spacing: Design.Spacing.md) {
+                pillContent
             }
-            VStack(alignment: .leading, spacing: 6) {
-                StatusPill(state: module.state, detail: failureSummary)
-                ForEach(metadataPills) { pill in
-                    metadataPill(pill.title, systemImage: pill.systemImage)
-                }
+            VStack(alignment: .leading, spacing: Design.Spacing.sm) {
+                pillContent
             }
         }
     }
 
-    private func metadataPill(_ title: String, systemImage: String) -> some View {
-        Label(title, systemImage: systemImage)
-            .font(.caption)
-            .lineLimit(1)
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(.quaternary.opacity(0.45), in: Capsule())
+    @ViewBuilder
+    private var pillContent: some View {
+        StatusPill(state: module.state, detail: failureSummary)
+        ForEach(metadataPills) { pill in
+            MetadataPill(pill.title, systemImage: pill.systemImage)
+        }
     }
 }

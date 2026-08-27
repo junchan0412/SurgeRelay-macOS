@@ -99,8 +99,8 @@ struct StatusPill: View {
             .font(.caption)
             .lineLimit(1)
             .foregroundStyle(color)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 5)
+            .padding(.horizontal, Design.Spacing.md + 1)
+            .padding(.vertical, Design.Spacing.xs + 1)
             .background(color.opacity(0.12), in: Capsule())
             .contentTransition(.opacity)
             .animation(.snappy(duration: 0.18), value: state)
@@ -118,14 +118,16 @@ struct StatusPill: View {
 }
 
 extension ModuleUpdateState {
-    var tintColor: Color {
+    var semanticStatus: SemanticStatus {
         switch self {
-        case .never: .secondary
-        case .updating: .blue
-        case .current: .green
-        case .failed: .red
+        case .never: .neutral
+        case .updating: .info
+        case .current: .success
+        case .failed: .error
         }
     }
+
+    var tintColor: Color { semanticStatus.color }
 }
 
 extension RelayModule {
@@ -178,17 +180,147 @@ struct SheetActionFooter<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Design.Spacing.lg) {
             content
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 14)
+        .padding(.horizontal, Design.Spacing.xl)
+        .padding(.vertical, Design.Spacing.md + 2)
         .frame(maxWidth: .infinity)
         .background(.bar)
         .overlay(alignment: .top) {
             Rectangle()
-                .fill(Color(nsColor: .separatorColor).opacity(0.14))
-                .frame(height: 0.5)
+                .fill(Design.Separator.color.opacity(0.14))
+                .frame(height: Design.Separator.hairline)
+        }
+    }
+}
+
+// MARK: - Design system
+
+/// Shared design tokens for consistent spacing, radii, separators, and row
+/// metrics across the app. Native counterpart to the token set that already
+/// exists for the Web UI in `WebResources/app.css`, so the two front-ends share
+/// one visual language. Previously every screen hardcoded its own values, which
+/// left the Detail / Editor / Settings row families visibly out of sync.
+enum Design {
+    enum Spacing {
+        static let xxs: CGFloat = 2
+        static let xs: CGFloat = 4
+        static let sm: CGFloat = 6
+        static let md: CGFloat = 8
+        static let lg: CGFloat = 12
+        static let xl: CGFloat = 16
+        static let xxl: CGFloat = 24
+    }
+
+    enum Radius {
+        static let small: CGFloat = 8
+        static let medium: CGFloat = 10
+        static let card: CGFloat = 12
+        static let large: CGFloat = 14
+    }
+
+    enum Separator {
+        static let color = Color(nsColor: .separatorColor)
+        static let opacity: Double = 0.16
+        static let hairline: CGFloat = 0.5
+    }
+
+    /// Metrics shared by every label / value / control row (Detail, Editor,
+    /// Settings) so the three families stay pixel-consistent.
+    enum Row {
+        static let labelWidth: CGFloat = 108
+        static let iconWidth: CGFloat = 20
+        static let spacing: CGFloat = 12
+        static let verticalPadding: CGFloat = 6
+        static let separatorInset: CGFloat = 32
+    }
+
+    enum Card {
+        static let padding: CGFloat = 14
+        static let verticalPadding: CGFloat = 10
+        static let radius: CGFloat = Radius.medium
+        static let strokeOpacity: Double = 0.18
+    }
+}
+
+/// A single semantic mapping for status colors, replacing the scattered inline
+/// `.green` / `.orange` / `.red` used across the sidebar, detail, and settings.
+enum SemanticStatus {
+    case neutral
+    case info
+    case success
+    case warning
+    case error
+
+    var color: Color {
+        switch self {
+        case .neutral: .secondary
+        case .info: .blue
+        case .success: .green
+        case .warning: .orange
+        case .error: .red
+        }
+    }
+}
+
+extension View {
+    /// Standard card chrome: material fill, continuous corners, hairline stroke.
+    func detailCard(radius: CGFloat = Design.Card.radius) -> some View {
+        background(.thinMaterial, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .strokeBorder(
+                        Design.Separator.color.opacity(Design.Card.strokeOpacity),
+                        lineWidth: Design.Separator.hairline
+                    )
+            }
+    }
+
+    /// Standard hairline row separator, inset to align under the value column.
+    func rowSeparator(inset: CGFloat = Design.Row.separatorInset) -> some View {
+        overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Design.Separator.color.opacity(Design.Separator.opacity))
+                .frame(height: Design.Separator.hairline)
+                .padding(.leading, inset)
+        }
+    }
+}
+
+/// Compact metadata capsule (icon + text) used to summarize a module's
+/// attributes. Consolidates the four near-identical pill recipes that used to
+/// live in the summary header, combined view, editor header, and import sheet.
+struct MetadataPill: View {
+    let text: String
+    var systemImage: String?
+    var tint: Color?
+
+    init(_ text: String, systemImage: String? = nil, tint: Color? = nil) {
+        self.text = text
+        self.systemImage = systemImage
+        self.tint = tint
+    }
+
+    var body: some View {
+        Group {
+            if let systemImage {
+                Label(text, systemImage: systemImage)
+            } else {
+                Text(text)
+            }
+        }
+        .font(.caption)
+        .lineLimit(1)
+        .foregroundStyle(tint ?? .secondary)
+        .padding(.horizontal, Design.Spacing.md)
+        .padding(.vertical, Design.Spacing.xs)
+        .background((tint ?? Color.primary).opacity(tint == nil ? 0.06 : 0.12), in: Capsule())
+        .overlay {
+            Capsule().strokeBorder(
+                (tint ?? Color.primary).opacity(tint == nil ? 0.08 : 0.0),
+                lineWidth: Design.Separator.hairline
+            )
         }
     }
 }

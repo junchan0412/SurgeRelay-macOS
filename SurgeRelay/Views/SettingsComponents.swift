@@ -43,21 +43,17 @@ struct SettingsSection<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Design.Spacing.md + 2) {
             Text(title)
                 .font(.headline)
-                .padding(.leading, 2)
-            VStack(alignment: .leading, spacing: 11) {
+                .padding(.leading, Design.Spacing.xxs)
+            VStack(alignment: .leading, spacing: Design.Spacing.md) {
                 content()
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 13)
+            .padding(.horizontal, Design.Card.padding)
+            .padding(.vertical, Design.Card.verticalPadding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(Color(nsColor: .separatorColor).opacity(0.18), lineWidth: 0.5)
-            }
+            .detailCard()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -101,25 +97,20 @@ struct SettingsInfoRow<Content: View>: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: Design.Row.spacing) {
             Image(systemName: icon)
                 .font(.callout)
                 .foregroundStyle(.secondary)
-                .frame(width: 20, alignment: .center)
+                .frame(width: Design.Row.iconWidth, alignment: .center)
             Text(title)
                 .font(.callout.weight(.medium))
                 .foregroundStyle(.primary)
-                .frame(width: 108, alignment: .leading)
+                .frame(width: Design.Row.labelWidth, alignment: .leading)
             content()
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.vertical, 5)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(Color(nsColor: .separatorColor).opacity(0.14))
-                .frame(height: 0.5)
-                .padding(.leading, 30)
-        }
+        .padding(.vertical, Design.Row.verticalPadding)
+        .rowSeparator()
     }
 }
 

@@ -50,11 +50,20 @@ struct ModuleSidebarView: View {
             .animation(.snappy(duration: 0.2), value: collapsedSectionIDsRaw)
             .overlay {
                 if filteredModulesAreEmpty {
-                    ContentUnavailableView(
-                        emptyStateTitle,
-                        systemImage: "shippingbox",
-                        description: Text(emptyStateDescription)
-                    )
+                    ContentUnavailableView {
+                        Label(emptyStateTitle, systemImage: "shippingbox")
+                    } description: {
+                        Text(emptyStateDescription)
+                    } actions: {
+                        if !allModulesAreEmpty && (sidebarFilter != .all || hasSearchQuery) {
+                            Button("清除筛选与搜索") {
+                                withAnimation(.snappy(duration: 0.2)) {
+                                    sidebarFilter = .all
+                                    searchText = ""
+                                }
+                            }
+                        }
+                    }
                     .transition(.opacity.combined(with: .scale(scale: 0.98)))
                 }
             }
@@ -115,6 +124,7 @@ struct ModuleSidebarView: View {
                     .labelsHidden()
                     .toggleStyle(.checkbox)
                     .help("勾选后随“发布所选”发布到该模块的存放位置")
+                    .accessibilityLabel("勾选发布 \(module.name)")
             }
             ModuleRow(
                 module: module,
@@ -434,6 +444,7 @@ private struct ModuleSidebarStatusCard: View {
                             .foregroundStyle(.tertiary)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("关闭错误提示")
                 }
                 .transition(.move(edge: .bottom).combined(with: .opacity))
                 Divider()
@@ -591,6 +602,8 @@ private struct ModuleRow: View {
                 }
             }
             .frame(width: 14, height: 14)
+            .accessibilityElement()
+            .accessibilityLabel("状态：\(statusHelp)")
             if combinedModuleEnabled {
                 Toggle("包含", isOn: Binding(
                     get: { module.isIncludedInCombined },
