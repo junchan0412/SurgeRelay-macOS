@@ -50,7 +50,11 @@ enum PublishCoordinator {
     ) -> PublishPlan {
         PublishPlan(
             standaloneModules: modules.filter {
-                $0.publishesStandalone && $0.storageLocation.matches(destination)
+                shouldPublishStandalone(
+                    $0,
+                    destination: destination,
+                    combinedModuleEnabled: combinedModuleEnabled
+                )
             },
             combinedModuleIDs: Set(ModuleRefreshPlanner.combinedContributorModules(
                 in: modules,
@@ -59,16 +63,42 @@ enum PublishCoordinator {
         )
     }
 
+    /// Whether a module's standalone file should be written for `destination`.
+    ///
+    /// A local module's own `.sgmodule` file is its only on-disk materialization
+    /// when it is not carried by an enabled combined module, so it must be written
+    /// even if `publishesStandalone` is off — otherwise updating a cache-only local
+    /// module (e.g. with the combined module disabled) leaves its source file
+    /// untouched on disk. Self-authored local sources are still protected from
+    /// self-overwrite by `shouldSkipStandaloneLocalExport`.
+    static func shouldPublishStandalone(
+        _ module: RelayModule,
+        destination: PublishDestination,
+        combinedModuleEnabled: Bool
+    ) -> Bool {
+        guard module.storageLocation.matches(destination) else { return false }
+        if module.publishesStandalone { return true }
+        return destination == .local
+            && !ModuleRefreshPlanner.contributesToCombined(
+                module,
+                combinedModuleEnabled: combinedModuleEnabled
+            )
+    }
+
     static func selectedPlan(
         modules: [RelayModule],
         moduleIDs: Set<UUID>,
+        combinedModuleEnabled: Bool,
         destination: PublishDestination
     ) -> PublishPlan {
         PublishPlan(
             standaloneModules: modules.filter {
                 moduleIDs.contains($0.id) &&
-                    $0.publishesStandalone &&
-                    $0.storageLocation.matches(destination)
+                    shouldPublishStandalone(
+                        $0,
+                        destination: destination,
+                        combinedModuleEnabled: combinedModuleEnabled
+                    )
             },
             combinedModuleIDs: []
         )

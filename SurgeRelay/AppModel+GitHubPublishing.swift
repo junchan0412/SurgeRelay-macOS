@@ -103,6 +103,7 @@ extension AppModel {
         let plan = PublishCoordinator.selectedPlan(
             modules: modules,
             moduleIDs: moduleIDs,
+            combinedModuleEnabled: settings.combinedModuleEnabled,
             destination: .gitHub
         )
         try GitHubPublishPlanner.validatePublishableSelection(plan)

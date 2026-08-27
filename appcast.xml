@@ -3,6 +3,21 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.3.45</title>
+            <pubDate>Fri, 28 Aug 2026 01:03:34 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.45</link>
+            <sparkle:version>94</sparkle:version>
+            <sparkle:shortVersionString>1.3.45</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.3.45
+
+
+- 修复：更新本地模块时会把最新内容（含 `#SUBSCRIBED` 标记）写回其本地源文件。此前当模块设为「不发布独立模块」且未启用总模块时，更新只刷新缓存、磁盘上的 `.sgmodule` 源文件不会变化。现在只要总模块未接管该模块，本地模块就会在更新/发布时写出自己的源文件；参与已启用总模块的模块仍只进入总模块（避免重复），GitHub 发布行为不变；自写本地来源仍受自覆盖保护。
+- 测试：新增本地计划在总模块关闭时写出「不发布独立模块」本地模块、总模块开启时不重复写出的回归测试。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.3.45/Surge-Relay-1.3.45.app.zip" length="9140604" type="application/zip" sparkle:edSignature="kF7rG/6GaV0A+zHjDb0OkOrLZ+cWsVOyBtEbRh04nIvheKS4MlRbh5BPB9Ql6KckdoPEl6ib4hE6K394nLFbBg=="/>
+        </item>
+        <item>
             <title>1.3.44</title>
             <pubDate>Fri, 28 Aug 2026 00:14:47 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.44</link>

@@ -106,6 +106,7 @@ final class PublishPlannerTests: XCTestCase {
         let plan = PublishCoordinator.selectedPlan(
             modules: [standalone, combinedOnly],
             moduleIDs: [standalone.id, combinedOnly.id],
+            combinedModuleEnabled: true,
             destination: .gitHub
         )
 
@@ -117,10 +118,62 @@ final class PublishPlannerTests: XCTestCase {
         let emptyPlan = PublishCoordinator.selectedPlan(
             modules: [standalone, combinedOnly],
             moduleIDs: [combinedOnly.id],
+            combinedModuleEnabled: true,
             destination: .gitHub
         )
         XCTAssertFalse(emptyPlan.hasPublishableModuleSelection)
         XCTAssertTrue(emptyPlan.assetModuleIDs.isEmpty)
+    }
+
+    func testLocalPlanWritesCacheOnlyLocalModulesWhenNotCarriedByCombined() {
+        // A local module that does not publish a standalone output still needs its
+        // own on-disk file when the combined module is disabled — otherwise
+        // updating it would leave the source file untouched.
+        let cacheOnlyLocal = RelayModule(
+            id: UUID(),
+            name: "Reven",
+            sourceURL: "https://gist.example/raw/Reven.sgmodule",
+            outputFileName: "reven.sgmodule",
+            storageLocation: .local,
+            localStorageRelativePath: "Sgmodule(#8会员模块)/reven.sgmodule",
+            publishesStandalone: false,
+            isEnabled: true
+        )
+        let cacheOnlyGitHub = RelayModule(
+            id: UUID(),
+            name: "RemoteCacheOnly",
+            sourceURL: "https://example.com/remote.sgmodule",
+            outputFileName: "Remote",
+            storageLocation: .gitHub,
+            publishesStandalone: false,
+            isEnabled: true
+        )
+
+        // Combined disabled: the local cache-only module writes its own file;
+        // the GitHub cache-only module still does not.
+        let localPlanCombinedOff = PublishCoordinator.plan(
+            modules: [cacheOnlyLocal, cacheOnlyGitHub],
+            combinedModuleEnabled: false,
+            destination: .local
+        )
+        XCTAssertEqual(localPlanCombinedOff.standaloneModules.map(\.id), [cacheOnlyLocal.id])
+
+        // Combined enabled and the module participates: it is represented by the
+        // combined module, so it must not also be written standalone (no duplicate).
+        let localPlanCombinedOn = PublishCoordinator.plan(
+            modules: [cacheOnlyLocal, cacheOnlyGitHub],
+            combinedModuleEnabled: true,
+            destination: .local
+        )
+        XCTAssertTrue(localPlanCombinedOn.standaloneModules.isEmpty)
+
+        // GitHub destination is unaffected: cache-only modules never publish.
+        let gitHubPlan = PublishCoordinator.plan(
+            modules: [cacheOnlyLocal, cacheOnlyGitHub],
+            combinedModuleEnabled: false,
+            destination: .gitHub
+        )
+        XCTAssertTrue(gitHubPlan.standaloneModules.isEmpty)
     }
 
     func testGitHubPublishPlannerBuildsStalePathPlanOnlyForSameRepository() {

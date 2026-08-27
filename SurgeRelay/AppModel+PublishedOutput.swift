@@ -147,6 +147,7 @@ extension AppModel {
         let plan = PublishCoordinator.selectedPlan(
             modules: modules,
             moduleIDs: moduleIDs,
+            combinedModuleEnabled: settings.combinedModuleEnabled,
             destination: .local
         )
         return try await publishedFiles(
