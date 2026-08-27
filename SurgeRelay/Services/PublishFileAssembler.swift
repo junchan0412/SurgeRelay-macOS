@@ -50,7 +50,16 @@ enum PublishFileAssembler {
                 module.customIconURL,
                 materialized
             )
-            files.append(PublishFile(name: module.publishedRelativePath, data: Data(namedContent.utf8)))
+            // Write the Script-Hub `#SUBSCRIBED` marker into the exported source
+            // file so on-disk output carries the original subscription/conversion
+            // URL — matching the in-app preview instead of only living in the
+            // project cache, which keeps re-import/provenance recovery lossless.
+            let subscription = ModuleMetadataParser.scriptHubSubscription(for: module)
+            let subscribedContent = ModuleMetadataParser.applyingScriptHubSubscription(
+                subscription,
+                to: namedContent
+            )
+            files.append(PublishFile(name: module.publishedRelativePath, data: Data(subscribedContent.utf8)))
         }
         if request.includeAssets {
             try await cancellationCheckpoint()

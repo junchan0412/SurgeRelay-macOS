@@ -3,6 +3,21 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.3.44</title>
+            <pubDate>Fri, 28 Aug 2026 00:14:47 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.44</link>
+            <sparkle:version>93</sparkle:version>
+            <sparkle:shortVersionString>1.3.44</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.3.44
+
+
+- 修复：发布 / 导出到本地或 GitHub 的独立模块源文件现在会写入 Script-Hub `#SUBSCRIBED` 标记（含原始订阅 / 转换地址），与应用内预览保持一致，不再仅保存在项目缓存中；重新导入或恢复来源时可无损还原订阅信息。自写（本地文件来源）模块不会被写入该标记。
+- 测试：新增独立导出写入 `#SUBSCRIBED`（位于 `#!` 头部块之下）与自写模块不写入标记的发布装配回归测试。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.3.44/Surge-Relay-1.3.44.app.zip" length="9140519" type="application/zip" sparkle:edSignature="kXVFBZhvuV2lC4V/p9rNRma86lz57AenmfU4ynog9eJUnZ2MshQcEPRylu4jOTD5K9JivI4wdlQ9tSb6313dBA=="/>
+        </item>
+        <item>
             <title>1.3.43</title>
             <pubDate>Thu, 27 Aug 2026 23:50:56 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.43</link>
