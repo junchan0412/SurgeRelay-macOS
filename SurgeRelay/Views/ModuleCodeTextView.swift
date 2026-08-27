@@ -6,81 +6,154 @@ struct ModuleCodeCursorPosition: Equatable {
     let column: Int
 }
 
-final class ModuleLineNumberRulerView: NSRulerView {
-    weak var codeTextView: NSTextView?
-    private var lineStarts = [0]
+/// Code text view that draws its own left line-number gutter.
+///
+/// It intentionally does not live inside an `NSScrollView`: on the current macOS
+/// SDK a SwiftUI-hosted `NSScrollView` composites its own chrome (scrollers,
+/// rulers) but never composites the content inside its `NSClipView`, so the text
+/// stayed invisible on screen even though it laid out and drew correctly. Hosting
+/// the text view directly (with scrolling provided by a surrounding SwiftUI
+/// `ScrollView`) sidesteps that clip-view compositing bug, and moving the line
+/// numbers into the text view keeps them aligned and scrolling with the content.
+final class CodeTextView: NSTextView {
+    static let gutterWidth: CGFloat = 44
+    private let gutterView = GutterView()
 
-    override var requiredThickness: CGFloat {
-        let digits = CGFloat(String(max(1, lineStarts.count)).count)
-        return max(42, 18 + digits * 8)
+    override init(frame frameRect: NSRect, textContainer container: NSTextContainer?) {
+        super.init(frame: frameRect, textContainer: container)
+        gutterView.textView = self
+        gutterView.autoresizingMask = [.height]
+        addSubview(gutterView)
     }
 
-    override func drawHashMarksAndLabels(in rect: NSRect) {
-        guard let codeTextView,
-              let layoutManager = codeTextView.layoutManager,
-              let textContainer = codeTextView.textContainer else { return }
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    /// The gutter is a sibling layer inside the text view; keep it pinned to the
+    /// left edge and spanning the full document height so it scrolls with content.
+    override func layout() {
+        super.layout()
+        gutterView.frame = NSRect(x: 0, y: 0, width: Self.gutterWidth, height: bounds.height)
+        gutterView.render()
+    }
+
+    func refreshGutter() {
+        gutterView.frame = NSRect(x: 0, y: 0, width: Self.gutterWidth, height: bounds.height)
+        gutterView.render()
+    }
+}
+
+/// Left line-number gutter. It renders line numbers into its backing layer's
+/// contents rather than via `draw(_:)`: on the current macOS SDK an
+/// `NSTextView` subclass' `draw(_:)` additions are not composited on screen, but
+/// a plain layer-backed sibling view is, so this keeps the numbers visible.
+final class GutterView: NSView {
+    weak var textView: CodeTextView?
+    private var lineStarts = [0]
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.contentsGravity = .topLeft
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override var isFlipped: Bool { true }
+
+    func render() {
+        guard let textView,
+              let layoutManager = textView.layoutManager,
+              let textContainer = textView.textContainer,
+              bounds.width > 0, bounds.height > 0 else { return }
+
+        rebuildLineStarts()
+        let scale = window?.backingScaleFactor ?? 2
+        let size = bounds.size
+        let pixelWidth = Int((size.width * scale).rounded())
+        let pixelHeight = Int((size.height * scale).rounded())
+        guard pixelWidth > 0, pixelHeight > 0,
+              let rep = NSBitmapImageRep(
+                bitmapDataPlanes: nil,
+                pixelsWide: pixelWidth,
+                pixelsHigh: pixelHeight,
+                bitsPerSample: 8,
+                samplesPerPixel: 4,
+                hasAlpha: true,
+                isPlanar: false,
+                colorSpaceName: .deviceRGB,
+                bytesPerRow: 0,
+                bitsPerPixel: 0
+              ) else { return }
+        rep.size = size
+
+        guard let context = NSGraphicsContext(bitmapImageRep: rep) else { return }
+        let previous = NSGraphicsContext.current
+        NSGraphicsContext.current = context
+        // The bitmap context has a bottom-left origin, so convert each item's
+        // top-down y (matching the flipped text view) with `size.height - y - h`
+        // and draw text upright without flipping the CTM.
+        let height = size.height
 
         NSColor.controlBackgroundColor.setFill()
-        rect.fill()
+        NSRect(origin: .zero, size: size).fill()
 
-        let contentBounds = codeTextView.enclosingScrollView?.contentView.bounds ?? .zero
-        let glyphRange = layoutManager.glyphRange(
-            forBoundingRect: contentBounds,
-            in: textContainer
-        )
-        let textStorage = codeTextView.textStorage
-        let textString = textStorage?.string as NSString? ?? ""
-        let selectedLine = lineNumber(at: codeTextView.selectedRange().location)
-
-        layoutManager.enumerateLineFragments(forGlyphRange: glyphRange) {
+        let origin = textView.textContainerOrigin
+        let nsString = textView.string as NSString
+        let selectedLine = lineNumber(at: textView.selectedRange().location)
+        let fullGlyphRange = layoutManager.glyphRange(for: textContainer)
+        layoutManager.enumerateLineFragments(forGlyphRange: fullGlyphRange) {
             _, usedRect, _, lineGlyphRange, _ in
             let characterIndex = layoutManager.characterIndexForGlyph(at: lineGlyphRange.location)
-            let lineNumber = self.lineNumber(at: min(characterIndex, textString.length))
-            let label = "\(lineNumber)" as NSString
-            if lineNumber == selectedLine {
-                NSColor.controlAccentColor.withAlphaComponent(0.10).setFill()
+            let number = self.lineNumber(at: min(characterIndex, nsString.length))
+            let topY = usedRect.minY + origin.y
+            if number == selectedLine {
+                NSColor.controlAccentColor.withAlphaComponent(0.12).setFill()
                 NSRect(
-                    x: rect.minX,
-                    y: usedRect.minY + codeTextView.textContainerInset.height,
-                    width: rect.width - 1,
+                    x: 0,
+                    y: height - topY - usedRect.height,
+                    width: Self.gutterWidth - 1,
                     height: usedRect.height
                 ).fill()
             }
             let attributes: [NSAttributedString.Key: Any] = [
                 .font: NSFont.monospacedDigitSystemFont(
                     ofSize: 11,
-                    weight: lineNumber == selectedLine ? .medium : .regular
+                    weight: number == selectedLine ? .medium : .regular
                 ),
-                .foregroundColor: lineNumber == selectedLine
+                .foregroundColor: number == selectedLine
                     ? NSColor.controlAccentColor
                     : NSColor.secondaryLabelColor,
             ]
+            let label = "\(number)" as NSString
             let labelSize = label.size(withAttributes: attributes)
-            let labelRect = NSRect(
-                x: rect.width - labelSize.width - 10,
-                y: usedRect.minY + codeTextView.textContainerInset.height,
-                width: labelSize.width,
-                height: labelSize.height
+            label.draw(
+                in: NSRect(
+                    x: Self.gutterWidth - labelSize.width - 8,
+                    y: height - topY - labelSize.height,
+                    width: labelSize.width,
+                    height: labelSize.height
+                ),
+                withAttributes: attributes
             )
-            label.draw(in: labelRect, withAttributes: attributes)
         }
 
         NSColor.separatorColor.setFill()
-        NSRect(x: rect.maxX - 1, y: rect.minY, width: 1, height: rect.height).fill()
+        NSRect(x: Self.gutterWidth - 1, y: 0, width: 1, height: size.height).fill()
+
+        NSGraphicsContext.current = previous
+        layer?.contents = rep.cgImage
     }
 
-    func refresh() {
-        rebuildLineStarts()
-        needsDisplay = true
-        enclosingScrollView?.tile()
-    }
+    static var gutterWidth: CGFloat { CodeTextView.gutterWidth }
 
     private func rebuildLineStarts() {
-        guard let codeTextView else {
-            lineStarts = [0]
-            return
-        }
-        let string = codeTextView.string as NSString
+        let string = textView?.string as NSString? ?? ""
         var starts = [0]
         var searchRange = NSRange(location: 0, length: string.length)
         while searchRange.length > 0 {
@@ -119,16 +192,30 @@ struct ModuleCodeTextView: NSViewRepresentable {
         Coordinator(text: $text, onCursorPositionChange: onCursorPositionChange)
     }
 
-    func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSScrollView()
-        scrollView.hasVerticalScroller = true
-        scrollView.hasHorizontalScroller = true
-        scrollView.autohidesScrollers = true
-        scrollView.borderType = .noBorder
-        scrollView.drawsBackground = true
-        scrollView.backgroundColor = .textBackgroundColor
+    func makeNSView(context: Context) -> CodeTextView {
+        // Build an explicit TextKit 1 stack. On the current macOS SDK a text view
+        // from NSTextView()/scrollableTextView() can be backed by TextKit 2
+        // (NSTextLayoutManager), whose rendering does not follow the legacy
+        // layoutManager/textStorage APIs this editor relies on for direct syntax
+        // highlighting and the line-number gutter — which left the view blank even
+        // though its content and layout were present.
+        let textStorage = NSTextStorage()
+        let layoutManager = NSLayoutManager()
+        textStorage.addLayoutManager(layoutManager)
+        let textContainer = NSTextContainer(
+            containerSize: NSSize(
+                width: CGFloat.greatestFiniteMagnitude,
+                height: CGFloat.greatestFiniteMagnitude
+            )
+        )
+        textContainer.widthTracksTextView = true
+        textContainer.lineFragmentPadding = 0
+        layoutManager.addTextContainer(textContainer)
 
-        let textView = NSTextView()
+        let textView = CodeTextView(
+            frame: NSRect(x: 0, y: 0, width: 400, height: 400),
+            textContainer: textContainer
+        )
         textView.delegate = context.coordinator
         textView.isRichText = false
         textView.isEditable = isEditable
@@ -146,15 +233,10 @@ struct ModuleCodeTextView: NSViewRepresentable {
         textView.smartInsertDeleteEnabled = false
         textView.insertionPointColor = .controlAccentColor
         textView.isVerticallyResizable = true
-        textView.isHorizontallyResizable = true
-        textView.autoresizingMask = [.width, .height]
-        textView.textContainer?.widthTracksTextView = false
-        textView.textContainer?.containerSize = NSSize(
-            width: CGFloat.greatestFiniteMagnitude,
-            height: CGFloat.greatestFiniteMagnitude
-        )
-        textView.textContainer?.lineFragmentPadding = 0
-        textView.textContainerInset = NSSize(width: 20, height: 16)
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+        // Reserve the gutter on the left; keep normal padding on the right.
+        textView.textContainerInset = NSSize(width: CodeTextView.gutterWidth + 8, height: 16)
         textView.minSize = NSSize(width: 0, height: 0)
         textView.maxSize = NSSize(
             width: CGFloat.greatestFiniteMagnitude,
@@ -162,29 +244,18 @@ struct ModuleCodeTextView: NSViewRepresentable {
         )
         textView.string = text
         textView.typingAttributes = Coordinator.defaultAttributes
-        scrollView.documentView = textView
-        let lineNumberRuler = ModuleLineNumberRulerView(
-            scrollView: scrollView,
-            orientation: .verticalRuler
-        )
-        lineNumberRuler.codeTextView = textView
-        scrollView.verticalRulerView = lineNumberRuler
-        scrollView.rulersVisible = true
-        lineNumberRuler.refresh()
         context.coordinator.textView = textView
-        context.coordinator.lineNumberRuler = lineNumberRuler
         context.coordinator.applyHighlighting(modules: modules, selectedModuleID: selectedModuleID)
         _ = context.coordinator.needsHighlight(text: text, selectedModuleID: selectedModuleID)
+        textView.refreshGutter()
         context.coordinator.publishCursorPosition()
-        return scrollView
+        return textView
     }
 
-    func updateNSView(_ scrollView: NSScrollView, context: Context) {
-        guard let textView = scrollView.documentView as? NSTextView else { return }
+    func updateNSView(_ textView: CodeTextView, context: Context) {
         textView.isEditable = isEditable
         if textView.string != text {
             let selectedRange = textView.selectedRange()
-            let scrollOrigin = scrollView.contentView.bounds.origin
             context.coordinator.isApplyingUpdate = true
             textView.string = text
             textView.typingAttributes = Coordinator.defaultAttributes
@@ -192,8 +263,7 @@ struct ModuleCodeTextView: NSViewRepresentable {
             let validLength = min(selectedRange.length, (text as NSString).length - validLocation)
             textView.setSelectedRange(NSRange(location: validLocation, length: validLength))
             context.coordinator.isApplyingUpdate = false
-            scrollView.contentView.setBoundsOrigin(scrollOrigin)
-            context.coordinator.lineNumberRuler?.refresh()
+            textView.refreshGutter()
         }
         // Re-highlighting runs several regex passes over the whole document; only
         // do it when the text or selection actually changed, so unrelated SwiftUI
@@ -202,6 +272,23 @@ struct ModuleCodeTextView: NSViewRepresentable {
             context.coordinator.scheduleHighlighting(modules: modules, selectedModuleID: selectedModuleID)
         }
         context.coordinator.scrollToSelectedModule(selectedModuleID, modules: modules)
+    }
+
+    /// Report the laid-out content height so an enclosing SwiftUI `ScrollView`
+    /// can scroll the full document.
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: CodeTextView, context: Context) -> CGSize? {
+        guard let container = nsView.textContainer, let layoutManager = nsView.layoutManager else {
+            return nil
+        }
+        let width = proposal.width ?? nsView.bounds.width
+        guard width > 0, width.isFinite else { return nil }
+        if abs(nsView.frame.width - width) > 0.5 {
+            nsView.setFrameSize(NSSize(width: width, height: nsView.frame.height))
+        }
+        layoutManager.ensureLayout(for: container)
+        let used = layoutManager.usedRect(for: container)
+        let height = used.height + nsView.textContainerInset.height * 2
+        return CGSize(width: width, height: max(height, 40))
     }
 
     @MainActor
@@ -243,8 +330,7 @@ struct ModuleCodeTextView: NSViewRepresentable {
         )
 
         @Binding private var text: String
-        weak var textView: NSTextView?
-        weak var lineNumberRuler: ModuleLineNumberRulerView?
+        weak var textView: CodeTextView?
         var isApplyingUpdate = false
         private let onCursorPositionChange: ((ModuleCodeCursorPosition) -> Void)?
         private var lastSelectedModuleID: UUID?
@@ -275,12 +361,12 @@ struct ModuleCodeTextView: NSViewRepresentable {
             guard !isApplyingUpdate, let textView else { return }
             text = textView.string
             publishCursorPosition()
-            lineNumberRuler?.refresh()
+            textView.refreshGutter()
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
             publishCursorPosition()
-            lineNumberRuler?.needsDisplay = true
+            textView?.needsDisplay = true
         }
 
         func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
@@ -369,7 +455,7 @@ struct ModuleCodeTextView: NSViewRepresentable {
         }
 
         func applyHighlighting(modules: [RelayModule], selectedModuleID: UUID?) {
-            guard let textStorage = textView?.textStorage else { return }
+            guard let textView, let textStorage = textView.textStorage else { return }
             let string = textStorage.string
             let fullRange = NSRange(location: 0, length: (string as NSString).length)
 
@@ -407,8 +493,8 @@ struct ModuleCodeTextView: NSViewRepresentable {
                 textStorage: textStorage
             )
             textStorage.endEditing()
-            textView?.typingAttributes = Self.defaultAttributes
-            lineNumberRuler?.refresh()
+            textView.typingAttributes = Self.defaultAttributes
+            textView.refreshGutter()
         }
 
         func scrollToSelectedModule(_ id: UUID?, modules: [RelayModule]) {

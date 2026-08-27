@@ -90,4 +90,63 @@ final class ModulePreviewContentProviderTests: XCTestCase {
             XCTAssertTrue(error.localizedDescription.contains("模块尚无转换缓存"))
         }
     }
+
+    @MainActor
+    func testModulePreviewContentProviderFallsBackFromEmptyOverrideToConvertedCache() async throws {
+        let moduleID = UUID()
+        var readConvertedCount = 0
+        let provider = ModulePreviewContentProvider(
+            hasComponent: { _ in true },
+            readComponent: { _ in "\n  \t" },
+            readConvertedComponent: { id in
+                XCTAssertEqual(id, moduleID)
+                readConvertedCount += 1
+                return "#!name=Converted\n[Rule]\nFINAL,DIRECT\n"
+            },
+            writeComponent: { _, _ in },
+            readCombined: { Data() },
+            materialize: { content, _ in content },
+            argumentInfo: { _ in ModuleArgumentInfo() },
+            applyingModuleMetadata: { _, _, _, content in content }
+        )
+        let module = RelayModule(
+            id: moduleID,
+            name: "Converted",
+            sourceURL: "https://example.com/module.sgmodule",
+            sourceFormat: .surge,
+            outputFileName: "Converted.sgmodule"
+        )
+
+        let preview = try await provider.previewContent(for: module)
+
+        XCTAssertTrue(preview.contains("FINAL,DIRECT"))
+        XCTAssertEqual(readConvertedCount, 1)
+    }
+
+    @MainActor
+    func testModulePreviewContentProviderRejectsEmptyRemoteCache() async {
+        let provider = ModulePreviewContentProvider(
+            hasComponent: { _ in true },
+            readComponent: { _ in "" },
+            readConvertedComponent: { _ in "\n" },
+            writeComponent: { _, _ in },
+            readCombined: { Data() },
+            materialize: { content, _ in content },
+            argumentInfo: { _ in ModuleArgumentInfo() },
+            applyingModuleMetadata: { _, _, _, content in content }
+        )
+        let module = RelayModule(
+            name: "Empty",
+            sourceURL: "https://example.com/empty.sgmodule",
+            sourceFormat: .surge,
+            outputFileName: "Empty.sgmodule"
+        )
+
+        do {
+            _ = try await provider.previewContent(for: module)
+            XCTFail("Empty remote caches should not be treated as successful previews")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("模块缓存为空"))
+        }
+    }
 }

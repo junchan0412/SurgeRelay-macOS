@@ -57,17 +57,48 @@ struct ModulePreviewContentProvider {
 
     func componentContent(for module: RelayModule) async throws -> String {
         if await hasComponent(module.id) {
-            return try await readComponent(module.id)
+            do {
+                if let content = try await usableContent(from: { try await readComponent(module.id) }) {
+                    return content
+                }
+            } catch {
+                // A stale or unreadable override should not prevent recovery from
+                // the converted cache or the original local Surge file.
+            }
+            do {
+                if let content = try await usableContent(from: { try await readConvertedComponent(module.id) }) {
+                    return content
+                }
+            } catch {
+                // Fall through to local-source recovery or the explicit error below.
+            }
+            if let recovered = try? await recoverLocalSourceContent(for: module) {
+                return recovered
+            }
+            throw RelayError.invalidOutput("模块缓存为空，请先更新该模块后再打开文本编辑器。")
         }
         return try await recoverLocalSourceContent(for: module)
     }
 
     func convertedComponentContent(for module: RelayModule) async throws -> String {
         do {
-            return try await readConvertedComponent(module.id)
+            if let content = try await usableContent(from: { try await readConvertedComponent(module.id) }) {
+                return content
+            }
         } catch {
-            return try await recoverLocalSourceContent(for: module)
+            // Fall through to local-source recovery.
         }
+        return try await recoverLocalSourceContent(for: module)
+    }
+
+    private func usableContent(
+        from reader: () async throws -> String
+    ) async throws -> String? {
+        let content = try await reader()
+        guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+        return content
     }
 
     private func recoverLocalSourceContent(for module: RelayModule) async throws -> String {

@@ -3,6 +3,22 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.3.43</title>
+            <pubDate>Thu, 27 Aug 2026 23:50:56 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.43</link>
+            <sparkle:version>92</sparkle:version>
+            <sparkle:shortVersionString>1.3.43</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.3.43
+
+
+- 修复：文本编辑器 / 模块预览在 macOS 26 上不再空白——改为直接托管 `NSTextView`（显式 TextKit 1 堆栈）并由 SwiftUI `ScrollView` 提供滚动，规避了 SwiftUI 承载的 `NSScrollView` 剪裁视图内容无法合成到屏幕的系统问题；行号栏改为在文本视图内自绘并随内容滚动。
+- 修复：打开文本编辑器时若本地覆盖缓存为空，会自动回退到转换缓存或本地 Surge 源，不再停留在空白编辑区；远程来源缓存为空时给出可重试的明确提示。
+- 测试：补充空覆盖缓存回退到转换缓存、以及空远程缓存被拒绝的预览内容回归测试。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.3.43/Surge-Relay-1.3.43.app.zip" length="9140442" type="application/zip" sparkle:edSignature="Nwh4lOaqFn9C6KyS1gwGIuZNe6VNb/qbIKSdA5WsTxtOxR/6+PPG7AWKx1Mku7Px0uOowzK65Cagvms0Gqf7AQ=="/>
+        </item>
+        <item>
             <title>1.3.42</title>
             <pubDate>Fri, 21 Aug 2026 20:36:51 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.3.42</link>

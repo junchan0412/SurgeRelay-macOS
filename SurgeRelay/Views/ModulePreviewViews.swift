@@ -47,14 +47,17 @@ struct ModulePreviewPane: View {
                 Divider()
             }
             ZStack {
-                ModuleCodeTextView(
-                    text: $text,
-                    isEditable: !isLoading,
-                    modules: [currentModule],
-                    selectedModuleID: module.id,
-                    onCursorPositionChange: { cursorPosition = $0 }
-                )
-                .ignoresSafeArea(.container, edges: .top)
+                ScrollView(.vertical) {
+                    ModuleCodeTextView(
+                        text: $text,
+                        isEditable: !isLoading,
+                        modules: [currentModule],
+                        selectedModuleID: module.id,
+                        onCursorPositionChange: { cursorPosition = $0 }
+                    )
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                }
+                .background(Color(nsColor: .textBackgroundColor))
                 if isLoading {
                     ProgressView("正在载入模块内容…")
                         .padding(16)
@@ -227,13 +230,16 @@ struct CombinedPreviewPane: View {
     }
 
     var body: some View {
-        ModuleCodeTextView(
-            text: .constant(text),
-            isEditable: false,
-            modules: enabledModules,
-            selectedModuleID: nil
-        )
-        .ignoresSafeArea(.container, edges: .top)
+        ScrollView(.vertical) {
+            ModuleCodeTextView(
+                text: .constant(text),
+                isEditable: false,
+                modules: enabledModules,
+                selectedModuleID: nil
+            )
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .background(Color(nsColor: .textBackgroundColor))
         .overlay {
             if !isLoading, text.isEmpty {
                 ContentUnavailableView("没有可预览的内容", systemImage: "doc.text.magnifyingglass")
@@ -309,13 +315,17 @@ struct ModuleTextEditorView: View {
             .padding(12)
             Divider()
             ZStack {
-                ModuleCodeTextView(
-                    text: $text,
-                    isEditable: !isLoading,
-                    modules: [currentModule],
-                    selectedModuleID: module.id,
-                    onCursorPositionChange: { cursorPosition = $0 }
-                )
+                ScrollView(.vertical) {
+                    ModuleCodeTextView(
+                        text: $text,
+                        isEditable: !isLoading,
+                        modules: [currentModule],
+                        selectedModuleID: module.id,
+                        onCursorPositionChange: { cursorPosition = $0 }
+                    )
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                }
+                .background(Color(nsColor: .textBackgroundColor))
                 if isLoading {
                     ProgressView("正在载入模块内容…")
                         .padding(16)
