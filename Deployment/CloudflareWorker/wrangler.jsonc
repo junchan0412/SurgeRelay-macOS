@@ -1,12 +1,12 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "eeliberto-surge-relay",
+  "name": "surge-relay",
   "main": "src/index.js",
   "compatibility_date": "2026-06-29",
   "workers_dev": true,
   "vars": {
-    "GITHUB_OWNER": "EEliberto",
-    "GITHUB_REPOSITORY": "Surge-Relay",
+    "GITHUB_OWNER": "YOUR_GITHUB_OWNER",
+    "GITHUB_REPOSITORY": "YOUR_REPOSITORY",
     "GITHUB_BRANCH": "main",
     "GITHUB_DIRECTORY": "modules"
   }

@@ -13,7 +13,13 @@ struct ModuleEditorBasicInfoSection: View {
 
     var body: some View {
         ModuleEditorSection("基本信息") {
-            ModuleEditorTextFieldRow(title: "显示名称", icon: "textformat", text: $name, prompt: "例如：YouTube 去广告")
+            ModuleEditorTextFieldRow(
+                title: "显示名称",
+                icon: "textformat",
+                text: $name,
+                prompt: "例如：YouTube 去广告",
+                accessibilityIdentifier: "module-editor.name"
+            )
             ModuleEditorControlRow("模块存放", icon: storageLocation.systemImage) {
                 ModuleEditorStorageLocationPicker(storageLocation: $storageLocation)
             }
@@ -115,7 +121,8 @@ struct ModuleEditorSourceSection: View {
                 title: "更新地址",
                 icon: "link",
                 text: $sourceURL,
-                prompt: "https://example.com/module.plugin 或 file:///.../Demo.sgmodule"
+                prompt: "https://example.com/module.plugin 或 file:///.../Demo.sgmodule",
+                accessibilityIdentifier: "module-editor.source-url"
             )
             ModuleEditorControlRow("来源格式", icon: "doc.text") {
                 Picker("来源格式", selection: $sourceFormat) {

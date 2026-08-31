@@ -1,7 +1,7 @@
 # Surge Relay Development Guide
 
 This document records the project conventions needed to maintain this fork.
-For the current completed-work summary, pending-work list, and release checklist, see `DEVELOPMENT_STATUS.md`.
+For the current version, capability summary, code metrics, optimization order, and release checklist, see the generated `DEVELOPMENT_STATUS.md`. Refresh it with `node script/generate_project_status.mjs`; do not edit it manually. Git/upstream snapshots belong in `docs/UPSTREAM_SYNC.md` so the generated file remains reproducible after commits and tag checkouts.
 
 ## Project Shape
 
@@ -20,7 +20,7 @@ For the current completed-work summary, pending-work list, and release checklist
 
 Keep `ModulesView.swift` focused on the split-view shell, search/index coordination, toolbar mounting, editor presentation, and sheet routing.
 
-- `ModuleSidebarSectionPlanner` owns the sidebar grouping rules for attention, local, GitHub, and uncategorized modules. `ModuleSidebarView.swift` owns the sidebar list rendering, module rows, batch-selection checkboxes, context menu entry points, empty/sidebar states, and the bottom status card.
+- `ModuleSidebarSectionPlanner` owns the sidebar grouping rules for attention, local, GitHub, and uncategorized modules. `ModuleSidebarView.swift` owns the sidebar list rendering, module rows, batch-selection checkboxes, context menu entry points, empty/sidebar states, and the bottom status card. `ModuleSidebarFilterBar.swift` owns quick filters, the full filter menu, result counts, clearing, and sort selection.
 - `ModuleSidebarToolbarContent.swift` owns the sidebar toolbar buttons and their enable/help rules for add, update, publish, batch publish, and local-module scanning.
 - `ModuleDetailPaneView.swift` owns main-window detail selection, the detail/preview tab picker, detail toolbar settings entry, and detail-pane search binding.
 - `ModuleDetailSummaryHeader.swift` owns the module detail title, icon, metadata pills, and summary metrics. `ModuleDetailView.swift` owns the detail page composition, management relation rows, sync status, module arguments, and publishing/local file sections.
@@ -192,6 +192,19 @@ SURGE_RELAY_RUN_UI_QA=1 ./script/build_and_run.sh --verify
 
 UI QA 模式使用临时配置与本地模块目录，并暂停启动期和编辑后的自动更新。
 
+原生设置、模块编辑与详情 smoke test 使用独立 scheme，避免系统 UI automation 权限影响日常单元测试：
+
+```bash
+DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
+xcodebuild test \
+  -project "Surge Relay.xcodeproj" \
+  -scheme "Surge Relay UI Tests" \
+  -destination "platform=macOS,arch=arm64" \
+  -skipPackagePluginValidation
+```
+
+该命令需要当前 macOS 桌面会话允许 Xcode UI automation；无此权限时 runner 会在执行测试代码前报告无法启用 automation mode。Web 管理界面的启动、搜索、筛选、详情与编辑交互继续由 `node script/test_web_dom_resources.mjs` 覆盖。
+
 `ModelAndCoordinatorTests.swift` owns pure model/coordinator coverage, including source metadata restoration, source identity, published address resolution, and summary counts. `UpdateFailureTests.swift` owns update failure formatting and original-source probe planning. `DiagnosticReportTests.swift` owns diagnostic report snapshots and secret redaction. `ModulePreviewContentProviderTests.swift` owns preview content recovery and cache-miss behavior. `ModulePreviewEditPlannerTests.swift` owns preview edit save/restore/conflict state planning. `CredentialTokenCoordinatorTests.swift` owns GitHub/Web token migration, storage fallback, and generated token behavior. `WorkActivityTests.swift` owns task activity state and update-admission rules.
 
 `ModulePlanningTests.swift` owns module naming, module editor source-name lookup, module argument override planning, sidebar section planning, output path inspection, and local self-export protection. `ModuleDraftPlannerTests.swift` owns module draft validation plus add/update planning. `ModuleOutputFolderTests.swift` owns output-folder path helpers, folder option catalogs, folder creation plans, and remote-folder refresh cache decisions. `LocalModuleImportPlannerTests.swift` owns local import candidate planning, deduplication, failure details, and user-visible scan/import statuses. `ModuleSearchIndexTests.swift` owns main-window search text, content-cache keys, and preview-content loading decisions. `ModuleMetadataParserTests.swift` owns Surge metadata parsing and metadata application rules. `ModuleMergerTests.swift` owns combined-module merge behavior. `ModuleMetadataRefreshPlannerTests.swift` owns cached metadata refresh planning, including restored subscription metadata, icon preference, and override base-hash rules.
@@ -220,7 +233,7 @@ node script/test_web_dom_resources.mjs
 ./script/check_release_configuration.sh
 ```
 
-`Surge Relay.xcodeproj/project.pbxproj` is maintained alongside `project.yml`. When adding a Swift source file, also add its file reference/build file entries to the Xcode project, or regenerate the project with the project's preferred tooling; `script/check_release_configuration.sh` fails the release preflight if any Swift file under `SurgeRelay/` or `SurgeRelayTests/` is missing from the project.
+`Surge Relay.xcodeproj/project.pbxproj` is maintained alongside `project.yml`. When adding a Swift source file, also add its file reference/build file entries to the Xcode project, or regenerate the project with the project's preferred tooling; `script/check_release_configuration.sh` fails the release preflight if any Swift file under `SurgeRelay/`, `SurgeRelayTests/`, or `SurgeRelayUITests/` is missing from the project.
 
 ```bash
 DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
@@ -255,7 +268,7 @@ Release builds require:
 Before importing signing certificates or calling GitHub, run the local release preflight:
 
 ```bash
-VERSION=1.3.24 BUILD=73 ./script/check_release_configuration.sh
+VERSION=X.Y.Z BUILD=N ./script/check_release_configuration.sh
 ```
 
 The preflight checks version/build consistency, Sparkle feed and public key metadata, Web resource syntax and behavior/DOM tests, the latest appcast entry, the release entitlement, shell syntax for release scripts, and the GitHub Actions release entrypoint.
@@ -289,7 +302,13 @@ When changing behavior, update:
 - `README.md` for user-facing behavior
 - `CHANGELOG.md` for release notes
 - `DEVELOPMENT.md` when architecture, release, or safety invariants change
-- `DEVELOPMENT_STATUS.md` or a newer audit file when completing a broad optimization pass
+- the source documentation used by `script/generate_project_status.mjs`, then run the generator when completing a broad optimization pass
+
+Verify that the generated status page is current with:
+
+```bash
+node script/generate_project_status.mjs --check
+```
 
 ## Upstream Sync
 

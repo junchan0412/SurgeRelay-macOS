@@ -35,6 +35,7 @@ struct ModuleDetailSummaryHeader: View {
                     }
                     Spacer(minLength: 0)
                     Button("编辑模块…", systemImage: "pencil", action: onEdit)
+                        .accessibilityIdentifier("module-detail.edit")
                 }
             }
             summaryMetricLayout

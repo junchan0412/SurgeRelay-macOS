@@ -468,6 +468,7 @@ await flushAsync();
 const list = document.querySelector('#module-list');
 const detail = document.querySelector('#detail-content');
 const refresh = document.querySelector('#refresh-button');
+const search = document.querySelector('#search-input');
 const filterRow = document.querySelector('#filter-row');
 const failureFilter = document.querySelector('#failure-filter');
 assert.match(list.innerHTML, /Block HTTPDNS/, 'app.js should render module rows from /api/state');
@@ -489,6 +490,17 @@ assert.ok(
 assert.match(detail.innerHTML, /复制错误/, 'module detail should provide a copy action for failure reasons');
 assert.match(detail.innerHTML, /订阅原始地址/, 'module detail should expose subscribed original source address');
 assert.equal(refresh.disabled, false, 'refresh button should stay enabled when update admission allows it');
+
+failureFilter.dispatch('click');
+assert.equal(failureFilter.getAttribute('aria-pressed'), 'false', 'failure filter should turn off before plain search');
+search.value = 'Clean';
+search.dispatch('input');
+assert.match(list.innerHTML, /Clean Module/, 'search should keep matching modules visible');
+assert.doesNotMatch(list.innerHTML, /Block HTTPDNS/, 'search should hide non-matching modules');
+search.value = '';
+search.dispatch('input');
+assert.match(list.innerHTML, /Block HTTPDNS/, 'clearing search should restore failed modules');
+assert.match(list.innerHTML, /Clean Module/, 'clearing search should restore current modules');
 
 document.querySelector('#add-button').dispatch('click');
 const form = document.querySelector('#module-form').elements;

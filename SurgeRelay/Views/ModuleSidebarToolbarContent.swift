@@ -31,6 +31,7 @@ struct ModuleSidebarToolbarContent: ToolbarContent {
         }
         .keyboardShortcut("n", modifiers: .command)
         .help("添加模块（⌘N）")
+        .accessibilityIdentifier("modules.add")
     }
 
     private var updateAllButton: some View {

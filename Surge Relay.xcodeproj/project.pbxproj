@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F20000000000000000000001 /* ModuleSidebarFilterBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000002 /* ModuleSidebarFilterBar.swift */; };
+		F10000000000000000000001 /* SurgeRelayUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000002 /* SurgeRelayUITests.swift */; };
 		D116D116D116D116D116D116 /* BoundedRemoteDataFetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = E116E116E116E116E116E116 /* BoundedRemoteDataFetcher.swift */; };
 		D106D106D106D106D106D106 /* ModuleEditorSourceNameLookup.swift in Sources */ = {isa = PBXBuildFile; fileRef = E106E106E106E106E106E106 /* ModuleEditorSourceNameLookup.swift */; };
 		D105D105D105D105D105D105 /* ModuleCodeTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E105E105E105E105E105E105 /* ModuleCodeTextView.swift */; };
@@ -232,6 +234,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		F10000000000000000000009 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 95062978F1F4A19EA710F4CB /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DE7344B3299D1D2C889AAAA3;
+			remoteInfo = "Surge Relay";
+		};
 		F684E4D89A35A80E65AE76AC /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 95062978F1F4A19EA710F4CB /* Project object */;
@@ -242,6 +251,9 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		F20000000000000000000002 /* ModuleSidebarFilterBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleSidebarFilterBar.swift; sourceTree = "<group>"; };
+		F10000000000000000000002 /* SurgeRelayUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurgeRelayUITests.swift; sourceTree = "<group>"; };
+		F10000000000000000000003 /* SurgeRelayUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SurgeRelayUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		00FF1B0D1608D65FBA6451BE /* LaunchAtLoginService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginService.swift; sourceTree = "<group>"; };
 		0527CB5F1032EC43E9673F5D /* ScriptHubOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptHubOptions.swift; sourceTree = "<group>"; };
 		08307B73F3678EC5C4513D20 /* info.circle.svg */ = {isa = PBXFileReference; path = info.circle.svg; sourceTree = "<group>"; };
@@ -534,6 +546,7 @@
 				E105E105E105E105E105E105 /* ModuleCodeTextView.swift */,
 				B21B21B21B21B21B21B21B21 /* ModulePreviewViews.swift */,
 				B80B80B80B80B80B80B80B80 /* ModuleSidebarView.swift */,
+				F20000000000000000000002 /* ModuleSidebarFilterBar.swift */,
 				C91C91C91C91C91C91C91C91 /* MainWindowCloseBehavior.swift */,
 				B27B27B27B27B27B27B27B27 /* ModuleSidebarToolbarContent.swift */,
 				F02309DE998787F453FD1166 /* ModulesView.swift */,
@@ -768,6 +781,7 @@
 			children = (
 				05D6584CC9473A8BC0B12784 /* SurgeRelay */,
 				992FBA5B9AB9596787D9E76C /* SurgeRelayTests */,
+				F10000000000000000000004 /* SurgeRelayUITests */,
 				E07D52108B30F9447A500E3D /* Surge Relay.icon */,
 				CB4D56D73372720752898C57 /* Frameworks */,
 				ED167BD0BF30B186951E9664 /* Products */,
@@ -787,8 +801,17 @@
 			children = (
 				FB702CBBD9181A2CF6940B32 /* Surge Relay.app */,
 				280D9149CE1820E1AE5F19C9 /* Surge RelayTests.xctest */,
+				F10000000000000000000003 /* SurgeRelayUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		F10000000000000000000004 /* SurgeRelayUITests */ = {
+			isa = PBXGroup;
+			children = (
+				F10000000000000000000002 /* SurgeRelayUITests.swift */,
+			);
+			path = SurgeRelayUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -832,6 +855,24 @@
 			productReference = 280D9149CE1820E1AE5F19C9 /* Surge RelayTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		F10000000000000000000005 /* SurgeRelayUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F1000000000000000000000D /* Build configuration list for PBXNativeTarget "SurgeRelayUITests" */;
+			buildPhases = (
+				F10000000000000000000006 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F1000000000000000000000A /* PBXTargetDependency */,
+			);
+			name = SurgeRelayUITests;
+			packageProductDependencies = (
+			);
+			productName = SurgeRelayUITests;
+			productReference = F10000000000000000000003 /* SurgeRelayUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -845,6 +886,9 @@
 						ProvisioningStyle = Automatic;
 					};
 					E31BDA64018EEFC05D12E6D5 = {
+						ProvisioningStyle = Automatic;
+					};
+					F10000000000000000000005 = {
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -868,6 +912,7 @@
 			targets = (
 				DE7344B3299D1D2C889AAAA3 /* Surge Relay */,
 				E31BDA64018EEFC05D12E6D5 /* Surge RelayTests */,
+				F10000000000000000000005 /* SurgeRelayUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -940,6 +985,14 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		F10000000000000000000006 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F10000000000000000000001 /* SurgeRelayUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		80D88AE2DCBE8E83CB9E4C62 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -1075,6 +1128,7 @@
 				709FF80593ADF6216AF25D9D /* RelayModule.swift in Sources */,
 				AA8F7B5F28379ACDB4DDEDB9 /* RootView.swift in Sources */,
 				A80A80A80A80A80A80A80A80 /* ModuleSidebarView.swift in Sources */,
+				F20000000000000000000001 /* ModuleSidebarFilterBar.swift in Sources */,
 				F91F91F91F91F91F91F91F91 /* MainWindowCloseBehavior.swift in Sources */,
 				A27A27A27A27A27A27A27A27 /* ModuleSidebarToolbarContent.swift in Sources */,
 				A81A81A81A81A81A81A81A81 /* ModuleDetailSummaryHeader.swift in Sources */,
@@ -1120,6 +1174,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		F1000000000000000000000A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DE7344B3299D1D2C889AAAA3 /* Surge Relay */;
+			targetProxy = F10000000000000000000009 /* PBXContainerItemProxy */;
+		};
 		1A6206DFB327D4287EC1C2F9 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = DE7344B3299D1D2C889AAAA3 /* Surge Relay */;
@@ -1128,6 +1187,42 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		F1000000000000000000000B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.allenmiao.SurgeRelayUITests;
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = "Surge Relay";
+			};
+			name = Debug;
+		};
+		F1000000000000000000000C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.allenmiao.SurgeRelayUITests;
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = "Surge Relay";
+			};
+			name = Release;
+		};
 		2D0D31CA9EBF11C84DC8CDE1 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1163,7 +1258,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-			CURRENT_PROJECT_VERSION = 95;
+			CURRENT_PROJECT_VERSION = 96;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1177,7 +1272,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-			MARKETING_VERSION = 1.4.0;
+			MARKETING_VERSION = 1.4.1;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1261,7 +1356,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-			CURRENT_PROJECT_VERSION = 95;
+			CURRENT_PROJECT_VERSION = 96;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -1281,7 +1376,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-			MARKETING_VERSION = 1.4.0;
+			MARKETING_VERSION = 1.4.1;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -1334,6 +1429,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		F1000000000000000000000D /* Build configuration list for PBXNativeTarget "SurgeRelayUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F1000000000000000000000B /* Debug */,
+				F1000000000000000000000C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		0ED6314309B11493AFBE5F66 /* Build configuration list for PBXNativeTarget "Surge RelayTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

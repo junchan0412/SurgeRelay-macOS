@@ -118,12 +118,14 @@ struct ModuleEditorTextFieldRow: View {
     let icon: String
     @Binding var text: String
     let prompt: String
+    var accessibilityIdentifier: String? = nil
 
     var body: some View {
         ModuleEditorControlRow(title, icon: icon) {
             TextField(title, text: $text, prompt: Text(prompt))
                 .labelsHidden()
                 .textFieldStyle(.roundedBorder)
+                .accessibilityIdentifier(accessibilityIdentifier ?? "module-editor.field.\(title)")
         }
     }
 }

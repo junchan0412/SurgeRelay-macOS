@@ -88,6 +88,7 @@ struct ModuleDetailPaneView: View {
                     Label("设置", systemImage: "gearshape")
                 }
                 .help("设置")
+                .accessibilityIdentifier("settings.open")
             }
         }
         .onChange(of: model.selectedModuleID) { _, _ in

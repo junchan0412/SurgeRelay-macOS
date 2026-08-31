@@ -1,151 +1,107 @@
-# Surge Relay Development Status
+# Surge Relay Project Status
 
-Updated: 2026-08-19
+> 本文件由 node script/generate_project_status.mjs 自动生成。不要手工编辑；修改代码、版本或维护策略后重新运行生成器。
 
-This document tracks the optimization work completed after the deep audit and the remaining work that should guide future development. The current release target is `1.3.42 (91)`.
+## 当前基线
 
-## 当前状态
+| 项目 | 当前值 |
+| --- | --- |
+| 版本 | 1.4.1 (96) |
+| macOS deployment target | 26.0 |
+| Swift | 6.0，strict concurrency complete |
 
-- `1.3.42 (91)` 修复本地自写模块改填远程更新地址后的受管输出路径接管，并修复预览/文本编辑器在缓存更新后的自动重载与可重试错误状态。
-- `1.3.41 (90)` 的变更已记录在 `CHANGELOG.md`，包含 Script-Hub `#SUBSCRIBED` HTML entity 归一化和真实用户地址回归测试。
-- `1.3.40 (89)` 的变更已记录在 `CHANGELOG.md`，包含编辑器行号栏、缩进编辑行为、行列反馈、加载状态和高亮刷新优化。
-- `1.3.37 (86)` 包含右键菜单“复制模块 / 拷贝更新地址 / 拷贝输出路径”与菜单栏“需要处理”监控计数。
-- 此前版本已落地：多选 / 发布所选按模块存放位置发布、侧边栏多维筛选与排序、远程来源本地模块本地发布、新模块首次更新失败自动重试等。
-- 凭据存储已从系统钥匙串迁移到配置目录内的 AES-256-GCM 本地加密文件，无开发者账户签名也能正常保存。
-- 自定义图标会重写模块输出中的 `#!icon`，桌面端、Web 管理端和发布产物使用同一个值。
-- 订阅模块可以从登记的 Script-Hub 转换地址恢复内嵌 `originalURL`，即使转换内容缺少 `#SUBSCRIBED` 标记，也能按订阅初始地址继续更新。
-- 初始来源恢复“远程来源”分类：有有效 `#SUBSCRIBED` 记录时归为订阅来源；没有该记录但更新地址为 HTTP/HTTPS 时归为远程来源；只有本地文件且无记录时才归为自写模块。
-- 侧边栏提供“全部 / 可更新 / 不可更新 / 更新失败 / 尚未更新 / 参与总模块 / 不参与总模块 / 本地 / GitHub / 订阅来源 / 远程来源 / 自写模块 / 独立发布 / 仅缓存 / 需要处理 / 覆盖冲突 / 未分类”筛选，并与搜索叠加；支持按名称 / 最近更新 / 最近创建 / 状态优先级排序，筛选与排序选择跨启动持久化。
-- 本地独立模块的自覆盖保护仅在“转换前来源”确实是本地文件时启用，远程来源本地模块会正常写入其输出目录。
-- 新模块首次自动更新遇到瞬时 404 / 5xx / 网络抖动失败时会自动重试一次，无需用户手动再次更新。
-- 发布链路仍为固定自签名 + Sparkle EdDSA；ATS 全局放宽与 App Sandbox 关闭状态与 `docs/RELEASE_HARDENING.md` 保持一致。
+## 当前维护决策
 
-## Completed Work
+- **本文件是唯一当前状态入口。** 旧的人工维护完成项、目标、待办和固定版本 release checklist 已由自动生成报告取代。详细审计快照位于 docs/project-status-report/report.html。
+- **继续采用兼容性优先策略。** 当前没有 Apple Developer ID、notarization、ATS 收紧或 App Sandbox 迁移时间表。
+- **保持现有分发模型。** Release 继续使用固定自签名证书与 Sparkle 2 EdDSA；首次安装仍可能受 Gatekeeper quarantine 影响。
+- **保持现有权限模型。** NSAllowsArbitraryLoads=true 与 App Sandbox disabled 继续服务于用户自定义 HTTP/HTTPS 来源和用户选择目录写入。
+- **迁移只在兼容方案具备后启动。** 未来变更必须先完成用户来源例外模型、security-scoped bookmarks、旧配置迁移和回归测试，不以日历日期强推。
 
-### Product Behavior
+## 当前能力
 
-- GitHub Token 与 Web 管理令牌改存到配置目录内的本地加密文件；启动、设置保存和 Web 管理令牌重置都不再访问系统钥匙串。
-- 自定义图标会写入模块输出的 `#!icon`，来源图标缺失或不匹配时自动替换，未填写自定义图标时保留来源图标。
-- 登记地址是 Script-Hub 转换 URL 的模块可以从地址本身恢复内嵌 `originalURL`，并在缺少 `#SUBSCRIBED` 标记时按订阅初始地址更新。
-- 模块详情始终显示“更新地址”，只有在原始地址或登记地址与更新地址不同时才额外展示对应行，减少重复信息。
-- 通用设置页的配置储存目录旁新增 Finder 快捷入口。
-- Web management exposes a lightweight `/api/activity` progress endpoint and polls it during bulk updates, with soft reconnect across brief SSE drops.
-- Network recovery restarts the local Web server when needed and re-queues automatic GitHub publish after connectivity returns.
-- Settings tabs keep a small back/forward history; the module detail toolbar can hide or show the sidebar.
-- Web favicon/PWA icons ship as transparent multi-size assets with maskable manifest entries.
-- Source format recognition treats `.sgmodule` / `.plugin` / `.lpx` as definitive, repairing mislabeled Quantumult X records and keeping native Surge updates on the direct fetch path.
-- Local and GitHub standalone destinations are modeled separately from initial source provenance. Initial source resolves valid converted `#SUBSCRIBED originalURL` metadata to subscribed, HTTP/HTTPS update addresses without that marker to remote, and local files without metadata to self-authored.
-- Draft modules remain in a pending-source state until their first successful update. A valid subscription uses `originalURL` as the resolved update source, while registration URLs and local storage paths retain separate responsibilities.
-- Standalone publishing is destination-specific: local modules publish only locally, GitHub modules publish only to GitHub, and cache-backed modules can still contribute to the combined module without producing a standalone file.
-- The macOS and Web editors share the same default-storage decision, destination-specific folder options, disabled-target warnings, and source/storage terminology.
-- Module sidebar sections can be collapsed or expanded. Storage grouping always follows the persisted local/GitHub destination; disabling standalone publishing is shown as cache-backed output behavior instead of inventing a third remote storage category.
-- Local physical modules repair missing `#SUBSCRIBED` provenance and stale relative filenames at startup. Confirmed subscription metadata survives later native upstream/cache payloads that omit the Script-Hub marker.
-- Source-name autofill now uses a shared bounded remote fetcher across the macOS editor and Web API, with private-address blocking, response-size limits, and timeout enforcement.
-- The release workflow pins external actions to full commit SHAs, and release preflight rejects mutable action references before signing assets.
-- The Cloudflare Worker example now pins Wrangler with a committed npm lockfile and documents `npm ci` based deployment.
-- Release preflight now verifies that the documented distribution hardening posture matches the current ATS and App Sandbox configuration.
-- Existing local `.sgmodule` files with Script-Hub `#SUBSCRIBED` metadata can be restored with their original source URL, source format, parameters, category, and local relative path.
-- Update failures now preserve user-facing causes such as 404, 403, 429, DNS failures, timeouts, and TLS errors, and the UI can copy the detailed error.
-- GitHub automatic publishing skips empty publish sets instead of attempting a meaningless publish when no standalone module is selected.
-- Combined module participation defaults and UI visibility now respect the combined-module setting.
-- Changing the local configuration storage directory migrates the app-managed configuration files into the new directory instead of leaving stale state behind.
+- 集中管理远程、本地与 Script-Hub 转换模块，并区分 storageLocation 与 initialSource。
+- 本地与 GitHub 发布可并存；独立模块按自身存放位置发布，总模块可同时发布到两个目标。
+- 支持本地模块扫描、转换预览、文本覆盖、冲突处理、发布预览、受管文件清理和自动发布。
+- 提供 macOS 主界面、菜单栏和带访问控制的 Web 管理端。
+- 凭据使用配置目录内 AES-256-GCM 加密文件，不依赖系统钥匙串。
+- Release preflight 覆盖版本、Sparkle、appcast、entitlements、Web 资源、workflow 和 Xcode 工程源文件登记。
 
-### Architecture And Maintainability
+## 代码与测试规模
 
-- `AppModel` has been split into focused extensions for credentials, diagnostics, settings, Web management, module state, local modules, module output folders, preview access/editing, publishing, GitHub publishing, updates, update completion, automatic publishing, published output, and foreground work lifecycle.
-- Shared models were split from catch-all files into focused model files such as `ModuleSourceModels.swift`, `PublishModels.swift`, `UpdateHistoryModels.swift`, `ConversionModels.swift`, diagnostic model files, and GitHub release/API models.
-- Publishing, update completion, local import, local published files, metadata refresh, update failure, module search, module ordering, and module draft rules now live in service/planner types with targeted tests.
-- Desktop module, settings, preview, sidebar, detail, and editor views have been progressively split into smaller SwiftUI files.
-- Web management logic has been split across `web-logic.js`, `web-format.js`, `web-markup.js`, `web-api.js`, `web-state.js`, `web-editor.js`, `web-feedback.js`, `web-preview.js`, `web-sidebar.js`, and `web-activity.js`.
+| 指标 | 数量 |
+| --- | --- |
+| 应用 Swift 文件 | 126 |
+| Swift 测试文件（unit / UI） | 38 / 1 |
+| 源码中的 XCTest 方法 | 276 |
+| Services / Models / Views / Utilities / App-Core | 55 / 19 / 28 / 3 / 21 |
+| 应用 Swift 行数 | 20,411 |
+| 测试 Swift 行数 | 7,684 |
+| CHANGELOG release 段落 | 96 |
 
-### Safety Boundaries
+## 主要维护热点
 
-- 凭据文件使用 AES-256-GCM 加密并限制为当前用户可读写；诊断报告只导出存储位置和检查状态，不导出密钥或令牌内容。
-- Local publish continues to rely on managed-file markers and explicit cleanup previews; generated outputs must not silently overwrite user-owned original modules.
-- Local source self-export protection is centralized in `PublishCoordinator`.
-- GitHub publish planning validates duplicate paths, selected publish sets, stale deletes, and no-op publishes before writing.
-- Release packaging strips quarantine/resource-fork metadata from generated zip/pkg contents.
+文件行数只用于导航维护成本，不等同于缺陷或质量评分。
 
-### Testing And Release Tooling
+| 文件 | 行数 |
+| --- | --- |
+| SurgeRelay/Views/ModuleCodeTextView.swift | 560 |
+| SurgeRelay/Utilities/ModuleMetadataParser.swift | 496 |
+| SurgeRelay/Views/ModuleSidebarView.swift | 485 |
+| SurgeRelay/Views/ModulePreviewViews.swift | 417 |
+| SurgeRelay/Services/ModuleFileStore.swift | 374 |
+| SurgeRelay/Services/EmbeddedScriptHubEngine.swift | 365 |
+| SurgeRelay/Views/ModuleDetailView.swift | 360 |
+| SurgeRelay/Models/RelayModule.swift | 357 |
+| SurgeRelay/Services/PersistenceStore.swift | 336 |
+| SurgeRelay/Views/LocalModuleImportPreviewView.swift | 333 |
 
-- Release preflight 会校验 `SurgeRelay/` 与 `SurgeRelayTests/` 下所有 Swift 源文件都已登记到 Xcode 工程，避免新增文件后忘记同步 `project.pbxproj`。
-- `script/build_and_run.sh` is the shared Debug build, launch, log, telemetry, verification, and isolated UI-QA entrypoint; `.codex/environments/environment.toml` and the shared Xcode scheme use the same project configuration.
-- Unit tests have been split into focused files for publishing, GitHub releases, Web management, Web HTTP security, settings, diagnostics, Script-Hub, local publishing, local import, ordering, search, metadata refresh, update failures, and task activity.
-- Web resources now have Node syntax checks, split behavior tests, a small aggregate entrypoint, and a lightweight DOM regression harness.
-- `script/check_release_configuration.sh` verifies version/build metadata, Sparkle configuration, appcast latest item, Web resources, release scripts, and GitHub Actions release workflow references.
-- `script/build_release_assets.sh` builds `.app.zip`, `.pkg`, sha256 sidecars, Sparkle EdDSA signature files, and can update `appcast.xml`.
-- Release builds use the fixed self-signed code signing identity `Surge Relay Self-Signed Code Signing` and Sparkle EdDSA update signatures.
+## 当前优化顺序
 
-### Performance And Memory
+1. 保持 BoundedRemoteDataFetcher 与 Web source-name 测试不依赖系统 DNS、Fake-IP、VPN 或企业网络环境。
+2. 保持本自动状态页与 project.yml、代码规模和维护策略同步；Git refs 快照单独维护在 UPSTREAM_SYNC。
+3. 保持 README、DEVELOPMENT、UPSTREAM_SYNC 与 Cloudflare 指南描述当前发布模型。
+4. 保持设置、模块编辑、详情页和 Web 管理的自动化 UI/交互覆盖稳定。
+5. 侧边栏筛选 UI 已独立成文件；按实际变更频率继续缩小其他高负荷 Swift 与 Web 文件，避免全局重写。
+6. 继续兼容性优先的 release hardening；没有前置兼容设计时不启用 Sandbox 或收紧 ATS。
 
-- Activity polling uses a compact payload instead of full `/api/state` snapshots during long update runs.
-- Search metadata and module-summary signatures are cached across bulk updates; module persistence is deferred during updateAll so progress ticks no longer rewrite modules.json on every source.
-- Sidebar presentation is rebuilt from a stable signature instead of every AppModel field change; detail selection uses asymmetric transitions while preview editors stay mounted after first open.
-- Sidebar module rows no longer observe the full AppModel graph, reducing list thrash during mass updates; status-card compositing and icon reloads were lightened for smoother progress animation.
-- Detail/preview segmented control and section collapse use short snappy transitions while keeping the preview editor mounted after first open.
-- Module metadata parsing is line-based and avoids recompiling regular expressions during refreshes; metadata rewrite, sanitizer, Script-Hub and merger regular expressions are static cached literals.
-- Local output-folder discovery runs off the main actor and reuses a bounded cache instead of recursively scanning during SwiftUI redraws.
-- Module icons load and decode on utility tasks keyed by icon revision; hidden preview editors are mounted only after the preview tab is used and are released when the selected module changes.
-- Sidebar grouping performs one classification pass over modules, and code-highlighting patterns are reused across editor updates.
+## 验证入口
 
-## 目标
+在发布或合并广泛变更前运行：
 
-- 发布 `1.3.42 (91)`，随后继续推进 macOS 设置窗口、模块编辑器、详情页和 Web 管理端的自动化 UI 截图/交互覆盖。
-- 为 Web 管理端补充 Playwright 冒烟测试；继续拆分 `WebResources/app.js` 和较大的 Swift 文件。
-- 持续对照 `docs/UPSTREAM_SYNC.md` 选择性移植 upstream 修复，不合并与本 fork 存储/发布模型冲突的改动。
-- 在 Apple Developer ID 可用前维持固定自签名 + Sparkle 更新；可用后补充 Developer ID 签名、公证、stapling 与验证。
-- 逐步收敛全局 ATS 放宽与 App Sandbox 关闭状态：先引入用户来源网络策略或显式例外模型，再补 security-scoped bookmark 与迁移测试。
-
-## Pending Work
-
-### High Priority
-
-- Add automated UI screenshot or interaction coverage for the macOS settings window, module editor, module detail page, and Web management page.
-- Detail rendering and live patching now live in `WebResources/web-detail.js` (with behavior tests and a load-order contract); keep shrinking `app.js` by extracting detail-action routing or module-editor orchestration if those sections keep growing.
-- Continue shrinking the largest Swift files that still exceed roughly 300 lines, especially `EmbeddedScriptHubEngine.swift`, `ModuleFileStore.swift`, `PersistenceStore.swift`, `ModuleDetailView.swift`, and larger focused test files.
-- Keep comparing upstream `EEliberto/SurgeRelay-macOS:main` using `docs/UPSTREAM_SYNC.md`; selectively port fixes that improve stability without undoing this fork's storage/publishing model.
-
-### Release And Distribution
-
-- Keep using fixed self-signed signing plus Sparkle in-app updates until an Apple Developer ID and notarization path is available.
-- If Developer ID becomes available, add notarization validation and document the Gatekeeper behavior difference from self-signed releases.
-- Periodically verify that GitHub Release assets include `.app.zip`, `.pkg`, `.sha256`, and `.sparkle.txt` files, and that the latest `appcast.xml` item points at the current `.app.zip`.
-
-### Future Design Work
-
-- Evaluate App Sandbox and security-scoped bookmarks for user-selected local module roots.
-- Add a more visual Web management smoke test or Playwright snapshot once the UI stabilizes.
-- Consider row-level Web list patching for very large module lists if full sidebar rerenders become observable.
-- Keep all local cleanup behavior behind publish previews and explicit confirmation.
-
-## Release Checklist
-
-Use the Xcode beta toolchain explicitly:
-
-```bash
-DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer"
-```
-
-Before publishing (当前目标版本为 `1.3.42 (91)`):
-
-```bash
+~~~bash
 git diff --check
+node script/generate_project_status.mjs --check
 node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs
-VERSION=1.3.42 BUILD=91 \
+VERSION=1.4.1 BUILD=96 ./script/check_release_configuration.sh
+
 DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
-./script/check_release_configuration.sh
-```
+xcodebuild test \
+  -project "Surge Relay.xcodeproj" \
+  -scheme "Surge Relay" \
+  -destination "platform=macOS,arch=arm64" \
+  -skipPackagePluginValidation
 
-For a signed release asset build:
-
-```bash
+# 需要允许 Xcode UI automation 的 macOS 桌面会话
 DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
-REQUIRE_SPARKLE_SIGNATURES=1 \
-REQUIRE_STABLE_CODESIGN=1 \
-VERIFY_APPCAST=1 \
-UPDATE_APPCAST=1 \
-./script/build_release_assets.sh
-```
+xcodebuild test \
+  -project "Surge Relay.xcodeproj" \
+  -scheme "Surge Relay UI Tests" \
+  -destination "platform=macOS,arch=arm64" \
+  -skipPackagePluginValidation
+~~~
 
-Then create the GitHub Release on `junchan0412/SurgeRelay-macOS` using the generated files under `dist/release-v<version>/artifacts`.
+正式 release asset 构建仍需要固定自签名证书和 Sparkle EdDSA 私钥。
+
+## 文档与事实来源
+
+| 来源 | 职责 |
+| --- | --- |
+| README.md | 用户能力、安装、安全与开发入口 |
+| DEVELOPMENT.md | 架构边界、测试归属和维护约束 |
+| CHANGELOG.md | 版本事实与发布历史 |
+| SECURITY.md | 当前安全边界 |
+| docs/RELEASE_HARDENING.md | 兼容性优先的分发策略 |
+| docs/UPSTREAM_SYNC.md | 选择性同步边界与 Git refs 快照 |
+| docs/project-status-report/report.html | 详细综合审计快照 |

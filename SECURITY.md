@@ -12,6 +12,10 @@ Sparkle 2 EdDSA signatures. Without Apple Developer ID notarization, the first
 manual browser download can still receive macOS quarantine. Use the in-app
 updater for later updates whenever possible.
 
+There is currently no migration schedule for Apple Developer ID signing or
+notarization. Fixed self-signed signing plus Sparkle EdDSA remains the supported
+distribution path until a separately planned migration is ready.
+
 ## Web Management
 
 The Web Management server is disabled by default and listens on loopback unless
@@ -54,10 +58,14 @@ normalization rules so generated module paths stay predictable.
 ## macOS Permissions
 
 The app currently keeps `NSAllowsArbitraryLoads=true` because users can add
-arbitrary HTTP module sources that must still be convertible. App Sandbox is currently disabled because Surge Relay writes to user-selected Surge/iCloud
+arbitrary HTTP module sources that must still be convertible.
+App Sandbox is currently disabled because Surge Relay writes to user-selected Surge/iCloud
 directories and maintains compatibility with existing non-sandboxed installs.
 
-Future sandboxing should use security-scoped bookmarks for local module roots
-and migration coverage for existing configuration directories. The current
-release hardening status and migration order are tracked in
-`docs/RELEASE_HARDENING.md`.
+There is no scheduled ATS or App Sandbox migration. Before either setting
+changes, the project requires an explicit exception model for user-selected
+plain HTTP sources, security-scoped bookmarks for module and configuration
+directories, migration coverage for existing installations, and regression
+tests for conversion, local/iCloud publishing, configuration migration, and
+updates. The current release hardening status and migration order are tracked
+in `docs/RELEASE_HARDENING.md`.

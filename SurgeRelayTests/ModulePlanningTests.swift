@@ -101,7 +101,7 @@ final class ModulePlanningTests: XCTestCase {
         )
 
         do {
-            _ = try await fetcher.data(for: URLRequest(url: try XCTUnwrap(URL(string: "https://public.example/large.sgmodule"))))
+            _ = try await fetcher.data(for: URLRequest(url: try XCTUnwrap(URL(string: "https://8.8.8.8/large.sgmodule"))))
             XCTFail("Expected oversized Content-Length to be rejected")
         } catch BoundedRemoteFetchError.responseTooLarge(let maximumSize) {
             XCTAssertEqual(maximumSize, 8)
@@ -123,7 +123,7 @@ final class ModulePlanningTests: XCTestCase {
             chunks: [Data("#!name=Tiny\n".utf8)]
         )
 
-        _ = try await fetcher.data(for: URLRequest(url: try XCTUnwrap(URL(string: "https://public.example/timeout.sgmodule"))))
+        _ = try await fetcher.data(for: URLRequest(url: try XCTUnwrap(URL(string: "https://8.8.8.8/timeout.sgmodule"))))
 
         XCTAssertEqual(BoundedRemoteDataFetcherURLProtocol.requestedTimeouts, [3])
     }
@@ -143,7 +143,7 @@ final class ModulePlanningTests: XCTestCase {
         )
 
         do {
-            _ = try await fetcher.data(for: URLRequest(url: try XCTUnwrap(URL(string: "https://public.example/body.sgmodule"))))
+            _ = try await fetcher.data(for: URLRequest(url: try XCTUnwrap(URL(string: "https://8.8.8.8/body.sgmodule"))))
             XCTFail("Expected oversized response body to be rejected")
         } catch BoundedRemoteFetchError.responseTooLarge(let maximumSize) {
             XCTAssertEqual(maximumSize, 8)

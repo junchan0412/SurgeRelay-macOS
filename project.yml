@@ -9,8 +9,8 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     MACOSX_DEPLOYMENT_TARGET: "26.0"
-    CURRENT_PROJECT_VERSION: 95
-    MARKETING_VERSION: 1.4.0
+    CURRENT_PROJECT_VERSION: 96
+    MARKETING_VERSION: 1.4.1
     CODE_SIGN_STYLE: Automatic
     ENABLE_USER_SCRIPT_SANDBOXING: YES
 packages:
@@ -66,6 +66,18 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.allenmiao.SurgeRelayTests
         GENERATE_INFOPLIST_FILE: YES
+  SurgeRelayUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: SurgeRelayUITests
+    dependencies:
+      - target: Surge Relay
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.allenmiao.SurgeRelayUITests
+        GENERATE_INFOPLIST_FILE: YES
 schemes:
   Surge Relay:
     build:
@@ -75,3 +87,11 @@ schemes:
     test:
       targets:
         - Surge RelayTests
+  Surge Relay UI Tests:
+    build:
+      targets:
+        Surge Relay: all
+        SurgeRelayUITests: [test]
+    test:
+      targets:
+        - SurgeRelayUITests

@@ -2,26 +2,26 @@
 
 本文件记录本 fork（`junchan0412/SurgeRelay-macOS`）相对 upstream（`EEliberto/SurgeRelay-macOS`）的提交分叉情况，以及后续如何更精准地同步。
 
-最后审查日期：2026-07-25  
+最后审查日期：2026-08-30（基于本地 remote-tracking refs，未执行 fetch）
 审查基线：
 
 | 引用 | SHA | 说明 |
 | --- | --- | --- |
-| fork `main` / 当前审查点 | `633e543` | `Update 1.3.19 release metadata` |
+| fork `HEAD` / 当前审查点 | `4b591fc56d7d` | 当前工作分支 HEAD |
 | upstream `main` | `a3e667c` | `Revert "Fix macOS 27 toolbar layout"` |
-| 共同祖先 `merge-base` | `30203ef` | `Update README.md` |
+| 共同祖先 `merge-base` | `30203ef732e1` | `Update README.md` |
 
 对比命令：
 
 ```bash
-git fetch upstream main
-git fetch origin main
-git rev-list --count origin/main..upstream/main   # behind
-git rev-list --count upstream/main..origin/main   # ahead
-git log --oneline origin/main..upstream/main
+git rev-parse HEAD
+git rev-parse upstream/main
+git merge-base HEAD upstream/main
+git rev-list --left-right --count upstream/main...HEAD   # behind, ahead
+git log --oneline HEAD..upstream/main
 ```
 
-审查时计数：**behind 51 / ahead 220**。
+本地引用审查时计数：**behind 51 / ahead 256**。需要判断远端最新状态时，先显式执行 `git fetch upstream main`，再更新本节证据。
 
 ## 1. 分叉模型（先读这个）
 
@@ -255,3 +255,4 @@ node script/test_web_dom_resources.mjs
 | --- | --- | --- |
 | 2026-07-25 | `a3e667c` | 首份分叉审查；移植 MainWindowCloseBehavior、Web toast/copy 样式、Cloudflare 指南；明确跳过 Ponte 与 Deployment 删除 |
 | 2026-07-25 | `a3e667c` | 完成 5 项 adapt：`/api/activity`、NetworkPathMonitor、PWA 图标、设置历史、侧边栏切换；发布 1.3.20 |
+| 2026-08-30 | `a3e667c` | 基于本地 refs 复核分叉计数与当前 HEAD；未 fetch，behind 51 / ahead 256 |

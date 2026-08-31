@@ -92,9 +92,11 @@ struct ModuleEditorView: View {
                 Button(module == nil ? "添加" : "保存") { save() }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
+                    .accessibilityIdentifier("module-editor.save")
             }
         }
         .frame(width: 620, height: 700)
+        .accessibilityIdentifier("module-editor.root")
         .alert("无法保存", isPresented: Binding(
             get: { localError != nil },
             set: { if !$0 { localError = nil } }

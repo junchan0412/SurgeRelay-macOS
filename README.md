@@ -100,7 +100,7 @@ xattr -dr com.apple.quarantine "/Applications/Surge Relay.app"
 
 ## 发布目标
 
-在设置的“发布”页可以分别开启“发布到本地”和“发布到 GitHub”。两者可以同时开启，但每个独立模块只进入自己选择的存放目标；总模块仍可同时发布到两个目标。工具栏的“发布全部”只提交 GitHub 模块与总模块；“多选 / 发布所选”也只允许选择 GitHub 独立模块，不会删除其他已发布文件。未完成 GitHub 配置时点击“发布全部”会直接打开设置页；模块搜索框位于左侧边栏，和筛选条件一起作用于模块列表。
+在设置的“发布”页可以分别开启“发布到本地”和“发布到 GitHub”。两者可以同时开启，但每个独立模块只进入自己选择的存放目标；总模块仍可同时发布到两个目标。工具栏的“发布全部”只提交 GitHub 模块与总模块；“多选 / 发布所选”会按每个模块的存放位置分别发布到本地或 GitHub，不会删除其他已发布文件。未完成 GitHub 配置时点击“发布全部”会直接打开设置页；模块搜索框位于左侧边栏，和筛选条件一起作用于模块列表。
 
 开启本地发布后，需要配置本地模块根目录。常见路径类似：
 
@@ -147,7 +147,7 @@ Surge Relay 1.3.x 对 Web 管理、Script-Hub 引擎和 GitHub 发布做了安�
 - JavaScriptCore HTTP bridge 只允许 `http` / `https`，会拦截本机、`.local`、内网、链路本地和保留地址，并把响应体限制为 20 MB。
 - GitHub owner、repository 和 branch 会做结构化校验；模块目录仍沿用现有路径规范化逻辑。
 
-当前工程仍保留 `NSAllowsArbitraryLoads=true` 和关闭 App Sandbox。原因是 Surge Relay 需要转换用户添加的任意 HTTP/HTTPS 模块来源，并写入用户选择的本地 Surge/iCloud 目录或执行 GitHub 发布；若开启沙盒，需要进一步引入 security-scoped bookmark 并迁移现有本地目录访问模型。发布预检会确认这些取舍仍在文档中明确记录；后续收敛路线见 [Release Hardening](./docs/RELEASE_HARDENING.md)。
+当前工程仍保留 `NSAllowsArbitraryLoads=true` 和关闭 App Sandbox。原因是 Surge Relay 需要转换用户添加的任意 HTTP/HTTPS 模块来源，并写入用户选择的本地 Surge/iCloud 目录或执行 GitHub 发布。目前 Apple Developer ID、notarization、ATS 收紧和 App Sandbox 迁移均无时间表，继续以兼容现有来源、目录和安装配置为优先；只有用户来源例外模型、security-scoped bookmarks、旧安装迁移和相关回归测试齐备后才会安排迁移。发布预检会确认这些取舍仍在文档中明确记录；后续收敛路线见 [Release Hardening](./docs/RELEASE_HARDENING.md)。
 
 ## 凭据与本地加密
 
@@ -238,7 +238,7 @@ xcodebuild build-for-testing \
 发布前可先运行无需证书和 GitHub secret 的配置预检，确认版本号、Sparkle 配置、Web 资源语法和行为/DOM 测试、appcast、entitlement、发布脚本和 GitHub Actions 入口保持一致：
 
 ```bash
-VERSION=1.3.37 BUILD=86 ./script/check_release_configuration.sh
+VERSION=X.Y.Z BUILD=N ./script/check_release_configuration.sh
 ```
 
 ```bash
@@ -258,10 +258,10 @@ EXPECT_ADHOC_SIGNATURE=0 \
 EXPECTED_CODESIGN_AUTHORITY="Surge Relay Self-Signed Code Signing" \
 ./script/verify_github_release_assets.sh \
   --repo junchan0412/SurgeRelay-macOS \
-  --tag v1.3.37
+  --tag vX.Y.Z
 ```
 
-当前已完成工作、待完成工作和发布核对入口见 [DEVELOPMENT_STATUS.md](./DEVELOPMENT_STATUS.md)。
+当前版本、仓库状态、能力、代码规模、优化顺序和发布核对入口见自动生成的 [DEVELOPMENT_STATUS.md](./DEVELOPMENT_STATUS.md)。不要手工编辑该文件；使用 `node script/generate_project_status.mjs` 刷新，或使用 `node script/generate_project_status.mjs --check` 检查是否过期。
 
 ## 开源协议
 

@@ -22,6 +22,7 @@ struct ModuleDetailView: View {
             .padding(.vertical, 28)
             .frame(maxWidth: .infinity, alignment: .top)
         }
+        .accessibilityIdentifier("module-detail.root")
         .task(id: "\(module.id.uuidString)-\(module.contentHash ?? "")") {
             argumentInfo = await model.moduleArgumentInfo(for: module)
         }

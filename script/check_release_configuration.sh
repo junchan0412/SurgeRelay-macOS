@@ -201,6 +201,9 @@ ok "verified changelog section for $VERSION"
 
 require_command node
 require_file "$ROOT_DIR/script/test_web_resources.mjs"
+require_file "$ROOT_DIR/script/generate_project_status.mjs"
+node "$ROOT_DIR/script/generate_project_status.mjs" --check
+ok "verified generated project status"
 [[ -d "$WEB_RESOURCE_TEST_DIR" ]] || fail "missing Web resource split test directory: $WEB_RESOURCE_TEST_DIR"
 WEB_RESOURCE_AGGREGATE_LINES="$(wc -l < "$ROOT_DIR/script/test_web_resources.mjs" | tr -d ' ')"
 [[ "$WEB_RESOURCE_AGGREGATE_LINES" -le 120 ]] \
@@ -275,6 +278,7 @@ ok "verified release workflow references"
 
 verify_swift_sources_referenced "$ROOT_DIR/SurgeRelay" "$XCODE_PROJECT"
 verify_swift_sources_referenced "$ROOT_DIR/SurgeRelayTests" "$XCODE_PROJECT"
+verify_swift_sources_referenced "$ROOT_DIR/SurgeRelayUITests" "$XCODE_PROJECT"
 ok "verified Swift sources are referenced in the Xcode project"
 
 ok "release configuration preflight passed for $VERSION ($BUILD)"

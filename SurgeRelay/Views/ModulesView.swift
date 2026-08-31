@@ -190,9 +190,11 @@ struct ModulesView: View {
                     Spacer()
                     Button("完成") { model.presentsSettings = false }
                         .keyboardShortcut(.defaultAction)
+                        .accessibilityIdentifier("settings.done")
                 }
             }
             .frame(width: 620, height: 560)
+            .accessibilityIdentifier("settings.root")
         }
         .sheet(isPresented: $model.presentsUpdateChecker) {
             CheckForUpdatesSheet()

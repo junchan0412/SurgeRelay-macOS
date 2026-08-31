@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.1
+
+- 稳定性：网络 mock 测试改用不经过系统 DNS 的确定性地址，避免 Surge Enhanced Mode、Fake-IP、VPN 或企业网络在 URLProtocol mock 前触发 SSRF 保留地址阻断；完整常规 Xcode 测试恢复为 273 / 273 通过。
+- 自动化：新增独立 `SurgeRelayUITests` target 与 `Surge Relay UI Tests` scheme，覆盖设置、模块编辑、详情页和 Web 搜索交互；相关控件补齐稳定的 accessibility identifiers，Web DOM tests 增加搜索回归断言。
+- 维护性：将侧边栏筛选、结果数、清除与排序 UI 抽取到 `ModuleSidebarFilterBar.swift`，`ModuleSidebarView.swift` 从 655 行降至 485 行，保持原有状态归属和交互逻辑。
+- 工程：`DEVELOPMENT_STATUS.md` 改由 `script/generate_project_status.mjs` 自动生成，移除会因提交动作自我失效的 HEAD/提交日期字段，release preflight 会在 commit 与 tag checkout 中稳定检查状态页新鲜度；同步 README、开发指南、上游同步、Cloudflare 部署与 release hardening 文档。
+- 分发策略：继续采用固定自签名证书与 Sparkle EdDSA；Apple Developer ID、notarization、ATS 收紧和 App Sandbox 迁移暂无时间表，待兼容模型、security-scoped bookmarks、旧安装迁移与回归方案具备后再推进。
+
 ## 1.4.0
 
 - 设计系统：新增原生统一设计令牌（间距 / 圆角 / 分隔线 / 行度量 / 语义状态色），与 Web 管理端的令牌体系对齐，作为全 App 视觉语言的单一来源。

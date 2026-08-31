@@ -57,9 +57,9 @@ final class WebManagementTests: XCTestCase {
     @MainActor
     func testWebSourceNamePayloadUsesSharedLookup() async throws {
         let payload = try await WebManagementAPI.sourceNamePayload(
-            for: "https://public.example/remote.conf"
+            for: "https://8.8.8.8/remote.conf"
         ) { request in
-            XCTAssertEqual(request.url?.absoluteString, "https://public.example/remote.conf")
+            XCTAssertEqual(request.url?.absoluteString, "https://8.8.8.8/remote.conf")
             XCTAssertEqual(request.value(forHTTPHeaderField: "User-Agent"), "Surge Relay")
             return Data("#!name=Remote From Web\n[Script]\n".utf8)
         }

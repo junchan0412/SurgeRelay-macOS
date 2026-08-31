@@ -194,6 +194,7 @@ struct SettingsView: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier("settings.tab.\(tab.rawValue)")
         .background {
             if isSelected {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)

@@ -54,7 +54,7 @@
 https://github.com/your-name/Surge-Relay
 ```
 
-> Surge Relay 会拒绝公开仓库。请确认仓库标题旁显示 `Private`。
+> Surge Relay 同时支持公开和私有仓库。本教程选择 `Private`，因为只有私有仓库需要通过 Cloudflare Worker 提供不暴露 Token 的订阅地址；公开仓库会直接使用 GitHub Raw 地址。
 
 ## 第二步：创建 Surge Relay 使用的可写 Token
 
@@ -217,23 +217,16 @@ https://surge-relay.your-subdomain.workers.dev
 这一部分在 Mac 上操作，无需打开网页。请保留前面复制的 GitHub 仓库地址、App Token 和 Cloudflare `workers.dev` 地址。
 
 1. 打开 Surge Relay → 菜单栏 **Surge Relay** → **设置…**。
-2. 在左侧选择 **同步**。
-3. 同步方式选择 **GitHub 私有仓库**。
-4. `仓库地址` 填写第一步复制的完整 GitHub 地址。
-5. `GitHub Token` 填写第二步创建的可写 Token。
-6. `公共地址` 填写 Cloudflare 提供的 `workers.dev` 地址，不要在末尾添加文件名。
-7. 点击 **验证并切换到 GitHub**。
+2. 进入 **发布**，开启 **发布到 GitHub**。
+3. 填写 **所有者**、**仓库**、**分支** 和 **模块根目录**。例如仓库地址为 `https://github.com/your-name/Surge-Relay` 时，所有者填写 `your-name`，仓库填写 `Surge-Relay`；分支通常为 `main`，模块根目录可填写 `modules`。
+4. 进入 **凭据**，在 **GitHub Token** 中填写第二步创建的可写 Token，点击 **保存到本地**。
+5. 点击 **测试连接**。成功后，**发布**页的 **仓库类型** 会显示为 **私有**；公开仓库则显示为 **公开** 并直接使用 Raw 地址。
+6. 返回 **发布**。检测到私有仓库后会出现 **Cloudflare Worker** 区域，在 **公共地址** 中填写 Cloudflare 提供的 `workers.dev` 地址，不要在末尾添加文件名。
+7. 使用工具栏的发布操作完成首次发布，再访问 Worker 下的模块地址验证结果。
 
 > 示意图：在 Surge Relay 中填写 GitHub 与 Cloudflare 信息
 
-验证过程中，Surge Relay 会依次确认：
-
-1. 仓库存在且为私有仓库。
-2. App Token 具有写入权限。
-3. Worker 公共地址可以访问。
-4. 实际发布一份汇总模块，并确认 Worker 能正确返回它。
-
-看到“GitHub 与 Cloudflare 已验证”后即设置完成。最终汇总模块地址为：
+“测试连接”会确认仓库可访问、Token 具有所需权限，并记录仓库类型。首次发布成功后，模块地址以 App 详情页显示的发布地址为准；若已启用总模块且文件名为 `Surge-Relay.sgmodule`，地址类似：
 
 ```text
 https://你的-worker-地址/Surge-Relay.sgmodule
@@ -241,9 +234,9 @@ https://你的-worker-地址/Surge-Relay.sgmodule
 
 ## 常见问题
 
-### 提示仓库不是私有仓库
+### 仓库类型显示为公开
 
-打开 GitHub 仓库 → **Settings** → 页面底部 **Danger Zone**，确认仓库可见性为 `Private`。Surge Relay 不允许使用公开仓库存储配置。
+这是受支持的配置，Surge Relay 会直接生成 GitHub Raw 订阅地址，不显示 Cloudflare Worker 的“公共地址”字段。只有希望隐藏仓库内容或使用 Worker 转发时，才需要在 GitHub 仓库 **Settings** → **Danger Zone** 中改为 `Private`，然后回到 **凭据**重新测试连接。
 
 ### 提示 401 或 403
 
@@ -262,7 +255,7 @@ Cloudflare 中缺少 `GITHUB_TOKEN` Secret。添加后必须再次点击 **Deplo
 
 ### Worker 首页正常，但模块地址显示 `Not Found`
 
-首次配置前这是正常现象。完成 Surge Relay 中的“验证并切换到 GitHub”后再次访问。如果仍然失败，请检查四个 Worker 文本变量是否与仓库一致。
+首次发布前这是正常现象。完成 Surge Relay 中的 GitHub 配置并发布模块后再次访问。如果仍然失败，请检查四个 Worker 文本变量是否与仓库一致，并确认 **发布**页的公共地址只填写 Worker 根地址。
 
 ### 提示 429 或 GitHub 请求过多
 

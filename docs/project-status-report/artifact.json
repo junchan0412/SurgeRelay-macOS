@@ -1,0 +1,799 @@
+{
+  "surface": "report",
+  "manifest": {
+    "version": 1,
+    "surface": "report",
+    "title": "Surge Relay 项目现状综合报告",
+    "description": "基于仓库文档、当前代码、版本配置、构建与测试结果形成的技术状态报告。",
+    "generatedAt": "2026-08-30T20:54:01+08:00",
+    "filters": [],
+    "cards": [
+      {
+        "id": "app_sources",
+        "description": "当前应用源码与 unit/UI 测试文件规模。",
+        "dataset": "project_metrics",
+        "sourceId": "audit_evidence",
+        "metrics": [
+          {
+            "label": "应用 Swift 文件",
+            "field": "app_swift_files",
+            "format": "number"
+          },
+          {
+            "label": "Swift 测试文件",
+            "field": "swift_test_files",
+            "format": "number"
+          }
+        ]
+      },
+      {
+        "id": "test_health",
+        "description": "Xcode 27 beta 在常规 scheme 中实际发现并执行的测试结果。",
+        "dataset": "project_metrics",
+        "sourceId": "audit_evidence",
+        "metrics": [
+          {
+            "label": "XCTest 通过率",
+            "field": "xctest_pass_rate",
+            "format": "percent"
+          },
+          {
+            "label": "通过",
+            "field": "xctest_passed",
+            "format": "number"
+          },
+          {
+            "label": "失败",
+            "field": "xctest_failed",
+            "format": "number"
+          }
+        ]
+      },
+      {
+        "id": "architecture_footprint",
+        "description": "当前主要 Swift 代码分层的文件数量。",
+        "dataset": "project_metrics",
+        "sourceId": "audit_evidence",
+        "metrics": [
+          {
+            "label": "Services",
+            "field": "services",
+            "format": "number"
+          },
+          {
+            "label": "Models",
+            "field": "models",
+            "format": "number"
+          },
+          {
+            "label": "Views",
+            "field": "views",
+            "format": "number"
+          }
+        ]
+      },
+      {
+        "id": "code_size",
+        "description": "应用、unit/UI 测试和 Web 资源的审计规模。",
+        "dataset": "project_metrics",
+        "sourceId": "audit_evidence",
+        "metrics": [
+          {
+            "label": "Swift 行数",
+            "field": "swift_loc",
+            "format": "number"
+          },
+          {
+            "label": "Web 与 Web 测试行数",
+            "field": "web_resource_loc",
+            "format": "number"
+          }
+        ]
+      }
+    ],
+    "charts": [
+      {
+        "id": "swift_layer_distribution",
+        "title": "应用 Swift 文件按代码层分布",
+        "subtitle": "当前工作区，共 126 个应用 Swift 文件；按目录职责归类。",
+        "type": "bar",
+        "dataset": "swift_files_by_layer",
+        "sourceId": "audit_evidence",
+        "valueFormat": "number",
+        "encodings": {
+          "x": {
+            "field": "layer",
+            "type": "nominal",
+            "label": "代码层"
+          },
+          "y": {
+            "field": "files",
+            "type": "quantitative",
+            "label": "Swift 文件数"
+          },
+          "tooltip": [
+            {
+              "field": "share",
+              "type": "quantitative",
+              "label": "占应用 Swift 文件",
+              "format": "percent"
+            },
+            {
+              "field": "rank",
+              "type": "quantitative",
+              "label": "文件数排名"
+            }
+          ]
+        },
+        "layout": "full"
+      }
+    ],
+    "tables": [
+      {
+        "id": "validation_summary",
+        "title": "当前验证结果",
+        "subtitle": "2026-08-30，在仓库当前 HEAD 与本机 Xcode 27 beta 环境执行。",
+        "dataset": "validation_summary",
+        "sourceId": "audit_evidence",
+        "defaultSort": {
+          "field": "order",
+          "direction": "asc"
+        },
+        "columns": [
+          {
+            "field": "order",
+            "label": "顺序",
+            "format": "number"
+          },
+          {
+            "field": "check",
+            "label": "检查",
+            "type": "text"
+          },
+          {
+            "field": "result",
+            "label": "结果",
+            "type": "text"
+          },
+          {
+            "field": "detail",
+            "label": "说明",
+            "type": "text"
+          }
+        ]
+      },
+      {
+        "id": "document_freshness",
+        "title": "现有报告与文档的新鲜度",
+        "subtitle": "按对当前维护决策的影响排序。",
+        "dataset": "document_freshness",
+        "sourceId": "audit_evidence",
+        "defaultSort": {
+          "field": "priority",
+          "direction": "asc"
+        },
+        "columns": [
+          {
+            "field": "priority",
+            "label": "优先级",
+            "format": "number"
+          },
+          {
+            "field": "document",
+            "label": "文档",
+            "type": "text"
+          },
+          {
+            "field": "state",
+            "label": "状态",
+            "type": "text"
+          },
+          {
+            "field": "finding",
+            "label": "当前判断",
+            "type": "text"
+          },
+          {
+            "field": "action",
+            "label": "建议",
+            "type": "text"
+          }
+        ]
+      },
+      {
+        "id": "largest_files",
+        "title": "主要代码热点",
+        "subtitle": "仅列应用源码，按行数降序；行数用于维护导航，不等同于缺陷。",
+        "dataset": "largest_files",
+        "sourceId": "audit_evidence",
+        "defaultSort": {
+          "field": "lines",
+          "direction": "desc"
+        },
+        "columns": [
+          {
+            "field": "file",
+            "label": "文件",
+            "type": "text"
+          },
+          {
+            "field": "lines",
+            "label": "行数",
+            "format": "number"
+          },
+          {
+            "field": "note",
+            "label": "审计说明",
+            "type": "text"
+          }
+        ]
+      },
+      {
+        "id": "priority_actions",
+        "title": "建议行动顺序",
+        "subtitle": "优先处理会影响验证可信度和协作判断的事项。",
+        "dataset": "priority_actions",
+        "sourceId": "audit_evidence",
+        "defaultSort": {
+          "field": "rank",
+          "direction": "asc"
+        },
+        "columns": [
+          {
+            "field": "rank",
+            "label": "顺序",
+            "format": "number"
+          },
+          {
+            "field": "priority",
+            "label": "级别",
+            "type": "text"
+          },
+          {
+            "field": "action",
+            "label": "行动",
+            "type": "text"
+          },
+          {
+            "field": "reason",
+            "label": "原因",
+            "type": "text"
+          }
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "id": "audit_evidence",
+        "label": "项目现状审计来源说明",
+        "path": "docs/project-status-report/source-notes.md",
+        "query": {
+          "engine": "duckdb",
+          "language": "sql",
+          "description": "加载 canonical artifact 中已由 source notes 所列 shell 命令复核的项目审计 snapshot。",
+          "sql": "SELECT surface, manifest, snapshot, sources FROM read_json_auto('docs/project-status-report/artifact.json');",
+          "executed_at": "2026-08-30T20:54:01+08:00",
+          "tables_used": [
+            "git checkout",
+            "project.yml",
+            "Surge Relay.xcodeproj/project.pbxproj",
+            "appcast.xml",
+            "SurgeRelay",
+            "SurgeRelayTests",
+            "SurgeRelayUITests",
+            "Xcode xcresult",
+            "Surge DNS state",
+            "macOS UI automation runner state"
+          ],
+          "filters": [
+            "Repository HEAD 4b591fc56d7d2989767912a38c337f257bb24a31",
+            "Application Swift files exclude SurgeRelayTests",
+            "Regular test totals use Xcode discovered and executed tests from the Surge Relay scheme",
+            "UI build-for-testing and UI automation execution are reported separately",
+            "Upstream counts use existing local remote-tracking refs without fetch"
+          ],
+          "metric_definitions": {
+            "app_swift_files": "Count of .swift files under SurgeRelay.",
+            "xctest_pass_rate": "Passed Xcode tests divided by total executed regular-scheme Xcode tests: 273 / 273.",
+            "swift_loc": "Line count across .swift files under SurgeRelay, SurgeRelayTests, and SurgeRelayUITests.",
+            "web_resource_loc": "Line count across WebResources JavaScript and script/web-resource-tests modules."
+          }
+        }
+      },
+      {
+        "id": "readme",
+        "label": "README",
+        "path": "README.md"
+      },
+      {
+        "id": "development",
+        "label": "Development guide",
+        "path": "DEVELOPMENT.md"
+      },
+      {
+        "id": "development_status",
+        "label": "Development status",
+        "path": "DEVELOPMENT_STATUS.md"
+      },
+      {
+        "id": "changelog",
+        "label": "Changelog",
+        "path": "CHANGELOG.md"
+      },
+      {
+        "id": "security",
+        "label": "Security notes",
+        "path": "SECURITY.md"
+      },
+      {
+        "id": "release_hardening",
+        "label": "Release hardening",
+        "path": "docs/RELEASE_HARDENING.md"
+      },
+      {
+        "id": "upstream_sync",
+        "label": "Upstream sync notes",
+        "path": "docs/UPSTREAM_SYNC.md"
+      },
+      {
+        "id": "cloudflare_guide",
+        "label": "GitHub and Cloudflare guide",
+        "path": "docs/GitHub-Cloudflare-Guide.md"
+      },
+      {
+        "id": "project_config",
+        "label": "Project configuration",
+        "path": "project.yml"
+      }
+    ],
+    "blocks": [
+      {
+        "id": "title",
+        "type": "markdown",
+        "body": "# Surge Relay 项目现状综合报告"
+      },
+      {
+        "id": "technical_summary",
+        "type": "markdown",
+        "sourceId": "audit_evidence",
+        "body": "## 技术摘要\n\n- **当前 release 基线是 1.4.0 (95)，版本链路一致。** Git tag、project.yml、Xcode 工程、CHANGELOG 和 appcast 的最新条目相互匹配；本次优化基于 main HEAD 4b591fc56d7d。\n- **常规自动化验证已恢复全绿。** Web behavior、Web DOM、release preflight、Debug build 和完整 Xcode 测试均通过；Xcode 实际执行 273 个测试，273 通过、0 失败。\n- **Fake-IP/DNS 环境耦合已消除。** 4 个网络 mock 用例改用确定性的数字地址夹具，不再让 public.example 在 Surge Enhanced Mode 下于 URLProtocol mock 之前触发 SSRF 保留地址阻断。\n- **项目状态与维护文档已统一。** DEVELOPMENT_STATUS 改为脚本生成并由 release preflight 检查新鲜度；README、DEVELOPMENT、UPSTREAM_SYNC、Cloudflare 指南及默认 Worker 配置均已同步当前行为。\n- **UI 自动化基础已落地，但实际运行仍有系统级限制。** 独立 UI target/scheme 已能 build-for-testing，测试覆盖设置、编辑器、详情和 Web DOM 搜索；本机运行在测试代码启动前因 macOS 无法启用 automation mode 而超时。\n- **总体判断：当前工作区符合继续开发和常规发布验证的条件。** 后续重点是取得可运行的 UI automation 桌面会话、持续控制热点文件，并维持兼容性优先的分发与权限策略。"
+      },
+      {
+        "id": "metrics",
+        "type": "metric-strip",
+        "cardIds": [
+          "app_sources",
+          "test_health",
+          "architecture_footprint",
+          "code_size"
+        ]
+      },
+      {
+        "id": "validation_findings",
+        "type": "markdown",
+        "sourceId": "audit_evidence",
+        "body": "## 常规验证全绿，UI 自动化只剩系统 runner 门槛\n\nRelease preflight 已覆盖版本、Sparkle、entitlements、appcast、Web 资源、release shell scripts、GitHub Actions 引用、自动状态页新鲜度和 Swift 文件的 Xcode 工程登记。Debug build 与完整常规 Xcode 测试在外置 Xcode 27 beta 下成功，xcresult 明确记录 273 / 273 通过。\n\n新增的独立 UI scheme 已完成 build-for-testing，说明 UI target、宿主 app、accessibility identifiers 和测试代码均可编译链接。实际 xcodebuild test 在执行任何 UI assertion 前超时，错误为 `Timed out while enabling automation mode`。\n\n**含义：** 代码与常规测试可信度已恢复；UI 测试尚不能记为运行通过，但当前阻断证据指向 macOS automation 初始化，而不是测试断言或应用行为。"
+      },
+      {
+        "id": "validation_table_block",
+        "type": "table",
+        "tableId": "validation_summary",
+        "layout": "full"
+      },
+      {
+        "id": "documentation_findings",
+        "type": "markdown",
+        "sourceId": "audit_evidence",
+        "body": "## 文档已从冲突状态收敛为一条可检查的事实链\n\nDEVELOPMENT_STATUS 现由 `script/generate_project_status.mjs` 从 project.yml、Git refs、源码规模和维护策略生成，release preflight 会拒绝过期状态页。README 与 DEVELOPMENT 使用参数化 release 示例；UPSTREAM_SYNC 记录当前本地 refs；Cloudflare 文档和 Worker 默认配置使用当前界面字段、中性占位符，并明确公开仓库受支持。\n\n**含义：** 后续维护者和 AI 可以先读取自动状态页获得当前基线，再用本综合报告查看审计证据；版本事实仍由 CHANGELOG、project.yml、appcast 和 release preflight 共同约束。"
+      },
+      {
+        "id": "document_table_block",
+        "type": "table",
+        "tableId": "document_freshness",
+        "layout": "full"
+      },
+      {
+        "id": "architecture_findings",
+        "type": "markdown",
+        "sourceId": "audit_evidence",
+        "body": "## 侧边栏热点已缩小，剩余维护成本仍集中在少数文件\n\nApp/Core 为 21 个文件，业务规则主要分布在 55 个 Services、19 个 Models 和 28 个 Views；Web 管理端继续采用拆分后的 web-* 模块。`ModuleSidebarFilterBar.swift` 承接筛选、结果数、清除和排序 UI 后，ModuleSidebarView.swift 从 655 行降至 485 行，且未改变状态归属或交互逻辑。\n\n当前最大的应用文件变为 ModuleCodeTextView.swift（560 行），其后是 ModuleMetadataParser.swift（495 行）和 ModuleSidebarView.swift（485 行）。\n\n**含义：** 这次拆分已经降低一个真实热点的认知负荷；下一轮仍应按变更频率、缺陷集中度和测试难度选择目标，避免全局重写。"
+      },
+      {
+        "id": "swift_layer_chart_block",
+        "type": "chart",
+        "chartId": "swift_layer_distribution",
+        "layout": "full"
+      },
+      {
+        "id": "hotspots_table_block",
+        "type": "table",
+        "tableId": "largest_files",
+        "layout": "full"
+      },
+      {
+        "id": "security_findings",
+        "type": "markdown",
+        "sourceId": "audit_evidence",
+        "body": "## 安全边界清晰，兼容性优先策略暂无迁移时间表\n\n当前项目继续使用固定自签名证书和 Sparkle 2 EdDSA；没有 Apple Developer ID notarization。NSAllowsArbitraryLoads=true、App Sandbox 关闭，并启用 disable-library-validation entitlement。SECURITY.md、README 与 RELEASE_HARDENING.md 已明确这些是当前维护决策，不是遗漏。\n\n应用侧已有多层防护：Web 管理默认 loopback、写操作同源校验、Bearer token 和 HttpOnly cookie；Script-Hub revision 固定与 hash 校验；HTTP bridge 阻断本机/内网/保留地址并限制响应体；凭据使用本地 AES-256-GCM 加密。\n\n**含义：** Apple Developer ID、notarization、ATS 收紧和 App Sandbox 迁移当前均无时间表。未来只有在用户来源例外模型、security-scoped bookmarks、旧安装迁移与回归测试准备完成后，才应启动相关迁移。"
+      },
+      {
+        "id": "scope",
+        "type": "markdown",
+        "sourceId": "audit_evidence",
+        "body": "## 审计范围与定义\n\n- **当前状态**：以 2026-08-30 的本地 main HEAD 4b591fc56d7d 与本轮未提交优化工作区为基线，不把历史文档中的目标版本自动视为现状。\n- **通过**：命令退出码为 0，或 Xcode result bundle 明确记录通过。\n- **常规测试通过率**：273 / 273 = 100%；报告使用 `Surge Relay` scheme 实际发现并执行的测试作为分母。UI scheme 的 build-for-testing 与实际 automation 运行单独记录。\n- **状态页新鲜度**：生成器 `--check` 输出与 DEVELOPMENT_STATUS.md 完全一致。\n- **代码热点**：按文件行数识别的维护导航信号，不等同于代码质量结论。\n- **上游差异**：基于仓库已有 upstream/main 引用，没有在本次审计中执行 fetch。"
+      },
+      {
+        "id": "methodology",
+        "type": "markdown",
+        "sourceId": "audit_evidence",
+        "body": "## 审计与优化方法\n\n1. 盘点仓库结构、Git 基线、版本标签、远端引用和全部现有 Markdown 报告/指南。\n2. 对照 README、原 DEVELOPMENT_STATUS、CHANGELOG、SECURITY、RELEASE_HARDENING、UPSTREAM_SYNC 和 Cloudflare 文档，识别可验证冲突。\n3. 从 project.yml、project.pbxproj、Info.plist、entitlements 和 appcast 核验版本、依赖、平台与发布配置。\n4. 用 xcresult、系统 DNS 与 Surge 状态定位 4 个网络 mock 失败，再以不经过 DNS 的测试地址修复夹具并重跑完整测试。\n5. 将 DEVELOPMENT_STATUS 改为可复现生成物，并把新鲜度检查接入 release preflight；同步其余维护文档。\n6. 新增独立 UI test target/scheme 与关键 accessibility identifiers，分别验证 build-for-testing 和实际 runner 启动。\n7. 按现有 SwiftUI 状态边界抽取侧边栏筛选组件，并重新统计文件数量、代码规模和热点。\n8. 只在当前证据一致时更新结论；正式 release 资产、可运行 UI automation 会话和远端 upstream fetch 继续作为限制。"
+      },
+      {
+        "id": "limitations",
+        "type": "markdown",
+        "sourceId": "audit_evidence",
+        "body": "## 限制、未知项与稳健性检查\n\n- **UI tests 尚未实际进入断言阶段。** `Surge Relay UI Tests` scheme 的 build-for-testing 成功，但本机 xcodebuild test 在启用 automation mode 时超时；因此不能把新增 UI flows 记为运行通过。\n- **未做完整人工 UI/VoiceOver 回归。** 新增 identifiers 和测试源码证明可定位设计，但不等同于窄窗口、辅助功能和真实模块数据的人工验证。\n- **未验证正式发布资产。** 本次没有导入自签名证书或 Sparkle 私钥，也没有构建 pkg/app.zip 或检查 GitHub Release 线上资产。\n- **DNS 修复已做前后对照。** 修复前 4 个失败均由 public.example 的 Fake-IP 触发；修复后同一完整 scheme 的 xcresult 为 273 通过、0 失败。\n- **上游状态可能继续变化。** 当前 behind 51 / ahead 256 仅代表本地 remote-tracking refs。\n- **代码规模是快照。** 行数和文件数用于维护规划，不用于推断缺陷密度或性能。\n- **报告渲染 QA 以 portable builder 回执为准。** 若环境仍无兼容 Chromium，交付保留 semantic fallback，并明确 structural-only 限制。"
+      },
+      {
+        "id": "recommendations",
+        "type": "markdown",
+        "sourceId": "audit_evidence",
+        "body": "## 下一步从修复转为持续验证与受控演进\n\n当前 P0 的测试确定性和状态文档可信度问题已经完成。接下来应在允许 UI automation 的 macOS 桌面会话中执行独立 UI scheme，确认设置、编辑器、详情页和 Web DOM 搜索 flows 的运行结果，并把系统权限前提写入日常验证环境。\n\n代码维护继续按热点与真实变更频率推进：ModuleCodeTextView 和 ModuleMetadataParser 比已缩小的 ModuleSidebarView 更值得观察，但只有在能保持现有状态边界与测试覆盖时才拆分。\n\n分发 hardening 继续采用兼容性优先策略；没有用户来源例外、security-scoped bookmarks、旧安装迁移和回归方案前，不启用 Sandbox，也不收紧 ATS。"
+      },
+      {
+        "id": "priority_table_block",
+        "type": "table",
+        "tableId": "priority_actions",
+        "layout": "full"
+      },
+      {
+        "id": "questions",
+        "type": "markdown",
+        "body": "## 仍需回答的问题\n\n- 哪个本地或 CI macOS 会话能够稳定启用 Xcode UI automation，并作为独立 UI scheme 的正式运行环境？\n- 1.4.0 的原生 UI 是否还需要补充 VoiceOver、窄窗口和真实大规模模块数据的人工验收记录？\n- 何时需要实际构建并核验自签名 pkg/app.zip、Sparkle 签名和 GitHub Release 线上资产？\n- 下一次选择性 upstream 审查是否需要先 fetch，以刷新当前 behind 51 / ahead 256 的本地引用快照？"
+      }
+    ]
+  },
+  "snapshot": {
+    "version": 1,
+    "generatedAt": "2026-08-30T20:54:01+08:00",
+    "status": "ready",
+    "datasets": {
+      "project_metrics": [
+        {
+          "app_swift_files": 126,
+          "swift_test_files": 39,
+          "xctest_total": 273,
+          "xctest_passed": 273,
+          "xctest_failed": 0,
+          "xctest_pass_rate": 1,
+          "services": 55,
+          "models": 19,
+          "views": 28,
+          "app_model_files": 21,
+          "swift_loc": 28095,
+          "web_resource_loc": 3785,
+          "web_js_files": 13,
+          "changelog_releases": 95,
+          "git_commits": 263,
+          "ahead_upstream": 256,
+          "behind_upstream": 51
+        }
+      ],
+      "swift_files_by_layer": [
+        {
+          "layer": "Services",
+          "files": 55,
+          "share": 0.4365079365,
+          "rank": 1
+        },
+        {
+          "layer": "Views",
+          "files": 28,
+          "share": 0.2222222222,
+          "rank": 2
+        },
+        {
+          "layer": "App/Core",
+          "files": 21,
+          "share": 0.1666666667,
+          "rank": 3
+        },
+        {
+          "layer": "Models",
+          "files": 19,
+          "share": 0.1507936508,
+          "rank": 4
+        },
+        {
+          "layer": "Utilities",
+          "files": 3,
+          "share": 0.0238095238,
+          "rank": 5
+        }
+      ],
+      "validation_summary": [
+        {
+          "order": 1,
+          "check": "Web behavior tests",
+          "result": "通过",
+          "detail": "web-detail behavior 与 Web resource behavior 均通过。"
+        },
+        {
+          "order": 2,
+          "check": "Web DOM tests",
+          "result": "通过",
+          "detail": "依赖真实 index.html 结构的 DOM 回归通过。"
+        },
+        {
+          "order": 3,
+          "check": "Release preflight",
+          "result": "通过",
+          "detail": "1.4.0 (95) 的版本、Sparkle、entitlements、appcast、脚本、workflow 与工程文件登记一致。"
+        },
+        {
+          "order": 4,
+          "check": "Debug build",
+          "result": "通过",
+          "detail": "外置 Xcode 27 beta、macOS arm64 destination 构建成功。"
+        },
+        {
+          "order": 5,
+          "check": "Xcode 常规测试",
+          "result": "273 通过 / 0 失败",
+          "detail": "完整 Surge Relay scheme 的 xcresult 为 Passed；Fake-IP/DNS 耦合用例已修复。"
+        },
+        {
+          "order": 6,
+          "check": "UI scheme build-for-testing",
+          "result": "通过",
+          "detail": "独立 UI target/scheme、宿主 app、accessibility identifiers 和 UI 测试代码编译链接成功。"
+        },
+        {
+          "order": 7,
+          "check": "UI tests 实际运行",
+          "result": "受系统阻断",
+          "detail": "测试代码执行前超时：Timed out while enabling automation mode。"
+        }
+      ],
+      "document_freshness": [
+        {
+          "priority": 1,
+          "document": "DEVELOPMENT_STATUS.md",
+          "state": "自动生成、当前有效",
+          "finding": "由 project.yml、Git refs、代码规模和维护策略生成，当前为 1.4.0 (95)。",
+          "action": "继续在 release preflight 中执行 --check。"
+        },
+        {
+          "priority": 2,
+          "document": "README.md",
+          "state": "已同步",
+          "finding": "发布所选已统一为支持本地与 GitHub，release 示例改为 X.Y.Z / N。",
+          "action": "随发布模型变化持续复核。"
+        },
+        {
+          "priority": 3,
+          "document": "DEVELOPMENT.md",
+          "state": "当前有效",
+          "finding": "架构边界保留，preflight 示例已参数化，并记录 UI tests 独立 scheme。",
+          "action": "架构或验证入口变化时同步。"
+        },
+        {
+          "priority": 4,
+          "document": "docs/UPSTREAM_SYNC.md",
+          "state": "本地 refs 快照有效",
+          "finding": "记录 HEAD 4b591fc56d7d、upstream a3e667c0ca72、behind 51 / ahead 256。",
+          "action": "下次审查前 fetch 并刷新计数。"
+        },
+        {
+          "priority": 5,
+          "document": "docs/GitHub-Cloudflare-Guide.md",
+          "state": "已同步",
+          "finding": "使用当前发布/凭据字段，明确公开仓库和私有仓库均受支持。",
+          "action": "界面字段变化时同步截图文字说明。"
+        },
+        {
+          "priority": 6,
+          "document": "Deployment/CloudflareWorker",
+          "state": "中性示例",
+          "finding": "README 与 wrangler 默认 owner/repository 已改为占位符。",
+          "action": "保持示例不绑定特定 fork。"
+        },
+        {
+          "priority": 7,
+          "document": "SECURITY.md / RELEASE_HARDENING.md",
+          "state": "当前有效",
+          "finding": "兼容性优先策略与配置一致，且明确当前无迁移时间表。",
+          "action": "迁移前先补齐兼容设计与回归方案。"
+        },
+        {
+          "priority": 8,
+          "document": "CHANGELOG.md / appcast.xml / project.yml",
+          "state": "当前有效",
+          "finding": "共同确认 1.4.0 (95) 为当前 release。",
+          "action": "作为版本事实的首要来源。"
+        }
+      ],
+      "largest_files": [
+        {
+          "file": "SurgeRelay/Views/ModuleCodeTextView.swift",
+          "lines": 560,
+          "note": "TextKit 1 编辑器、行号、高亮与滚动行为集中。"
+        },
+        {
+          "file": "SurgeRelay/Utilities/ModuleMetadataParser.swift",
+          "lines": 495,
+          "note": "核心元数据解析与兼容规则密集。"
+        },
+        {
+          "file": "SurgeRelay/Views/ModuleSidebarView.swift",
+          "lines": 485,
+          "note": "筛选条已抽取到独立文件；主视图仍负责选择、分组和列表状态。"
+        },
+        {
+          "file": "SurgeRelay/Views/ModulePreviewViews.swift",
+          "lines": 417,
+          "note": "预览与编辑状态组合仍较大。"
+        },
+        {
+          "file": "SurgeRelay/Services/ModuleFileStore.swift",
+          "lines": 374,
+          "note": "文件写入、覆盖与清理安全边界集中。"
+        },
+        {
+          "file": "SurgeRelay/Services/EmbeddedScriptHubEngine.swift",
+          "lines": 365,
+          "note": "JavaScriptCore 引擎和网络桥接复杂度较高。"
+        },
+        {
+          "file": "SurgeRelay/Views/ModuleDetailView.swift",
+          "lines": 360,
+          "note": "详情组合已拆分但主视图仍偏大。"
+        },
+        {
+          "file": "SurgeRelay/Models/RelayModule.swift",
+          "lines": 356,
+          "note": "模块身份、来源与存放关系的核心模型。"
+        },
+        {
+          "file": "SurgeRelay/Services/PersistenceStore.swift",
+          "lines": 336,
+          "note": "持久化与迁移责任集中。"
+        },
+        {
+          "file": "SurgeRelay/Views/LocalModuleImportPreviewView.swift",
+          "lines": 333,
+          "note": "本地导入预览和编辑交互较密集。"
+        }
+      ],
+      "priority_actions": [
+        {
+          "rank": 1,
+          "priority": "P0",
+          "action": "保持网络 mock 测试不依赖系统 DNS、Fake-IP、VPN 或企业网络。",
+          "reason": "本轮已修复并恢复 273 / 273；后续夹具变更需维持确定性。"
+        },
+        {
+          "rank": 2,
+          "priority": "P0",
+          "action": "保持自动状态页与当前代码、Git refs 和维护策略同步。",
+          "reason": "生成器与 release preflight 已建立单一当前状态入口。"
+        },
+        {
+          "rank": 3,
+          "priority": "P1",
+          "action": "在可启用 automation mode 的 macOS 会话运行独立 UI scheme。",
+          "reason": "build-for-testing 已通过，但当前机器在测试代码启动前被系统 runner 阻断。"
+        },
+        {
+          "rank": 4,
+          "priority": "P1",
+          "action": "保持 README、DEVELOPMENT、UPSTREAM_SYNC 和 Cloudflare 指南同步。",
+          "reason": "本轮冲突已消除，后续发布模型或界面字段变化仍可能再次漂移。"
+        },
+        {
+          "rank": 5,
+          "priority": "P1",
+          "action": "按变更频率继续缩小 ModuleCodeTextView、ModuleMetadataParser 等热点。",
+          "reason": "ModuleSidebarView 已从 655 行降至 485 行，剩余热点应继续采用小范围拆分。"
+        },
+        {
+          "rank": 6,
+          "priority": "P2",
+          "action": "在正式发布时核验自签名产物、Sparkle 签名和线上 release assets。",
+          "reason": "本轮只验证配置与构建测试，未执行完整 release asset 流程。"
+        },
+        {
+          "rank": 7,
+          "priority": "P2",
+          "action": "维持兼容性优先的 release hardening 决策。",
+          "reason": "当前无迁移时间表；兼容模型、bookmarks、迁移和回归方案未完成前不推进。"
+        }
+      ]
+    },
+    "accessIssues": []
+  },
+  "sources": [
+    {
+      "id": "audit_evidence",
+      "label": "项目现状审计来源说明",
+      "path": "docs/project-status-report/source-notes.md",
+      "query": {
+        "engine": "duckdb",
+        "language": "sql",
+        "description": "加载 canonical artifact 中已由 source notes 所列 shell 命令复核的项目审计 snapshot。",
+        "sql": "SELECT surface, manifest, snapshot, sources FROM read_json_auto('docs/project-status-report/artifact.json');",
+        "executed_at": "2026-08-30T20:54:01+08:00",
+        "tables_used": [
+          "git checkout",
+          "project.yml",
+          "Surge Relay.xcodeproj/project.pbxproj",
+          "appcast.xml",
+          "SurgeRelay",
+          "SurgeRelayTests",
+          "SurgeRelayUITests",
+          "Xcode xcresult",
+          "Surge DNS state",
+          "macOS UI automation runner state"
+        ],
+        "filters": [
+          "Repository HEAD 4b591fc56d7d2989767912a38c337f257bb24a31",
+          "Application Swift files exclude SurgeRelayTests",
+          "Regular test totals use Xcode discovered and executed tests from the Surge Relay scheme",
+          "UI build-for-testing and UI automation execution are reported separately",
+          "Upstream counts use existing local remote-tracking refs without fetch"
+        ],
+        "metric_definitions": {
+          "app_swift_files": "Count of .swift files under SurgeRelay.",
+          "xctest_pass_rate": "Passed Xcode tests divided by total executed regular-scheme Xcode tests: 273 / 273.",
+          "swift_loc": "Line count across .swift files under SurgeRelay, SurgeRelayTests, and SurgeRelayUITests.",
+          "web_resource_loc": "Line count across WebResources JavaScript and script/web-resource-tests modules."
+        }
+      }
+    },
+    {
+      "id": "readme",
+      "label": "README",
+      "path": "README.md"
+    },
+    {
+      "id": "development",
+      "label": "Development guide",
+      "path": "DEVELOPMENT.md"
+    },
+    {
+      "id": "development_status",
+      "label": "Development status",
+      "path": "DEVELOPMENT_STATUS.md"
+    },
+    {
+      "id": "changelog",
+      "label": "Changelog",
+      "path": "CHANGELOG.md"
+    },
+    {
+      "id": "security",
+      "label": "Security notes",
+      "path": "SECURITY.md"
+    },
+    {
+      "id": "release_hardening",
+      "label": "Release hardening",
+      "path": "docs/RELEASE_HARDENING.md"
+    },
+    {
+      "id": "upstream_sync",
+      "label": "Upstream sync notes",
+      "path": "docs/UPSTREAM_SYNC.md"
+    },
+    {
+      "id": "cloudflare_guide",
+      "label": "GitHub and Cloudflare guide",
+      "path": "docs/GitHub-Cloudflare-Guide.md"
+    },
+    {
+      "id": "project_config",
+      "label": "Project configuration",
+      "path": "project.yml"
+    }
+  ]
+}
