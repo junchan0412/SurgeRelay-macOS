@@ -23,7 +23,7 @@
 - [x] Release configuration 构建成功。
 - [x] `.app.zip` 与 `.pkg` 中的 App 使用固定自签名证书签名并通过 bundle 校验。
 - [x] `.app.zip` 与 `.pkg` 生成 SHA-256 和 Sparkle EdDSA metadata。
-- [ ] Git tag、GitHub Release、线上 assets 与 appcast 完成核验。
+- [x] Git tag、[GitHub Release v1.4.1](https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.4.1)、线上 assets 与 appcast 完成核验。
 
 ## 已知限制
 
