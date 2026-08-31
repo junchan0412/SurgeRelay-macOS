@@ -3,6 +3,21 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.4.2</title>
+            <pubDate>Tue, 01 Sep 2026 00:30:09 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.4.2</link>
+            <sparkle:version>97</sparkle:version>
+            <sparkle:shortVersionString>1.4.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.4.2
+
+
+- 易读性：为 macOS 详情/预览分段控件、错误提示关闭按钮，以及 Web 管理端的返回和弹窗关闭图标补充悬浮文本；保留现有无障碍标签与交互行为。
+- 验证：使用 Xcode 27.0 完成常规测试与独立 UI test target 的 `build-for-testing`；Web DOM 和行为测试通过。当前桌面会话仍在 UI assertions 建立连接前终止 runner。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.4.2/Surge-Relay-1.4.2.app.zip" length="9155419" type="application/zip" sparkle:edSignature="k2yTxQU3JUmMXDWad3qiyO7CgIPVnNzAwNWsiICZA18P93H3eaw6oKFTmwv7qgWt9ONCsO6h5qO9qYUN3bx/CQ=="/>
+        </item>
+        <item>
             <title>1.4.1</title>
             <pubDate>Mon, 31 Aug 2026 23:18:36 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.4.1</link>

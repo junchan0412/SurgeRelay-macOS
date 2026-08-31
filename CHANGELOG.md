@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.4.2
+
+- 易读性：为 macOS 详情/预览分段控件、错误提示关闭按钮，以及 Web 管理端的返回和弹窗关闭图标补充悬浮文本；保留现有无障碍标签与交互行为。
+- 验证：使用 Xcode 27.0 完成常规测试与独立 UI test target 的 `build-for-testing`；Web DOM 和行为测试通过。当前桌面会话仍在 UI assertions 建立连接前终止 runner。
+
 ## 1.4.1
 
 - 稳定性：网络 mock 测试改用不经过系统 DNS 的确定性地址，避免 Surge Enhanced Mode、Fake-IP、VPN 或企业网络在 URLProtocol mock 前触发 SSRF 保留地址阻断；完整常规 Xcode 测试恢复为 273 / 273 通过。

@@ -274,6 +274,7 @@ private struct ModuleSidebarStatusCard: View {
                             .foregroundStyle(.tertiary)
                     }
                     .buttonStyle(.plain)
+                    .help("关闭错误提示")
                     .accessibilityLabel("关闭错误提示")
                 }
                 .transition(.move(edge: .bottom).combined(with: .opacity))

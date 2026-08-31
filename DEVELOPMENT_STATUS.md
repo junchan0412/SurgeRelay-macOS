@@ -6,7 +6,7 @@
 
 | 项目 | 当前值 |
 | --- | --- |
-| 版本 | 1.4.1 (96) |
+| 版本 | 1.4.2 (97) |
 | macOS deployment target | 26.0 |
 | Swift | 6.0，strict concurrency complete |
 
@@ -35,9 +35,9 @@
 | Swift 测试文件（unit / UI） | 38 / 1 |
 | 源码中的 XCTest 方法 | 276 |
 | Services / Models / Views / Utilities / App-Core | 55 / 19 / 28 / 3 / 21 |
-| 应用 Swift 行数 | 20,411 |
+| 应用 Swift 行数 | 20,414 |
 | 测试 Swift 行数 | 7,684 |
-| CHANGELOG release 段落 | 96 |
+| CHANGELOG release 段落 | 97 |
 
 ## 主要维护热点
 
@@ -47,7 +47,7 @@
 | --- | --- |
 | SurgeRelay/Views/ModuleCodeTextView.swift | 560 |
 | SurgeRelay/Utilities/ModuleMetadataParser.swift | 496 |
-| SurgeRelay/Views/ModuleSidebarView.swift | 485 |
+| SurgeRelay/Views/ModuleSidebarView.swift | 486 |
 | SurgeRelay/Views/ModulePreviewViews.swift | 417 |
 | SurgeRelay/Services/ModuleFileStore.swift | 374 |
 | SurgeRelay/Services/EmbeddedScriptHubEngine.swift | 365 |
@@ -74,7 +74,7 @@ git diff --check
 node script/generate_project_status.mjs --check
 node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs
-VERSION=1.4.1 BUILD=96 ./script/check_release_configuration.sh
+VERSION=1.4.2 BUILD=97 ./script/check_release_configuration.sh
 
 DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
 xcodebuild test \

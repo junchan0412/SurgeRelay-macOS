@@ -71,9 +71,11 @@ struct ModuleDetailPaneView: View {
                     Picker("视图", selection: selectedTabBinding) {
                         Image(systemName: "info.circle")
                             .accessibilityLabel("详情")
+                            .help("查看模块详情")
                             .tag(DetailTab.info)
                         Image(systemName: "curlybraces")
                             .accessibilityLabel("预览")
+                            .help("预览模块内容")
                             .tag(DetailTab.preview)
                     }
                     .pickerStyle(.segmented)
