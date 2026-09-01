@@ -71,6 +71,7 @@ struct ModuleSidebarFilterBar: View {
             }
         }
         .buttonStyle(.plain)
+        .help("筛选：\(filter.title)（\(counts[filter, default: 0]) 个模块）")
         .accessibilityAddTraits(selection == filter ? .isSelected : [])
     }
 

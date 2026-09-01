@@ -3,6 +3,22 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.4.3</title>
+            <pubDate>Tue, 01 Sep 2026 12:13:06 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.4.3</link>
+            <sparkle:version>98</sparkle:version>
+            <sparkle:shortVersionString>1.4.3</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.4.3
+
+
+- 易读性：为侧边栏“全部 / 可更新 / 不可更新 / 需要处理”四个单图标快捷筛选按钮补充动态悬浮文本，同时显示筛选名称和当前模块数量。
+- 一致性：确认普通工具栏与多选工具栏中的添加、更新、发布、扫描、全选、清空等图标按钮均保留对应悬浮说明，包括 disabled 状态。
+- 验证：273 / 273 unit tests、Release universal build、固定证书与 Sparkle 签名、zip/pkg 启动冒烟、release preflight、运行态 accessibility tree 与差异检查均通过。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.4.3/Surge-Relay-1.4.3.app.zip" length="9156430" type="application/zip" sparkle:edSignature="sr6SQ328A8xbEa5HRHotXoiZR5Mn4uac+1kqL8rXpm+CG80j32bUz2h34y/7xU9x8zn0BHxt8cSv56kT9nceAw=="/>
+        </item>
+        <item>
             <title>1.4.2</title>
             <pubDate>Tue, 01 Sep 2026 00:30:09 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.4.2</link>
