@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.4
+
+- 修复：Script-Hub HTTP bridge 在 request object 缺少 `body` 时不再把 JavaScript 的 `undefined` 转成请求体，避免 macOS 27 对 GitHub Raw GET 请求返回 `NSURLErrorDomain -1103`。
+- 兼容性：允许 Surge Enhanced Mode 域名解析产生的 `198.18.0.0/15` Fake-IP 继续进入转换请求；字面保留地址、loopback、LAN 和 link-local 地址仍被拒绝。
+- 错误提示：内嵌 parser 的原始内容现在会在追加模块元数据前校验，转换失败时错误摘要不再被前缀遮挡。
+- 验证：真实 Notability 脚本转换成功；277 / 277 unit tests、Debug build/launch、签名发布资产与启动冒烟测试通过。
+
 ## 1.4.3
 
 - 易读性：为侧边栏“全部 / 可更新 / 不可更新 / 需要处理”四个单图标快捷筛选按钮补充动态悬浮文本，同时显示筛选名称和当前模块数量。

@@ -85,6 +85,7 @@ actor ScriptHubClient {
             scriptConverterScript: converter,
             requestURL: url
         )
+        try validate(content)
         let materialized = try await materializeConvertedScripts(
             in: content,
             module: module,

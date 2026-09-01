@@ -180,7 +180,7 @@ actor EmbeddedScriptHubEngine {
         return output
     }
 
-    private static func makeRequest(method: String, value: JSValue) throws -> URLRequest {
+    static func makeRequest(method: String, value: JSValue) throws -> URLRequest {
         let urlString: String
         if value.isString {
             urlString = value.toString()
@@ -194,7 +194,9 @@ actor EmbeddedScriptHubEngine {
             if let headers = value.forProperty("headers")?.toDictionary() as? [String: Any] {
                 for (key, value) in headers { request.setValue(String(describing: value), forHTTPHeaderField: key) }
             }
-            if let body = value.forProperty("body")?.toString(), !body.isEmpty {
+            let bodyValue = value.forProperty("body")
+            if let bodyValue, !bodyValue.isUndefined, !bodyValue.isNull,
+               let body = bodyValue.toString(), !body.isEmpty {
                 request.httpBody = Data(body.utf8)
             }
         }
@@ -300,7 +302,7 @@ actor EmbeddedScriptHubEngine {
         while let info = cursor?.pointee {
             if info.ai_family == AF_INET,
                let address = info.ai_addr?.withMemoryRebound(to: sockaddr_in.self, capacity: 1, { $0.pointee.sin_addr }) {
-                if isPrivateIPv4(UInt32(bigEndian: address.s_addr)) { return true }
+                if isBlockedResolvedIPv4(UInt32(bigEndian: address.s_addr)) { return true }
             } else if info.ai_family == AF_INET6,
                       let address = info.ai_addr?.withMemoryRebound(to: sockaddr_in6.self, capacity: 1, { $0.pointee.sin6_addr }) {
                 let bytes = withUnsafeBytes(of: address) { Array($0.prefix(16)) }
@@ -309,6 +311,15 @@ actor EmbeddedScriptHubEngine {
             cursor = info.ai_next
         }
         return false
+    }
+
+    static func isBlockedResolvedIPv4(_ value: UInt32) -> Bool {
+        let first = Int((value >> 24) & 0xff)
+        let second = Int((value >> 16) & 0xff)
+        if first == 198 && (18...19).contains(second) {
+            return false
+        }
+        return isPrivateIPv4(value)
     }
 
     private static func isPrivateIPv4(_ value: UInt32) -> Bool {

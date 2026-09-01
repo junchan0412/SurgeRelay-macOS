@@ -1,4 +1,5 @@
 import Foundation
+import JavaScriptCore
 import XCTest
 @testable import SurgeRelay
 
@@ -236,6 +237,47 @@ final class ScriptHubTests: XCTestCase {
         XCTAssertFalse(output.contains("allowed"))
     }
 
+    func testEmbeddedScriptHubEngineKeepsLiteralBenchmarkAddressBlocked() async throws {
+        let script = """
+        $httpClient.get("http://198.18.1.49/private", function(error, response, body) {
+          $done({body: String(error || "allowed")});
+        });
+        """
+
+        let output = try await EmbeddedScriptHubEngine().convert(
+            script: script,
+            requestURL: try XCTUnwrap(URL(string: "https://example.com/demo.conf"))
+        )
+
+        XCTAssertTrue(output.contains("198.18.1.49"))
+        XCTAssertFalse(output.contains("allowed"))
+    }
+
+    func testEmbeddedScriptHubEngineAllowsSurgeFakeIPForResolvedHostname() {
+        XCTAssertFalse(EmbeddedScriptHubEngine.isBlockedResolvedIPv4(ipv4(198, 18, 1, 49)))
+        XCTAssertFalse(EmbeddedScriptHubEngine.isBlockedResolvedIPv4(ipv4(198, 19, 255, 254)))
+        XCTAssertTrue(EmbeddedScriptHubEngine.isBlockedResolvedIPv4(ipv4(192, 168, 1, 1)))
+        XCTAssertTrue(EmbeddedScriptHubEngine.isBlockedResolvedIPv4(ipv4(127, 0, 0, 1)))
+    }
+
+    func testEmbeddedScriptHubEngineDoesNotAttachUndefinedBodyToGETRequest() throws {
+        let context = try XCTUnwrap(JSContext())
+        let value = try XCTUnwrap(context.evaluateScript("({url: 'https://example.com/source.js'})"))
+
+        let request = try EmbeddedScriptHubEngine.makeRequest(method: "GET", value: value)
+
+        XCTAssertNil(request.httpBody)
+    }
+
+    func testEmbeddedScriptHubEnginePreservesExplicitRequestBody() throws {
+        let context = try XCTUnwrap(JSContext())
+        let value = try XCTUnwrap(context.evaluateScript("({url: 'https://example.com/api', body: 'payload'})"))
+
+        let request = try EmbeddedScriptHubEngine.makeRequest(method: "POST", value: value)
+
+        XCTAssertEqual(request.httpBody, Data("payload".utf8))
+    }
+
     func testScriptHubClientConvertsLocalSurgeModule() async throws {
         let root = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
@@ -317,6 +359,10 @@ final class ScriptHubTests: XCTestCase {
         XCTAssertTrue(result.content.contains("#!name=Managed"))
         XCTAssertTrue(result.content.contains("#!category=Imported"))
         XCTAssertTrue(result.content.contains("#!icon=https://example.com/source-icon.png"))
+    }
+
+    private func ipv4(_ first: UInt32, _ second: UInt32, _ third: UInt32, _ fourth: UInt32) -> UInt32 {
+        (first << 24) | (second << 16) | (third << 8) | fourth
     }
 
     func testModuleArgumentsAreMaterializedAndArgumentMetadataIsRemoved() {

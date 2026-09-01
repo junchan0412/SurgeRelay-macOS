@@ -3,6 +3,23 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.4.4</title>
+            <pubDate>Tue, 01 Sep 2026 19:16:21 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.4.4</link>
+            <sparkle:version>99</sparkle:version>
+            <sparkle:shortVersionString>1.4.4</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.4.4
+
+
+- 修复：Script-Hub HTTP bridge 在 request object 缺少 `body` 时不再把 JavaScript 的 `undefined` 转成请求体，避免 macOS 27 对 GitHub Raw GET 请求返回 `NSURLErrorDomain -1103`。
+- 兼容性：允许 Surge Enhanced Mode 域名解析产生的 `198.18.0.0/15` Fake-IP 继续进入转换请求；字面保留地址、loopback、LAN 和 link-local 地址仍被拒绝。
+- 错误提示：内嵌 parser 的原始内容现在会在追加模块元数据前校验，转换失败时错误摘要不再被前缀遮挡。
+- 验证：真实 Notability 脚本转换成功；277 / 277 unit tests、Debug build/launch、签名发布资产与启动冒烟测试通过。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.4.4/Surge-Relay-1.4.4.app.zip" length="9156762" type="application/zip" sparkle:edSignature="O/tPG2JkW0vO2bcteggAVpSErBG32nIXJyPBNPHuuKfj2N2BEZmh/yVfwwZhmmKOkqyMfazvuNLi8TirBRd0Dg=="/>
+        </item>
+        <item>
             <title>1.4.3</title>
             <pubDate>Tue, 01 Sep 2026 12:13:06 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.4.3</link>
