@@ -296,6 +296,10 @@ extension AppModel {
         try PersistenceStore.saveModules(modules)
     }
 
+    func persistModulesIfNeededIgnoringErrors(force: Bool = false) {
+        try? persistModulesIfNeeded(force: force)
+    }
+
     private func scheduleAutomaticUpdate() {
         guard !AppRuntimeOptions.isUIQAMode else { return }
         automaticUpdateTask?.cancel()

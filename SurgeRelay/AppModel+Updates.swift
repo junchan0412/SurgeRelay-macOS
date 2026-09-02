@@ -342,7 +342,7 @@ extension AppModel {
             updated.lastError = nil
             updated.state = .current
             replace(updated)
-            try? persistModulesIfNeeded(force: true)
+            persistModulesIfNeededIgnoringErrors(force: true)
             switch resolution {
             case .localWins: statusMessage = "已用本地版本覆盖 GitHub"
             case .githubWins: statusMessage = "已用 GitHub 版本覆盖本地"
