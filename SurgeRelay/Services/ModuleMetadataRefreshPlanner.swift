@@ -119,6 +119,7 @@ enum ModuleMetadataRefreshPlanner {
         )
 
         let contentChanged = module.contentHash != nextContentHash
+        module.syncConflict = nil
         module.contentHash = nextContentHash
         module.lastUpdatedAt = updatedAt
         module.state = .current

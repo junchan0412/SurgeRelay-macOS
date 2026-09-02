@@ -35,7 +35,7 @@
 | Swift 测试文件（unit / UI） | 39 / 1 |
 | 源码中的 XCTest 方法 | 284 |
 | Services / Models / Views / Utilities / App-Core | 56 / 19 / 28 / 3 / 21 |
-| 应用 Swift 行数 | 20,815 |
+| 应用 Swift 行数 | 20,816 |
 | 测试 Swift 行数 | 7,798 |
 | CHANGELOG release 段落 | 101 |
 
