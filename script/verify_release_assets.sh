@@ -240,7 +240,14 @@ verify_dynamic_library_linkage() {
   local dependency
 
   [[ -x "$binary" ]] || fail "missing executable: $binary"
-  dependencies="$(otool -L "$binary" | awk '/^[[:space:]]/ { print $1 }')"
+  dependencies="$(otool -L "$binary" | awk '
+    /^[[:space:]]/ {
+      line = $0
+      sub(/^[[:space:]]+/, "", line)
+      sub(/[[:space:]]+\(compatibility version.*$/, "", line)
+      print line
+    }
+  ')"
   if [[ "$dependencies" == *"@rpath/"* ]]; then
     rpaths="$(binary_rpaths "$binary" | tr '\n' ' ')"
     assert_contains "$binary rpaths" "@executable_path/../Frameworks" "$rpaths"
