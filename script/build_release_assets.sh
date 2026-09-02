@@ -276,6 +276,10 @@ if [[ -d "$SPARKLE/Versions/B" ]]; then
     [[ -e "$item" ]] && codesign "${codesign_nested_args[@]}" "$item"
   done
 fi
+PREVIEW_DYLIB="$APP_PATH/Contents/MacOS/__preview.dylib"
+if [[ -e "$PREVIEW_DYLIB" ]]; then
+  codesign "${codesign_nested_args[@]}" "$PREVIEW_DYLIB"
+fi
 codesign "${codesign_app_args[@]}" "$APP_PATH"
 codesign --verify --deep --strict --verbose=2 "$APP_PATH"
 
