@@ -240,6 +240,7 @@ xcodebuild \
   CODE_SIGNING_REQUIRED=NO \
   CODE_SIGN_IDENTITY="" \
   SWIFT_COMPILATION_MODE=singlefile \
+  SWIFT_OPTIMIZATION_LEVEL=-Onone \
   build
 
 APP_PATH="$(find "$DERIVED_DATA/Build/Products/Release" -maxdepth 1 -name "Surge Relay.app" -type d -print -quit)"
