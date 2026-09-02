@@ -169,7 +169,7 @@ struct ModuleDetailView: View {
 
     @ViewBuilder
     private var publishingSection: some View {
-        if model.settings.publishToGitHub, module.storageLocation == .gitHub {
+        if model.settings.publishToGitHub, module.hasGitHubStorageTarget {
             detailSection(model.settings.github.repositoryIsPrivate == true ? "Cloudflare" : "GitHub") {
                 if !module.publishesStandalone {
                     Label("该模块未开启独立发布。", systemImage: "pause.circle")
@@ -183,7 +183,7 @@ struct ModuleDetailView: View {
             }
         }
         if model.settings.publishToLocal,
-           module.storageLocation == .local,
+           module.hasLocalStorageTarget,
            module.publishesStandalone {
             detailSection("本地文件") {
                 detailRow("文件位置", value: localPublishedPath, icon: "doc", monospaced: true, copyValue: localPublishedPath)
@@ -216,6 +216,27 @@ struct ModuleDetailView: View {
                     .foregroundStyle(.orange)
             }
         }
+
+        if let conflict = module.syncConflict {
+            detailSection("本地与 GitHub 内容冲突") {
+                VStack(alignment: .leading, spacing: 10) {
+                    Label("检测到本地发布文件与 GitHub 文件内容不同。请选择要保留的版本。", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    Text("本地最后更新：\(conflict.localUpdatedAtText)")
+                    Text("GitHub 最后更新：\(conflict.githubUpdatedAtText)")
+                    HStack {
+                        Button("本地覆盖 GitHub") {
+                            Task { await model.resolveModuleSyncConflict(moduleID: module.id, resolution: .localWins) }
+                        }
+                        Button("GitHub 覆盖本地") {
+                            Task { await model.resolveModuleSyncConflict(moduleID: module.id, resolution: .githubWins) }
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .font(.caption)
+            }
+        }
     }
 
     private var combinedOutputLocation: String {
@@ -240,7 +261,7 @@ struct ModuleDetailView: View {
     }
 
     private var localStoragePath: String? {
-        guard module.storageLocation == .local else { return nil }
+        guard module.hasLocalStorageTarget else { return nil }
         return module.localStorageRelativePath ?? module.publishedRelativePath
     }
 

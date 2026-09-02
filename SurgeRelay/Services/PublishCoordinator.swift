@@ -76,7 +76,10 @@ enum PublishCoordinator {
         destination: PublishDestination,
         combinedModuleEnabled: Bool
     ) -> Bool {
-        guard module.storageLocation.matches(destination) else { return false }
+        let hasTarget = destination == .local
+            ? module.hasLocalStorageTarget
+            : module.hasGitHubStorageTarget
+        guard hasTarget else { return false }
         if module.publishesStandalone { return true }
         return destination == .local
             && !ModuleRefreshPlanner.contributesToCombined(
@@ -138,7 +141,7 @@ enum LocalSourcePathResolver {
         // 才存在需要避免自覆盖的来源文件。远程来源本地模块的
         // localStorageRelativePath 只是发布输出路径，不是来源，不能当作来源。
         guard URL(string: module.sourceURL)?.isFileURL == true else { return nil }
-        if module.storageLocation == .local, let relativePath = module.localStorageRelativePath {
+        if module.hasLocalStorageTarget, let relativePath = module.localStorageRelativePath {
             return ModuleOutputFolder.normalized(relativePath)
         }
         return relativePath(forSourceURL: module.sourceURL, rootDirectoryPath: rootDirectoryPath)

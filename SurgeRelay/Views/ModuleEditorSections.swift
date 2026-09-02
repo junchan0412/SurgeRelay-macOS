@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ModuleEditorBasicInfoSection: View {
     @Binding var name: String
-    @Binding var storageLocation: ModuleStorageLocation
+    @Binding var storageTargets: Set<ModuleStorageLocation>
     @Binding var category: String
     @Binding var outputFolder: String
     let initialSource: ModuleInitialSource
@@ -20,8 +20,8 @@ struct ModuleEditorBasicInfoSection: View {
                 prompt: "例如：YouTube 去广告",
                 accessibilityIdentifier: "module-editor.name"
             )
-            ModuleEditorControlRow("模块存放", icon: storageLocation.systemImage) {
-                ModuleEditorStorageLocationPicker(storageLocation: $storageLocation)
+            ModuleEditorControlRow("模块存放", icon: "arrow.triangle.2.circlepath") {
+                ModuleEditorStorageTargetsPicker(storageTargets: $storageTargets)
             }
             ModuleEditorInfoRow(
                 relationshipIsWarning ? "发布目标未开启" : "关系",

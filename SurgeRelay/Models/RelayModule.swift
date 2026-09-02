@@ -8,7 +8,17 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     var outputFileName: String
     var category: String
     var outputFolder: String
-    var storageLocation: ModuleStorageLocation
+    /// A module may be materialized in more than one destination.
+    var storageTargets: Set<ModuleStorageLocation>
+    /// Compatibility accessor for older callers and persisted data.
+    /// When both targets are present this returns the preferred local target.
+    var storageLocation: ModuleStorageLocation {
+        get {
+            if storageTargets.count == 1 { return storageTargets.first! }
+            return storageTargets.contains(.local) ? .local : .gitHub
+        }
+        set { storageTargets = [newValue] }
+    }
     var localStorageRelativePath: String?
     var preservesOutputFileName: Bool
     var publishesStandalone: Bool
@@ -29,6 +39,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     var conversionEngineRevision: String?
     var overrideBaseHash: String?
     var hasOverrideConflict: Bool
+    var syncConflict: ModuleSyncConflictMetadata?
     var state: ModuleUpdateState
     var lastError: String?
 
@@ -48,6 +59,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         category: String = "",
         outputFolder: String = ModuleOutputFolder.root,
         storageLocation: ModuleStorageLocation? = nil,
+        storageTargets: Set<ModuleStorageLocation>? = nil,
         localStorageRelativePath: String? = nil,
         preservesOutputFileName: Bool? = nil,
         publishesStandalone: Bool = true,
@@ -68,6 +80,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         conversionEngineRevision: String? = nil,
         overrideBaseHash: String? = nil,
         hasOverrideConflict: Bool = false,
+        syncConflict: ModuleSyncConflictMetadata? = nil,
         state: ModuleUpdateState = .never,
         lastError: String? = nil
     ) {
@@ -87,7 +100,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         )
         self.category = category.trimmingCharacters(in: .whitespacesAndNewlines)
         self.outputFolder = ModuleOutputFolder.normalized(outputFolder)
-        self.storageLocation = inferredStorageLocation
+        self.storageTargets = storageTargets?.isEmpty == false ? storageTargets! : [inferredStorageLocation]
         self.localStorageRelativePath = normalizedLocalStorageRelativePath
         self.preservesOutputFileName = shouldPreserveOutputFileName
         self.publishesStandalone = publishesStandalone
@@ -108,16 +121,53 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         self.conversionEngineRevision = conversionEngineRevision
         self.overrideBaseHash = overrideBaseHash
         self.hasOverrideConflict = hasOverrideConflict
+        self.syncConflict = syncConflict
         self.state = state
         self.lastError = lastError
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, name, sourceURL, sourceFormat, outputFileName, category, outputFolder
-        case storageLocation, localStorageRelativePath, preservesOutputFileName
+        case storageLocation, storageTargets, localStorageRelativePath, preservesOutputFileName
         case publishesStandalone, isEnabled, scriptHubOptions, argumentOverrides, iconURL, customIconURL, scriptHubSubscription, detectedSourceFormat
         case createdAt, lastUpdatedAt, contentHash, sourceETag, sourceLastModified, sourceContentHash, sourceCheckedAt
-        case conversionEngineRevision, overrideBaseHash, hasOverrideConflict, state, lastError
+        case conversionEngineRevision, overrideBaseHash, hasOverrideConflict, syncConflict, state, lastError
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(sourceURL, forKey: .sourceURL)
+        try container.encode(sourceFormat, forKey: .sourceFormat)
+        try container.encode(outputFileName, forKey: .outputFileName)
+        try container.encode(category, forKey: .category)
+        try container.encode(outputFolder, forKey: .outputFolder)
+        try container.encode(storageLocation, forKey: .storageLocation)
+        try container.encode(storageTargets, forKey: .storageTargets)
+        try container.encodeIfPresent(localStorageRelativePath, forKey: .localStorageRelativePath)
+        try container.encode(preservesOutputFileName, forKey: .preservesOutputFileName)
+        try container.encode(publishesStandalone, forKey: .publishesStandalone)
+        try container.encode(isEnabled, forKey: .isEnabled)
+        try container.encode(scriptHubOptions, forKey: .scriptHubOptions)
+        try container.encode(argumentOverrides, forKey: .argumentOverrides)
+        try container.encodeIfPresent(iconURL, forKey: .iconURL)
+        try container.encodeIfPresent(customIconURL, forKey: .customIconURL)
+        try container.encodeIfPresent(scriptHubSubscription, forKey: .scriptHubSubscription)
+        try container.encodeIfPresent(detectedSourceFormat, forKey: .detectedSourceFormat)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encodeIfPresent(lastUpdatedAt, forKey: .lastUpdatedAt)
+        try container.encodeIfPresent(contentHash, forKey: .contentHash)
+        try container.encodeIfPresent(sourceETag, forKey: .sourceETag)
+        try container.encodeIfPresent(sourceLastModified, forKey: .sourceLastModified)
+        try container.encodeIfPresent(sourceContentHash, forKey: .sourceContentHash)
+        try container.encodeIfPresent(sourceCheckedAt, forKey: .sourceCheckedAt)
+        try container.encodeIfPresent(conversionEngineRevision, forKey: .conversionEngineRevision)
+        try container.encodeIfPresent(overrideBaseHash, forKey: .overrideBaseHash)
+        try container.encode(hasOverrideConflict, forKey: .hasOverrideConflict)
+        try container.encodeIfPresent(syncConflict, forKey: .syncConflict)
+        try container.encode(state, forKey: .state)
+        try container.encodeIfPresent(lastError, forKey: .lastError)
     }
 
     init(from decoder: Decoder) throws {
@@ -130,11 +180,14 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
             try container.decodeIfPresent(String.self, forKey: .localStorageRelativePath)
         )
         let decodedStorageLocation = try container.decodeIfPresent(ModuleStorageLocation.self, forKey: .storageLocation)
-        storageLocation = localStorageRelativePath != nil
+        let decodedStorageTargets = try container.decodeIfPresent(Set<ModuleStorageLocation>.self, forKey: .storageTargets)
+        storageTargets = decodedStorageTargets?.isEmpty == false
+            ? decodedStorageTargets!
+            : [localStorageRelativePath != nil
             ? .local
-            : decodedStorageLocation ?? (URL(string: sourceURL)?.isFileURL == true ? .local : .gitHub)
+            : decodedStorageLocation ?? (URL(string: sourceURL)?.isFileURL == true ? .local : .gitHub)]
         preservesOutputFileName = try container.decodeIfPresent(Bool.self, forKey: .preservesOutputFileName)
-            ?? (storageLocation == .local || URL(string: sourceURL)?.isFileURL == true)
+            ?? (storageTargets.contains(.local) || URL(string: sourceURL)?.isFileURL == true)
         let decodedOutputFileName = try container.decodeIfPresent(String.self, forKey: .outputFileName)
             ?? FilenameSanitizer.suggestedName(from: sourceURL)
         outputFileName = Self.normalizedOutputFileName(
@@ -166,6 +219,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         conversionEngineRevision = try container.decodeIfPresent(String.self, forKey: .conversionEngineRevision)
         overrideBaseHash = try container.decodeIfPresent(String.self, forKey: .overrideBaseHash)
         hasOverrideConflict = try container.decodeIfPresent(Bool.self, forKey: .hasOverrideConflict) ?? false
+        syncConflict = try container.decodeIfPresent(ModuleSyncConflictMetadata.self, forKey: .syncConflict)
         state = try container.decodeIfPresent(ModuleUpdateState.self, forKey: .state) ?? .never
         lastError = try container.decodeIfPresent(String.self, forKey: .lastError)
     }
@@ -191,18 +245,31 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         "\(displayStorageLocationTitle) · \(initialSource.title)"
     }
 
+    var hasLocalStorageTarget: Bool { storageTargets.contains(.local) }
+    var hasGitHubStorageTarget: Bool { storageTargets.contains(.gitHub) }
+
+    var storageTargetsTitle: String {
+        switch (hasLocalStorageTarget, hasGitHubStorageTarget) {
+        case (true, true): "本地 + GitHub"
+        case (true, false): "本地模块"
+        case (false, true): "GitHub 模块"
+        default: "未设置存放位置"
+        }
+    }
+
     var displayStorageLocationTitle: String {
-        storageLocation.title
+        storageTargetsTitle
     }
 
     var displayStorageLocationSystemImage: String {
-        storageLocation.systemImage
+        hasLocalStorageTarget && hasGitHubStorageTarget ? "arrow.triangle.2.circlepath" : storageLocation.systemImage
     }
 
     var standaloneStorageDetail: String {
         guard publishesStandalone else {
             return "未开启独立发布；转换结果保存在本地缓存"
         }
+        if hasLocalStorageTarget && hasGitHubStorageTarget { return "同时储存在本地模块根目录和 GitHub 模块目录" }
         return storageLocation.detail
     }
 
@@ -235,6 +302,8 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         return scheme == "http" || scheme == "https"
     }
 
+    var hasSyncConflict: Bool { syncConflict != nil }
+
     mutating func reconcileScriptHubSubscriptionMetadata(_ subscription: ScriptHubSubscriptionInfo) -> Bool {
         var changed = false
         let sourceWasFile = URL(string: sourceURL)?.isFileURL == true
@@ -249,7 +318,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
             if sourceURL != subscription.originalURL {
                 sourceURL = subscription.originalURL
                 if sourceWasFile {
-                    storageLocation = .local
+                    storageTargets.insert(.local)
                     preservesOutputFileName = true
                 }
                 sourceETag = nil

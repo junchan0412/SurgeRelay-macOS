@@ -60,6 +60,15 @@ struct GitHubRESTClient {
         return try JSONDecoder().decode(GitHubAPI.ExistingContent.self, from: data).sha
     }
 
+    func blob(sha: String, settings: GitHubSettings, token: String) async throws -> GitHubAPI.BlobContentResponse {
+        try await requestJSON(
+            path: "git/blobs/\(GitHubRepositoryPath.encodedPathComponent(sha))",
+            method: "GET",
+            settings: settings,
+            token: token
+        )
+    }
+
     private func requestJSON<Response: Decodable>(
         path: String,
         method: String,

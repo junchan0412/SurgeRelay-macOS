@@ -3,6 +3,30 @@ import XCTest
 @testable import SurgeRelay
 
 final class PublishPlannerTests: XCTestCase {
+    func testModuleCanTargetLocalAndGitHubSimultaneously() {
+        let module = RelayModule(
+            name: "双目标",
+            sourceURL: "https://example.com/module.conf",
+            outputFileName: "Dual",
+            storageTargets: [.local, .gitHub]
+        )
+        XCTAssertTrue(module.hasLocalStorageTarget)
+        XCTAssertTrue(module.hasGitHubStorageTarget)
+        let local = PublishCoordinator.plan(modules: [module], combinedModuleEnabled: false, destination: .local)
+        let github = PublishCoordinator.plan(modules: [module], combinedModuleEnabled: false, destination: .gitHub)
+        XCTAssertEqual(local.standaloneModules.map(\.id), [module.id])
+        XCTAssertEqual(github.standaloneModules.map(\.id), [module.id])
+    }
+
+    func testLegacyStorageLocationDecodesAsSingleTarget() throws {
+        let module = RelayModule(name: "旧模块", sourceURL: "https://example.com/a", outputFileName: "A", storageLocation: .local)
+        let data = try JSONEncoder().encode(module)
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object.removeValue(forKey: "storageTargets")
+        let legacyData = try JSONSerialization.data(withJSONObject: object)
+        let decoded = try JSONDecoder().decode(RelayModule.self, from: legacyData)
+        XCTAssertEqual(decoded.storageTargets, [.local])
+    }
     func testPublishCoordinatorRequiresAtLeastOnePublishableModule() {
         let gitHubStandalone = RelayModule(
             id: UUID(),

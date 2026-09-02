@@ -124,7 +124,7 @@ enum ModuleNamingPlanner {
         return modules.map { value in
             var module = value
             module.outputFolder = ModuleOutputFolder.normalized(module.outputFolder)
-            if module.storageLocation == .local {
+            if module.hasLocalStorageTarget {
                 if module.localStorageRelativePath == nil {
                     module.localStorageRelativePath = LocalSourcePathResolver.relativePath(
                         forSourceURL: module.sourceURL,

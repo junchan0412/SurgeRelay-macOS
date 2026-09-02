@@ -82,6 +82,7 @@
 		D93D93D93D93D93D93D93D93 /* PublishCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E93E93E93E93E93E93E93E93 /* PublishCoordinator.swift */; };
 		D9BDD9BDD9BDD9BDD9BDD9BD /* GitHubRESTClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9BEE9BEE9BEE9BEE9BEE9BE /* GitHubRESTClient.swift */; };
 		D91D91D91D91D91D91D91D91 /* ModuleRefreshPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E91E91E91E91E91E91E91E91 /* ModuleRefreshPlanner.swift */; };
+		F30000000000000000000001 /* ModuleSyncPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30000000000000000000002 /* ModuleSyncPlanner.swift */; };
 		B71B71B71B71B71B71B71B71 /* NetworkPathMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A71A71A71A71A71A71A71A71 /* NetworkPathMonitor.swift */; };
 		D92D92D92D92D92D92D92D92 /* ModuleMetadataRefreshPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E92E92E92E92E92E92E92E92 /* ModuleMetadataRefreshPlanner.swift */; };
 		D99D99D99D99D99D99D99D99 /* WebManagementController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E99E99E99E99E99E99E99E99 /* WebManagementController.swift */; };
@@ -117,6 +118,7 @@
 		3E4F5A6B7C8D9E0F10213245 /* ManagedPublishedFileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E4F5A6B7C8D9E0F10213245 /* ManagedPublishedFileTests.swift */; };
 		3A4B5C6D7E8F901122334457 /* LegacyOutputCleanupPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A4B5C6D7E8F901122334457 /* LegacyOutputCleanupPlannerTests.swift */; };
 		35E6F708192A3B4C5D6E7F80 /* PublishPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45E6F708192A3B4C5D6E7F80 /* PublishPlannerTests.swift */; };
+		F30100000000000000000001 /* ModuleSyncPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30100000000000000000002 /* ModuleSyncPlannerTests.swift */; };
 		3E4F5A6B7C8D9E0F10213244 /* PublishFileAssemblerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E4F5A6B7C8D9E0F10213244 /* PublishFileAssemblerTests.swift */; };
 		36F708192A3B4C5D6E7F8091 /* ScriptHubTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46F708192A3B4C5D6E7F8091 /* ScriptHubTests.swift */; };
 		5A8A9B0C1D2E3F4051627384 /* LocalModuleImportPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B8A9B0C1D2E3F4051627384 /* LocalModuleImportPlannerTests.swift */; };
@@ -320,6 +322,7 @@
 		4E4F5A6B7C8D9E0F10213245 /* ManagedPublishedFileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedPublishedFileTests.swift; sourceTree = "<group>"; };
 		4A4B5C6D7E8F901122334457 /* LegacyOutputCleanupPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyOutputCleanupPlannerTests.swift; sourceTree = "<group>"; };
 		45E6F708192A3B4C5D6E7F80 /* PublishPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishPlannerTests.swift; sourceTree = "<group>"; };
+		F30100000000000000000002 /* ModuleSyncPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleSyncPlannerTests.swift; sourceTree = "<group>"; };
 		4E4F5A6B7C8D9E0F10213244 /* PublishFileAssemblerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishFileAssemblerTests.swift; sourceTree = "<group>"; };
 		46F708192A3B4C5D6E7F8091 /* ScriptHubTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptHubTests.swift; sourceTree = "<group>"; };
 		5B8A9B0C1D2E3F4051627384 /* LocalModuleImportPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModuleImportPlannerTests.swift; sourceTree = "<group>"; };
@@ -442,6 +445,7 @@
 		E93E93E93E93E93E93E93E93 /* PublishCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishCoordinator.swift; sourceTree = "<group>"; };
 		E9BEE9BEE9BEE9BEE9BEE9BE /* GitHubRESTClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubRESTClient.swift; sourceTree = "<group>"; };
 		E91E91E91E91E91E91E91E91 /* ModuleRefreshPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleRefreshPlanner.swift; sourceTree = "<group>"; };
+		F30000000000000000000002 /* ModuleSyncPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleSyncPlanner.swift; sourceTree = "<group>"; };
 		A71A71A71A71A71A71A71A71 /* NetworkPathMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPathMonitor.swift; sourceTree = "<group>"; };
 		E92E92E92E92E92E92E92E92 /* ModuleMetadataRefreshPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleMetadataRefreshPlanner.swift; sourceTree = "<group>"; };
 		E99E99E99E99E99E99E99E99 /* WebManagementController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebManagementController.swift; sourceTree = "<group>"; };
@@ -597,6 +601,7 @@
 				E21E21E21E21E21E21E21E21 /* ModulePreviewEditPlanner.swift */,
 				E92E92E92E92E92E92E92E92 /* ModuleMetadataRefreshPlanner.swift */,
 				E91E91E91E91E91E91E91E91 /* ModuleRefreshPlanner.swift */,
+				F30000000000000000000002 /* ModuleSyncPlanner.swift */,
 				A71A71A71A71A71A71A71A71 /* NetworkPathMonitor.swift */,
 				B94B94B94B94B94B94B94B94 /* ModuleSearchIndex.swift */,
 				B82B82B82B82B82B82B82B82 /* ModuleSidebarSectionPlanner.swift */,
@@ -761,6 +766,7 @@
 				4A5E1A2B3C4D5E6F708192A3 /* ModuleSearchIndexTests.swift */,
 				4E4F5A6B7C8D9E0F10213244 /* PublishFileAssemblerTests.swift */,
 				45E6F708192A3B4C5D6E7F80 /* PublishPlannerTests.swift */,
+				F30100000000000000000002 /* ModuleSyncPlannerTests.swift */,
 				46F708192A3B4C5D6E7F8091 /* ScriptHubTests.swift */,
 				47A1B2C3D4E5F60718293A4B /* SecurityDiagnosticsTests.swift */,
 				4A7E1A2B3C4D5E6F708192A3 /* SourceRevisionServiceTests.swift */,
@@ -1024,6 +1030,7 @@
 				3A5E1A2B3C4D5E6F708192A3 /* ModuleSearchIndexTests.swift in Sources */,
 				3E4F5A6B7C8D9E0F10213244 /* PublishFileAssemblerTests.swift in Sources */,
 				35E6F708192A3B4C5D6E7F80 /* PublishPlannerTests.swift in Sources */,
+				F30100000000000000000001 /* ModuleSyncPlannerTests.swift in Sources */,
 				36F708192A3B4C5D6E7F8091 /* ScriptHubTests.swift in Sources */,
 				37A1B2C3D4E5F60718293A4B /* SecurityDiagnosticsTests.swift in Sources */,
 				3A7E1A2B3C4D5E6F708192A3 /* SourceRevisionServiceTests.swift in Sources */,
@@ -1112,6 +1119,7 @@
 				A21A21A21A21A21A21A21A21 /* ModulePreviewViews.swift in Sources */,
 				D92D92D92D92D92D92D92D92 /* ModuleMetadataRefreshPlanner.swift in Sources */,
 				D91D91D91D91D91D91D91D91 /* ModuleRefreshPlanner.swift in Sources */,
+				F30000000000000000000001 /* ModuleSyncPlanner.swift in Sources */,
 				B71B71B71B71B71B71B71B71 /* NetworkPathMonitor.swift in Sources */,
 				94D94D94D94D94D94D94D94D /* ModuleSearchIndex.swift in Sources */,
 				A19A19A19A19A19A19A19A19 /* ModuleDraft.swift in Sources */,
@@ -1258,7 +1266,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-			CURRENT_PROJECT_VERSION = 100;
+			CURRENT_PROJECT_VERSION = 101;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1272,7 +1280,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-			MARKETING_VERSION = 1.4.5;
+			MARKETING_VERSION = 1.4.6;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1356,7 +1364,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-			CURRENT_PROJECT_VERSION = 100;
+			CURRENT_PROJECT_VERSION = 101;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -1376,7 +1384,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-			MARKETING_VERSION = 1.4.5;
+			MARKETING_VERSION = 1.4.6;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

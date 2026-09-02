@@ -10,6 +10,7 @@
       module.id, module.name, module.sourceURL, module.initialSourceURL, module.updateSourceURL,
       module.sourceFormatTitle, module.outputFolder, module.publishedRelativePath,
       module.storageLocation, module.storageLocationTitle, module.storageLocationDetail, module.initialSourceTitle,
+      module.storageTargets, module.hasSyncConflict, module.syncConflictLocalUpdatedAt, module.syncConflictGitHubUpdatedAt,
       module.relationshipSummary, module.localStorageRelativePath,
       module.iconURL, module.customIconURL, module.isEnabled, module.publishesStandalone,
       module.state, module.stateTitle, module.lastError, module.lastUpdatedAt, module.sourceCheckedAt,

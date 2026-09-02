@@ -50,8 +50,8 @@ extension AppModel {
             return false
         }
         let selected = modules.filter { moduleIDs.contains($0.id) }
-        let hasLocalSelection = selected.contains { $0.storageLocation == .local }
-        let hasGitHubSelection = selected.contains { $0.storageLocation == .gitHub }
+        let hasLocalSelection = selected.contains { $0.hasLocalStorageTarget }
+        let hasGitHubSelection = selected.contains { $0.hasGitHubStorageTarget }
         let publishLocally = settings.publishToLocal &&
             hasLocalSelection &&
             !settings.localModuleDirectory.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty

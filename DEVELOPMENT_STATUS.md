@@ -6,7 +6,7 @@
 
 | 项目 | 当前值 |
 | --- | --- |
-| 版本 | 1.4.5 (100) |
+| 版本 | 1.4.6 (101) |
 | macOS deployment target | 26.0 |
 | Swift | 6.0，strict concurrency complete |
 
@@ -31,13 +31,13 @@
 
 | 指标 | 数量 |
 | --- | --- |
-| 应用 Swift 文件 | 126 |
-| Swift 测试文件（unit / UI） | 38 / 1 |
-| 源码中的 XCTest 方法 | 280 |
-| Services / Models / Views / Utilities / App-Core | 55 / 19 / 28 / 3 / 21 |
-| 应用 Swift 行数 | 20,453 |
-| 测试 Swift 行数 | 7,733 |
-| CHANGELOG release 段落 | 100 |
+| 应用 Swift 文件 | 127 |
+| Swift 测试文件（unit / UI） | 39 / 1 |
+| 源码中的 XCTest 方法 | 284 |
+| Services / Models / Views / Utilities / App-Core | 56 / 19 / 28 / 3 / 21 |
+| 应用 Swift 行数 | 20,824 |
+| 测试 Swift 行数 | 7,798 |
+| CHANGELOG release 段落 | 101 |
 
 ## 主要维护热点
 
@@ -48,13 +48,13 @@
 | SurgeRelay/Views/ModuleCodeTextView.swift | 560 |
 | SurgeRelay/Views/ModuleSidebarView.swift | 503 |
 | SurgeRelay/Utilities/ModuleMetadataParser.swift | 496 |
+| SurgeRelay/Models/RelayModule.swift | 426 |
 | SurgeRelay/Views/ModulePreviewViews.swift | 417 |
+| SurgeRelay/AppModel+Updates.swift | 412 |
+| SurgeRelay/Services/ModuleFileStore.swift | 383 |
+| SurgeRelay/Views/ModuleDetailView.swift | 381 |
 | SurgeRelay/Services/EmbeddedScriptHubEngine.swift | 376 |
-| SurgeRelay/Services/ModuleFileStore.swift | 374 |
-| SurgeRelay/Views/ModuleDetailView.swift | 360 |
-| SurgeRelay/Models/RelayModule.swift | 357 |
 | SurgeRelay/Services/PersistenceStore.swift | 336 |
-| SurgeRelay/Views/LocalModuleImportPreviewView.swift | 333 |
 
 ## 当前优化顺序
 
@@ -74,7 +74,7 @@ git diff --check
 node script/generate_project_status.mjs --check
 node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs
-VERSION=1.4.5 BUILD=100 ./script/check_release_configuration.sh
+VERSION=1.4.6 BUILD=101 ./script/check_release_configuration.sh
 
 DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
 xcodebuild test \

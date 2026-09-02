@@ -7,14 +7,18 @@ struct ModuleDraft: Sendable {
     var outputFileName = ""
     var category = ""
     var outputFolder = ModuleOutputFolder.root
-    var storageLocation: ModuleStorageLocation = .gitHub
+    var storageTargets: Set<ModuleStorageLocation> = [.gitHub]
+    var storageLocation: ModuleStorageLocation {
+        get { storageTargets.count == 1 ? storageTargets.first! : (storageTargets.contains(.local) ? .local : .gitHub) }
+        set { storageTargets = [newValue] }
+    }
     var publishesStandalone = true
     var isEnabled = false
     var scriptHubOptions = ScriptHubOptions()
     var iconURL = ""
 
     init(defaultStorageLocation: ModuleStorageLocation = .gitHub) {
-        storageLocation = defaultStorageLocation
+        storageTargets = [defaultStorageLocation]
     }
 
     init(module: RelayModule) {
@@ -24,7 +28,7 @@ struct ModuleDraft: Sendable {
         outputFileName = module.outputFileName
         category = module.category
         outputFolder = module.outputFolder
-        storageLocation = module.storageLocation
+        storageTargets = module.storageTargets
         publishesStandalone = module.publishesStandalone
         isEnabled = module.isEnabled
         scriptHubOptions = module.scriptHubOptions
@@ -74,7 +78,7 @@ struct ModuleDraft: Sendable {
             preferred = FilenameSanitizer.suggestedName(from: sourceValue)
         }
         return URL(string: sourceValue)?.isFileURL == true
-            || storageLocation == .local
+            || storageTargets.contains(.local)
             ? FilenameSanitizer.existingSgmoduleName(from: preferred)
             : FilenameSanitizer.sgmoduleName(from: preferred)
     }
@@ -84,7 +88,7 @@ struct ModuleDraft: Sendable {
         return ModuleOutputFolder.relativePath(
             fileName: normalizedOutputFileName(for: sourceValue),
             folder: outputFolder,
-            preservesExistingFileName: URL(string: sourceValue)?.isFileURL == true || storageLocation == .local
+            preservesExistingFileName: URL(string: sourceValue)?.isFileURL == true || storageTargets.contains(.local)
         )
     }
 }

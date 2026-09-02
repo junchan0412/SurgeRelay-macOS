@@ -116,7 +116,7 @@ extension AppModel {
         try? await fileStore.removeAssets(id: id)
         try? await iconStore.removeIcon(for: id)
         // 本地模块按删除模式处理磁盘上的输出文件。
-        if module.storageLocation == .local {
+        if module.hasLocalStorageTarget {
             switch mode {
             case .removeFromList:
                 break
@@ -166,7 +166,7 @@ extension AppModel {
         copy.sourceCheckedAt = nil
         copy.state = .never
         copy.lastError = nil
-        if copy.storageLocation == .local {
+        if copy.hasLocalStorageTarget {
             copy.localStorageRelativePath = try ModuleNamingPlanner.localStorageRelativePath(
                 storageLocation: .local,
                 source: copy.sourceURL,

@@ -1,6 +1,13 @@
 import Foundation
 
 actor GitHubClient {
+    struct FileSnapshot: Sendable, Equatable {
+        let path: String
+        let data: Data
+        let contentHash: String
+        let updatedAt: Date
+        let commitSHA: String
+    }
     private enum PublishAttemptError: Error {
         case verificationFailed
     }
@@ -11,6 +18,7 @@ actor GitHubClient {
         let blobsByRepositoryPath: [String: String]
         let moduleDirectories: [String]
         let isTruncated: Bool
+        let updatedAt: Date
     }
     private struct RemotePublishDiff {
         let snapshot: RemoteTreeSnapshot
@@ -33,6 +41,32 @@ actor GitHubClient {
         guard settings.isConfigured else { throw RelayError.githubNotConfigured }
         let snapshot = try await remoteTreeSnapshot(settings: settings, token: token)
         return snapshot.moduleDirectories
+    }
+
+    func fileSnapshot(
+        fileName: String,
+        settings: GitHubSettings,
+        token: String
+    ) async throws -> FileSnapshot? {
+        let snapshot = try await remoteTreeSnapshot(settings: settings, token: token)
+        let repositoryPath = GitHubRepositoryPath.repositoryPath(for: fileName, settings: settings)
+        guard let sha = snapshot.blobsByRepositoryPath[repositoryPath] else { return nil }
+        let blob: GitHubAPI.BlobContentResponse = try await restClient.blob(
+            sha: sha,
+            settings: settings,
+            token: token
+        )
+        guard blob.encoding.lowercased() == "base64",
+              let data = Data(base64Encoded: blob.content.filter { !$0.isWhitespace }) else {
+            throw RelayError.invalidOutput("GitHub 文件内容无法解码。")
+        }
+        return FileSnapshot(
+            path: fileName,
+            data: data,
+            contentHash: data.sha256String,
+            updatedAt: snapshot.updatedAt,
+            commitSHA: snapshot.headCommitSHA
+        )
     }
 
     func previewPublish(
@@ -267,8 +301,15 @@ actor GitHubClient {
             baseTreeSHA: headCommit.tree.sha,
             blobsByRepositoryPath: GitHubRepositoryPath.blobsByRepositoryPath(from: tree.tree),
             moduleDirectories: GitHubRepositoryPath.moduleDirectories(from: tree.tree, settings: settings),
-            isTruncated: tree.truncated == true
+            isTruncated: tree.truncated == true,
+            updatedAt: Self.commitDate(headCommit) ?? .now
         )
+    }
+
+    private static func commitDate(_ commit: GitHubAPI.CommitResponse) -> Date? {
+        let value = commit.commit?.committer?.date ?? commit.commit?.author?.date
+        guard let value else { return nil }
+        return ISO8601DateFormatter().date(from: value)
     }
 
 }

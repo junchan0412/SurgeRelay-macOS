@@ -35,9 +35,10 @@ enum ModuleDraftRelationshipPlanner {
         publishToGitHub: Bool
     ) -> ModuleDraftRelationshipPresentation {
         let initialSource = initialSource(draft: draft, existingModule: existingModule)
-        let storageTitle = draft.storageLocation.title
+        let storageTitle = storageTargetsTitle(draft.storageTargets)
         let isWarning = draft.publishesStandalone && (
-            draft.storageLocation == .local ? !publishToLocal : !publishToGitHub
+            (draft.storageTargets.contains(.local) && !publishToLocal) ||
+            (draft.storageTargets.contains(.gitHub) && !publishToGitHub)
         )
         return ModuleDraftRelationshipPresentation(
             storageTitle: storageTitle,
@@ -73,13 +74,15 @@ enum ModuleDraftRelationshipPlanner {
         initialSource: ModuleInitialSource,
         isWarning: Bool
     ) -> String {
+        if draft.storageTargets.contains(.local) && draft.storageTargets.contains(.gitHub) {
+            if isWarning { return "该模块同时发布到本地和 GitHub；请开启对应的全局发布开关。" }
+            return "双目标模块：转换结果会同时写入本地模块根目录并发布到 GitHub。两端内容不一致时，更新会暂停并要求选择覆盖方向。"
+        }
         if !draft.publishesStandalone {
             return "未开启独立发布：转换结果保存在本地缓存，不会写入独立模块目录。"
         }
         if isWarning {
-            return draft.storageLocation == .local
-                ? "该模块设为本地存放，但全局“发布到本地”尚未开启；保存后暂不会生成独立文件。"
-                : "该模块设为 GitHub 存放，但全局“发布到 GitHub”尚未开启；保存后暂不会发布独立文件。"
+            return "该模块的部分发布目标尚未开启；开启对应的本地或 GitHub 发布后才会生成独立文件。"
         }
         return switch (draft.storageLocation, initialSource) {
         case (_, .pending):
@@ -98,6 +101,15 @@ enum ModuleDraftRelationshipPlanner {
             "订阅模块：从 originalURL 更新，转换结果发布到 GitHub 模块目录。"
         case (_, .invalid):
             "来源地址格式无效；请填写 HTTP、HTTPS 或本地 Surge 模块地址。"
+        }
+    }
+
+    private static func storageTargetsTitle(_ targets: Set<ModuleStorageLocation>) -> String {
+        switch (targets.contains(.local), targets.contains(.gitHub)) {
+        case (true, true): "本地 + GitHub"
+        case (true, false): "本地模块"
+        case (false, true): "GitHub 模块"
+        default: "未设置存放位置"
         }
     }
 }
@@ -129,8 +141,9 @@ enum ModuleDraftPlanner {
             category: normalizedDraft.category,
             outputFolder: normalizedDraft.outputFolder,
             storageLocation: draft.storageLocation,
+            storageTargets: draft.storageTargets,
             localStorageRelativePath: normalizedDraft.localStorageRelativePath,
-            preservesOutputFileName: draft.storageLocation == .local,
+            preservesOutputFileName: draft.storageTargets.contains(.local),
             publishesStandalone: draft.publishesStandalone,
             isEnabled: draft.isEnabled,
             scriptHubOptions: draft.scriptHubOptions,
@@ -174,9 +187,9 @@ enum ModuleDraftPlanner {
             current.outputFileName != normalizedDraft.outputFileName ||
             current.category != normalizedDraft.category ||
             current.outputFolder != normalizedDraft.outputFolder ||
-            current.storageLocation != draft.storageLocation ||
+            current.storageTargets != draft.storageTargets ||
             current.localStorageRelativePath != normalizedDraft.localStorageRelativePath ||
-            current.preservesOutputFileName != (draft.storageLocation == .local) ||
+            current.preservesOutputFileName != draft.storageTargets.contains(.local) ||
             current.publishesStandalone != draft.publishesStandalone ||
             current.isEnabled != draft.isEnabled ||
             current.scriptHubOptions != draft.scriptHubOptions ||
@@ -203,9 +216,9 @@ enum ModuleDraftPlanner {
         module.outputFileName = normalizedDraft.outputFileName
         module.category = normalizedDraft.category
         module.outputFolder = normalizedDraft.outputFolder
-        module.storageLocation = draft.storageLocation
+        module.storageTargets = draft.storageTargets
         module.localStorageRelativePath = normalizedDraft.localStorageRelativePath
-        module.preservesOutputFileName = draft.storageLocation == .local
+        module.preservesOutputFileName = draft.storageTargets.contains(.local)
         module.publishesStandalone = draft.publishesStandalone
         module.isEnabled = draft.isEnabled
         module.scriptHubOptions = draft.scriptHubOptions
@@ -226,7 +239,7 @@ enum ModuleDraftPlanner {
                                                    URL(string: current.sourceURL)?.isFileURL == true,
                                                    let newSourceURL = URL(string: normalizedDraft.source),
                                                    ["http", "https"].contains(newSourceURL.scheme?.lowercased()),
-                                                   module.storageLocation == .local,
+                                                   module.hasLocalStorageTarget,
                                                    module.localStorageRelativePath != nil,
                                                    module.publishesStandalone {
             module.publishedRelativePath

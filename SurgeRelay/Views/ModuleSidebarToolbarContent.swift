@@ -123,7 +123,7 @@ struct ModuleSidebarToolbarContent: ToolbarContent {
         if model.settings.publishToGitHub,
            model.settings.github.isConfigured,
            !model.settings.publishToLocal,
-           !model.modules.contains(where: { batchSelectedModuleIDs.contains($0.id) && $0.storageLocation == .gitHub }) {
+           !model.modules.contains(where: { batchSelectedModuleIDs.contains($0.id) && $0.hasGitHubStorageTarget }) {
             return "当前勾选的是本地模块；请编辑模块并将“模块存放”改为 GitHub"
         }
         return "只发布勾选模块：本地模块写入本地目录，GitHub 模块推送到 GitHub，不删除其他已发布文件"

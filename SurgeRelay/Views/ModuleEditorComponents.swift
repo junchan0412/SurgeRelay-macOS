@@ -222,6 +222,28 @@ struct ModuleEditorStorageLocationPicker: View {
     }
 }
 
+struct ModuleEditorStorageTargetsPicker: View {
+    @Binding var storageTargets: Set<ModuleStorageLocation>
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(ModuleStorageLocation.allCases) { location in
+                Toggle(isOn: Binding(
+                    get: { storageTargets.contains(location) },
+                    set: { enabled in
+                        if enabled { storageTargets.insert(location) }
+                        else if storageTargets.count > 1 { storageTargets.remove(location) }
+                    }
+                )) {
+                    Label(location.title, systemImage: location.systemImage)
+                }
+                .toggleStyle(.button)
+                .help(location.detail)
+            }
+        }
+    }
+}
+
 struct DraftModuleIconPreview: View {
     let url: URL?
     let size: CGFloat

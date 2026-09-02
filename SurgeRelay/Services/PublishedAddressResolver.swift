@@ -7,7 +7,7 @@ enum PublishedAddressResolver {
     }
 
     static func standaloneURL(for module: RelayModule, settings: AppSettings) -> URL? {
-        guard module.publishesStandalone, module.storageLocation == .gitHub else { return nil }
+        guard module.publishesStandalone, module.hasGitHubStorageTarget else { return nil }
         return githubURL(for: module.publishedRelativePath, settings: settings)
     }
 

@@ -114,6 +114,7 @@
     const errorActions = module.lastError ? `<div><button class="button" data-action="copy" data-value="${escapeAttribute(module.lastError)}"><span class="symbol" data-symbol="copy"></span>复制错误</button></div>` : '';
     const error = module.lastError ? `<section class="form-section-view"><h3 class="section-heading">最近一次更新失败</h3><div class="group-box"><div class="detail-row action-row error-box"><strong>${escapeHTML(logic.moduleStatusTitle(module))}</strong><div>${errorBody}</div><small>${escapeHTML(errorNote)}</small>${errorActions}</div></div></section>` : '';
     const conflict = module.hasOverrideConflict ? `<section class="form-section-view"><h3 class="section-heading">本地编辑冲突</h3><div class="group-box"><div class="detail-row action-row error-box"><strong>上游内容已经变化</strong><div>当前仍在使用本地编辑。可在预览中比较内容后保留或恢复。</div><div><button class="button" data-action="accept-override">保留本地编辑</button><button class="button" data-action="tab-preview">前往预览</button></div></div></div></section>` : '';
+    const syncConflict = module.hasSyncConflict ? `<section class="form-section-view"><h3 class="section-heading">本地与 GitHub 内容冲突</h3><div class="group-box"><div class="detail-row action-row error-box"><strong>检测到两端输出内容不同</strong><div>本地最后更新：${escapeHTML(formatDate(module.syncConflictLocalUpdatedAt, '未知'))}</div><div>GitHub 最后更新：${escapeHTML(formatDate(module.syncConflictGitHubUpdatedAt, '未知'))}</div></div></div></section>` : '';
     const combinedSubscription = combined.subscriptionURL || '';
     const combinedRow = combined.isEnabled ? detailRow('square.stack.3d.up.fill', '汇总订阅', combinedSubscription || '等待发布配置', false, combinedSubscription || null) : '';
     const iconURL = module.customIconURL || module.iconURL;
@@ -168,7 +169,7 @@
       ${sourceLastModifiedRow}
       ${detailRow('gearshape', '转换引擎', module.conversionEngineRevision ? module.conversionEngineRevision.slice(0, 12) : '原生 Surge 模块', false, module.conversionEngineRevision || null)}
     </div></section>
-    ${advanced}<div id="arguments-section"></div>${conflict}${published}`;
+    ${advanced}<div id="arguments-section"></div>${conflict}${syncConflict}${published}`;
   }
 
   function argumentMarkup(argument) {

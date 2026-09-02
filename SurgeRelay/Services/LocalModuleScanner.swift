@@ -45,7 +45,7 @@ enum LocalModuleMetadataReader {
         for module: RelayModule,
         rootDirectoryPath: String
     ) -> LocalModuleMetadataSnapshot? {
-        guard module.storageLocation == .local,
+        guard module.hasLocalStorageTarget,
               let relativePath = module.localStorageRelativePath,
               let fileURL = fileURL(relativePath: relativePath, rootDirectoryPath: rootDirectoryPath),
               let data = try? Data(contentsOf: fileURL),

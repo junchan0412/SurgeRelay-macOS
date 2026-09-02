@@ -19,7 +19,10 @@ enum ModuleSidebarSectionPlanner {
                 attention.append(module)
             } else if !hasValidSource(module) {
                 uncategorized.append(module)
-            } else if module.storageLocation == .local {
+            } else if module.hasLocalStorageTarget && module.hasGitHubStorageTarget {
+                local.append(module)
+                github.append(module)
+            } else if module.hasLocalStorageTarget {
                 local.append(module)
             } else {
                 github.append(module)
@@ -56,7 +59,7 @@ enum ModuleSidebarSectionPlanner {
     }
 
     private static func needsAttention(_ module: RelayModule) -> Bool {
-        module.state == .failed || module.hasOverrideConflict
+        module.state == .failed || module.hasOverrideConflict || module.hasSyncConflict
     }
 
     private static func hasValidSource(_ module: RelayModule) -> Bool {

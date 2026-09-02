@@ -139,9 +139,9 @@ enum ModuleFilter: String, CaseIterable, Identifiable, Sendable {
                 combinedModuleEnabled: combinedModuleEnabled
             )
         case .local:
-            module.storageLocation == .local
+            module.hasLocalStorageTarget
         case .github:
-            module.storageLocation == .gitHub
+            module.hasGitHubStorageTarget
         case .subscribed:
             module.initialSource.isSubscribed
         case .remoteSource:
@@ -153,7 +153,7 @@ enum ModuleFilter: String, CaseIterable, Identifiable, Sendable {
         case .cachedOnly:
             !module.publishesStandalone
         case .attention:
-            module.state == .failed || module.hasOverrideConflict
+            module.state == .failed || module.hasOverrideConflict || module.hasSyncConflict
         case .overrideConflict:
             module.hasOverrideConflict
         case .uncategorized:

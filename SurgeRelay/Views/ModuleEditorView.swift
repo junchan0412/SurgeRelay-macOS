@@ -110,7 +110,7 @@ struct ModuleEditorView: View {
             Button("创建") { createFolder() }
             Button("取消", role: .cancel) {}
         } message: {
-            Text(draft.storageLocation == .local
+            Text(draft.storageTargets.contains(.local)
                 ? "将在本地模块根目录下创建文件夹。"
                 : "GitHub 不支持空文件夹；该路径会先保存为选项，发布模块时自动创建。")
         }
@@ -179,14 +179,14 @@ struct ModuleEditorView: View {
     private var basicInfoSection: some View {
         ModuleEditorBasicInfoSection(
             name: $draft.name,
-            storageLocation: $draft.storageLocation,
+            storageTargets: $draft.storageTargets,
             category: $draft.category,
             outputFolder: $draft.outputFolder,
             initialSource: draftRelationship.initialSource,
             relationshipHint: draftRelationship.hint,
             relationshipIsWarning: draftRelationship.isWarning,
             folders: model.moduleOutputFolderOptions(
-                storageLocation: draft.storageLocation,
+                storageLocation: draft.storageTargets.contains(.local) ? .local : .gitHub,
                 preserving: draft.outputFolder
             ),
             onCreateFolder: presentNewFolderDialog
@@ -264,7 +264,7 @@ struct ModuleEditorView: View {
         do {
             let folder = try model.createModuleOutputFolder(
                 named: newFolderName,
-                storageLocation: draft.storageLocation
+                storageLocation: draft.storageTargets.contains(.local) ? .local : .gitHub
             )
             draft.outputFolder = folder
         } catch {

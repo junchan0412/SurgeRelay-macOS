@@ -39,7 +39,7 @@ enum ModuleOutputFolderCatalog {
             configuredFolders.append(contentsOf: githubFolders)
         }
         let moduleFolders = modules.compactMap { module in
-            storageLocation == nil || module.storageLocation == storageLocation
+            storageLocation == nil || (storageLocation == .local ? module.hasLocalStorageTarget : module.hasGitHubStorageTarget)
                 ? module.outputFolder
                 : nil
         }

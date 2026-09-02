@@ -232,6 +232,15 @@ actor ModuleFileStore {
         }
     }
 
+    func readPublishedFile(relativePath: String, rootDirectoryPath: String) throws -> Data? {
+        guard !relativePath.isEmpty,
+              !rootDirectoryPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        let root = URL(filePath: rootDirectoryPath, directoryHint: .isDirectory)
+        let destination = try exportURL(root: root, relativePath: relativePath)
+        guard FileManager.default.fileExists(atPath: destination.path) else { return nil }
+        return try Data(contentsOf: destination)
+    }
+
     /// 强制删除一个已发布的本地独立文件（无论是否带 Surge Relay 管理标记）。
     /// 仅用于用户明确确认“彻底删除（含源文件）”的场景。
     func removePublishedFileForcing(relativePath: String, rootDirectoryPath: String) throws {

@@ -40,6 +40,7 @@ struct WebModulePayload: Encodable {
     let category: String
     let outputFolder: String
     let storageLocation: String
+    let storageTargets: [String]
     let storageLocationTitle: String
     let storageLocationDetail: String
     let storageLocationIcon: String
@@ -63,6 +64,9 @@ struct WebModulePayload: Encodable {
     let publishedURL: String?
     let advancedSummary: String?
     let hasOverrideConflict: Bool
+    let hasSyncConflict: Bool
+    let syncConflictLocalUpdatedAt: Date?
+    let syncConflictGitHubUpdatedAt: Date?
     let scriptHubOptions: ScriptHubOptions
     let policy: String
     let includeKeywords: String
@@ -133,6 +137,7 @@ struct WebModuleMutation: Decodable {
     let sourceURL: String
     let sourceFormat: String?
     let storageLocation: String?
+    let storageTargets: [String]?
     let category: String?
     let iconURL: String?
     let outputFolder: String?
@@ -167,6 +172,13 @@ struct WebModuleMutation: Decodable {
                 throw WebAPIError.invalidStorageLocation
             }
             draft.storageLocation = location
+        }
+        if let storageTargets {
+            let targets = Set(storageTargets.compactMap(ModuleStorageLocation.init(rawValue:)))
+            guard !targets.isEmpty, targets.count == storageTargets.count else {
+                throw WebAPIError.invalidStorageLocation
+            }
+            draft.storageTargets = targets
         }
         if let category { draft.category = category }
         if let iconURL { draft.iconURL = iconURL }

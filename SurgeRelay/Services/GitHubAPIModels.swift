@@ -28,6 +28,16 @@ enum GitHubAPI {
     struct CommitResponse: Decodable {
         let sha: String
         let tree: Object
+        let commit: CommitDetails?
+    }
+
+    struct CommitDetails: Decodable {
+        let author: Signature?
+        let committer: Signature?
+    }
+
+    struct Signature: Decodable {
+        let date: String?
     }
 
     struct TreeItem: Decodable {
@@ -48,6 +58,11 @@ enum GitHubAPI {
 
     struct BlobResponse: Decodable {
         let sha: String
+    }
+
+    struct BlobContentResponse: Decodable {
+        let content: String
+        let encoding: String
     }
 
     struct TreeEntry: Encodable {
