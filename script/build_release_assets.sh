@@ -16,7 +16,7 @@ fail() {
 codesign_identity_exists() {
   local identity="$1"
   [[ "$identity" == "-" ]] && return 0
-  security find-identity -v -p codesigning 2>/dev/null | grep -Fq "\"$identity\""
+  security find-identity -p codesigning 2>/dev/null | grep -Fq "\"$identity\""
 }
 
 sparkle_attribute() {
