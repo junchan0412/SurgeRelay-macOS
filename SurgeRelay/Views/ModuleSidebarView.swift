@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 
+@MainActor
 struct ModuleSidebarView: View {
     @Environment(AppModel.self) private var model
     @SceneStorage("ModuleSidebarView.collapsedSectionIDs") private var collapsedSectionIDsRaw = ""
@@ -217,6 +218,7 @@ struct ModuleSidebarView: View {
     }
 }
 
+@MainActor
 private struct ModuleSidebarSectionHeader: View {
     let title: String
     let count: Int
@@ -252,6 +254,7 @@ private struct ModuleSidebarSectionHeader: View {
     }
 }
 
+@MainActor
 private struct ModuleSidebarStatusCard: View {
     @Environment(AppModel.self) private var model
 

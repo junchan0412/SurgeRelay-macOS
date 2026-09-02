@@ -35,7 +35,7 @@
 | Swift 测试文件（unit / UI） | 39 / 1 |
 | 源码中的 XCTest 方法 | 284 |
 | Services / Models / Views / Utilities / App-Core | 56 / 19 / 28 / 3 / 21 |
-| 应用 Swift 行数 | 20,820 |
+| 应用 Swift 行数 | 20,823 |
 | 测试 Swift 行数 | 7,798 |
 | CHANGELOG release 段落 | 101 |
 
@@ -46,7 +46,7 @@
 | 文件 | 行数 |
 | --- | --- |
 | SurgeRelay/Views/ModuleCodeTextView.swift | 560 |
-| SurgeRelay/Views/ModuleSidebarView.swift | 503 |
+| SurgeRelay/Views/ModuleSidebarView.swift | 506 |
 | SurgeRelay/Utilities/ModuleMetadataParser.swift | 496 |
 | SurgeRelay/Models/RelayModule.swift | 426 |
 | SurgeRelay/Views/ModulePreviewViews.swift | 417 |
