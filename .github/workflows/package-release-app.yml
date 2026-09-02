@@ -64,6 +64,7 @@ jobs:
             -T /usr/bin/security
           security find-certificate -c "Surge Relay Self-Signed Code Signing" -p "$KEYCHAIN_PATH" > "$RUNNER_TEMP/surge-relay-signing.cer"
           security add-trusted-cert \
+            -d \
             -r trustRoot \
             -p codeSign \
             -k "$KEYCHAIN_PATH" \
