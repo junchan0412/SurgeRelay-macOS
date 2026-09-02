@@ -80,6 +80,7 @@ jobs:
           fi
           export REQUIRE_SPARKLE_SIGNATURES=1
           export REQUIRE_STABLE_CODESIGN=1
+          export UPDATE_APPCAST=1
           export VERIFY_APPCAST=1
           if [[ "${{ inputs.launch_smoke_test }}" == "true" ]]; then
             export RUN_LAUNCH_SMOKE_TEST=1
