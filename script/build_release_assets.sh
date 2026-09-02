@@ -243,6 +243,7 @@ xcodebuild \
   SWIFT_ENABLE_BATCH_MODE=NO \
   SWIFT_OPTIMIZATION_LEVEL=-Onone \
   SWIFT_STRICT_CONCURRENCY=targeted \
+  SWIFT_VERSION=5.9 \
   build
 
 APP_PATH="$(find "$DERIVED_DATA/Build/Products/Release" -maxdepth 1 -name "Surge Relay.app" -type d -print -quit)"
