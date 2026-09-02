@@ -19,7 +19,7 @@
 - 兼容性：GitHub 模块根目录无需预先创建，首次提交嵌套文件路径时会由 Git tree 自动创建目录。
 - 验证：Release 构建、代码签名、Sparkle 签名、zip/pkg 启动冒烟和远端资产校验通过；本轮 Xcode 测试管理器在启动阶段挂起，未执行测试用例。
 ]]></description>
-            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.4.6/Surge-Relay-1.4.6.app.zip" length="9164179" type="application/zip" sparkle:edSignature="IUw/6U9l+h6jEKOoiqS68auNSC/rwy4fcpnitlbpye0mI4akk6gFnt99vK1GpoKbwjsQBh76XmXYFPGkwdzGDQ=="/>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.4.6/Surge-Relay-1.4.6.app.zip" length="11813594" type="application/zip" sparkle:edSignature="bd3Z7aYpJv0Nn3rwvkkUYhQRPVYVlkMnaX8tflP9KhJuBLyWwOdMywCH+ySNIwBsuyE41tjSDMO3aFoZsN5zAQ=="/>
         </item>
         <item>
             <title>1.4.4</title>
