@@ -142,7 +142,7 @@ struct ModuleSidebarView: View {
                 Button("文本编辑") { textEditModule(module) }
                     .help("直接编辑转换后的模块文本内容")
             }
-            if module.hasLocalStorageTarget {
+            if module.storageTargets.contains(.local) {
                 Button("在访达中显示") { revealModuleInFinder(module) }
             }
             Button("更新") { model.startUpdate(moduleID: module.id) }
