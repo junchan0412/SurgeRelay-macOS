@@ -120,6 +120,12 @@ struct ModuleSidebarToolbarContent: ToolbarContent {
             !(model.settings.publishToGitHub && model.settings.github.isConfigured) {
             return "请先在设置中开启本地发布或 GitHub 发布"
         }
+        if model.settings.publishToGitHub,
+           model.settings.github.isConfigured,
+           !model.settings.publishToLocal,
+           !model.modules.contains(where: { batchSelectedModuleIDs.contains($0.id) && $0.storageLocation == .gitHub }) {
+            return "当前勾选的是本地模块；请编辑模块并将“模块存放”改为 GitHub"
+        }
         return "只发布勾选模块：本地模块写入本地目录，GitHub 模块推送到 GitHub，不删除其他已发布文件"
     }
 
@@ -136,6 +142,9 @@ struct ModuleSidebarToolbarContent: ToolbarContent {
     private var publishAllHelp: String {
         if !model.settings.publishToGitHub { return "请在设置中开启 GitHub 发布" }
         if !model.settings.github.isConfigured { return "请先完成 GitHub 发布配置" }
+        if !model.githubPublishPlan.hasPublishableModuleSelection {
+            return "当前没有 GitHub 存放的可发布模块；请编辑模块并将“模块存放”改为 GitHub"
+        }
         return "发布当前所有输出到 GitHub"
     }
 

@@ -133,7 +133,7 @@ enum GitHubPublishPlanner {
     static func noFilesStatus(for action: GitHubPublishAction) -> String {
         switch action {
         case .publishAll:
-            return "没有可发布的模块文件"
+            return "没有可发布的 GitHub 模块；请将模块存放位置设为 GitHub，或开启总模块"
         case .publishSelected:
             return "所选模块没有可发布的独立输出"
         case .preview:

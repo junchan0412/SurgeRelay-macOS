@@ -3,6 +3,23 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>1.4.5</title>
+            <pubDate>Wed, 02 Sep 2026 20:21:01 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.4.5</link>
+            <sparkle:version>100</sparkle:version>
+            <sparkle:shortVersionString>1.4.5</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 1.4.5
+
+
+- 易用性：发布全部没有可发布内容时，明确提示当前没有 GitHub 存放模块，并指引将模块存放位置改为 GitHub 或开启总模块。
+- 易读性：桌面侧边栏现在显示发布完成、无变更和阻塞原因；发布按钮悬浮说明会指出当前勾选的本地模块不能直接进入 GitHub 发布流程。
+- 兼容性：GitHub 模块根目录无需预先创建，首次提交嵌套文件路径时会由 Git tree 自动创建目录。
+- 验证：Release 构建、代码签名、Sparkle 签名、zip/pkg 启动冒烟和远端资产校验通过；本轮 Xcode 测试管理器在启动阶段挂起，未执行测试用例。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.4.5/Surge-Relay-1.4.5.app.zip" length="9164179" type="application/zip" sparkle:edSignature="IUw/6U9l+h6jEKOoiqS68auNSC/rwy4fcpnitlbpye0mI4akk6gFnt99vK1GpoKbwjsQBh76XmXYFPGkwdzGDQ=="/>
+        </item>
+        <item>
             <title>1.4.4</title>
             <pubDate>Tue, 01 Sep 2026 19:16:21 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v1.4.4</link>

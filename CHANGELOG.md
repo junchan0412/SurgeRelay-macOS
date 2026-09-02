@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.5
+
+- 易用性：发布全部没有可发布内容时，明确提示当前没有 GitHub 存放模块，并指引将模块存放位置改为 GitHub 或开启总模块。
+- 易读性：桌面侧边栏现在显示发布完成、无变更和阻塞原因；发布按钮悬浮说明会指出当前勾选的本地模块不能直接进入 GitHub 发布流程。
+- 兼容性：GitHub 模块根目录无需预先创建，首次提交嵌套文件路径时会由 Git tree 自动创建目录。
+- 验证：Release 构建、代码签名、Sparkle 签名、zip/pkg 启动冒烟和远端资产校验通过；本轮 Xcode 测试管理器在启动阶段挂起，未执行测试用例。
+
 ## 1.4.4
 
 - 修复：Script-Hub HTTP bridge 在 request object 缺少 `body` 时不再把 JavaScript 的 `undefined` 转成请求体，避免 macOS 27 对 GitHub Raw GET 请求返回 `NSURLErrorDomain -1103`。

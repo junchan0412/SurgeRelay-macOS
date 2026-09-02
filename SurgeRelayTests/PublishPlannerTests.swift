@@ -375,7 +375,10 @@ final class PublishPlannerTests: XCTestCase {
             deletedFiles: []
         )
 
-        XCTAssertEqual(GitHubPublishPlanner.noFilesStatus(for: .publishAll), "没有可发布的模块文件")
+        XCTAssertEqual(
+            GitHubPublishPlanner.noFilesStatus(for: .publishAll),
+            "没有可发布的 GitHub 模块；请将模块存放位置设为 GitHub，或开启总模块"
+        )
         XCTAssertEqual(GitHubPublishPlanner.noFilesStatus(for: .publishSelected), "所选模块没有可发布的独立输出")
         XCTAssertEqual(GitHubPublishPlanner.noFilesStatus(for: .preview), "没有可发布的模块文件，已跳过 GitHub 发布预览")
         XCTAssertEqual(GitHubPublishPlanner.unchangedStatus(for: .publishAll), "没有文件需要发布")

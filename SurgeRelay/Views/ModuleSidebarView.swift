@@ -281,6 +281,23 @@ private struct ModuleSidebarStatusCard: View {
                 Divider()
             }
 
+            if !model.workActivity.isActive,
+               model.presentedError == nil,
+               automaticPublishText == nil,
+               !model.statusMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               model.statusMessage != "准备就绪" {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "info.circle.fill")
+                        .foregroundStyle(.secondary)
+                    Text(model.statusMessage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                }
+                Divider()
+            }
+
             if model.workActivity.isActive {
                 if model.workActivity.kind == .updatingModules,
                    let name = synchronizingModuleName,
