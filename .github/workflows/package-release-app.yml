@@ -62,6 +62,12 @@ jobs:
             -P "${CODESIGN_CERTIFICATE_PASSWORD:-}" \
             -T /usr/bin/codesign \
             -T /usr/bin/security
+          security find-certificate -c "Surge Relay Self-Signed Code Signing" -p "$KEYCHAIN_PATH" > "$RUNNER_TEMP/surge-relay-signing.cer"
+          security add-trusted-cert \
+            -r trustRoot \
+            -p codeSign \
+            -k "$KEYCHAIN_PATH" \
+            "$RUNNER_TEMP/surge-relay-signing.cer"
           security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security find-identity -v -p codesigning "$KEYCHAIN_PATH"
