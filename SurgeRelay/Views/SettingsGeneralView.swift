@@ -90,6 +90,22 @@ struct SettingsGeneralView: View {
                     model.saveSettings()
                 }
             ))
+            SettingsToggleRow(
+                "同步本地模块改动",
+                icon: "externaldrive.badge.icloud",
+                isOn: Binding(
+                    get: { model.settings.watchesLocalModuleChanges },
+                    set: { model.setWatchesLocalModuleChanges($0) }
+                )
+            )
+            .help("本地模块源文件在磁盘上被修改后立即重新转换并刷新输出，无需等待刷新间隔")
+            SettingsControlRow("本地来源检查", icon: "arrow.triangle.2.circlepath.circle") {
+                Button("立即检查", systemImage: "magnifyingglass") {
+                    Task { await model.syncChangedLocalSources(reason: .manual) }
+                }
+                .disabled(!model.settings.watchesLocalModuleChanges)
+                .help("立即比较全部本地模块源文件，同步已经改动的模块")
+            }
         }
     }
 

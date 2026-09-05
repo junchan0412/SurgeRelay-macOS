@@ -28,6 +28,7 @@ extension AppModel {
             Task { try? await iconStore.cacheIcon(from: url, for: module.id, force: true) }
         }
         try persistModules()
+        refreshLocalSourceWatching()
         statusMessage = AppRuntimeOptions.isUIQAMode
             ? "已添加 \(module.name)；UI QA 模式未启动自动更新"
             : "已添加 \(module.name)，即将自动更新"
@@ -71,6 +72,7 @@ extension AppModel {
             }
         }
         try persistModules()
+        refreshLocalSourceWatching()
         statusMessage = if plan.sourceChanged, AppRuntimeOptions.isUIQAMode {
             "已保存 \(modules[index].name)；UI QA 模式未启动自动更新"
         } else if plan.sourceChanged {
@@ -135,6 +137,7 @@ extension AppModel {
             }
         }
         try? persistModules()
+        refreshLocalSourceWatching()
         selectedModuleID = modules.first?.id
         await rebuildCombinedFromCache()
         statusMessage = "已删除 \(module.name)，输出已刷新"
@@ -181,6 +184,7 @@ extension AppModel {
         invalidateModuleSummaryCache()
         selectedModuleID = copy.id
         try persistModules()
+        refreshLocalSourceWatching()
         statusMessage = "已复制 \(source.name) 为 \(copy.name)"
         scheduleAutomaticUpdate()
     }

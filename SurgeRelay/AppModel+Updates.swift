@@ -2,7 +2,10 @@ import Foundation
 
 @MainActor
 extension AppModel {
-    func updateAll(only moduleIDs: Set<UUID>? = nil) async {
+    func updateAll(
+        only moduleIDs: Set<UUID>? = nil,
+        refreshesScriptHubEngine: Bool = true
+    ) async {
         let admission = updateAdmission
         guard admission.isAccepted else {
             statusMessage = admission.message
@@ -32,7 +35,9 @@ extension AppModel {
         }
 
         let missingEngine = !(await engineStore.hasScript(named: "Rewrite-Parser.js"))
-        if settings.automaticallyUpdateScriptHub || missingEngine {
+        // 本地来源同步只关心磁盘内容，跳过顺带的上游引擎检查；引擎缺失时仍要补齐，
+        // 否则非原生 Surge 来源无法转换。
+        if (refreshesScriptHubEngine && settings.automaticallyUpdateScriptHub) || missingEngine {
             await refreshScriptHubInternal()
         }
         guard shouldContinueCurrentWork(generation: updateGeneration) else { return }

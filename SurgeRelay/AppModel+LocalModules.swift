@@ -87,6 +87,7 @@ extension AppModel {
         } catch {
             presentedError = "保存导入模块失败：\(error.localizedDescription)"
         }
+        refreshLocalSourceWatching()
         await rebuildCombinedFromCache()
         statusMessage = LocalModuleImportPlanner.importStatus(
             importedCount: imported.count,

@@ -54,11 +54,14 @@ final class AppModel {
     @ObservationIgnored let processingWorker = ModuleProcessingWorker()
     @ObservationIgnored let webServer = WebManagementServer()
     @ObservationIgnored let networkPathMonitor = NetworkPathMonitor()
+    @ObservationIgnored let localSourceWatcher = LocalSourceWatcher()
     @ObservationIgnored var foregroundWorkTask: Task<Void, Never>?
     @ObservationIgnored var foregroundWorkIdentifier = UUID()
     @ObservationIgnored var schedulerTask: Task<Void, Never>?
     @ObservationIgnored var automaticUpdateTask: Task<Void, Never>?
     @ObservationIgnored var automaticPublishTask: Task<Void, Never>?
+    @ObservationIgnored var localSourceWatcherTask: Task<Void, Never>?
+    @ObservationIgnored var localSourceSyncTask: Task<Void, Never>?
     @ObservationIgnored var localChangeGeneration = 0
     @ObservationIgnored private var hasStarted = false
     @ObservationIgnored var githubModuleOutputFoldersLastRefreshedAt: Date?
@@ -148,6 +151,7 @@ final class AppModel {
         Task {
             await cleanupLegacyOutputFiles()
             await refreshModuleMetadataFromCache()
+            refreshLocalSourceWatching()
             let missingEngine = !(await engineStore.hasScript(named: "Rewrite-Parser.js"))
             if settings.automaticallyUpdateOnLaunch,
                await ModuleRefreshPlanner.shouldUpdateOnLaunch(
@@ -168,6 +172,9 @@ final class AppModel {
             } else if modules.contains(where: shouldUpdateModule) {
                 statusMessage = "模块仍在刷新周期内，无需重新加载"
             }
+            // App 未运行期间发生的本地文件改动不会产生 FSEvents 通知，
+            // 启动后补扫一次，避免手工编辑的模块一直停留在旧内容。
+            await syncChangedLocalSources(reason: .launch)
         }
     }
 

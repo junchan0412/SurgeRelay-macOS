@@ -27,6 +27,7 @@ extension AppModel {
         localModuleOutputFoldersRootPath = nil
         localModuleOutputFoldersLastRefreshedAt = nil
         saveSettings()
+        refreshLocalSourceWatching()
         Task { await refreshModuleOutputFolders(force: true) }
         if settings.publishToLocal { Task { await rebuildCombinedFromCache() } }
     }

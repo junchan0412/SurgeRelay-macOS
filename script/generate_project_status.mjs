@@ -135,6 +135,8 @@ ${markdownTable(
 - 集中管理远程、本地与 Script-Hub 转换模块，并区分 storageLocation 与 initialSource。
 - 本地与 GitHub 发布可并存；独立模块按自身存放位置发布，总模块可同时发布到两个目标。
 - 支持本地模块扫描、转换预览、文本覆盖、冲突处理、发布预览、受管文件清理和自动发布。
+- 监听本地模块目录，源文件在 App 外改动后按来源内容 sha256 只重新转换改动过的模块。
+- 模块内容编辑器支持撤销/重做、查找与替换（含正则）、跳转到行、切换注释和缩进操作。
 - 提供 macOS 主界面、菜单栏和带访问控制的 Web 管理端。
 - 凭据使用配置目录内 AES-256-GCM 加密文件，不依赖系统钥匙串。
 - Release preflight 覆盖版本、Sparkle、appcast、entitlements、Web 资源、workflow 和 Xcode 工程源文件登记。

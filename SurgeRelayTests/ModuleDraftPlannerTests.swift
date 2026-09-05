@@ -73,7 +73,7 @@ final class ModuleDraftPlannerTests: XCTestCase {
         )
         XCTAssertEqual(disabledLocal.initialSource, .pending)
         XCTAssertTrue(disabledLocal.isWarning)
-        XCTAssertTrue(disabledLocal.hint.contains("发布到本地"))
+        XCTAssertTrue(disabledLocal.hint.contains("发布目标尚未开启"))
     }
 
     func testModuleDraftRelationshipPlannerKeepsUnresolvedDraftsPending() {

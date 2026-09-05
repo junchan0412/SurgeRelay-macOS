@@ -7,6 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D117D117D117D117D117D117 /* LocalSourceSyncPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E117E117E117E117E117E117 /* LocalSourceSyncPlanner.swift */; };
+		D118D118D118D118D118D118 /* LocalSourceWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = E118E118E118E118E118E118 /* LocalSourceWatcher.swift */; };
+		D119D119D119D119D119D119 /* AppModel+LocalSourceSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = E119E119E119E119E119E119 /* AppModel+LocalSourceSync.swift */; };
+		D11AD11AD11AD11AD11AD11A /* CodeSearchEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E11AE11AE11AE11AE11AE11A /* CodeSearchEngine.swift */; };
+		D11BD11BD11BD11BD11BD11B /* CodeEditorTextTransform.swift in Sources */ = {isa = PBXBuildFile; fileRef = E11BE11BE11BE11BE11BE11B /* CodeEditorTextTransform.swift */; };
+		D11CD11CD11CD11CD11CD11C /* ModuleCodeEditorController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E11CE11CE11CE11CE11CE11C /* ModuleCodeEditorController.swift */; };
+		D11DD11DD11DD11DD11DD11D /* ModuleCodeSearchBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = E11DE11DE11DE11DE11DE11D /* ModuleCodeSearchBar.swift */; };
+		F41000000000000000000001 /* LocalSourceSyncPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F41000000000000000000002 /* LocalSourceSyncPlannerTests.swift */; };
+		F42000000000000000000001 /* CodeSearchEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F42000000000000000000002 /* CodeSearchEngineTests.swift */; };
+		F43000000000000000000001 /* CodeEditorTextTransformTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F43000000000000000000002 /* CodeEditorTextTransformTests.swift */; };
 		F20000000000000000000001 /* ModuleSidebarFilterBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000002 /* ModuleSidebarFilterBar.swift */; };
 		F10000000000000000000001 /* SurgeRelayUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000002 /* SurgeRelayUITests.swift */; };
 		D116D116D116D116D116D116 /* BoundedRemoteDataFetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = E116E116E116E116E116E116 /* BoundedRemoteDataFetcher.swift */; };
@@ -253,6 +263,16 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		E117E117E117E117E117E117 /* LocalSourceSyncPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalSourceSyncPlanner.swift; sourceTree = "<group>"; };
+		E118E118E118E118E118E118 /* LocalSourceWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalSourceWatcher.swift; sourceTree = "<group>"; };
+		E119E119E119E119E119E119 /* AppModel+LocalSourceSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+LocalSourceSync.swift"; sourceTree = "<group>"; };
+		E11AE11AE11AE11AE11AE11A /* CodeSearchEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeSearchEngine.swift; sourceTree = "<group>"; };
+		E11BE11BE11BE11BE11BE11B /* CodeEditorTextTransform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeEditorTextTransform.swift; sourceTree = "<group>"; };
+		E11CE11CE11CE11CE11CE11C /* ModuleCodeEditorController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleCodeEditorController.swift; sourceTree = "<group>"; };
+		E11DE11DE11DE11DE11DE11D /* ModuleCodeSearchBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleCodeSearchBar.swift; sourceTree = "<group>"; };
+		F41000000000000000000002 /* LocalSourceSyncPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalSourceSyncPlannerTests.swift; sourceTree = "<group>"; };
+		F42000000000000000000002 /* CodeSearchEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeSearchEngineTests.swift; sourceTree = "<group>"; };
+		F43000000000000000000002 /* CodeEditorTextTransformTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeEditorTextTransformTests.swift; sourceTree = "<group>"; };
 		F20000000000000000000002 /* ModuleSidebarFilterBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleSidebarFilterBar.swift; sourceTree = "<group>"; };
 		F10000000000000000000002 /* SurgeRelayUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurgeRelayUITests.swift; sourceTree = "<group>"; };
 		F10000000000000000000003 /* SurgeRelayUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SurgeRelayUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -500,6 +520,7 @@
 		05D6584CC9473A8BC0B12784 /* SurgeRelay */ = {
 			isa = PBXGroup;
 			children = (
+				E119E119E119E119E119E119 /* AppModel+LocalSourceSync.swift */,
 				34A9D55DA8369A1C9187A35C /* Models */,
 				25F381528CBA8FEE25E4A139 /* Services */,
 				566BC4E001EE9379DF8EA731 /* Utilities */,
@@ -535,6 +556,8 @@
 		25432D20905F79D6AE1E1480 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				E11CE11CE11CE11CE11CE11C /* ModuleCodeEditorController.swift */,
+				E11DE11DE11DE11DE11DE11D /* ModuleCodeSearchBar.swift */,
 				8157D4CB748796B7AD783D8F /* CheckForUpdatesView.swift */,
 				B11B11B11B11B11B11B11B11 /* CombinedModuleViews.swift */,
 				B7DAE6646C847419124DE9BB /* Components.swift */,
@@ -570,6 +593,10 @@
 		25F381528CBA8FEE25E4A139 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				E117E117E117E117E117E117 /* LocalSourceSyncPlanner.swift */,
+				E118E118E118E118E118E118 /* LocalSourceWatcher.swift */,
+				E11AE11AE11AE11AE11AE11A /* CodeSearchEngine.swift */,
+				E11BE11BE11BE11BE11BE11B /* CodeEditorTextTransform.swift */,
 				C25C25C25C25C25C25C25C25 /* AutomaticPublishPlanner.swift */,
 				E116E116E116E116E116E116 /* BoundedRemoteDataFetcher.swift */,
 				E10E10E10E10E10E10E10E10 /* DiagnosticReportBuilder.swift */,
@@ -739,6 +766,9 @@
 		992FBA5B9AB9596787D9E76C /* SurgeRelayTests */ = {
 			isa = PBXGroup;
 			children = (
+				F41000000000000000000002 /* LocalSourceSyncPlannerTests.swift */,
+				F42000000000000000000002 /* CodeSearchEngineTests.swift */,
+				F43000000000000000000002 /* CodeEditorTextTransformTests.swift */,
 				40A1B2C3D4E5F60718293A4B /* AppSettingsTests.swift */,
 				4C7A8B9C0D1E2F3041526374 /* AutomaticPublishPlannerTests.swift */,
 				4A4B5C6D7E8F901122334455 /* ConfigurationMigrationTests.swift */,
@@ -1003,6 +1033,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F41000000000000000000001 /* LocalSourceSyncPlannerTests.swift in Sources */,
+				F42000000000000000000001 /* CodeSearchEngineTests.swift in Sources */,
+				F43000000000000000000001 /* CodeEditorTextTransformTests.swift in Sources */,
 				30A1B2C3D4E5F60718293A4B /* AppSettingsTests.swift in Sources */,
 				3C7A8B9C0D1E2F3041526374 /* AutomaticPublishPlannerTests.swift in Sources */,
 				3A4B5C6D7E8F901122334455 /* ConfigurationMigrationTests.swift in Sources */,
@@ -1049,6 +1082,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D117D117D117D117D117D117 /* LocalSourceSyncPlanner.swift in Sources */,
+				D118D118D118D118D118D118 /* LocalSourceWatcher.swift in Sources */,
+				D119D119D119D119D119D119 /* AppModel+LocalSourceSync.swift in Sources */,
+				D11AD11AD11AD11AD11AD11A /* CodeSearchEngine.swift in Sources */,
+				D11BD11BD11BD11BD11BD11B /* CodeEditorTextTransform.swift in Sources */,
+				D11CD11CD11CD11CD11CD11C /* ModuleCodeEditorController.swift in Sources */,
+				D11DD11DD11DD11DD11DD11D /* ModuleCodeSearchBar.swift in Sources */,
 				384BEBC6E1F8C9A0A53FB0FC /* AppModel.swift in Sources */,
 				D104D104D104D104D104D104 /* AppModel+AutomaticPublishing.swift in Sources */,
 				D0C0D0C0D0C0D0C0D0C0D0C0 /* AppModel+Credentials.swift in Sources */,
@@ -1266,7 +1306,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-			CURRENT_PROJECT_VERSION = 101;
+			CURRENT_PROJECT_VERSION = 102;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1280,7 +1320,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-			MARKETING_VERSION = 1.4.6;
+			MARKETING_VERSION = 1.4.7;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1364,7 +1404,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-			CURRENT_PROJECT_VERSION = 101;
+			CURRENT_PROJECT_VERSION = 102;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -1384,7 +1424,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-			MARKETING_VERSION = 1.4.6;
+			MARKETING_VERSION = 1.4.7;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

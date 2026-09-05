@@ -18,6 +18,9 @@ struct ModuleCodeCursorPosition: Equatable {
 final class CodeTextView: NSTextView {
     static let gutterWidth: CGFloat = 44
     private let gutterView = GutterView()
+    /// 查找栏与菜单命令的目标；由 `ModuleCodeEditorController.attach(_:)` 建立。
+    weak var editorController: ModuleCodeEditorController?
+    private var hasSearchHighlights = false
 
     override init(frame frameRect: NSRect, textContainer container: NSTextContainer?) {
         super.init(frame: frameRect, textContainer: container)
@@ -42,6 +45,98 @@ final class CodeTextView: NSTextView {
     func refreshGutter() {
         gutterView.frame = NSRect(x: 0, y: 0, width: Self.gutterWidth, height: bounds.height)
         gutterView.render()
+    }
+
+    /// 执行一次可撤销的文本替换。
+    ///
+    /// 走 `shouldChangeText(in:replacementString:)` / `didChangeText()` 而不是直接
+    /// 改 `textStorage`，这样缩进、注释、替换全部会进入 `NSTextView` 的撤销栈，
+    /// ⌘Z 才能还原程序化编辑。
+    @discardableResult
+    func applyEdit(_ edit: CodeEditorEdit) -> Bool {
+        guard isEditable,
+              NSMaxRange(edit.range) <= (string as NSString).length,
+              shouldChangeText(in: edit.range, replacementString: edit.replacement) else {
+            return false
+        }
+        replaceCharacters(in: edit.range, with: edit.replacement)
+        didChangeText()
+        let length = (string as NSString).length
+        let location = min(edit.selection.location, length)
+        setSelectedRange(NSRange(location: location, length: min(edit.selection.length, length - location)))
+        return true
+    }
+
+    /// 用 layout manager 的临时属性标记查找结果。
+    ///
+    /// 临时属性不属于 `textStorage`，因此语法高亮重新设置属性时不会被抹掉，
+    /// 也不会污染模块内容本身。
+    func applySearchHighlights(_ ranges: [NSRange], current: NSRange?) {
+        guard let layoutManager else { return }
+        clearSearchHighlights()
+        let length = (string as NSString).length
+        guard length > 0 else { return }
+        for range in ranges where NSMaxRange(range) <= length {
+            layoutManager.addTemporaryAttributes(
+                [.backgroundColor: NSColor.systemYellow.withAlphaComponent(0.3)],
+                forCharacterRange: range
+            )
+            hasSearchHighlights = true
+        }
+        if let current, NSMaxRange(current) <= length {
+            layoutManager.addTemporaryAttributes(
+                [
+                    .backgroundColor: NSColor.controlAccentColor.withAlphaComponent(0.45),
+                    .underlineStyle: NSUnderlineStyle.single.rawValue,
+                ],
+                forCharacterRange: current
+            )
+            hasSearchHighlights = true
+        }
+    }
+
+    func clearSearchHighlights() {
+        guard hasSearchHighlights, let layoutManager else { return }
+        let fullRange = NSRange(location: 0, length: (string as NSString).length)
+        layoutManager.removeTemporaryAttribute(.backgroundColor, forCharacterRange: fullRange)
+        layoutManager.removeTemporaryAttribute(.underlineStyle, forCharacterRange: fullRange)
+        hasSearchHighlights = false
+    }
+
+    /// 编辑器自己处理常用快捷键，这样即使主菜单没有对应项，⌘Z / ⌘F 也可用。
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard modifiers.contains(.command),
+              modifiers.subtracting([.command, .shift, .option]).isEmpty,
+              let controller = editorController,
+              let key = event.charactersIgnoringModifiers?.lowercased() else {
+            return super.performKeyEquivalent(with: event)
+        }
+        let hasShift = modifiers.contains(.shift)
+        let hasOption = modifiers.contains(.option)
+        switch key {
+        case "z" where !hasOption:
+            if hasShift { controller.redo() } else { controller.undo() }
+        case "f" where !hasShift:
+            controller.presentFind(showsReplace: hasOption)
+        case "g" where !hasOption:
+            controller.find(forward: !hasShift)
+        case "l" where !hasShift && !hasOption:
+            controller.presentGoToLine()
+        case "/" where !hasShift && !hasOption:
+            controller.toggleComment()
+        default:
+            return super.performKeyEquivalent(with: event)
+        }
+        return true
+    }
+
+    override func cancelOperation(_ sender: Any?) {
+        guard let controller = editorController, controller.isFindBarPresented else {
+            super.cancelOperation(sender)
+            return
+        }
+        controller.dismissFindBar()
     }
 }
 
@@ -186,10 +281,15 @@ struct ModuleCodeTextView: NSViewRepresentable {
     let isEditable: Bool
     let modules: [RelayModule]
     let selectedModuleID: UUID?
+    var controller: ModuleCodeEditorController? = nil
     var onCursorPositionChange: ((ModuleCodeCursorPosition) -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text, onCursorPositionChange: onCursorPositionChange)
+        Coordinator(
+            text: $text,
+            controller: controller,
+            onCursorPositionChange: onCursorPositionChange
+        )
     }
 
     func makeNSView(context: Context) -> CodeTextView {
@@ -221,7 +321,9 @@ struct ModuleCodeTextView: NSViewRepresentable {
         textView.isEditable = isEditable
         textView.isSelectable = true
         textView.allowsUndo = true
-        textView.usesFindPanel = true
+        // 系统 find bar 需要依附 NSScrollView，这里的编辑器有意不放进
+        // NSScrollView，改由 ModuleCodeSearchBar 提供查找与替换。
+        textView.usesFindPanel = false
         textView.usesFontPanel = false
         textView.isAutomaticSpellingCorrectionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
@@ -245,6 +347,8 @@ struct ModuleCodeTextView: NSViewRepresentable {
         textView.string = text
         textView.typingAttributes = Coordinator.defaultAttributes
         context.coordinator.textView = textView
+        controller?.attach(textView)
+        controller?.setEditable(isEditable)
         context.coordinator.applyHighlighting(modules: modules, selectedModuleID: selectedModuleID)
         _ = context.coordinator.needsHighlight(text: text, selectedModuleID: selectedModuleID)
         textView.refreshGutter()
@@ -254,6 +358,7 @@ struct ModuleCodeTextView: NSViewRepresentable {
 
     func updateNSView(_ textView: CodeTextView, context: Context) {
         textView.isEditable = isEditable
+        controller?.setEditable(isEditable)
         if textView.string != text {
             let selectedRange = textView.selectedRange()
             context.coordinator.isApplyingUpdate = true
@@ -264,6 +369,8 @@ struct ModuleCodeTextView: NSViewRepresentable {
             textView.setSelectedRange(NSRange(location: validLocation, length: validLength))
             context.coordinator.isApplyingUpdate = false
             textView.refreshGutter()
+            // 外部重新载入的内容与旧撤销栈不再对应，清空后重新计算查找结果。
+            controller?.resetForReloadedContent()
         }
         // Re-highlighting runs several regex passes over the whole document; only
         // do it when the text or selection actually changed, so unrelated SwiftUI
@@ -332,6 +439,12 @@ struct ModuleCodeTextView: NSViewRepresentable {
         @Binding private var text: String
         weak var textView: CodeTextView?
         var isApplyingUpdate = false
+        /// 编辑器自带的撤销栈。
+        ///
+        /// 不依赖窗口的 `UndoManager`：SwiftUI 承载的窗口不保证把它接进
+        /// Edit 菜单，而每个编辑器拥有独立撤销栈也避免了预览和文本编辑器互相干扰。
+        private let editorUndoManager = UndoManager()
+        private let controller: ModuleCodeEditorController?
         private let onCursorPositionChange: ((ModuleCodeCursorPosition) -> Void)?
         private var lastSelectedModuleID: UUID?
         private var lastHighlightedText: String?
@@ -340,10 +453,17 @@ struct ModuleCodeTextView: NSViewRepresentable {
 
         init(
             text: Binding<String>,
+            controller: ModuleCodeEditorController?,
             onCursorPositionChange: ((ModuleCodeCursorPosition) -> Void)?
         ) {
             _text = text
+            self.controller = controller
             self.onCursorPositionChange = onCursorPositionChange
+            editorUndoManager.levelsOfUndo = 200
+        }
+
+        func undoManager(for view: NSTextView) -> UndoManager? {
+            editorUndoManager
         }
 
         /// Returns true (and records the new state) when the text or selection
@@ -362,23 +482,36 @@ struct ModuleCodeTextView: NSViewRepresentable {
             text = textView.string
             publishCursorPosition()
             textView.refreshGutter()
+            controller?.textDidChange()
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
             publishCursorPosition()
+            controller?.selectionDidChange()
             textView?.needsDisplay = true
         }
 
         func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            guard let codeTextView = textView as? CodeTextView else { return false }
             switch commandSelector {
             case #selector(NSResponder.insertTab(_:)):
-                indentSelection(in: textView)
+                codeTextView.applyEdit(CodeEditorTextTransform.indent(
+                    in: textView.string,
+                    selection: textView.selectedRange()
+                ))
                 return true
             case #selector(NSResponder.insertBacktab(_:)):
-                unindentSelection(in: textView)
+                guard let edit = CodeEditorTextTransform.unindent(
+                    in: textView.string,
+                    selection: textView.selectedRange()
+                ) else { return true }
+                codeTextView.applyEdit(edit)
                 return true
             case #selector(NSResponder.insertNewline(_:)):
-                insertIndentedNewline(in: textView)
+                codeTextView.applyEdit(CodeEditorTextTransform.newlineKeepingIndentation(
+                    in: textView.string,
+                    selection: textView.selectedRange()
+                ))
                 return true
             default:
                 return false
@@ -396,51 +529,6 @@ struct ModuleCodeTextView: NSViewRepresentable {
             }
             let column = prefix.split(separator: "\n", omittingEmptySubsequences: false).last?.count ?? 0
             onCursorPositionChange(ModuleCodeCursorPosition(line: line, column: column + 1))
-        }
-
-        private func indentSelection(in textView: NSTextView) {
-            let range = textView.selectedRange()
-            guard range.length > 0 else {
-                textView.insertText("    ", replacementRange: range)
-                return
-            }
-            let string = textView.string as NSString
-            let lineRange = string.lineRange(for: range)
-            let selectedLines = string.substring(with: lineRange)
-            let replacement = selectedLines
-                .split(separator: "\n", omittingEmptySubsequences: false)
-                .map { "    " + String($0) }
-                .joined(separator: "\n")
-            textView.replaceCharacters(in: lineRange, with: replacement)
-            textView.setSelectedRange(NSRange(location: lineRange.location, length: (replacement as NSString).length))
-        }
-
-        private func unindentSelection(in textView: NSTextView) {
-            let range = textView.selectedRange()
-            let string = textView.string as NSString
-            let lineRange = string.lineRange(for: range)
-            let selectedLines = string.substring(with: lineRange)
-            let replacement = selectedLines
-                .split(separator: "\n", omittingEmptySubsequences: false)
-                .map { line -> Substring in
-                    if line.hasPrefix("    ") { return line.dropFirst(4) }
-                    if line.hasPrefix("\t") { return line.dropFirst() }
-                    if line.hasPrefix(" ") { return line.dropFirst() }
-                    return line
-                }
-                .joined(separator: "\n")
-            guard replacement != selectedLines else { return }
-            textView.replaceCharacters(in: lineRange, with: replacement)
-            textView.setSelectedRange(NSRange(location: lineRange.location, length: (replacement as NSString).length))
-        }
-
-        private func insertIndentedNewline(in textView: NSTextView) {
-            let range = textView.selectedRange()
-            let string = textView.string as NSString
-            let lineStart = string.lineRange(for: NSRange(location: range.location, length: 0)).location
-            let linePrefix = string.substring(with: NSRange(location: lineStart, length: range.location - lineStart))
-            let indentation = String(linePrefix.prefix(while: { $0 == " " || $0 == "\t" }))
-            textView.insertText("\n\(indentation)", replacementRange: range)
         }
 
         func scheduleHighlighting(modules: [RelayModule], selectedModuleID: UUID?) {

@@ -13,6 +13,7 @@ struct ModulePreviewPane: View {
     @State private var loadErrorMessage: String?
     @State private var cursorPosition = ModuleCodeCursorPosition(line: 1, column: 1)
     @State private var showsComparison = false
+    @State private var editor = ModuleCodeEditorController()
 
     private var currentModule: RelayModule {
         model.modules.first(where: { $0.id == module.id }) ?? module
@@ -46,6 +47,9 @@ struct ModulePreviewPane: View {
                 .background(.orange.opacity(0.08))
                 Divider()
             }
+            if editor.isFindBarPresented {
+                ModuleCodeSearchBar(controller: editor)
+            }
             ZStack {
                 ScrollView(.vertical) {
                     ModuleCodeTextView(
@@ -53,6 +57,7 @@ struct ModulePreviewPane: View {
                         isEditable: !isLoading,
                         modules: [currentModule],
                         selectedModuleID: module.id,
+                        controller: editor,
                         onCursorPositionChange: { cursorPosition = $0 }
                     )
                     .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -78,6 +83,7 @@ struct ModulePreviewPane: View {
                 Label("第 \(cursorPosition.line) 行，第 \(cursorPosition.column) 列", systemImage: "text.cursor")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
+                ModuleCodeEditorToolbar(controller: editor)
                 Button("恢复") { restore() }
                     .disabled(isWriting || isLoading)
                 if !isLoading, text != savedText {
@@ -217,6 +223,7 @@ struct CombinedPreviewPane: View {
     @State private var text = ""
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var editor = ModuleCodeEditorController()
 
     private var enabledModules: [RelayModule] {
         ModuleRefreshPlanner.combinedContributorModules(
@@ -230,16 +237,22 @@ struct CombinedPreviewPane: View {
     }
 
     var body: some View {
-        ScrollView(.vertical) {
-            ModuleCodeTextView(
-                text: .constant(text),
-                isEditable: false,
-                modules: enabledModules,
-                selectedModuleID: nil
-            )
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+        VStack(spacing: 0) {
+            if editor.isFindBarPresented {
+                ModuleCodeSearchBar(controller: editor)
+            }
+            ScrollView(.vertical) {
+                ModuleCodeTextView(
+                    text: .constant(text),
+                    isEditable: false,
+                    modules: enabledModules,
+                    selectedModuleID: nil,
+                    controller: editor
+                )
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+            .background(Color(nsColor: .textBackgroundColor))
         }
-        .background(Color(nsColor: .textBackgroundColor))
         .overlay {
             if !isLoading, text.isEmpty {
                 ContentUnavailableView("没有可预览的内容", systemImage: "doc.text.magnifyingglass")
@@ -279,6 +292,7 @@ struct ModuleTextEditorView: View {
     @State private var errorMessage: String?
     @State private var loadErrorMessage: String?
     @State private var cursorPosition = ModuleCodeCursorPosition(line: 1, column: 1)
+    @State private var editor = ModuleCodeEditorController()
 
     private var currentModule: RelayModule {
         model.modules.first(where: { $0.id == module.id }) ?? module
@@ -303,17 +317,22 @@ struct ModuleTextEditorView: View {
                     .font(.headline)
                     .lineLimit(1)
                 Spacer(minLength: 0)
+                ModuleCodeEditorToolbar(controller: editor)
                 Button("恢复") { restore() }
                     .disabled(isWriting || isLoading)
                 Button("保存") { write() }
                     .keyboardShortcut("s", modifiers: .command)
                     .buttonStyle(.borderedProminent)
                     .disabled(isWriting || isLoading || text == savedText)
+                // 不给“完成”绑定 return：编辑器聚焦时 return 必须落到文本里换行。
                 Button("完成") { dismiss() }
-                    .keyboardShortcut(.defaultAction)
+                    .keyboardShortcut("w", modifiers: .command)
             }
             .padding(12)
             Divider()
+            if editor.isFindBarPresented {
+                ModuleCodeSearchBar(controller: editor)
+            }
             ZStack {
                 ScrollView(.vertical) {
                     ModuleCodeTextView(
@@ -321,6 +340,7 @@ struct ModuleTextEditorView: View {
                         isEditable: !isLoading,
                         modules: [currentModule],
                         selectedModuleID: module.id,
+                        controller: editor,
                         onCursorPositionChange: { cursorPosition = $0 }
                     )
                     .frame(maxWidth: .infinity, alignment: .topLeading)

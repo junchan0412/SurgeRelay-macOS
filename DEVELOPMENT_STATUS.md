@@ -6,7 +6,7 @@
 
 | 项目 | 当前值 |
 | --- | --- |
-| 版本 | 1.4.6 (101) |
+| 版本 | 1.4.7 (102) |
 | macOS deployment target | 26.0 |
 | Swift | 6.0，strict concurrency complete |
 
@@ -23,6 +23,8 @@
 - 集中管理远程、本地与 Script-Hub 转换模块，并区分 storageLocation 与 initialSource。
 - 本地与 GitHub 发布可并存；独立模块按自身存放位置发布，总模块可同时发布到两个目标。
 - 支持本地模块扫描、转换预览、文本覆盖、冲突处理、发布预览、受管文件清理和自动发布。
+- 监听本地模块目录，源文件在 App 外改动后按来源内容 sha256 只重新转换改动过的模块。
+- 模块内容编辑器支持撤销/重做、查找与替换（含正则）、跳转到行、切换注释和缩进操作。
 - 提供 macOS 主界面、菜单栏和带访问控制的 Web 管理端。
 - 凭据使用配置目录内 AES-256-GCM 加密文件，不依赖系统钥匙串。
 - Release preflight 覆盖版本、Sparkle、appcast、entitlements、Web 资源、workflow 和 Xcode 工程源文件登记。
@@ -31,13 +33,13 @@
 
 | 指标 | 数量 |
 | --- | --- |
-| 应用 Swift 文件 | 127 |
-| Swift 测试文件（unit / UI） | 39 / 1 |
-| 源码中的 XCTest 方法 | 284 |
-| Services / Models / Views / Utilities / App-Core | 56 / 19 / 28 / 3 / 21 |
-| 应用 Swift 行数 | 20,823 |
-| 测试 Swift 行数 | 7,798 |
-| CHANGELOG release 段落 | 101 |
+| 应用 Swift 文件 | 134 |
+| Swift 测试文件（unit / UI） | 42 / 1 |
+| 源码中的 XCTest 方法 | 315 |
+| Services / Models / Views / Utilities / App-Core | 60 / 19 / 30 / 3 / 22 |
+| 应用 Swift 行数 | 22,193 |
+| 测试 Swift 行数 | 8,337 |
+| CHANGELOG release 段落 | 102 |
 
 ## 主要维护热点
 
@@ -45,12 +47,12 @@
 
 | 文件 | 行数 |
 | --- | --- |
-| SurgeRelay/Views/ModuleCodeTextView.swift | 560 |
+| SurgeRelay/Views/ModuleCodeTextView.swift | 648 |
 | SurgeRelay/Views/ModuleSidebarView.swift | 506 |
 | SurgeRelay/Utilities/ModuleMetadataParser.swift | 496 |
+| SurgeRelay/Views/ModulePreviewViews.swift | 437 |
 | SurgeRelay/Models/RelayModule.swift | 426 |
-| SurgeRelay/Views/ModulePreviewViews.swift | 417 |
-| SurgeRelay/AppModel+Updates.swift | 412 |
+| SurgeRelay/AppModel+Updates.swift | 417 |
 | SurgeRelay/Services/ModuleFileStore.swift | 383 |
 | SurgeRelay/Views/ModuleDetailView.swift | 381 |
 | SurgeRelay/Services/EmbeddedScriptHubEngine.swift | 376 |
@@ -74,7 +76,7 @@ git diff --check
 node script/generate_project_status.mjs --check
 node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs
-VERSION=1.4.6 BUILD=101 ./script/check_release_configuration.sh
+VERSION=1.4.7 BUILD=102 ./script/check_release_configuration.sh
 
 DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
 xcodebuild test \

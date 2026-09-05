@@ -131,6 +131,8 @@ struct AppSettings: Codable, Equatable, Sendable {
     var refreshIntervalMinutes = 60
     var automaticallyUpdateOnLaunch = true
     var automaticallyPublish = true
+    /// 监听本地模块来源文件，磁盘内容变化后自动重新转换并发布。
+    var watchesLocalModuleChanges = true
     var launchAtLogin = false
     var github = GitHubSettings()
     var githubToken = ""
@@ -163,6 +165,7 @@ struct AppSettings: Codable, Equatable, Sendable {
         refreshIntervalMinutes = try container.decodeIfPresent(Int.self, forKey: .refreshIntervalMinutes) ?? 60
         automaticallyUpdateOnLaunch = try container.decodeIfPresent(Bool.self, forKey: .automaticallyUpdateOnLaunch) ?? true
         automaticallyPublish = try container.decodeIfPresent(Bool.self, forKey: .automaticallyPublish) ?? true
+        watchesLocalModuleChanges = try container.decodeIfPresent(Bool.self, forKey: .watchesLocalModuleChanges) ?? true
         launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
         github = try container.decodeIfPresent(GitHubSettings.self, forKey: .github) ?? GitHubSettings()
         githubToken = try container.decodeIfPresent(String.self, forKey: .githubToken) ?? ""
