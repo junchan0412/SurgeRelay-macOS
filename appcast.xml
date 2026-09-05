@@ -20,7 +20,7 @@
 - 文本编辑：独立文本编辑器窗口的“完成”不再占用 return 键，⌘W 关闭，return 恢复为换行。
 - 验证：常规 Xcode 单元测试、Debug build、Release 构建、代码签名、Sparkle 签名、appcast 同步与发布资产校验通过。
 ]]></description>
-            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.4.7/Surge-Relay-1.4.7.app.zip" length="12425004" type="application/zip" sparkle:edSignature="JA9n1/FCZXjGfp+8yw1/cSF8NIuO5j8IZVG/aRTg+RExRZQIX9+17QVX3814BMJOR/rzxi80aLFxfZwz8sbvBw=="/>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v1.4.7/Surge-Relay-1.4.7.app.zip" length="12097504" type="application/zip" sparkle:edSignature="vMqafHPTQRl2FsXrKuEFcQNFo05ULl7hOhmvhHgcK5t2XShsBdnGQ8WIrNsSXEYFy3L5NXOqHOxwQ5QkR0WZCg=="/>
         </item>
         <item>
             <title>1.4.6</title>
