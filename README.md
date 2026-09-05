@@ -262,7 +262,18 @@ DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Devel
 ./script/build_release_assets.sh
 ```
 
-本地验证会检查版本号、构建号、签名身份、Sparkle 签名、动态库依赖、zip 元数据、pkg payload 和安装脚本。线上发布后可继续验证 GitHub Release 资产：
+本地验证会检查版本号、构建号、签名身份、Sparkle 签名、动态库依赖、zip 元数据、pkg payload 和安装脚本。
+
+本地构建产生的 appcast 条目先随版本提交并打 tag，`Package Release App` workflow 再用同一 tag 构建并上传自己的资产。两次构建的 zip 不会逐字节相同，因此上传完成后必须把 `appcast.xml` 中该版本 `<enclosure>` 的 `length` 和 `sparkle:edSignature` 同步成 Release 上实际资产的值，否则 Sparkle 会因为签名不匹配拒绝更新：
+
+```bash
+gh release view vX.Y.Z --repo junchan0412/SurgeRelay-macOS \
+  --json assets --jq '.assets[] | "\(.name) \(.size)"'
+gh release download vX.Y.Z --repo junchan0412/SurgeRelay-macOS \
+  --pattern "Surge-Relay-X.Y.Z.app.zip.sparkle.txt" --dir /tmp --clobber
+```
+
+把两个值写回 `appcast.xml` 后重新运行配置预检并提交。线上发布后可继续验证 GitHub Release 资产：
 
 ```bash
 REQUIRE_SPARKLE_SIGNATURES=1 \
