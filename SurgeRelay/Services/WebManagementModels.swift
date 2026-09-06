@@ -5,6 +5,21 @@ struct WebStatePayload: Encodable {
     let moduleEditor: WebModuleEditorPayload
     let modules: [WebModulePayload]
     let activity: WebActivityPayload
+    var workspace: WebWorkspacePayload? = nil
+}
+
+struct WebWorkspacePayload: Encodable {
+    let localDirectory: String
+    let githubRepository: String
+    let githubBranch: String
+    let historyCount: Int
+    let recentHistory: [UpdateHistoryEntry]
+}
+
+struct WebModuleProjectionCache {
+    let revision: UInt64
+    let settings: AppSettings
+    let modules: [WebModulePayload]
 }
 
 struct WebModuleEditorPayload: Encodable {

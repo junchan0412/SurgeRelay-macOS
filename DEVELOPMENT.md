@@ -3,6 +3,19 @@
 This document records the project conventions needed to maintain this fork.
 For the current version, capability summary, code metrics, optimization order, and release checklist, see the generated `DEVELOPMENT_STATUS.md`. Refresh it with `node script/generate_project_status.mjs`; do not edit it manually. Git/upstream snapshots belong in `docs/UPSTREAM_SYNC.md` so the generated file remains reproducible after commits and tag checkouts.
 
+## 2.0 Architecture
+
+The 2.0 refactor and reproducible validation are described in `docs/RELAY_2_0.md`.
+
+- `ModuleUpdatePipeline` bounds concurrency to four and restores source order. `AppModel+Updates` owns admission, cancellable preparation, aggregation and persistence; `AppModel+ModuleUpdate` owns one module's refresh. Keep cancellation and generation checks before cache/model commits.
+- `BoundedHTTPClient` reuses URLSession connections, limits bytes before appending, and propagates cancellation. Native conversion accepts the bytes already read by `SourceRevisionService`.
+- `ModuleFileStore.commitConversion` stages `Content.cache` and `Assets` together and atomically replaces `Cache/Snapshots/<module-id>`. Legacy component/asset caches remain readable; manual overrides stay outside the snapshot. Normalize enumerated URLs before deriving relative paths on macOS (`/var` and `/private/var`).
+- Module summaries invalidate on `moduleRevision`; `WebModuleProjectionCache` also accounts for settings. The progress endpoint builds activity only. Asset fingerprints must remain byte-compatible with existing SHA-256 values.
+- `WorkspaceOverviewView`, `ActivityHistoryView`, `ModuleSidebarStatusCard` and `SettingsPage` define the new workspace. Keep list filtering/grouping off the main actor and keep editors lazy. Unsaved preview drafts are in-memory and are retained across module selection, not across app restarts.
+- Web navigation supports `overview`, `activity`, `combined` and module IDs. `web-state.js` owns connection timers and lifecycle; `web-preview.js` owns drafts and response generations. Hidden mobile panes must be inert.
+- WebResources is a folder resource in the Xcode project, matching project.yml. `verify_web_bundle.mjs` validates references and script syntax inside built zip/pkg bundles.
+- Release scripts must use Swift 6, complete concurrency checking, `-O` and no Debug dylib. Launch smoke tests use isolated UI QA data, never the user's automation/publish configuration.
+
 ## Project Shape
 
 - Xcode project: `Surge Relay.xcodeproj`

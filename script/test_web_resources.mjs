@@ -5,5 +5,7 @@ import './web-resource-tests/api-state.test.mjs';
 import './web-resource-tests/editor-feedback-preview.test.mjs';
 import './web-resource-tests/detail.test.mjs';
 import './web-resource-tests/index-contract.test.mjs';
+import './web-resource-tests/lifecycle.test.mjs';
+import './web-resource-tests/bundle.test.mjs';
 
 console.log('Web resource behavior tests passed');

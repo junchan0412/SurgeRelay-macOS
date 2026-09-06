@@ -228,12 +228,12 @@ const activeFailureFilter = logic.sidebarFailureFilterState(sidebarModules, true
 assert.equal(activeFailureFilter.failedCount, 2);
 assert.equal(activeFailureFilter.failuresOnly, true);
 assert.equal(activeFailureFilter.isVisible, true);
-assert.equal(activeFailureFilter.label, '失败 2');
+assert.equal(activeFailureFilter.label, '待处理 2');
 const hiddenFailureFilter = logic.sidebarFailureFilterState([{ ...signatureBase, state: 'current' }], true);
 assert.equal(hiddenFailureFilter.failedCount, 0);
 assert.equal(hiddenFailureFilter.failuresOnly, false);
 assert.equal(hiddenFailureFilter.isVisible, false);
-assert.equal(hiddenFailureFilter.label, '失败 0');
+assert.equal(hiddenFailureFilter.label, '待处理 0');
 assert.deepEqual(
   Array.from(logic.sidebarModules(sidebarModules, { query: 'rewrite', failuresOnly: true }).map(module => module.id)),
   ['failed-2']

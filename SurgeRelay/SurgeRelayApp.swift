@@ -18,7 +18,7 @@ struct SurgeRelayApp: App {
                     }
                     model.start()
                 }
-                .frame(minWidth: 700)
+                .frame(minWidth: 920, minHeight: 600)
         }
         .windowStyle(.automatic)
         .windowToolbarStyle(.unified(showsTitle: false))
@@ -36,6 +36,10 @@ struct SurgeRelayApp: App {
                     .keyboardShortcut(",", modifiers: .command)
             }
             CommandGroup(after: .newItem) {
+                Button("显示工作台") { model.selectedModuleID = AppModel.overviewSelectionID }
+                    .keyboardShortcut("1", modifiers: .command)
+                Button("显示活动记录") { model.selectedModuleID = AppModel.activitySelectionID }
+                    .keyboardShortcut("2", modifiers: .command)
                 Button("更新全部模块") {
                     model.startUpdateAll()
                 }

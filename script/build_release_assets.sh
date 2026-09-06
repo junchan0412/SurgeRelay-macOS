@@ -239,11 +239,11 @@ xcodebuild \
   CODE_SIGNING_ALLOWED=NO \
   CODE_SIGNING_REQUIRED=NO \
   CODE_SIGN_IDENTITY="" \
-  SWIFT_COMPILATION_MODE=singlefile \
-  SWIFT_ENABLE_BATCH_MODE=NO \
-  SWIFT_OPTIMIZATION_LEVEL=-Onone \
-  SWIFT_STRICT_CONCURRENCY=targeted \
-  SWIFT_VERSION=5.9 \
+  SWIFT_COMPILATION_MODE=wholemodule \
+  SWIFT_OPTIMIZATION_LEVEL=-O \
+  SWIFT_STRICT_CONCURRENCY=complete \
+  SWIFT_VERSION=6.0 \
+  ENABLE_DEBUG_DYLIB=NO \
   build
 
 APP_PATH="$(find "$DERIVED_DATA/Build/Products/Release" -maxdepth 1 -name "Surge Relay.app" -type d -print -quit)"

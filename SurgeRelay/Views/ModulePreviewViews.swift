@@ -13,6 +13,7 @@ struct ModulePreviewPane: View {
     @State private var loadErrorMessage: String?
     @State private var cursorPosition = ModuleCodeCursorPosition(line: 1, column: 1)
     @State private var showsComparison = false
+    @State private var confirmsRestore = false
     @State private var editor = ModuleCodeEditorController()
 
     private var currentModule: RelayModule {
@@ -84,7 +85,7 @@ struct ModulePreviewPane: View {
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
                 ModuleCodeEditorToolbar(controller: editor)
-                Button("恢复") { restore() }
+                Button("恢复") { confirmsRestore = true }
                     .disabled(isWriting || isLoading)
                 if !isLoading, text != savedText {
                     Text("有尚未写入的修改")
@@ -100,6 +101,11 @@ struct ModulePreviewPane: View {
             .padding(12)
         }
         .task(id: reloadToken) { await load() }
+        .onChange(of: text) { _, _ in retainDraft() }
+        .onDisappear { retainDraft() }
+        .confirmationDialog("恢复转换结果？", isPresented: $confirmsRestore) {
+            Button("恢复转换结果", role: .destructive) { restore() }
+        } message: { Text("当前模块的手动修改会被丢弃。") }
         .alert("无法完成操作", isPresented: Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
@@ -115,6 +121,12 @@ struct ModulePreviewPane: View {
     }
 
     private func load(force: Bool = false) async {
+        if !force, let draft = model.modulePreviewDrafts[module.id] {
+            text = draft.text
+            savedText = draft.savedText
+            isLoading = false
+            return
+        }
         guard force || text == savedText else { return }
         isLoading = true
         defer {
@@ -137,11 +149,13 @@ struct ModulePreviewPane: View {
 
     private func write() {
         isWriting = true
+        let submittedText = text
         Task {
             defer { isWriting = false }
             do {
-                try await model.savePreviewContent(text, for: currentModule)
-                savedText = text
+                try await model.savePreviewContent(submittedText, for: currentModule)
+                savedText = submittedText
+                retainDraft()
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -156,11 +170,18 @@ struct ModulePreviewPane: View {
                 let restored = try await model.restorePreviewContent(for: currentModule)
                 text = restored
                 savedText = restored
+                model.modulePreviewDrafts.removeValue(forKey: module.id)
                 loadErrorMessage = nil
             } catch {
                 errorMessage = error.localizedDescription
             }
         }
+    }
+
+    private func retainDraft() {
+        guard !isLoading else { return }
+        if text == savedText { model.modulePreviewDrafts.removeValue(forKey: module.id) }
+        else { model.modulePreviewDrafts[module.id] = ModulePreviewDraft(text: text, savedText: savedText) }
     }
 }
 

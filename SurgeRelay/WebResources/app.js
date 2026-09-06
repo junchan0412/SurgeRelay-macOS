@@ -1,7 +1,12 @@
 const ui = {
   body: document.body,
+  sidebar: document.querySelector('.sidebar'),
+  detailPane: document.querySelector('#detail'),
   list: document.querySelector('#module-list'),
   summaryRow: document.querySelector('#summary-row'),
+  overview: document.querySelector('#overview-button'),
+  history: document.querySelector('#history-button'),
+  connection: document.querySelector('#connection-status'),
   summarySubtitle: document.querySelector('#summary-subtitle'),
   detail: document.querySelector('#detail-content'),
   search: document.querySelector('#search-input'),
@@ -86,6 +91,8 @@ let state = null;
 let selectedID = null;
 let editingID = null;
 let showFailuresOnly = false;
+let stateRevision = 0;
+let stateRequest = 0;
 const mobileLayout = window.matchMedia('(max-width: 700px)');
 const moduleEditor = webEditor.createModuleEditorController({
   ui,
@@ -153,12 +160,18 @@ const stateEventController = webState.createStateEventController({
   setInterval: window.setInterval.bind(window),
   clearInterval: window.clearInterval.bind(window),
   setTimeout: window.setTimeout.bind(window),
+  clearTimeout: window.clearTimeout.bind(window),
   loadState: (...args) => loadState(...args),
   applyState: (...args) => applyState(...args),
   applyActivity: activity => applyActivity(activity),
   fetchActivity: () => api('/api/activity'),
   isWorking: () => Boolean(state?.activity?.isWorking),
-  establishSession: () => apiClient.establishSession()
+  establishSession: () => apiClient.establishSession(),
+  onConnectionChange: status => {
+    if (!ui.connection) return;
+    ui.connection.textContent = ({ connected: '已连接', connecting: '连接中', reconnecting: '正在重连', polling: '定时同步', paused: '已暂停' })[status];
+    ui.connection.dataset.status = status;
+  }
 });
 
 apiClient.initializeAccessToken();
@@ -172,6 +185,8 @@ ui.add.addEventListener('click', () => openEditor());
 ui.refresh.addEventListener('click', updateAll);
 ui.cancelActivity.addEventListener('click', cancelCurrentWork);
 ui.summaryRow.addEventListener('click', () => { if (combinedEnabled()) selectItem('combined'); });
+ui.overview?.addEventListener('click', () => selectItem('overview'));
+ui.history?.addEventListener('click', () => selectItem('activity'));
 ui.back.addEventListener('click', navigateBackToList);
 ui.advancedMaster.addEventListener('click', () => moduleEditor.animateAdvancedResize(ui.advancedMaster.getAttribute('aria-expanded') !== 'true'));
 ui.advancedOptions.addEventListener('click', event => {
@@ -214,12 +229,19 @@ ui.confirmDialog.addEventListener('click', event => { if (event.target === ui.co
 ui.list.addEventListener('click', handleListClick);
 ui.list.addEventListener('change', handleListChange);
 ui.list.addEventListener('keydown', event => {
+  if (event.target.closest('.module-toggle')) return;
   const row = event.target.closest('.module-row');
   if (row && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); selectItem(row.dataset.id); }
 });
 ui.detail.addEventListener('click', handleDetailClick);
 ui.detail.addEventListener('change', handleDetailChange);
 window.addEventListener('popstate', handleHistoryNavigation);
+mobileLayout.addEventListener?.('change', syncResponsiveNavigation);
+window.addEventListener('pagehide', () => stateEventController.close());
+window.addEventListener('beforeunload', event => {
+  if (previewController.hasUnsavedChanges) { event.preventDefault(); event.returnValue = ''; }
+});
+window.addEventListener('pageshow', event => { if (event.persisted) stateEventController.start(); });
 
 apiClient.establishSession()
   .catch(error => showToast(error.message, true))
@@ -230,13 +252,17 @@ function api(path, options = {}) {
 }
 
 async function loadState(initial = false, renderCurrentDetail = false) {
+  const request = ++stateRequest;
+  const revision = stateRevision;
   try {
     const next = await api('/api/state');
+    if (request !== stateRequest || revision !== stateRevision) return;
     applyState(next, initial, renderCurrentDetail);
   } catch (error) { showToast(error.message, true); }
 }
 
 function applyState(next, initial = false, renderCurrentDetail = false) {
+    stateRevision += 1;
     const previous = state;
     const previousSelectedID = selectedID;
     state = next;
@@ -250,6 +276,7 @@ function applyState(next, initial = false, renderCurrentDetail = false) {
     }
     const selectionChanged = normalizeSelection(next) || previousSelectedID !== selectedID;
     ui.body.classList.toggle('has-selection', Boolean(selectedID));
+    syncResponsiveNavigation();
     if (initial || renderCurrentDetail || selectionChanged) {
       sidebarController.render();
       activityController.render();
@@ -329,6 +356,24 @@ async function handleDetailClick(event) {
   if (!action) return;
   const module = state.modules.find(item => item.id === selectedID);
   switch (action) {
+  case 'add-module': openEditor(); break;
+  case 'update-all': await updateAll(); break;
+  case 'show-activity': selectItem('activity'); break;
+  case 'show-module': selectItem(source.dataset.id); break;
+  case 'show-attention': {
+    showFailuresOnly = true;
+    ui.search.value = '';
+    const first = state.modules.find(item => item.state === 'failed' || item.hasOverrideConflict || item.hasSyncConflict);
+    if (mobileLayout.matches || !first) showModuleList(true); else selectItem(first.id);
+    sidebarController.render();
+    break;
+  }
+  case 'update-module':
+    if (module) {
+      try { const result = await api(`/api/modules/${module.id}/update`, { method: 'POST' }); showToast(result.message); await loadState(false, true); }
+      catch (error) { showToast(error.message, true); }
+    }
+    break;
   case 'tab-info': detailController.setTab('info'); renderDetail(false); break;
   case 'tab-preview': detailController.setTab('preview'); renderDetail(false); break;
   case 'edit': if (module) openEditor(module); break;
@@ -361,16 +406,30 @@ async function handleDetailChange(event) {
 function selectItem(id, pushHistory = true) {
   if (!state) return;
   if (id === 'combined' && !state.combined.isEnabled) id = fallbackSelection();
-  if (id !== 'combined' && !state.modules.some(module => module.id === id)) id = fallbackSelection();
+  if (!['combined', 'overview', 'activity'].includes(id) && !state.modules.some(module => module.id === id)) id = fallbackSelection();
   if (!id) { showModuleList(pushHistory); return; }
   const cameFromList = mobileLayout.matches && !ui.body.classList.contains('has-selection');
   selectedID = id; detailController.setTab('info'); ui.body.classList.add('has-selection');
+  syncResponsiveNavigation();
   resetHorizontalScroll();
   if (pushHistory) {
     const entry = webState.detailHistoryEntry(location, id, cameFromList);
     history.pushState(entry.state, '', entry.url);
   }
   sidebarController.render(); renderDetail(false);
+  if (mobileLayout.matches) {
+    const heading = ui.detail.querySelector?.('h1');
+    if (heading) { heading.tabIndex = -1; heading.focus?.({ preventScroll: true }); }
+  }
+}
+
+function syncResponsiveNavigation() {
+  const detailVisible = ui.body.classList.contains('has-selection');
+  if (ui.sidebar) {
+    ui.sidebar.inert = mobileLayout.matches && detailVisible;
+    ui.sidebar.setAttribute('aria-hidden', String(mobileLayout.matches && detailVisible));
+  }
+  if (ui.detailPane) ui.detailPane.inert = mobileLayout.matches && !detailVisible;
 }
 
 function initializeHistoryState() {
@@ -384,6 +443,7 @@ function showModuleList(replaceHistory = false) {
   selectedID = null;
   detailController.setTab('info');
   ui.body.classList.remove('has-selection');
+  syncResponsiveNavigation();
   resetHorizontalScroll();
   if (replaceHistory) {
     const entry = webState.listHistoryEntry(location);

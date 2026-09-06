@@ -38,6 +38,7 @@ extension AppModel {
             PersistenceStore.saveUpstreamState(upstreamState)
             statusMessage = result.changed ? "内置 Script-Hub 引擎已更新至 \(result.revision)" : "内置 Script-Hub 引擎已是最新"
         } catch {
+            if isCurrentWorkCancellation(error) { return }
             upstreamState.lastCheckedAt = .now
             upstreamState.lastError = error.localizedDescription
             PersistenceStore.saveUpstreamState(upstreamState)

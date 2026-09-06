@@ -5,6 +5,7 @@ struct SourceRevisionSnapshot: Sendable {
     var lastModified: String?
     var contentHash: String
     var checkedAt: Date
+    var data: Data? = nil
 }
 
 enum SourceRevisionResult: Sendable {

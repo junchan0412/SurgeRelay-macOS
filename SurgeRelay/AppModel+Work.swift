@@ -39,6 +39,9 @@ extension AppModel {
         workCancellationRequested = true
         statusMessage = "正在取消\(workActivity.title)…"
         foregroundWorkTask?.cancel()
+        moduleUpdateTask?.cancel()
+        updatePreparationTask?.cancel()
+        localSourceSyncTask?.cancel()
         automaticUpdateTask?.cancel()
         if workActivity.kind == .automaticPublishing {
             automaticPublishTask?.cancel()

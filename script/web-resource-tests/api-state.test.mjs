@@ -60,7 +60,7 @@ const navigationState = {
   modules: [{ id: 'module-1' }, { id: 'module-2' }]
 };
 assert.equal(stateHelpers.combinedEnabled(navigationState), true);
-assert.equal(stateHelpers.fallbackSelection(navigationState, false), 'combined');
+assert.equal(stateHelpers.fallbackSelection(navigationState, false), 'overview');
 assert.equal(stateHelpers.fallbackSelection(navigationState, true), null);
 const requestedSelection = stateHelpers.resolveInitialSelection(navigationState, {
   requestedModuleID: 'module-2',
@@ -78,7 +78,7 @@ const normalizedSelection = stateHelpers.normalizeSelection({
   combined: { isEnabled: false },
   modules: [{ id: 'module-1' }]
 }, 'combined', false);
-assert.equal(normalizedSelection.selectedID, 'module-1');
+assert.equal(normalizedSelection.selectedID, 'overview');
 assert.equal(normalizedSelection.changed, true);
 assert.equal(
   stateHelpers.moduleIDFromLocation({ href: 'https://relay.example.test/?module=module-1&token=redacted' }),

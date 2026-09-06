@@ -265,6 +265,10 @@ do
   zsh -n "$script"
 done
 ok "verified release shell scripts"
+require_contains "$ROOT_DIR/script/build_release_assets.sh" 'SWIFT_OPTIMIZATION_LEVEL=-O ' "optimized Release build"
+require_contains "$ROOT_DIR/script/build_release_assets.sh" 'SWIFT_STRICT_CONCURRENCY=complete' "Release concurrency checking"
+require_contains "$ROOT_DIR/script/build_release_assets.sh" 'SWIFT_VERSION=6.0' "Release Swift language version"
+require_contains "$ROOT_DIR/script/build_release_assets.sh" 'ENABLE_DEBUG_DYLIB=NO' "Release debug dylib exclusion"
 
 require_contains "$WORKFLOW_PATH" 'CODESIGN_CERTIFICATE_P12_BASE64' "release workflow"
 require_contains "$WORKFLOW_PATH" 'SPARKLE_ED_KEY' "release workflow"

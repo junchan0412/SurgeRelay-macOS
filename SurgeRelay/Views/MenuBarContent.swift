@@ -53,7 +53,14 @@ struct MenuBarContent: View {
 
         Divider()
 
-        Button("打开 Surge Relay") { activateMainWindow() }
+        Button("打开工作台", systemImage: "square.grid.2x2") {
+            model.selectedModuleID = AppModel.overviewSelectionID
+            activateMainWindow()
+        }
+        Button("查看活动记录", systemImage: "clock.arrow.circlepath") {
+            model.selectedModuleID = AppModel.activitySelectionID
+            activateMainWindow()
+        }
         CheckForUpdatesView()
         Button("查看 GitHub Release 资产…") {
             activateMainWindow()
@@ -84,7 +91,7 @@ struct MenuBarContent: View {
 
     private var attentionCount: Int {
         let summary = model.moduleSummary
-        return summary.failedCount + summary.overrideConflictCount
+        return summary.attentionCount
     }
 
     private var workingText: String {

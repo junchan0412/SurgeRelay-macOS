@@ -3,6 +3,34 @@ import XCTest
 @testable import SurgeRelay
 
 final class SourceRevisionServiceTests: XCTestCase {
+    func testNativeConversionReusesCheckedResponse() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [SourceRevisionURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        SourceRevisionURLProtocol.requestedURLs = []
+        SourceRevisionURLProtocol.response = (200, ["ETag": "new-version"], Data("#!name=DNS\n[Rule]\nDOMAIN,example.org,DIRECT\n".utf8))
+        let module = RelayModule(name: "DNS", sourceURL: "https://example.org/dns.sgmodule", outputFileName: "DNS")
+        let revision = try await SourceRevisionService(session: session).check(module, hasCache: false)
+        guard case let .changed(snapshot) = revision else { return XCTFail("A new source must be converted") }
+        let result = try await ScriptHubClient(session: session).convert(module: module, sourceData: snapshot.data)
+        XCTAssertTrue(result.content.contains("DOMAIN,example.org,DIRECT"))
+        XCTAssertEqual(SourceRevisionURLProtocol.requestedURLs.count, 1)
+        XCTAssertEqual(snapshot.etag, "new-version")
+    }
+
+    func testCachedRevisionHonorsNotModifiedResponse() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [SourceRevisionURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        SourceRevisionURLProtocol.response = (304, ["ETag": "refreshed"], Data())
+        let module = RelayModule(name: "DNS", sourceURL: "https://example.org/dns.sgmodule", outputFileName: "DNS", sourceContentHash: "existing-hash")
+        let revision = try await SourceRevisionService(session: session).check(module)
+        guard case let .unchanged(snapshot) = revision else { return XCTFail("304 must reuse existing cache") }
+        XCTAssertEqual(snapshot.contentHash, "existing-hash")
+        XCTAssertEqual(snapshot.etag, "refreshed")
+        XCTAssertNil(snapshot.data)
+    }
+
     func testRecognizesUnchangedContent() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [SourceRevisionURLProtocol.self]

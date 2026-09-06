@@ -8,20 +8,21 @@ struct ModuleDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 24) {
                 moduleSummaryHeader
                 diagnosticsSection
                 sourceAndOutputSection
-                synchronizationSection
-                advancedSection
                 argumentsSection
                 publishingSection
+                synchronizationSection
+                advancedSection
             }
-            .frame(maxWidth: 760, alignment: .topLeading)
+            .frame(maxWidth: 940, alignment: .topLeading)
             .padding(.horizontal, 32)
             .padding(.vertical, 28)
             .frame(maxWidth: .infinity, alignment: .top)
         }
+        .background(Design.Palette.canvas)
         .accessibilityIdentifier("module-detail.root")
         .task(id: "\(module.id.uuidString)-\(module.contentHash ?? "")") {
             argumentInfo = await model.moduleArgumentInfo(for: module)
@@ -38,86 +39,97 @@ struct ModuleDetailView: View {
 
     private var sourceAndOutputSection: some View {
         detailSection("管理关系") {
-            detailRow(
-                "独立模块存放",
-                value: standaloneStorageDescription,
-                icon: module.standaloneStorageSystemImage
-            )
-            detailRow("初始来源", value: module.initialSource.title, icon: module.initialSource.systemImage)
-            if let initialSourceURL = module.initialSourceURL,
-               !ModuleSourceIdentity.matches(initialSourceURL, module.updateSourceURL) {
-                detailRow("订阅原始地址", value: initialSourceURL, icon: "link", monospaced: true, copyValue: initialSourceURL)
-            }
-            if let localStoragePath {
-                detailRow("本地相对路径", value: localStoragePath, icon: "folder", monospaced: true, copyValue: localStoragePath)
-            }
             detailRow("更新地址", value: sourceAddressDisplay, icon: "link", monospaced: true, copyValue: sourceAddressCopyValue)
-            if let registeredSourceAddress {
-                detailRow("登记地址", value: registeredSourceAddress.display, icon: "link", monospaced: true, copyValue: registeredSourceAddress.copyValue)
-            }
-            detailRow("来源格式", value: module.sourceFormatDisplayTitle, icon: "doc.text")
-            if let subscription = module.scriptHubSubscription {
-                detailRow("来源记录", value: subscription.displaySummary, icon: "point.3.connected.trianglepath.dotted")
-                detailRow("模块链接", value: subscription.subscriptionURL, icon: "link.badge.plus", monospaced: true, copyValue: subscription.subscriptionURL)
-                if let outputName = subscription.outputName {
-                    detailRow("原输出名", value: outputName, icon: "doc.text", monospaced: true)
+            detailRow("发布位置", value: standaloneStorageDescription, icon: module.standaloneStorageSystemImage)
+            detailRow("输出路径", value: module.publishedRelativePath, icon: "doc.badge.gearshape", monospaced: true, copyValue: module.publishedRelativePath)
+            DisclosureGroup("来源与输出详情") {
+                detailRow(
+                    "独立模块存放",
+                    value: standaloneStorageDescription,
+                    icon: module.standaloneStorageSystemImage
+                )
+                detailRow("初始来源", value: module.initialSource.title, icon: module.initialSource.systemImage)
+                if let initialSourceURL = module.initialSourceURL,
+                   !ModuleSourceIdentity.matches(initialSourceURL, module.updateSourceURL) {
+                    detailRow("订阅原始地址", value: initialSourceURL, icon: "link", monospaced: true, copyValue: initialSourceURL)
+                }
+                if let localStoragePath {
+                    detailRow("本地相对路径", value: localStoragePath, icon: "folder", monospaced: true, copyValue: localStoragePath)
+                }
+                if let registeredSourceAddress {
+                    detailRow("登记地址", value: registeredSourceAddress.display, icon: "link", monospaced: true, copyValue: registeredSourceAddress.copyValue)
+                }
+                detailRow("来源格式", value: module.sourceFormatDisplayTitle, icon: "doc.text")
+                if let subscription = module.scriptHubSubscription {
+                    detailRow("来源记录", value: subscription.displaySummary, icon: "point.3.connected.trianglepath.dotted")
+                    detailRow("模块链接", value: subscription.subscriptionURL, icon: "link.badge.plus", monospaced: true, copyValue: subscription.subscriptionURL)
+                    if let outputName = subscription.outputName {
+                        detailRow("原输出名", value: outputName, icon: "doc.text", monospaced: true)
+                    }
+                }
+                detailRow("模块标签", value: module.category.isEmpty ? "未设置" : module.category, icon: "tag")
+                detailRow("存放文件夹", value: ModuleOutputFolder.displayTitle(for: module.outputFolder), icon: "folder")
+                detailRow(
+                    "输出文件",
+                    value: module.publishesStandalone ? module.publishedRelativePath : "未开启独立发布",
+                    icon: "doc.badge.gearshape",
+                    monospaced: module.publishesStandalone,
+                    copyValue: module.publishesStandalone ? module.publishedRelativePath : nil
+                )
+                detailRow("图标来源", value: module.iconSourceDescription, icon: "photo")
+                if let iconURLDisplay {
+                    detailRow("图标地址", value: iconURLDisplay, icon: "link", monospaced: true, copyValue: iconURLDisplay)
                 }
             }
-            detailRow("模块标签", value: module.category.isEmpty ? "未设置" : module.category, icon: "tag")
-            detailRow("存放文件夹", value: ModuleOutputFolder.displayTitle(for: module.outputFolder), icon: "folder")
-            detailRow(
-                "输出文件",
-                value: module.publishesStandalone ? module.publishedRelativePath : "未开启独立发布",
-                icon: "doc.badge.gearshape",
-                monospaced: module.publishesStandalone,
-                copyValue: module.publishesStandalone ? module.publishedRelativePath : nil
-            )
-            detailRow("图标来源", value: module.iconSourceDescription, icon: "photo")
-            if let iconURLDisplay {
-                detailRow("图标地址", value: iconURLDisplay, icon: "link", monospaced: true, copyValue: iconURLDisplay)
-            }
+            .font(.system(size: 13))
+            .padding(.vertical, 6)
+
         }
     }
 
     private var synchronizationSection: some View {
         detailSection("同步状态") {
             detailRow("更新状态", value: module.state.title, icon: module.state.systemImage)
-            detailRow("创建时间", value: module.createdAt.formatted(date: .long, time: .standard), icon: "calendar")
             detailRow("上次更新", value: module.lastUpdatedAt?.formatted(date: .long, time: .standard) ?? "从未更新", icon: "clock")
             detailRow("来源检查", value: module.sourceCheckedAt?.formatted(date: .long, time: .standard) ?? "尚未检查", icon: "dot.radiowaves.left.and.right")
-            detailRow(
-                "内容 hash",
-                value: module.contentHash.map { String($0.prefix(12)) } ?? "尚未生成",
-                icon: "number",
-                monospaced: true,
-                copyValue: module.contentHash
-            )
-            if let sourceContentHash = module.sourceContentHash {
-                detailRow("来源 hash", value: String(sourceContentHash.prefix(12)), icon: "number", monospaced: true, copyValue: sourceContentHash)
-            }
-            if let sourceETag = module.sourceETag {
-                detailRow("来源 ETag", value: sourceETag, icon: "tag", monospaced: true, copyValue: sourceETag)
-            }
-            if let sourceLastModified = module.sourceLastModified {
-                detailRow("来源修改时间", value: sourceLastModified, icon: "calendar.badge.clock", monospaced: true)
-            }
-            detailRow(
-                "转换引擎",
-                value: module.conversionEngineRevision.map { String($0.prefix(12)) } ?? "原生 Surge 模块",
-                icon: "cpu",
-                monospaced: module.conversionEngineRevision != nil,
-                copyValue: module.conversionEngineRevision
-            )
-            if model.settings.combinedModuleEnabled {
-                detailRow("总模块", value: module.isEnabled ? "包含" : "不包含", icon: "square.stack.3d.up")
+            DisclosureGroup("技术信息与校验值") {
+            detailRow("创建时间", value: module.createdAt.formatted(date: .long, time: .standard), icon: "calendar")
                 detailRow(
-                    "汇总输出",
-                    value: combinedOutputLocation,
-                    icon: "square.stack.3d.up",
+                    "内容 hash",
+                    value: module.contentHash.map { String($0.prefix(12)) } ?? "尚未生成",
+                    icon: "number",
                     monospaced: true,
-                    copyValue: combinedOutputCopyValue
+                    copyValue: module.contentHash
                 )
+                if let sourceContentHash = module.sourceContentHash {
+                    detailRow("来源 hash", value: String(sourceContentHash.prefix(12)), icon: "number", monospaced: true, copyValue: sourceContentHash)
+                }
+                if let sourceETag = module.sourceETag {
+                    detailRow("来源 ETag", value: sourceETag, icon: "tag", monospaced: true, copyValue: sourceETag)
+                }
+                if let sourceLastModified = module.sourceLastModified {
+                    detailRow("来源修改时间", value: sourceLastModified, icon: "calendar.badge.clock", monospaced: true)
+                }
+                detailRow(
+                    "转换引擎",
+                    value: module.conversionEngineRevision.map { String($0.prefix(12)) } ?? "原生 Surge 模块",
+                    icon: "cpu",
+                    monospaced: module.conversionEngineRevision != nil,
+                    copyValue: module.conversionEngineRevision
+                )
+                if model.settings.combinedModuleEnabled {
+                    detailRow("总模块", value: module.isEnabled ? "包含" : "不包含", icon: "square.stack.3d.up")
+                    detailRow(
+                        "汇总输出",
+                        value: combinedOutputLocation,
+                        icon: "square.stack.3d.up",
+                        monospaced: true,
+                        copyValue: combinedOutputCopyValue
+                    )
+                }
             }
+            .font(.system(size: 13))
+            .padding(.vertical, 6)
         }
     }
 

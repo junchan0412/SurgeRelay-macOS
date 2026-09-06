@@ -35,12 +35,13 @@ extension AppModel {
     }
 
     var moduleSummary: ModuleCollectionSummary {
-        if let cachedModuleSummary, cachedModuleSummaryToken == moduleSummaryToken {
+        _ = moduleRevision
+        _ = settings.combinedModuleEnabled
+        if let cachedModuleSummary {
             return cachedModuleSummary
         }
         let summary = ModuleCollectionSummary(modules: modules, isUpdateable: shouldUpdateModule)
         cachedModuleSummary = summary
-        cachedModuleSummaryToken = moduleSummaryToken
         return summary
     }
 
@@ -52,24 +53,7 @@ extension AppModel {
         workActivity.isActive && workActivity.canCancel && !workCancellationRequested
     }
 
-    /// Signature of the fields that affect ModuleCollectionSummary.
-    var moduleSummaryToken: String {
-        modules.map { module in
-            [
-                module.id.uuidString,
-                module.isIncludedInCombined ? "1" : "0",
-                module.publishesStandalone ? "1" : "0",
-                module.state.rawValue,
-                module.hasOverrideConflict ? "1" : "0",
-                module.lastUpdatedAt.map { String($0.timeIntervalSinceReferenceDate) } ?? "",
-                // updateable depends on source validity / combined participation
-                shouldUpdateModule(module) ? "1" : "0",
-            ].joined(separator: ":")
-        }.joined(separator: "|") + "|\(settings.combinedModuleEnabled ? 1 : 0)"
-    }
-
     func invalidateModuleSummaryCache() {
         cachedModuleSummary = nil
-        cachedModuleSummaryToken = nil
     }
 }

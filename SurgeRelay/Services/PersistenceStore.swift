@@ -30,8 +30,10 @@ enum PersistenceStore {
     }
 
     static var cacheDirectoryURL: URL {
-        let directory = FileManager.default.homeDirectoryForCurrentUser
-            .appending(path: "Library/Application Support/Surge Relay/Cache", directoryHint: .isDirectory)
+        let directory = AppRuntimeOptions.isUIQAMode
+            ? FileManager.default.temporaryDirectory.appending(path: "SurgeRelayUIQA/Cache", directoryHint: .isDirectory)
+            : FileManager.default.homeDirectoryForCurrentUser
+                .appending(path: "Library/Application Support/Surge Relay/Cache", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
     }
@@ -56,6 +58,7 @@ enum PersistenceStore {
         if let modules: [RelayModule] = decodeFile(at: registryURL) {
             return modules
         }
+        guard !AppRuntimeOptions.isUIQAMode else { return [] }
         let legacyURL = FileManager.default.homeDirectoryForCurrentUser
             .appending(path: "Library/Application Support/Surge Relay/modules.json")
         guard let modules: [RelayModule] = decodeFile(at: legacyURL) else { return [] }
@@ -71,6 +74,7 @@ enum PersistenceStore {
         if let settings: AppSettings = decodeFile(at: settingsURL) {
             return settings
         }
+        guard !AppRuntimeOptions.isUIQAMode else { return AppSettings() }
         if let data = UserDefaults.standard.data(forKey: legacySettingsKey),
            let settings = try? decoder.decode(AppSettings.self, from: data) {
             saveSettings(settings)
@@ -89,6 +93,7 @@ enum PersistenceStore {
         if let state: ScriptHubUpstreamState = decodeFile(at: upstreamStateURL) {
             return state
         }
+        guard !AppRuntimeOptions.isUIQAMode else { return ScriptHubUpstreamState() }
         if let data = UserDefaults.standard.data(forKey: legacyUpstreamKey),
            let state = try? decoder.decode(ScriptHubUpstreamState.self, from: data) {
             saveUpstreamState(state)

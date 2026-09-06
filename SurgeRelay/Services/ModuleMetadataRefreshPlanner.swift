@@ -86,6 +86,7 @@ enum ModuleMetadataRefreshPlanner {
         nextContentHash: String,
         updatedAt: Date = .now
     ) -> ModuleSuccessfulConversionPlan {
+        let previousIconURL = module.iconURL
         var module = module
         if let revisionSnapshot {
             module.sourceETag = revisionSnapshot.etag
@@ -128,7 +129,7 @@ enum ModuleMetadataRefreshPlanner {
         return ModuleSuccessfulConversionPlan(
             module: module,
             preferredIconURL: preferredIconURL,
-            shouldRefreshIconCache: true,
+            shouldRefreshIconCache: preferredIconURL?.absoluteString != previousIconURL,
             contentChanged: contentChanged,
             historyMessage: module.hasOverrideConflict ? "上游已更新，本地编辑需要确认" : "转换完成"
         )

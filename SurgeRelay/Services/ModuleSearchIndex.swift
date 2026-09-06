@@ -37,54 +37,41 @@ enum ModuleSearchIndex {
         let query = normalizedQuery(query)
         guard !query.isEmpty else { return "idle" }
         return "active|\(query)|" + modules
-            .map { "\($0.id.uuidString):\($0.contentHash ?? "")" }
+            .map { "\($0.id.uuidString):\(contentCacheKey(for: $0))" }
             .joined(separator: "|")
     }
 
     static func contentCacheKey(for module: RelayModule) -> String {
-        module.contentHash ?? ""
+        guard !module.argumentOverrides.isEmpty else { return module.contentHash ?? "" }
+        var hash = Hasher()
+        hash.combine(module.argumentOverrides)
+        return "\(module.contentHash ?? "")|\(hash.finalize())"
     }
 
     /// Fields that influence metadata-only search text. Used to reuse expensive
     /// joined strings across repeated sidebar filtering during updates.
     static func metadataCacheKey(for module: RelayModule) -> String {
-        var parts: [String] = [
-            module.name,
-            module.sourceURL,
-            module.outputFileName,
-            module.publishedRelativePath,
-            module.sourceFormat.rawValue,
-            module.detectedSourceFormat?.rawValue ?? "",
-            module.category,
-            module.outputFolder,
-            module.storageLocation.rawValue,
-            module.localStorageRelativePath ?? "",
-            module.publishesStandalone ? "1" : "0",
-            module.isIncludedInCombined ? "1" : "0",
-            module.state.rawValue,
-            module.iconURL ?? "",
-            module.customIconURL ?? "",
-            module.lastError ?? "",
-        ]
-        if let subscription = module.scriptHubSubscription {
-            parts.append(subscription.subscriptionURL)
-            parts.append(subscription.originalURL)
-            parts.append(subscription.outputName ?? "")
-            parts.append(subscription.sourceType ?? "")
-            parts.append(subscription.target ?? "")
-            parts.append(subscription.category ?? "")
-        }
-        if !module.argumentOverrides.isEmpty {
-            for key in module.argumentOverrides.keys.sorted() {
-                parts.append(key)
-                parts.append(module.argumentOverrides[key] ?? "")
-            }
-        }
-        if let data = try? JSONEncoder().encode(module.scriptHubOptions),
-           let text = String(data: data, encoding: .utf8) {
-            parts.append(text)
-        }
-        return parts.joined(separator: "\u{1e}")
+        var hash = Hasher()
+        hash.combine(module.name)
+        hash.combine(module.sourceURL)
+        hash.combine(module.outputFileName)
+        hash.combine(module.publishedRelativePath)
+        hash.combine(module.sourceFormat)
+        hash.combine(module.detectedSourceFormat)
+        hash.combine(module.category)
+        hash.combine(module.outputFolder)
+        hash.combine(module.storageLocation)
+        hash.combine(module.localStorageRelativePath)
+        hash.combine(module.publishesStandalone)
+        hash.combine(module.isIncludedInCombined)
+        hash.combine(module.state)
+        hash.combine(module.iconURL)
+        hash.combine(module.customIconURL)
+        hash.combine(module.lastError)
+        hash.combine(module.scriptHubSubscription)
+        hash.combine(module.argumentOverrides)
+        hash.combine(module.scriptHubOptions)
+        return String(hash.finalize())
     }
 
     static func cachedContent(

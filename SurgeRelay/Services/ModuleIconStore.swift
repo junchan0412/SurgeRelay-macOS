@@ -1,6 +1,7 @@
 import Foundation
 
 actor ModuleIconStore {
+    private let httpClient = BoundedHTTPClient(maximumResponseSize: 5 * 1024 * 1024)
     nonisolated static var directoryURL: URL {
         PersistenceStore.cacheDirectoryURL
             .appending(path: "Icons", directoryHint: .isDirectory)
@@ -19,8 +20,8 @@ actor ModuleIconStore {
             return
         }
         var request = URLRequest(url: url, cachePolicy: .reloadRevalidatingCacheData, timeoutInterval: 30)
-        request.setValue("SurgeRelay/0.1", forHTTPHeaderField: "User-Agent")
-        let (data, response) = try await URLSession.shared.data(for: request)
+        request.setValue("SurgeRelay/2.0", forHTTPHeaderField: "User-Agent")
+        let (data, response) = try await httpClient.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(status), !data.isEmpty, data.count <= 5 * 1024 * 1024 else {
             throw RelayError.httpFailure(status: status, message: "模块图标下载失败。")

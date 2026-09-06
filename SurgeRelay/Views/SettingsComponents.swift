@@ -28,7 +28,7 @@ struct SettingsForm<Content: View>: View {
                 .frame(width: geometry.size.width, alignment: .top)
             }
             .scrollIndicators(.visible)
-            .background(Color(nsColor: .windowBackgroundColor))
+            .background(Design.Palette.canvas)
         }
     }
 }
@@ -59,32 +59,6 @@ struct SettingsSection<Content: View>: View {
     }
 }
 
-struct SettingsWindowChromeConfigurator: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        configureWhenReady(view)
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        configureWhenReady(nsView)
-    }
-
-    private func configureWhenReady(_ view: NSView) {
-        DispatchQueue.main.async {
-            guard let window = view.window else { return }
-            window.titleVisibility = .hidden
-            window.titlebarSeparatorStyle = .none
-        }
-    }
-}
-
-enum SettingsTabMetrics {
-    static let selectorWidth: CGFloat = 406
-    static let selectorHeight: CGFloat = 40
-    static let itemHeight: CGFloat = 30
-}
-
 struct SettingsInfoRow<Content: View>: View {
     let title: String
     let icon: String
@@ -103,7 +77,7 @@ struct SettingsInfoRow<Content: View>: View {
                 .foregroundStyle(.secondary)
                 .frame(width: Design.Row.iconWidth, alignment: .center)
             Text(title)
-                .font(.callout.weight(.medium))
+                .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(.primary)
                 .frame(width: Design.Row.labelWidth, alignment: .leading)
             content()

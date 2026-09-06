@@ -50,11 +50,9 @@ struct BoundedRemoteDataFetcher {
         let configuration = configuration.copy() as! URLSessionConfiguration
         configuration.timeoutIntervalForRequest = timeoutInterval
         configuration.timeoutIntervalForResource = timeoutInterval
-        let delegate = BoundedRemoteDataDelegate(maximumSize: maximumResponseSize)
-        let session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
-        defer { session.invalidateAndCancel() }
-
-        let (data, response) = try await delegate.data(for: request, session: session)
+        let client = BoundedHTTPClient(maximumResponseSize: maximumResponseSize, configuration: configuration,
+                                       validateRequest: Self.validateRemoteRequest)
+        let (data, response) = try await client.data(for: request)
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
             throw BoundedRemoteFetchError.httpFailure(
                 status: http.statusCode,
@@ -158,6 +156,10 @@ struct BoundedRemoteDataFetcher {
         guard bytes.count >= 16 else { return true }
         if bytes.allSatisfy({ $0 == 0 }) { return true }
         if bytes.prefix(15).allSatisfy({ $0 == 0 }) && bytes[15] == 1 { return true }
+        if bytes.prefix(10).allSatisfy({ $0 == 0 }), bytes[10] == 0xff, bytes[11] == 0xff {
+            let ipv4 = bytes.suffix(4).reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
+            return isPrivateIPv4(ipv4)
+        }
         if bytes[0] & 0xfe == 0xfc { return true }
         if bytes[0] == 0xfe && bytes[1] & 0xc0 == 0x80 { return true }
         if bytes[0] == 0xff { return true }
@@ -168,90 +170,5 @@ struct BoundedRemoteDataFetcher {
         String(data: data, encoding: .utf8)
             ?? String(data: data, encoding: .isoLatin1)
             ?? String(decoding: data, as: UTF8.self)
-    }
-}
-
-private final class BoundedRemoteDataDelegate: NSObject, URLSessionDataDelegate, @unchecked Sendable {
-    private let maximumSize: Int
-    private let lock = NSLock()
-    private var storedData = Data()
-    private var storedResponse: URLResponse?
-    private var completion: ((Result<(Data, URLResponse), Error>) -> Void)?
-    private var isCompleted = false
-
-    init(maximumSize: Int) {
-        self.maximumSize = maximumSize
-    }
-
-    func data(for request: URLRequest, session: URLSession) async throws -> (Data, URLResponse) {
-        try await withCheckedThrowingContinuation { continuation in
-            let task = session.dataTask(with: request)
-            lock.withLock {
-                self.completion = { result in
-                    continuation.resume(with: result)
-                }
-            }
-            task.resume()
-        }
-    }
-
-    func urlSession(
-        _ session: URLSession,
-        dataTask: URLSessionDataTask,
-        didReceive response: URLResponse,
-        completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
-    ) {
-        if response.expectedContentLength > Int64(maximumSize) {
-            finish(.failure(BoundedRemoteFetchError.responseTooLarge(maximumSize: maximumSize)))
-            completionHandler(.cancel)
-            return
-        }
-        lock.withLock {
-            storedResponse = response
-        }
-        completionHandler(.allow)
-    }
-
-    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
-        let exceedsLimit = lock.withLock { () -> Bool in
-            storedData.append(data)
-            return storedData.count > maximumSize
-        }
-        if exceedsLimit {
-            finish(.failure(BoundedRemoteFetchError.responseTooLarge(maximumSize: maximumSize)))
-            dataTask.cancel()
-        }
-    }
-
-    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        if let error, !isCancellationAfterExplicitFailure(error) {
-            finish(.failure(error))
-            return
-        }
-        let result = lock.withLock { () -> Result<(Data, URLResponse), Error> in
-            guard let response = storedResponse else {
-                return .failure(URLError(.badServerResponse))
-            }
-            return .success((storedData, response))
-        }
-        finish(result)
-    }
-
-    private func finish(_ result: Result<(Data, URLResponse), Error>) {
-        let completion = lock.withLock { () -> ((Result<(Data, URLResponse), Error>) -> Void)? in
-            guard !isCompleted else { return nil }
-            isCompleted = true
-            let completion = self.completion
-            self.completion = nil
-            return completion
-        }
-        completion?(result)
-    }
-
-    private func isCancellationAfterExplicitFailure(_ error: Error) -> Bool {
-        let nsError = error as NSError
-        return nsError.domain == NSURLErrorDomain &&
-            nsError.code == NSURLErrorCancelled &&
-            lock.withLock { isCompleted }
     }
 }

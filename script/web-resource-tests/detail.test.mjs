@@ -85,3 +85,27 @@ function createController(overrides = {}) {
 }
 
 console.log('web-detail behavior tests passed');
+
+{
+  const previous = { id: 'live', contentHash: 'old-content-hash', sourceContentHash: 'old-source-hash', sourceETag: 'old-etag' };
+  const next = { ...previous, contentHash: 'new-content-hash', sourceContentHash: 'new-source-hash', sourceETag: 'new-etag' };
+  const nodes = new Map(['内容 hash', '来源 hash', '来源 ETag'].map(label => [label, {
+    label: { textContent: label }, text: { textContent: 'old' }, copy: { dataset: { value: 'old' } }
+  }]));
+  const rows = [...nodes.values()].map(node => ({ querySelector(selector) {
+    if (selector === '.detail-label span:last-child') return node.label;
+    if (selector === '.detail-value-text') return node.text;
+    if (selector === '.detail-copy') return node.copy;
+    return null;
+  }}));
+  const { controller } = createController({
+    state: { modules: [next], combined: {} }, selectedID: 'live',
+    inject: { document: { querySelector: () => null }, ui: { detail: { querySelectorAll: () => rows, querySelector: () => null }, mobileTitle: { textContent: '' } } }
+  });
+  controller.patchLiveDetail({ modules: [previous], combined: {} }, { modules: [next], combined: {} });
+  assert.equal(nodes.get('内容 hash').copy.dataset.value, 'new-content-hash');
+  assert.equal(nodes.get('来源 hash').copy.dataset.value, 'new-source-hash');
+  assert.equal(nodes.get('来源 ETag').text.textContent, 'new-etag');
+  assert.equal(nodes.get('来源 ETag').copy.dataset.value, 'new-etag');
+  assert.equal(logic.metadataRowPresenceChanged(previous, { ...next, hasOverrideConflict: true }), true);
+}

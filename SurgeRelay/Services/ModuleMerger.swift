@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 enum ModuleMerger {
     private struct ParsedModule {
@@ -223,14 +224,15 @@ actor ModuleProcessingWorker {
     }
 
     func contentFingerprint(of content: String, assets: [GeneratedAsset]) -> String {
-        var data = Data(content.utf8)
+        var hash = SHA256()
+        hash.update(data: Data(content.utf8))
         for asset in assets.sorted(by: { $0.relativePath < $1.relativePath }) {
-            data.append(0)
-            data.append(contentsOf: asset.relativePath.utf8)
-            data.append(0)
-            data.append(asset.data)
+            hash.update(data: Data([0]))
+            hash.update(data: Data(asset.relativePath.utf8))
+            hash.update(data: Data([0]))
+            hash.update(data: asset.data)
         }
-        return data.sha256String
+        return hash.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
     func merge(_ components: [(RelayModule, String)], engineRevision: String?) throws -> String {

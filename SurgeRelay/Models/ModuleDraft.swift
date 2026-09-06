@@ -1,5 +1,10 @@
 import Foundation
 
+struct ModulePreviewDraft: Sendable {
+    var text: String
+    var savedText: String
+}
+
 struct ModuleDraft: Sendable {
     var name = ""
     var sourceURL = ""

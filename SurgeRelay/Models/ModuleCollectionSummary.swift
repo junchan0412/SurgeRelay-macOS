@@ -9,9 +9,7 @@ struct ModuleCollectionSummary: Equatable, Sendable {
     var updateableCount = 0
     var latestUpdatedAt: Date?
 
-    var attentionCount: Int {
-        failedCount + overrideConflictCount
-    }
+    var attentionCount = 0
 
     var hasFailures: Bool {
         failedCount > 0
@@ -27,6 +25,7 @@ struct ModuleCollectionSummary: Equatable, Sendable {
             if module.publishesStandalone { standaloneCount += 1 }
             if module.state == .failed { failedCount += 1 }
             if module.hasOverrideConflict { overrideConflictCount += 1 }
+            if module.state == .failed || module.hasOverrideConflict || module.hasSyncConflict { attentionCount += 1 }
             if isUpdateable(module) { updateableCount += 1 }
             if let lastUpdatedAt = module.lastUpdatedAt {
                 if let currentLatest = latestUpdatedAt {

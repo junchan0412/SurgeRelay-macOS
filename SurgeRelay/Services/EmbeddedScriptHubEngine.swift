@@ -16,6 +16,16 @@ actor EmbeddedScriptHubEngine {
             self.semaphore = semaphore
         }
 
+        func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                        newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+            do { try EmbeddedScriptHubEngine.validateNetworkRequest(request); completionHandler(request) }
+            catch {
+                lock.withLock { storedError = error }
+                completionHandler(nil)
+                task.cancel()
+            }
+        }
+
         func urlSession(
             _ session: URLSession,
             dataTask: URLSessionDataTask,
@@ -37,10 +47,11 @@ actor EmbeddedScriptHubEngine {
 
         func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
             lock.lock()
-            storedData.append(data)
-            let exceedsLimit = storedData.count > maximumSize
+            let exceedsLimit = data.count > maximumSize - storedData.count
             if exceedsLimit {
                 storedError = RelayError.invalidOutput("Script-Hub HTTP bridge 响应超过 20 MB 限制。")
+            } else {
+                storedData.append(data)
             }
             lock.unlock()
             if exceedsLimit {
@@ -67,11 +78,14 @@ actor EmbeddedScriptHubEngine {
     private static let maximumHTTPBridgeResponseSize = 20 * 1024 * 1024
 
     func convert(script: String, scriptConverterScript: String? = nil, requestURL: URL) throws -> String {
-        try Self.execute(
+        try Task.checkCancellation()
+        let result = try Self.execute(
             script: script,
             scriptConverterScript: scriptConverterScript,
             requestURL: requestURL
         )
+        try Task.checkCancellation()
+        return result
     }
 
     private static func execute(
@@ -206,6 +220,7 @@ actor EmbeddedScriptHubEngine {
 
     private static func performSynchronously(_ request: URLRequest) throws -> (Data, URLResponse) {
         for attempt in 0..<3 {
+            try Task.checkCancellation()
             do {
                 return try performOnce(request)
             } catch {
@@ -226,10 +241,12 @@ actor EmbeddedScriptHubEngine {
         defer { session.invalidateAndCancel() }
         let task = session.dataTask(with: request)
         task.resume()
-        guard semaphore.wait(timeout: .now() + request.timeoutInterval + 2) == .success else {
-            task.cancel()
-            throw URLError(.timedOut)
+        let deadline = DispatchTime.now() + request.timeoutInterval + 2
+        while semaphore.wait(timeout: .now() + .milliseconds(100)) != .success {
+            if Task.isCancelled { task.cancel(); throw CancellationError() }
+            if DispatchTime.now() >= deadline { task.cancel(); throw URLError(.timedOut) }
         }
+        try Task.checkCancellation()
         let (data, response, error) = result.get()
         if let error { throw error }
         guard let data, let response else { throw URLError(.badServerResponse) }
@@ -342,6 +359,10 @@ actor EmbeddedScriptHubEngine {
         guard bytes.count >= 16 else { return true }
         if bytes.allSatisfy({ $0 == 0 }) { return true }
         if bytes.prefix(15).allSatisfy({ $0 == 0 }) && bytes[15] == 1 { return true }
+        if bytes.prefix(10).allSatisfy({ $0 == 0 }), bytes[10] == 0xff, bytes[11] == 0xff {
+            let ipv4 = bytes.suffix(4).reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
+            return isPrivateIPv4(ipv4)
+        }
         if bytes[0] & 0xfe == 0xfc { return true }
         if bytes[0] == 0xfe && bytes[1] & 0xc0 == 0x80 { return true }
         if bytes[0] == 0xff { return true }

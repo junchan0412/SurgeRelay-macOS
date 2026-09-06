@@ -14,9 +14,23 @@ enum AppRuntimeOptions {
 @Observable
 final class AppModel {
     static let combinedModuleSelectionID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+    static let overviewSelectionID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+    static let activitySelectionID = UUID(uuidString: "00000000-0000-0000-0000-000000000003")!
 
-    var modules: [RelayModule]
-    var settings: AppSettings
+    var modules: [RelayModule] {
+        didSet {
+            moduleRevision &+= 1
+            cachedModuleSummary = nil
+        }
+    }
+    private(set) var moduleRevision: UInt64 = 0
+    var settings: AppSettings {
+        didSet {
+            if oldValue.combinedModuleEnabled != settings.combinedModuleEnabled {
+                cachedModuleSummary = nil
+            }
+        }
+    }
     var upstreamState: ScriptHubUpstreamState
     var selectedModuleID: UUID?
     var isWorking = false
@@ -31,10 +45,12 @@ final class AppModel {
     /// Set to true to ask the main window to present the in-app settings sheet
     /// (used by the menu bar, the ⌘, command, and the toolbar gear button).
     var presentsSettings = false
+    var settingsPage: SettingsPage = .general
     var presentsUpdateChecker = false
     var synchronizationCompletedCount = 0
     var synchronizationTotalCount = 0
-    var synchronizingModuleID: UUID?
+    var synchronizingModuleIDs: Set<UUID> = []
+    var synchronizingModuleID: UUID? { modules.first { synchronizingModuleIDs.contains($0.id) }?.id }
     var webServerState: WebServerRuntimeState = .stopped
     var updateHistory: [UpdateHistoryEntry]
     var localModuleOutputFolders: [String] = [ModuleOutputFolder.root]
@@ -56,6 +72,8 @@ final class AppModel {
     @ObservationIgnored let networkPathMonitor = NetworkPathMonitor()
     @ObservationIgnored let localSourceWatcher = LocalSourceWatcher()
     @ObservationIgnored var foregroundWorkTask: Task<Void, Never>?
+    @ObservationIgnored var moduleUpdateTask: Task<[ModuleUpdateOutcome?], Never>?
+    @ObservationIgnored var updatePreparationTask: Task<Void, Never>?
     @ObservationIgnored var foregroundWorkIdentifier = UUID()
     @ObservationIgnored var schedulerTask: Task<Void, Never>?
     @ObservationIgnored var automaticUpdateTask: Task<Void, Never>?
@@ -70,7 +88,8 @@ final class AppModel {
     @ObservationIgnored var localModuleOutputFoldersLastRefreshedAt: Date?
     @ObservationIgnored static let automaticPublishDelaySeconds = 30
     @ObservationIgnored var cachedModuleSummary: ModuleCollectionSummary?
-    @ObservationIgnored var cachedModuleSummaryToken: String?
+    @ObservationIgnored var cachedWebProjection: WebModuleProjectionCache?
+    @ObservationIgnored var modulePreviewDrafts: [UUID: ModulePreviewDraft] = [:]
     /// When true, module mutations during a bulk update skip intermediate disk writes
     /// and high-frequency status text churn that would force full-tree observation.
     @ObservationIgnored var defersModulePersistence = false
@@ -86,15 +105,17 @@ final class AppModel {
             loadedSettings.publishToGitHub = false
             loadedSettings.localModuleDirectory = uiQAModuleDirectory.path
         }
-        if loadedSettings.github.owner.isEmpty { loadedSettings.github.owner = "EEliberto" }
-        if loadedSettings.github.repository.isEmpty { loadedSettings.github.repository = "Surge-Relay" }
         if loadedSettings.github.branch.isEmpty { loadedSettings.github.branch = "main" }
         if loadedSettings.github.directory.isEmpty { loadedSettings.github.directory = "modules" }
         loadedSettings.customModuleOutputFolders = ModuleOutputFolder.options(
             from: loadedSettings.customModuleOutputFolders
         ).filter { !$0.isEmpty }
         let loadedModules = ModuleNamingPlanner.normalizedModuleNaming(
-            PersistenceStore.loadModules(),
+            PersistenceStore.loadModules().map { module in
+                var module = module
+                module.state = ModuleUpdatePipeline.restoredState(for: module)
+                return module
+            },
             combinedFileName: loadedSettings.combinedModuleFileName,
             localModuleDirectory: loadedSettings.localModuleDirectory
         )
@@ -113,9 +134,7 @@ final class AppModel {
         githubTokenStorageStatus = legacyGitHubToken.isEmpty ? .notChecked : .legacyConfigurationFallback
         webAccessTokenStorageStatus = .notChecked
         credentialProbe = .notChecked
-        selectedModuleID = loadedSettings.combinedModuleEnabled
-            ? Self.combinedModuleSelectionID
-            : loadedModules.first?.id
+        selectedModuleID = Self.overviewSelectionID
         if !AppRuntimeOptions.isUIQAMode {
             PersistenceStore.saveSettings(loadedSettings)
             try? PersistenceStore.saveModules(loadedModules)
@@ -142,6 +161,9 @@ final class AppModel {
         guard !hasStarted else { return }
         hasStarted = true
         guard !AppRuntimeOptions.isUIQAMode else {
+            if let appearance = ProcessInfo.processInfo.environment["SURGE_RELAY_UI_QA_APPEARANCE"] {
+                NSApp.appearance = NSAppearance(named: appearance == "light" ? .aqua : .darkAqua)
+            }
             statusMessage = "UI QA 模式：自动任务已暂停"
             return
         }

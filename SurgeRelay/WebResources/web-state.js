@@ -5,14 +5,13 @@
 
   function fallbackSelection(snapshot, isMobile = false) {
     if (!snapshot || isMobile) return null;
-    if (combinedEnabled(snapshot)) return 'combined';
-    return snapshot.modules?.[0]?.id || null;
+    return 'overview';
   }
 
   function resolveInitialSelection(snapshot, options = {}) {
     const requested = options.requestedModuleID || '';
     const isMobile = Boolean(options.isMobile);
-    const requestedExists = requested === 'combined'
+    const requestedExists = requested === 'overview' || requested === 'activity' ? true : requested === 'combined'
       ? combinedEnabled(snapshot)
       : Boolean(requested && snapshot?.modules?.some(module => module.id === requested));
 
@@ -34,7 +33,7 @@
     if (next === 'combined' && !combinedEnabled(snapshot)) {
       next = fallbackSelection(snapshot, isMobile);
     }
-    if (next && next !== 'combined' && !snapshot?.modules?.some(module => module.id === next)) {
+    if (next && !['combined', 'overview', 'activity'].includes(next) && !snapshot?.modules?.some(module => module.id === next)) {
       next = fallbackSelection(snapshot, isMobile);
     }
     if (!next && !isMobile) {
@@ -117,105 +116,126 @@
     const setIntervalImpl = dependencies.setInterval || global.setInterval;
     const clearIntervalImpl = dependencies.clearInterval || global.clearInterval;
     const setTimeoutImpl = dependencies.setTimeout || global.setTimeout;
-    const loadState = dependencies.loadState;
-    const applyState = dependencies.applyState;
-    const applyActivity = dependencies.applyActivity || null;
-    const fetchActivity = dependencies.fetchActivity || null;
+    const clearTimeoutImpl = dependencies.clearTimeout || global.clearTimeout;
+    const { loadState, applyState } = dependencies;
+    const applyActivity = dependencies.applyActivity;
+    const fetchActivity = dependencies.fetchActivity;
     const isWorking = dependencies.isWorking || (() => false);
     const establishSession = dependencies.establishSession || (() => Promise.resolve());
+    const onConnectionChange = dependencies.onConnectionChange || (() => {});
     const reconnectDelay = dependencies.reconnectDelay ?? 3000;
     const activityPollInterval = dependencies.activityPollInterval ?? 1000;
     let stateEvents = null;
     let pollingTimer = null;
     let activityTimer = null;
+    let reconnectTimer = null;
+    let generation = 0;
+    let running = false;
+    let stateInFlight = false;
+    let activityInFlight = false;
+    let reconnectAttempts = 0;
     let softReconnectUntil = 0;
 
-    function close() {
-      stateEvents?.close?.();
+    function disconnect() {
+      if (stateEvents) { stateEvents.onerror = null; stateEvents.close?.(); }
       stateEvents = null;
     }
 
     function stopActivityPolling() {
-      if (activityTimer != null) {
-        clearIntervalImpl(activityTimer);
-        activityTimer = null;
-      }
+      if (activityTimer != null) clearIntervalImpl(activityTimer);
+      activityTimer = null;
     }
 
-    function startActivityPolling() {
-      if (!fetchActivity || !applyActivity || activityTimer != null) return;
-      activityTimer = setIntervalImpl(() => {
-        if (documentRef?.hidden) return;
-        if (!isWorking()) {
-          stopActivityPolling();
-          return;
-        }
-        Promise.resolve(fetchActivity())
-          .then(activity => {
-            if (activity) applyActivity(activity);
-          })
-          .catch(() => {
-            // Soft-reconnect window: keep last progress projection briefly.
-          });
-      }, activityPollInterval);
+    function close() {
+      running = false;
+      generation += 1;
+      disconnect();
+      stopActivityPolling();
+      if (pollingTimer != null) clearIntervalImpl(pollingTimer);
+      if (reconnectTimer != null) clearTimeoutImpl?.(reconnectTimer);
+      pollingTimer = null;
+      reconnectTimer = null;
+      softReconnectUntil = 0;
+    }
+
+    function pollState(epoch) {
+      if (!running || epoch !== generation || documentRef?.hidden || stateInFlight) return;
+      stateInFlight = true;
+      Promise.resolve().then(() => loadState(false, false)).catch(() => {}).finally(() => { stateInFlight = false; });
     }
 
     function syncActivityPolling() {
-      if (isWorking()) startActivityPolling();
-      else stopActivityPolling();
+      const needed = running && !documentRef?.hidden && isWorking() && !stateEvents && fetchActivity && applyActivity;
+      if (!needed) { stopActivityPolling(); return; }
+      if (activityTimer != null) return;
+      const epoch = generation;
+      activityTimer = setIntervalImpl(() => {
+        if (!running || epoch !== generation || documentRef?.hidden || !isWorking()) { stopActivityPolling(); return; }
+        if (activityInFlight) return;
+        activityInFlight = true;
+        Promise.resolve().then(fetchActivity).then(activity => {
+          if (activity && running && epoch === generation && !stateEvents && !documentRef?.hidden) applyActivity(activity);
+        }).catch(() => {}).finally(() => { activityInFlight = false; });
+      }, activityPollInterval);
     }
 
-    function start() {
+    function connect(epoch) {
+      if (!running || epoch !== generation || documentRef?.hidden) return;
+      disconnect();
       if (!EventSourceImpl) {
-        if (pollingTimer == null) {
-          pollingTimer = setIntervalImpl(() => {
-            if (!documentRef?.hidden) loadState(false, false);
-          }, 5000);
-        }
+        if (pollingTimer == null) pollingTimer = setIntervalImpl(() => pollState(epoch), 5000);
         syncActivityPolling();
+        onConnectionChange('polling');
         return;
       }
-
-      close();
-      stateEvents = new EventSourceImpl('/api/events');
-      stateEvents.addEventListener('state', event => {
+      onConnectionChange(reconnectAttempts ? 'reconnecting' : 'connecting');
+      const stream = new EventSourceImpl('/api/events');
+      stateEvents = stream;
+      stream.addEventListener('state', event => {
+        if (!running || epoch !== generation || stateEvents !== stream || documentRef?.hidden) return;
         try {
           applyState(JSON.parse(event.data), false, false);
+          reconnectAttempts = 0;
           softReconnectUntil = 0;
+          onConnectionChange('connected');
           syncActivityPolling();
-        } catch (_) {
-          // The next event contains a complete state snapshot.
-        }
+        } catch (_) {}
       });
-      stateEvents.onerror = () => {
-        // Soft reconnect: keep current projection for a short window while
-        // activity polling continues, then re-establish the stream.
+      stream.onerror = () => {
+        if (!running || epoch !== generation || stateEvents !== stream) return;
         softReconnectUntil = Date.now() + 8000;
-        close();
+        disconnect();
+        onConnectionChange('reconnecting');
         syncActivityPolling();
-        if (!documentRef?.hidden) {
-          Promise.resolve(establishSession())
-            .catch(() => {})
-            .finally(() => {
-              Promise.resolve(loadState(false, false))
-                .finally(() => setTimeoutImpl(start, reconnectDelay));
-            });
-        }
+        Promise.resolve().then(establishSession).then(() => {
+          if (running && epoch === generation && !documentRef?.hidden) return loadState(false, false);
+        }).catch(() => {}).finally(() => {
+          if (!running || epoch !== generation || documentRef?.hidden) return;
+          const delay = Math.min(reconnectDelay * 2 ** reconnectAttempts++, 30000);
+          reconnectTimer = setTimeoutImpl(() => { reconnectTimer = null; connect(epoch); }, delay);
+        });
       };
       syncActivityPolling();
     }
 
+    function start() {
+      close();
+      running = true;
+      reconnectAttempts = 0;
+      connect(generation);
+    }
+
+    function visibilityChanged() {
+      if (documentRef?.hidden) { close(); onConnectionChange('paused'); }
+      else { start(); pollState(generation); }
+    }
+    documentRef?.addEventListener?.('visibilitychange', visibilityChanged);
+
     return {
-      start,
-      close,
-      syncActivityPolling,
-      stopActivityPolling,
-      get currentEventSource() {
-        return stateEvents;
-      },
-      get isSoftReconnecting() {
-        return Date.now() < softReconnectUntil;
-      }
+      start, close, syncActivityPolling, stopActivityPolling,
+      dispose() { close(); documentRef?.removeEventListener?.('visibilitychange', visibilityChanged); },
+      get currentEventSource() { return stateEvents; },
+      get isSoftReconnecting() { return Date.now() < softReconnectUntil; }
     };
   }
 

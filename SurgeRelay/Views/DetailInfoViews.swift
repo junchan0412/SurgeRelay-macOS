@@ -13,13 +13,13 @@ struct DetailInfoSection<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Design.Spacing.md + 2) {
             Text(title)
-                .font(.headline)
+                .font(.system(size: 15, weight: .semibold))
                 .padding(.leading, Design.Spacing.xxs)
             VStack(alignment: .leading, spacing: Design.Spacing.md) {
                 content()
             }
-            .padding(.horizontal, Design.Card.padding)
-            .padding(.vertical, Design.Card.verticalPadding)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
             .frame(maxWidth: .infinity, alignment: .leading)
             .detailCard()
         }
@@ -41,7 +41,7 @@ struct DetailInfoRow: View {
                 .foregroundStyle(.secondary)
                 .frame(width: Design.Row.iconWidth, alignment: .center)
             Text(label)
-                .font(.callout.weight(.medium))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.primary)
                 .frame(width: Design.Row.labelWidth, alignment: .leading)
             valueContent

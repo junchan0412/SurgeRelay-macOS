@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f4f6f5" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#181c1c" media="(prefers-color-scheme: dark)">
   <title>Surge Relay</title>
   <link rel="icon" href="/favicon.ico?v=1" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png?v=1">
@@ -13,20 +13,20 @@
   <link rel="manifest" href="/manifest.webmanifest?v=2">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Surge Relay">
-  <link rel="stylesheet" href="/app.css?v=30">
+  <link rel="stylesheet" href="/app.css?v=200">
   <script src="/web-logic.js?v=2" defer></script>
   <script src="/web-options.js?v=1" defer></script>
   <script src="/web-format.js?v=1" defer></script>
-  <script src="/web-markup.js?v=5" defer></script>
-  <script src="/web-sidebar.js?v=1" defer></script>
+  <script src="/web-markup.js?v=200" defer></script>
+  <script src="/web-sidebar.js?v=200" defer></script>
   <script src="/web-activity.js?v=1" defer></script>
   <script src="/web-api.js?v=1" defer></script>
-  <script src="/web-state.js?v=2" defer></script>
+  <script src="/web-state.js?v=200" defer></script>
   <script src="/web-editor.js?v=1" defer></script>
   <script src="/web-feedback.js?v=1" defer></script>
   <script src="/web-preview.js?v=1" defer></script>
-  <script src="/web-detail.js?v=1" defer></script>
-  <script src="/app.js?v=48" defer></script>
+  <script src="/web-detail.js?v=200" defer></script>
+  <script src="/app.js?v=200" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -34,13 +34,17 @@
       <div class="sidebar-top">
         <div class="brand-row">
           <span class="brand-mark"><img class="app-icon" src="/app-icon.png?v=1" alt=""></span>
-          <div class="brand-copy"><h1>Surge Relay</h1><p>Web 管理</p></div>
+          <div class="brand-copy"><h1>Surge Relay</h1><p>Web 管理 · <span id="connection-status" role="status">连接中</span></p></div>
           <div class="toolbar sidebar-toolbar">
             <button class="icon-button" id="add-button" type="button" aria-label="添加模块" title="添加模块"><span class="symbol" data-symbol="plus"></span></button>
             <button class="icon-button" id="refresh-button" type="button" aria-label="更新全部" title="更新全部"><span class="symbol" data-symbol="refresh"></span></button>
           </div>
         </div>
-        <label class="search-field"><span class="symbol" data-symbol="magnifyingglass"></span><input id="search-input" type="search" placeholder="搜索" autocomplete="off"></label>
+        <nav class="workspace-navigation" aria-label="工作空间">
+          <button id="overview-button" class="workspace-nav-item" type="button"><span class="symbol" data-symbol="sidebar.left"></span><span>工作台</span></button>
+          <button id="history-button" class="workspace-nav-item" type="button"><span class="symbol" data-symbol="clock"></span><span>活动记录</span></button>
+        </nav>
+        <label class="search-field"><span class="symbol" data-symbol="magnifyingglass"></span><input id="search-input" type="search" placeholder="搜索模块" autocomplete="off"></label>
         <div class="filter-row" id="filter-row" hidden>
           <button class="filter-chip" id="failure-filter" type="button" hidden aria-pressed="false"><span class="symbol" data-symbol="exclamationmark.triangle"></span><span>失败</span></button>
         </div>
@@ -49,14 +53,12 @@
       <nav class="module-navigation">
         <button class="summary-row" id="summary-row" type="button">
           <span class="module-icon summary-icon"><img class="app-icon" src="/app-icon.png?v=1" alt=""></span>
-          <span class="module-copy"><strong>Surge Relay 汇总</strong><small id="summary-subtitle">正在载入…</small></span>
+          <span class="module-copy"><strong>总模块</strong><small id="summary-subtitle">正在载入…</small></span>
           <span class="symbol disclosure" data-symbol="chevron.right"></span>
         </button>
-        <div class="section-label">来源模块</div>
+        <div class="section-label">模块库 <span id="module-count"></span></div>
         <div id="module-list" class="module-list"></div>
       </nav>
-
-    </aside>
 
     <div class="activity-shell">
       <div class="activity-card" id="activity-card" aria-live="polite">
@@ -66,6 +68,8 @@
         <div class="latest-update"><strong>最新更新时间</strong><span id="latest-update">尚未更新</span></div>
       </div>
     </div>
+
+    </aside>
 
     <main class="detail" id="detail">
       <header class="mobile-header">

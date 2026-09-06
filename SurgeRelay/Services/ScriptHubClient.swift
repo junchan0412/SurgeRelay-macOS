@@ -7,7 +7,7 @@ actor ScriptHubClient {
 
     private let engineStore: EngineStore
     private let embeddedEngine: EmbeddedScriptHubEngine
-    private let session: URLSession
+    private let httpClient: BoundedHTTPClient
 
     init(
         engineStore: EngineStore = EngineStore(),
@@ -16,7 +16,7 @@ actor ScriptHubClient {
     ) {
         self.engineStore = engineStore
         self.embeddedEngine = embeddedEngine
-        self.session = session
+        self.httpClient = BoundedHTTPClient(configuration: session.configuration)
     }
 
     func conversionURL(module: RelayModule, baseURL: String) throws -> URL {
@@ -47,16 +47,22 @@ actor ScriptHubClient {
         return url
     }
 
-    func convert(module: RelayModule, github: GitHubSettings? = nil) async throws -> ConversionResult {
+    func convert(module: RelayModule, github: GitHubSettings? = nil, sourceData: Data? = nil) async throws -> ConversionResult {
+        try Task.checkCancellation()
         guard let sourceURL = URL(string: module.updateSourceURL) else { throw RelayError.invalidSourceURL }
         if module.sourceFormat.isNativeSurgeModule(for: sourceURL) {
             let data: Data
-            if sourceURL.isFileURL {
-                data = try Data(contentsOf: sourceURL)
+            if let sourceData {
+                data = sourceData
+            } else if sourceURL.isFileURL {
+                data = try SourceRevisionService.readLocalSource(sourceURL)
             } else {
+                guard ["http", "https"].contains(sourceURL.scheme?.lowercased()) else {
+                    throw RelayError.invalidSourceURL
+                }
                 var request = URLRequest(url: sourceURL, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: 60)
-                request.setValue("SurgeRelay/0.1", forHTTPHeaderField: "User-Agent")
-                let (responseData, response) = try await session.data(for: request)
+                request.setValue("SurgeRelay/2.0", forHTTPHeaderField: "User-Agent")
+                let (responseData, response) = try await httpClient.data(for: request)
                 let status = (response as? HTTPURLResponse)?.statusCode ?? 0
                 guard (200..<300).contains(status) else {
                     let body = String(data: responseData, encoding: .utf8) ?? ""
@@ -64,14 +70,16 @@ actor ScriptHubClient {
                 }
                 data = responseData
             }
-            let content = String(data: data, encoding: .utf8) ?? ""
+            guard let content = String(data: data, encoding: .utf8) else {
+                throw RelayError.invalidOutput("来源不是有效的 UTF-8 模块文本。")
+            }
             let namedContent = ModuleMetadataParser.applyingModuleMetadata(
                 name: module.name,
                 category: module.category,
                 iconURL: module.customIconURL,
                 to: content
             )
-        let subscription = scriptHubSubscription(for: module)
+            let subscription = scriptHubSubscription(for: module)
             let subscribedContent = ModuleMetadataParser.applyingScriptHubSubscription(subscription, to: namedContent)
             let sanitized = SurgeModuleSanitizer.sanitize(subscribedContent)
             try validate(sanitized)
@@ -98,7 +106,7 @@ actor ScriptHubClient {
             iconURL: module.customIconURL,
             to: materialized.content
         )
-            let subscription = scriptHubSubscription(for: module)
+        let subscription = scriptHubSubscription(for: module)
         let subscribedContent = ModuleMetadataParser.applyingScriptHubSubscription(subscription, to: namedContent)
         let sanitized = SurgeModuleSanitizer.sanitize(subscribedContent)
         try validate(sanitized)
@@ -144,6 +152,7 @@ actor ScriptHubClient {
         var rewritten = content
         var assets: [GeneratedAsset] = []
         for source in uniqueURLs {
+            try Task.checkCancellation()
             guard let requestURL = URL(string: source) else { throw RelayError.invalidServiceURL }
             let converted = try await embeddedEngine.convert(script: converterScript, requestURL: requestURL)
             guard !converted.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -162,65 +171,5 @@ actor ScriptHubClient {
             assets.append(GeneratedAsset(relativePath: relativePath, data: Data(converted.utf8)))
         }
         return (rewritten, assets)
-    }
-}
-
-actor SourceRevisionService {
-    private let session: URLSession
-
-    init(session: URLSession = .shared) {
-        self.session = session
-    }
-
-    func check(_ module: RelayModule) async throws -> SourceRevisionResult {
-        guard let url = URL(string: module.updateSourceURL) else {
-            throw RelayError.invalidSourceURL
-        }
-        if url.isFileURL {
-            let data = try Data(contentsOf: url)
-            guard !data.isEmpty, data.count <= 20 * 1024 * 1024 else {
-                throw RelayError.invalidOutput("来源文件为空或超过 20 MB。")
-            }
-            let snapshot = SourceRevisionSnapshot(
-                etag: nil,
-                lastModified: nil,
-                contentHash: data.sha256String,
-                checkedAt: .now
-            )
-            return snapshot.contentHash == module.sourceContentHash ? .unchanged(snapshot) : .changed(snapshot)
-        }
-        guard ["http", "https"].contains(url.scheme?.lowercased()) else {
-            throw RelayError.invalidSourceURL
-        }
-        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: 45)
-        request.setValue("SurgeRelay/1.0", forHTTPHeaderField: "User-Agent")
-        if let etag = module.sourceETag { request.setValue(etag, forHTTPHeaderField: "If-None-Match") }
-        if let modified = module.sourceLastModified { request.setValue(modified, forHTTPHeaderField: "If-Modified-Since") }
-        let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse else {
-            throw RelayError.invalidOutput("来源没有返回有效的 HTTP 响应。")
-        }
-        if http.statusCode == 304, let hash = module.sourceContentHash {
-            return .unchanged(SourceRevisionSnapshot(
-                etag: module.sourceETag,
-                lastModified: module.sourceLastModified,
-                contentHash: hash,
-                checkedAt: .now
-            ))
-        }
-        guard (200..<300).contains(http.statusCode) else {
-            let message = String(data: data, encoding: .utf8).map { String($0.prefix(240)) } ?? "来源检查失败。"
-            throw RelayError.httpFailure(status: http.statusCode, message: message)
-        }
-        guard !data.isEmpty, data.count <= 20 * 1024 * 1024 else {
-            throw RelayError.invalidOutput("来源文件为空或超过 20 MB。")
-        }
-        let snapshot = SourceRevisionSnapshot(
-            etag: http.value(forHTTPHeaderField: "ETag"),
-            lastModified: http.value(forHTTPHeaderField: "Last-Modified"),
-            contentHash: data.sha256String,
-            checkedAt: .now
-        )
-        return snapshot.contentHash == module.sourceContentHash ? .unchanged(snapshot) : .changed(snapshot)
     }
 }

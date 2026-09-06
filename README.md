@@ -22,6 +22,9 @@ Surge Relay 面向需要长期维护大量 `.sgmodule` / `.module`、从 Loon/Qu
 
 ## ✨ 功能特性
 
+- 全新工作台集中展示模块状态、发布去向与最近活动；macOS 和 Web 使用一致的信息层级与浅色 / 深色视觉。
+- 更新流水线最多同时处理 4 个模块，保持总模块合并顺序；来源检查与原生转换复用下载结果，内容和脚本资源以完整快照提交。
+- macOS 与 Web 内容页支持在切换模块时保留未保存草稿；退出 App 或刷新网页前请保存修改。
 - 内置 Script-Hub 本地引擎，转换 Quantumult X、Loon、Surge 模块；远程 Surge 模块直接抓取并自动写入 `#SUBSCRIBED` 标记。
 - 模块“存放位置”与“初始来源”分离建模：本地 / GitHub 存放，订阅 / 远程 / 自写来源，避免混淆。
 - 本地与 GitHub 发布可同时开启，每个独立模块只写入自己选择的存放目标。
@@ -36,6 +39,7 @@ Surge Relay 面向需要长期维护大量 `.sgmodule` / `.module`、从 Loon/Qu
 
 | 操作 | 快捷键 |
 |------|--------|
+| 工作台 / 活动记录 | <kbd>⌘</kbd> + <kbd>1</kbd> / <kbd>⌘</kbd> + <kbd>2</kbd> |
 | 添加模块 | <kbd>⌘</kbd> + <kbd>N</kbd> |
 | 更新全部 | <kbd>⌘</kbd> + <kbd>R</kbd> |
 | 发布全部 | <kbd>⌘</kbd> + <kbd>⇧</kbd> + <kbd>P</kbd> |
@@ -48,6 +52,7 @@ Surge Relay 面向需要长期维护大量 `.sgmodule` / `.module`、从 Loon/Qu
 
 ## <a name="capabilities"></a>当前能力
 
+- 2.0 重构说明、性能基准与验证边界见 [Surge Relay 2.0](./docs/RELAY_2_0.md)。
 - 管理远程 HTTP/HTTPS 模块和本地 `file://` Surge 模块。
 - 使用内置 Script-Hub 引擎转换 Quantumult X、Loon 和 Surge 模块。
 - `.sgmodule` 与 `.module` 都按 Surge 模块识别，远程 Surge 模块直接抓取并自动写入 `#SUBSCRIBED` 标记，便于 Script-Hub 解析更新。

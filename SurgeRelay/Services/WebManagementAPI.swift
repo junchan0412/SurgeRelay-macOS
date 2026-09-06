@@ -28,8 +28,9 @@ enum WebManagementAPI {
             case ("GET", "/api/state"):
                 return .json(WebManagementStateBuilder.payload(model: model))
             case ("GET", "/api/activity"):
-                // Lightweight progress endpoint for frequent polling during updates.
-                return .json(WebManagementStateBuilder.payload(model: model).activity)
+                return .json(WebManagementStateBuilder.activityPayload(model: model))
+            case ("GET", "/api/history"):
+                return .json(model.updateHistory)
             case ("POST", "/api/activity/error/dismiss"):
                 model.presentedError = nil
                 return .json(ActionPayload(ok: true, message: "已清除错误提示。"))

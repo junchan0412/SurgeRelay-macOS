@@ -7,165 +7,77 @@ struct ModuleSidebarFilterBar: View {
     let resultCount: Int
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                ForEach(ModuleFilter.quickPresets) { filter in
-                    chip(filter)
-                }
-                if !selection.isQuickPreset {
-                    activeChip(selection)
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Text("模块库").font(.system(size: 13, weight: .semibold))
+                Text("\(resultCount)").font(.system(size: 12)).monospacedDigit().foregroundStyle(.secondary)
                 Spacer(minLength: 0)
                 filterMenu
                 sortMenu
             }
-            .font(.caption)
-            .padding(.horizontal, 2)
-
-            HStack(spacing: 6) {
-                Text("\(resultCount) 个模块")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                if selection != .all {
-                    Button {
-                        withAnimation(.snappy(duration: 0.2)) { selection = .all }
-                    } label: {
-                        Label("清除筛选", systemImage: "xmark.circle.fill")
-                            .font(.caption2)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
+            HStack(spacing: 5) {
+                ForEach([ModuleFilter.all, .updatable, .attention]) { filter in chip(filter) }
+            }
+            if ![ModuleFilter.all, .updatable, .attention].contains(selection) {
+                HStack {
+                    Text("筛选：\(selection.title)").font(.system(size: 12)).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("清除") { selection = .all }.font(.system(size: 12)).buttonStyle(.borderless)
                 }
             }
-            .padding(.horizontal, 2)
         }
+        .padding(.vertical, 8)
     }
 
     private func chip(_ filter: ModuleFilter) -> some View {
-        Button {
-            withAnimation(.snappy(duration: 0.2)) { selection = filter }
-        } label: {
-            Label {
-                Text("\(filter.title) \(counts[filter, default: 0])")
-            } icon: {
-                Image(systemName: filter.systemImage)
+        Button { selection = filter } label: {
+            HStack(spacing: 4) {
+                Text(filter == .attention ? "待处理" : filter.title)
+                Text("\(counts[filter, default: 0])").monospacedDigit().opacity(0.75)
             }
+            .font(.system(size: 11, weight: selection == filter ? .semibold : .regular))
             .lineLimit(1)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 4)
-            .background(
-                selection == filter
-                    ? Color.accentColor.opacity(0.18)
-                    : Color.primary.opacity(0.06),
-                in: Capsule()
-            )
-            .overlay {
-                Capsule()
-                    .strokeBorder(
-                        selection == filter
-                            ? Color.accentColor.opacity(0.5)
-                            : Color.primary.opacity(0.08),
-                        lineWidth: 1
-                    )
-            }
+            .foregroundStyle(selection == filter ? Design.Palette.accent : Color.secondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 7)
+            .background(selection == filter ? Design.Palette.accent.opacity(0.12) : Color.primary.opacity(0.035), in: .rect(cornerRadius: 7))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help("筛选：\(filter.title)（\(counts[filter, default: 0]) 个模块）")
         .accessibilityAddTraits(selection == filter ? .isSelected : [])
     }
 
-    private func activeChip(_ filter: ModuleFilter) -> some View {
-        HStack(spacing: 4) {
-            Label(filter.title, systemImage: filter.systemImage)
-                .lineLimit(1)
-            Button {
-                withAnimation(.snappy(duration: 0.2)) { selection = .all }
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .help("清除筛选")
-        }
-        .padding(.leading, 9)
-        .padding(.trailing, 6)
-        .padding(.vertical, 4)
-        .background(Color.accentColor.opacity(0.18), in: Capsule())
-        .overlay {
-            Capsule().strokeBorder(Color.accentColor.opacity(0.5), lineWidth: 1)
-        }
-        .accessibilityAddTraits(.isSelected)
-    }
-
     private var filterMenu: some View {
         Menu {
-            Button {
-                withAnimation(.snappy(duration: 0.2)) { selection = .all }
-            } label: {
-                Label("全部", systemImage: selection == .all
-                    ? "checkmark"
-                    : ModuleFilter.all.systemImage)
-            }
-            Divider()
+            Button("全部") { selection = .all }
             ForEach(ModuleFilterGroup.allCases) { group in
                 Section(group.title) {
                     ForEach(ModuleFilter.allCases.filter { $0.group == group }) { filter in
-                        Button {
-                            withAnimation(.snappy(duration: 0.2)) { selection = filter }
-                        } label: {
-                            Label(filter.title, systemImage: selection == filter
-                                ? "checkmark"
-                                : filter.systemImage)
+                        Button { selection = filter } label: {
+                            Label(filter.title, systemImage: selection == filter ? "checkmark" : filter.systemImage)
                         }
                     }
                 }
             }
-            Divider()
-            Button(role: .destructive) {
-                withAnimation(.snappy(duration: 0.2)) { selection = .all }
-            } label: {
-                Label("清除筛选", systemImage: "xmark.circle")
-            }
-            .disabled(selection == .all)
         } label: {
-            Label(selection.isQuickPreset || selection == .all ? "筛选" : selection.title,
-                  systemImage: "line.3.horizontal.decrease.circle")
-                .lineLimit(1)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color.primary.opacity(0.06), in: Capsule())
-                .overlay {
-                    Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-                }
+            Image(systemName: "line.3.horizontal.decrease").frame(width: 22, height: 24)
         }
-        .menuStyle(.borderlessButton)
-        .fixedSize()
+        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+        .help("筛选模块").accessibilityLabel("筛选模块")
     }
 
     private var sortMenu: some View {
         Menu {
             ForEach(ModuleSortOrder.allCases) { order in
-                Button {
-                    sortOrder = order
-                } label: {
-                    Label(order.title, systemImage: sortOrder == order
-                        ? "checkmark"
-                        : order.systemImage)
+                Button { sortOrder = order } label: {
+                    Label(order.title, systemImage: sortOrder == order ? "checkmark" : order.systemImage)
                 }
             }
         } label: {
-            Label(sortOrder.title, systemImage: sortOrder.systemImage)
-                .lineLimit(1)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color.primary.opacity(0.06), in: Capsule())
-                .overlay {
-                    Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-                }
+            Image(systemName: "arrow.up.arrow.down").frame(width: 22, height: 24)
         }
-        .menuStyle(.borderlessButton)
-        .fixedSize()
+        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+        .help("排序：\(sortOrder.title)").accessibilityLabel("模块排序")
     }
 }

@@ -31,6 +31,12 @@
         ui.summarySubtitle.textContent = `${state.combined.enabledCount} 个来源 · 总模块订阅`;
       }
       const selectedID = getSelectedID();
+      const count = global.document?.querySelector?.('#module-count');
+      if (count) count.textContent = String(modules.length);
+      for (const [element, id] of [[ui.overview, 'overview'], [ui.history, 'activity']]) {
+        element?.classList.toggle('selected', selectedID === id);
+        element?.setAttribute('aria-current', selectedID === id ? 'page' : 'false');
+      }
       ui.summaryRow.classList.toggle('selected', state.combined.isEnabled && selectedID === 'combined');
       const emptyText = logic.sidebarEmptyText({ query, failuresOnly: filterState.failuresOnly });
       ui.list.innerHTML = modules.length

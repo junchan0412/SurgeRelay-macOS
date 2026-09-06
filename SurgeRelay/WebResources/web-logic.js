@@ -10,7 +10,7 @@
       module.id, module.name, module.sourceURL, module.initialSourceURL, module.updateSourceURL,
       module.sourceFormatTitle, module.outputFolder, module.publishedRelativePath,
       module.storageLocation, module.storageLocationTitle, module.storageLocationDetail, module.initialSourceTitle,
-      module.storageTargets, module.hasSyncConflict, module.syncConflictLocalUpdatedAt, module.syncConflictGitHubUpdatedAt,
+      module.storageTargets, module.hasOverrideConflict, module.hasSyncConflict, module.syncConflictLocalUpdatedAt, module.syncConflictGitHubUpdatedAt,
       module.relationshipSummary, module.localStorageRelativePath,
       module.iconURL, module.customIconURL, module.isEnabled, module.publishesStandalone,
       module.state, module.stateTitle, module.lastError, module.lastUpdatedAt, module.sourceCheckedAt,
@@ -28,7 +28,12 @@
 
   function metadataRowPresenceChanged(previousModule, nextModule) {
     if (!previousModule || !nextModule) return false;
-    return Boolean(previousModule.sourceContentHash) !== Boolean(nextModule.sourceContentHash) ||
+    const fields = ['name', 'sourceURL', 'initialSourceURL', 'updateSourceURL', 'outputFileName', 'publishedRelativePath',
+      'category', 'outputFolder', 'iconURL', 'customIconURL', 'advancedSummary', 'hasOverrideConflict',
+      'hasSyncConflict', 'syncConflictLocalUpdatedAt', 'syncConflictGitHubUpdatedAt'];
+    return fields.some(key => previousModule[key] !== nextModule[key]) ||
+      Boolean(previousModule.contentHash) !== Boolean(nextModule.contentHash) ||
+      Boolean(previousModule.sourceContentHash) !== Boolean(nextModule.sourceContentHash) ||
       Boolean(previousModule.sourceETag) !== Boolean(nextModule.sourceETag) ||
       Boolean(previousModule.sourceLastModified) !== Boolean(nextModule.sourceLastModified) ||
       previousModule.storageLocation !== nextModule.storageLocation ||
@@ -46,7 +51,7 @@
     if (module.category) parts.push(module.category);
     if (module.outputFolder) parts.push(folderTitle(module.outputFolder));
     if (!module.publishesStandalone) parts.push('不发布独立模块');
-    return parts.join(' · ');
+    return [...new Set(parts)].join(' · ');
   }
 
   function moduleStatusTitle(module) {
@@ -96,7 +101,7 @@
       failedCount,
       failuresOnly: failedCount > 0 && Boolean(requestedFailuresOnly),
       isVisible: failedCount > 0,
-      label: `失败 ${failedCount}`
+      label: `待处理 ${failedCount}`
     };
   }
 
@@ -153,7 +158,7 @@
   }
 
   function isFailedModule(module) {
-    return module?.state === 'failed';
+    return module?.state === 'failed' || Boolean(module?.hasOverrideConflict || module?.hasSyncConflict);
   }
 
   function folderTitle(folder) {

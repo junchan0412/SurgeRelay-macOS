@@ -1,180 +1,74 @@
 import SwiftUI
 
-private struct ModuleDetailMetadataPill: Identifiable {
-    let title: String
-    let systemImage: String
-
-    var id: String { "\(systemImage)|\(title)" }
-}
-
-private struct ModuleDetailSummaryMetric: Identifiable {
-    let title: String
-    let value: String
-    let systemImage: String
-    let tint: Color
-
-    var id: String { "\(systemImage)|\(title)|\(value)" }
-}
-
 struct ModuleDetailSummaryHeader: View {
+    @Environment(AppModel.self) private var model
     let module: RelayModule
     let combinedModuleEnabled: Bool
     let onEdit: () -> Void
 
+    private var source: URL? { URL(string: module.updateSourceURL) }
+    private var isNative: Bool { source.map { module.sourceFormat.isNativeSurgeModule(for: $0) } ?? false }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 16) {
-                ModuleIconView(module: module, size: 56)
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(module.name)
-                            .font(.title2.weight(.semibold))
-                            .lineLimit(2)
-                            .textSelection(.enabled)
-                        metadataPillLayout
-                    }
-                    Spacer(minLength: 0)
-                    Button("编辑模块…", systemImage: "pencil", action: onEdit)
-                        .accessibilityIdentifier("module-detail.edit")
+        VStack(alignment: .leading, spacing: 24) {
+            HStack(alignment: .top, spacing: 18) {
+                ModuleIconView(module: module, size: 60)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(module.name)
+                        .font(.system(size: 28, weight: .bold))
+                        .lineLimit(3).textSelection(.enabled)
+                    Text([module.initialSource.title, module.category].filter { !$0.isEmpty }.joined(separator: " · "))
+                        .font(.system(size: 14)).foregroundStyle(.secondary)
                 }
+                Spacer(minLength: 0)
             }
-            summaryMetricLayout
+            HStack(spacing: 10) {
+                StatusPill(state: module.state)
+                if let date = module.lastUpdatedAt {
+                    Text("更新于 \(date.formatted(date: .abbreviated, time: .shortened))")
+                        .font(.system(size: 12)).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            HStack(spacing: 10) {
+                Button("更新模块", systemImage: "arrow.clockwise") { model.startUpdate(moduleID: module.id) }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!model.updateAdmission(for: module).isAccepted)
+                    .help(model.updateAdmission(for: module).message)
+                    .accessibilityIdentifier("module-detail.update")
+                Button("编辑配置", systemImage: "slider.horizontal.3", action: onEdit)
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("module-detail.edit")
+                Spacer(minLength: 0)
+                TextCopyButton(text: module.updateSourceURL, title: "拷贝来源")
+            }
+            .controlSize(.large)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 120), spacing: 0), count: 3), alignment: .leading, spacing: 18) {
+                flowStep("来源", symbol: module.initialSource.systemImage,
+                         value: source?.isFileURL == true ? "本地源文件" : source?.host() ?? "尚未配置",
+                         detail: module.sourceFormatDisplayTitle)
+                flowStep("转换", symbol: "arrow.triangle.2.circlepath",
+                         value: isNative ? "原生 Surge" : "Script-Hub",
+                         detail: isNative ? "保留原生模块格式" : "转换为 Surge 模块")
+                flowStep("输出", symbol: module.standaloneStorageSystemImage,
+                         value: module.publishesStandalone ? module.displayStorageLocationTitle : "模块缓存",
+                         detail: module.publishesStandalone ? module.publishedRelativePath : "未开启独立发布")
+            }
+            .padding(.vertical, 20)
+            .detailCard(radius: Design.Radius.large)
         }
-        .padding(Design.Spacing.xl)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .detailCard(radius: Design.Radius.large)
     }
 
-    private var metadataPills: [ModuleDetailMetadataPill] {
-        var pills = [
-            ModuleDetailMetadataPill(
-                title: module.displayStorageLocationTitle,
-                systemImage: module.displayStorageLocationSystemImage
-            ),
-            ModuleDetailMetadataPill(title: module.initialSource.title, systemImage: module.initialSource.systemImage)
-        ]
-        if !module.category.isEmpty {
-            pills.append(ModuleDetailMetadataPill(title: module.category, systemImage: "tag"))
+    private func flowStep(_ title: String, symbol: String, value: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Label(title, systemImage: symbol)
+                .font(.system(size: 12, weight: .medium)).foregroundStyle(Design.Palette.accent)
+            Text(value).font(.system(size: 14, weight: .semibold)).lineLimit(1).truncationMode(.middle)
+            Text(detail).font(.system(size: 12)).foregroundStyle(.secondary)
+                .lineLimit(1).truncationMode(.middle).help(detail)
         }
-        if module.scriptHubSubscription != nil {
-            pills.append(ModuleDetailMetadataPill(title: "Script-Hub", systemImage: "link"))
-        }
-        let folder = ModuleOutputFolder.normalized(module.outputFolder)
-        if folder != ModuleOutputFolder.root {
-            pills.append(ModuleDetailMetadataPill(
-                title: ModuleOutputFolder.displayTitle(for: folder),
-                systemImage: "folder"
-            ))
-        }
-        pills.append(ModuleDetailMetadataPill(
-            title: module.publishesStandalone ? "独立发布" : "不发布独立模块",
-            systemImage: module.publishesStandalone ? "checkmark.circle" : "pause.circle"
-        ))
-        if combinedModuleEnabled {
-            pills.append(ModuleDetailMetadataPill(
-                title: module.isEnabled ? "包含在总模块" : "不进总模块",
-                systemImage: "square.stack.3d.up"
-            ))
-        }
-        return pills
-    }
-
-    private var summaryMetrics: [ModuleDetailSummaryMetric] {
-        [
-            ModuleDetailSummaryMetric(
-                title: "输出",
-                value: summaryOutputValue,
-                systemImage: module.publishesStandalone ? "doc.badge.gearshape" : "pause.circle",
-                tint: .secondary
-            ),
-            ModuleDetailSummaryMetric(
-                title: "更新",
-                value: summaryUpdateValue,
-                systemImage: module.state.systemImage,
-                tint: module.state.tintColor
-            ),
-            ModuleDetailSummaryMetric(
-                title: "图标",
-                value: module.iconSourceDescription,
-                systemImage: module.iconURL == nil ? "shippingbox" : "photo",
-                tint: .secondary
-            )
-        ]
-    }
-
-    private var summaryOutputValue: String {
-        guard module.publishesStandalone else { return "不发布独立模块" }
-        return module.publishedRelativePath
-    }
-
-    private var summaryUpdateValue: String {
-        if module.state == .failed, let failureSummary {
-            return failureSummary
-        }
-        if let lastUpdatedAt = module.lastUpdatedAt {
-            return lastUpdatedAt.formatted(date: .abbreviated, time: .shortened)
-        }
-        return module.state.title
-    }
-
-    private var failureSummary: String? {
-        module.failureSummary
-    }
-
-    private var summaryMetricLayout: some View {
-        LazyVGrid(
-            columns: [GridItem(.adaptive(minimum: 152), spacing: Design.Spacing.md, alignment: .top)],
-            alignment: .leading,
-            spacing: Design.Spacing.md
-        ) {
-            ForEach(summaryMetrics) { metric in
-                summaryMetric(metric)
-            }
-        }
-    }
-
-    private func summaryMetric(_ metric: ModuleDetailSummaryMetric) -> some View {
-        HStack(alignment: .top, spacing: 9) {
-            Image(systemName: metric.systemImage)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(metric.tint)
-                .frame(width: 18, height: 18)
-                .background(metric.tint.opacity(0.14), in: .rect(cornerRadius: Design.Spacing.sm - 1))
-            VStack(alignment: .leading, spacing: Design.Spacing.xxs) {
-                Text(metric.title)
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.tertiary)
-                Text(metric.value)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .truncationMode(.middle)
-                    .textSelection(.enabled)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(.horizontal, Design.Spacing.md + 2)
-        .padding(.vertical, Design.Spacing.md)
-        .frame(maxWidth: .infinity, minHeight: 54, alignment: .topLeading)
-        .background(.quaternary.opacity(0.32), in: RoundedRectangle(cornerRadius: Design.Radius.small, style: .continuous))
-    }
-
-    private var metadataPillLayout: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: Design.Spacing.md) {
-                pillContent
-            }
-            VStack(alignment: .leading, spacing: Design.Spacing.sm) {
-                pillContent
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var pillContent: some View {
-        StatusPill(state: module.state, detail: failureSummary)
-        ForEach(metadataPills) { pill in
-            MetadataPill(pill.title, systemImage: pill.systemImage)
-        }
+        .padding(.horizontal, 20)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

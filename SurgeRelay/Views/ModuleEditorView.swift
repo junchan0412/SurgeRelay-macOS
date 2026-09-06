@@ -66,11 +66,11 @@ struct ModuleEditorView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    editorPreviewCard
-                    basicInfoSection
-                    iconSection
-                    publishingSection
                     sourceSection
+                    basicInfoSection
+                    publishingSection
+                    DisclosureGroup("图标与显示") { iconSection.padding(.top, 12) }
+                        .font(.system(size: 14, weight: .medium))
                     advancedEditorSection
                 }
                 .padding(.horizontal, 24)
@@ -95,7 +95,10 @@ struct ModuleEditorView: View {
                     .accessibilityIdentifier("module-editor.save")
             }
         }
-        .frame(width: 620, height: 700)
+        .frame(width: 680, height: 720)
+        .background(Design.Palette.canvas)
+        .onDisappear { nameLookup?.cancel() }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("module-editor.root")
         .alert("无法保存", isPresented: Binding(
             get: { localError != nil },

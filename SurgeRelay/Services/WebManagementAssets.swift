@@ -4,8 +4,8 @@ enum WebManagementAssets {
     static let webContentSecurityPolicy = "default-src 'self'; img-src 'self' data: http: https:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
 
     static func iconURL(for module: RelayModule) -> String? {
-        if cachedIconData(for: module) != nil {
-            return "/api/modules/\(module.id.uuidString.lowercased())/icon"
+        if FileManager.default.fileExists(atPath: ModuleIconStore.cachedURL(for: module.id).path) {
+            return "/api/modules/\(module.id.uuidString.lowercased())/icon?v=\(module.lastUpdatedAt?.timeIntervalSince1970 ?? 0)"
         }
         return module.iconURL
     }

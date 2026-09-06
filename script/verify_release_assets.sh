@@ -322,7 +322,7 @@ launch_smoke_test() {
   local new_pid=""
 
   pgrep -x "$APP_NAME" > "$existing_pids" 2>/dev/null || true
-  open -n "$app_path"
+  open -n --env SURGE_RELAY_UI_QA=1 "$app_path"
   for _ in {1..10}; do
     pgrep -x "$APP_NAME" > "$current_pids" 2>/dev/null || true
     grep -Fvx -f "$existing_pids" "$current_pids" > "$new_pids" 2>/dev/null || true
@@ -375,6 +375,7 @@ verify_app_bundle() {
   assert_contains "$app_path architectures" "arm64" " $archs "
   assert_contains "$app_path architectures" "x86_64" " $archs "
   verify_dynamic_library_linkage "$app_path"
+  node "$ROOT_DIR/script/verify_web_bundle.mjs" "$app_path"
 }
 
 verify_app_zip() {

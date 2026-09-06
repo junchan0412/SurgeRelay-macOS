@@ -25,50 +25,26 @@ struct ModulesView: View {
     }
 
     private var contentIndexToken: String {
-        ModuleSearchIndex.contentIndexToken(
-            for: model.modules,
-            query: normalizedSearchText
-        )
+        normalizedSearchText.isEmpty ? "idle" : "\(normalizedSearchText)|\(model.moduleRevision)"
     }
 
-    private var sidebarRefreshToken: String {
-        // Include fields that affect grouping/filtering, but not high-frequency
-        // progress counters that should not rebuild the entire section tree.
-        let modulesSignature = model.modules.map { module in
-            [
-                module.id.uuidString,
-                module.name,
-                module.state.rawValue,
-                module.isIncludedInCombined ? "1" : "0",
-                module.publishesStandalone ? "1" : "0",
-                module.storageLocation.rawValue,
-                module.category,
-                module.outputFolder,
-                module.hasOverrideConflict ? "1" : "0",
-                module.contentHash ?? "",
-                module.lastError.map { String($0.hashValue) } ?? "",
-                module.initialSource.title,
-            ].joined(separator: ":")
-        }.joined(separator: "|")
-        return [
-            normalizedSearchText,
-            sidebarFilter.rawValue,
-            sortOrder.rawValue,
-            model.settings.combinedModuleEnabled ? "1" : "0",
-            contentIndexState.contentIndexCacheKeys
-                .map { "\($0.key.uuidString)=\($0.value)" }
-                .sorted()
-                .joined(separator: ","),
-            modulesSignature,
-        ].joined(separator: "\u{1e}")
+    private var sidebarRefreshToken: SidebarRefreshKey {
+        SidebarRefreshKey(revision: model.moduleRevision, query: normalizedSearchText, filter: sidebarFilter,
+                          sort: sortOrder, combined: model.settings.combinedModuleEnabled,
+                          contentKeys: contentIndexState.contentIndexCacheKeys)
     }
 
     private func rebuildContentIndex() async {
-        let plan = ModuleSearchIndex.contentLoadPlan(
-            modules: model.modules,
-            query: normalizedSearchText,
-            state: contentIndexState
-        )
+        if !normalizedSearchText.isEmpty {
+            do { try await Task.sleep(for: .milliseconds(160)) } catch { return }
+        }
+        let modules = model.modules
+        let query = normalizedSearchText
+        let state = contentIndexState
+        let plan = await Task.detached(priority: .userInitiated) {
+            ModuleSearchIndex.contentLoadPlan(modules: modules, query: query, state: state)
+        }.value
+        guard !Task.isCancelled else { return }
         guard !plan.isIdle else {
             if contentIndexState != .empty { contentIndexState = .empty }
             return
@@ -78,7 +54,7 @@ struct ModulesView: View {
             guard !Task.isCancelled else { return }
             let cacheKey = ModuleSearchIndex.contentCacheKey(for: module)
             if let content = try? await model.previewContent(for: module) {
-                nextState.contentIndex[module.id] = content.lowercased()
+                nextState.contentIndex[module.id] = await Task.detached(priority: .utility) { content.lowercased() }.value
                 nextState.contentIndexCacheKeys[module.id] = cacheKey
             }
             await Task.yield()
@@ -87,35 +63,39 @@ struct ModulesView: View {
         contentIndexState = nextState
     }
 
-    private func rebuildSidebarPresentation() {
-        let filterPlan = ModuleSearchIndex.filterPlan(
-            modules: model.modules,
-            query: normalizedSearchText,
-            contentState: contentIndexState,
-            metadataState: metadataIndexState
-        )
-        metadataIndexState = filterPlan.metadataState
-        let filteredBySidebar = sidebarFilter == .all
-            ? filterPlan.matches
-            : filterPlan.matches.filter {
-                sidebarFilter.matches($0, combinedModuleEnabled: model.settings.combinedModuleEnabled)
-            }
-        let sorted = sortOrder.sorted(filteredBySidebar)
-        let filterCounts = ModuleFilter.counts(
-            for: filterPlan.matches,
-            combinedModuleEnabled: model.settings.combinedModuleEnabled
-        )
-        let sections = ModuleSidebarSectionPlanner.sections(for: sorted)
-        let next = SidebarPresentation(
-            sections: sections,
-            filteredModulesAreEmpty: sorted.isEmpty,
-            allModulesAreEmpty: model.modules.isEmpty,
-            combinedModuleEnabled: model.settings.combinedModuleEnabled,
-            filterCounts: filterCounts,
-            resultCount: sorted.count
-        )
-        guard next != sidebarPresentation else { return }
-        sidebarPresentation = next
+    private func rebuildSidebarPresentation() async {
+        let modules = model.modules
+        let query = normalizedSearchText
+        let content = contentIndexState
+        let metadata = metadataIndexState
+        let filter = sidebarFilter
+        let sort = sortOrder
+        let combined = model.settings.combinedModuleEnabled
+        let (nextMetadata, next) = await Task.detached(priority: .userInitiated) {
+            let plan = ModuleSearchIndex.filterPlan(modules: modules, query: query, contentState: content, metadataState: metadata)
+            let filtered = filter == .all ? plan.matches : plan.matches.filter { filter.matches($0, combinedModuleEnabled: combined) }
+            let sorted = sort.sorted(filtered)
+            let presentation = SidebarPresentation(
+                sections: ModuleSidebarSectionPlanner.sections(for: sorted),
+                filteredModulesAreEmpty: sorted.isEmpty, allModulesAreEmpty: modules.isEmpty,
+                combinedModuleEnabled: combined,
+                filterCounts: ModuleFilter.counts(for: plan.matches, combinedModuleEnabled: combined),
+                resultCount: sorted.count
+            )
+            return (plan.metadataState, presentation)
+        }.value
+        guard !Task.isCancelled else { return }
+        metadataIndexState = nextMetadata
+        if next != sidebarPresentation { sidebarPresentation = next }
+    }
+
+    private func showModules(_ filter: ModuleFilter) {
+        sidebarFilter = filter
+        searchText = ""
+        if let first = sortOrder.sorted(model.modules).first(where: { filter.matches($0, combinedModuleEnabled: model.settings.combinedModuleEnabled) }) {
+            model.selectedModuleID = first.id
+        }
+        columnVisibility = .all
     }
 
     var body: some View {
@@ -136,10 +116,11 @@ struct ModulesView: View {
                 batchSelectedModuleIDs: $batchSelectedModuleIDs,
                 deleteCandidate: $deleteCandidate,
                 editModule: presentEditor,
-                textEditModule: { textEditModule = $0 }
+                textEditModule: { textEditModule = $0 },
+                addModule: { editorRoute = ModuleEditorRoute(module: nil) }
             )
-            .navigationSplitViewColumnWidth(min: 280, ideal: 300, max: 380)
-            .navigationTitle("模块")
+            .navigationSplitViewColumnWidth(min: 260, ideal: 292, max: 360)
+            .navigationTitle("Surge Relay")
             .toolbar {
                 if columnVisibility != .detailOnly {
                     ModuleSidebarToolbarContent(
@@ -153,13 +134,14 @@ struct ModulesView: View {
             }
         } detail: {
             ModuleDetailPaneView(
-                editModule: presentEditor
+                editModule: presentEditor,
+                addModule: { editorRoute = ModuleEditorRoute(module: nil) },
+                scanLocalModules: scanLocalModulesForPreview,
+                filterModules: showModules
             )
         }
         .task(id: contentIndexToken) { await rebuildContentIndex() }
-        .onChange(of: sidebarRefreshToken, initial: true) { _, _ in
-            rebuildSidebarPresentation()
-        }
+        .task(id: sidebarRefreshToken) { await rebuildSidebarPresentation() }
         .sheet(item: $editorRoute) { route in
             ModuleEditorView(
                 module: route.module,
@@ -193,7 +175,8 @@ struct ModulesView: View {
                         .accessibilityIdentifier("settings.done")
                 }
             }
-            .frame(width: 620, height: 560)
+            .frame(width: 820, height: 620)
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("settings.root")
         }
         .sheet(isPresented: $model.presentsUpdateChecker) {
@@ -265,7 +248,7 @@ struct ModulesView: View {
 
 }
 
-private struct SidebarPresentation: Equatable {
+private struct SidebarPresentation: Equatable, Sendable {
     var sections: [ModuleSidebarSection]
     var filteredModulesAreEmpty: Bool
     var allModulesAreEmpty: Bool
@@ -291,4 +274,13 @@ private struct ModuleEditorRoute: Identifiable {
         self.module = module
         id = module?.id ?? UUID()
     }
+}
+
+private struct SidebarRefreshKey: Equatable {
+    var revision: UInt64
+    var query: String
+    var filter: ModuleFilter
+    var sort: ModuleSortOrder
+    var combined: Bool
+    var contentKeys: [UUID: String]
 }

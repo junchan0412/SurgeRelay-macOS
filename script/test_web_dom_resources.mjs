@@ -481,7 +481,9 @@ failureFilter.dispatch('click');
 assert.equal(failureFilter.getAttribute('aria-pressed'), 'true', 'failure filter should toggle on');
 assert.match(list.innerHTML, /Block HTTPDNS/, 'failure filter should keep failed modules visible');
 assert.doesNotMatch(list.innerHTML, /Clean Module/, 'failure filter should hide non-failed modules');
-assert.match(detail.innerHTML, /管理关系/, 'module detail should render management relationship section');
+assert.match(detail.innerHTML, /模块工作台/, 'desktop opens the workspace overview');
+vm.runInContext("selectItem('module-1', false)", context);
+assert.match(detail.innerHTML, /管理关系/, 'selecting a module opens its detail');
 assert.ok(
   detail.innerHTML.indexOf('最近一次更新失败') >= 0 &&
     detail.innerHTML.indexOf('最近一次更新失败') < detail.innerHTML.indexOf('管理关系'),

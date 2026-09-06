@@ -4,7 +4,6 @@ enum WebManagementStateBuilder {
     @MainActor
     static func payload(model: AppModel) -> WebStatePayload {
         let summary = model.moduleSummary
-        let updateAdmission = model.updateAdmission
         return WebStatePayload(
             combined: combinedPayload(
                 summary: summary,
@@ -17,14 +16,23 @@ enum WebManagementStateBuilder {
                 localOutputFolders: model.moduleOutputFolderOptions(storageLocation: .local),
                 githubOutputFolders: model.moduleOutputFolderOptions(storageLocation: .gitHub)
             ),
-            modules: model.modules.map { module in
-                modulePayload(
-                    module,
-                    publishedURL: model.rawURL(for: module),
-                    iconURL: WebManagementAssets.iconURL(for: module)
-                )
-            },
-            activity: activityPayload(
+            modules: moduleProjection(model: model),
+            activity: activityPayload(model: model),
+            workspace: WebWorkspacePayload(
+                localDirectory: model.settings.localModuleDirectory,
+                githubRepository: model.settings.github.isConfigured ? "\(model.settings.github.owner)/\(model.settings.github.repository)" : "",
+                githubBranch: model.settings.github.branch,
+                historyCount: model.updateHistory.count,
+                recentHistory: Array(model.updateHistory.prefix(4))
+            )
+        )
+    }
+
+    @MainActor
+    static func activityPayload(model: AppModel) -> WebActivityPayload {
+        let summary = model.moduleSummary
+        let updateAdmission = model.updateAdmission
+        return activityPayload(
                 isWorking: model.isWorking,
                 workActivity: model.workActivity,
                 statusMessage: model.statusMessage,
@@ -38,8 +46,19 @@ enum WebManagementStateBuilder {
                 latestGitHubPublish: model.latestGitHubPublish,
                 error: model.presentedError,
                 cancellationRequested: model.workCancellationRequested
-            )
         )
+    }
+
+    @MainActor
+    private static func moduleProjection(model: AppModel) -> [WebModulePayload] {
+        if let cached = model.cachedWebProjection, cached.revision == model.moduleRevision, cached.settings == model.settings {
+            return cached.modules
+        }
+        let modules = model.modules.map { module in
+            modulePayload(module, publishedURL: model.rawURL(for: module), iconURL: WebManagementAssets.iconURL(for: module))
+        }
+        model.cachedWebProjection = WebModuleProjectionCache(revision: model.moduleRevision, settings: model.settings, modules: modules)
+        return modules
     }
 
     static func moduleEditorPayload(

@@ -203,6 +203,25 @@ struct SheetActionFooter<Content: View>: View {
 /// one visual language. Previously every screen hardcoded its own values, which
 /// left the Detail / Editor / Settings row families visibly out of sync.
 enum Design {
+    enum Palette {
+        static let accent = adaptive(0x207566, 0x79CDBA)
+        static let canvas = adaptive(0xF4F6F5, 0x181C1C)
+        static let surface = adaptive(0xFFFFFF, 0x232827)
+        static let stroke = adaptive(0xDDE3E0, 0x3C4441)
+        static let success = adaptive(0x28734D, 0x81CCA0)
+        static let warning = adaptive(0x9A5D13, 0xEDBE72)
+        static let error = adaptive(0xB34036, 0xF59387)
+
+        private static func adaptive(_ light: UInt32, _ dark: UInt32) -> Color {
+            Color(nsColor: NSColor(name: nil) { appearance in
+                let value = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : light
+                return NSColor(srgbRed: CGFloat((value >> 16) & 0xFF) / 255,
+                               green: CGFloat((value >> 8) & 0xFF) / 255,
+                               blue: CGFloat(value & 0xFF) / 255, alpha: 1)
+            })
+        }
+    }
+
     enum Spacing {
         static let xxs: CGFloat = 2
         static let xs: CGFloat = 4
@@ -211,13 +230,14 @@ enum Design {
         static let lg: CGFloat = 12
         static let xl: CGFloat = 16
         static let xxl: CGFloat = 24
+        static let xxxl: CGFloat = 32
     }
 
     enum Radius {
         static let small: CGFloat = 8
         static let medium: CGFloat = 10
-        static let card: CGFloat = 12
-        static let large: CGFloat = 14
+        static let card: CGFloat = 14
+        static let large: CGFloat = 18
     }
 
     enum Separator {
@@ -239,7 +259,7 @@ enum Design {
     enum Card {
         static let padding: CGFloat = 14
         static let verticalPadding: CGFloat = 10
-        static let radius: CGFloat = Radius.medium
+        static let radius: CGFloat = Radius.card
         static let strokeOpacity: Double = 0.18
     }
 }
@@ -257,9 +277,9 @@ enum SemanticStatus {
         switch self {
         case .neutral: .secondary
         case .info: .blue
-        case .success: .green
-        case .warning: .orange
-        case .error: .red
+        case .success: Design.Palette.success
+        case .warning: Design.Palette.warning
+        case .error: Design.Palette.error
         }
     }
 }
@@ -267,11 +287,11 @@ enum SemanticStatus {
 extension View {
     /// Standard card chrome: material fill, continuous corners, hairline stroke.
     func detailCard(radius: CGFloat = Design.Card.radius) -> some View {
-        background(.thinMaterial, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+        background(Design.Palette.surface, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
                     .strokeBorder(
-                        Design.Separator.color.opacity(Design.Card.strokeOpacity),
+                        Design.Palette.stroke,
                         lineWidth: Design.Separator.hairline
                     )
             }

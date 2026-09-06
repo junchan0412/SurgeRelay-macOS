@@ -3,6 +3,9 @@ import SwiftUI
 struct ModuleDetailPaneView: View {
     @Environment(AppModel.self) private var model
     let editModule: (RelayModule) -> Void
+    let addModule: () -> Void
+    let scanLocalModules: () -> Void
+    let filterModules: (ModuleFilter) -> Void
 
     @State private var selectedTab: DetailTab = .info
     @State private var hasPresentedPreview = false
@@ -50,37 +53,33 @@ struct ModuleDetailPaneView: View {
 
     var body: some View {
         Group {
-            if let kind = selectionKind {
+            if model.selectedModuleID == AppModel.activitySelectionID {
+                ActivityHistoryView()
+            } else if let kind = selectionKind {
                 detailContent(for: kind)
                     .id(kindID(kind))
-                    .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .move(edge: .trailing)).combined(with: .offset(x: 8)),
-                        removal: .opacity.combined(with: .offset(x: -6))
-                    ))
             } else {
-                ContentUnavailableView("选择一个模块", systemImage: "sidebar.right")
-                    .transition(.opacity)
+                WorkspaceOverviewView(addModule: addModule, scanLocalModules: scanLocalModules, filterModules: filterModules)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .animation(.snappy(duration: 0.22), value: selectionKind.map(kindID))
         .toolbar {
             ToolbarSpacer(.flexible)
             if selectionKind != nil {
                 ToolbarItem {
                     Picker("视图", selection: selectedTabBinding) {
-                        Image(systemName: "info.circle")
+                        Label("概览", systemImage: "info.circle")
                             .accessibilityLabel("详情")
                             .help("查看模块详情")
                             .tag(DetailTab.info)
-                        Image(systemName: "curlybraces")
+                        Label("内容", systemImage: "curlybraces")
                             .accessibilityLabel("预览")
                             .help("预览模块内容")
                             .tag(DetailTab.preview)
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
-                    .frame(width: 88)
+                    .frame(width: 160)
                 }
             }
             ToolbarItem {
@@ -119,11 +118,13 @@ struct ModuleDetailPaneView: View {
                     .opacity(selectedTab == .info ? 1 : 0)
                     .offset(y: selectedTab == .info ? 0 : 6)
                     .allowsHitTesting(selectedTab == .info)
+                    .accessibilityHidden(selectedTab != .info)
                 if hasPresentedPreview {
                     CombinedPreviewPane()
                         .opacity(selectedTab == .preview ? 1 : 0)
                         .offset(y: selectedTab == .preview ? 0 : 6)
                         .allowsHitTesting(selectedTab == .preview)
+                        .accessibilityHidden(selectedTab != .preview)
                 }
             case .module:
                 if let module = selectedModule {
@@ -131,11 +132,13 @@ struct ModuleDetailPaneView: View {
                         .opacity(selectedTab == .info ? 1 : 0)
                         .offset(y: selectedTab == .info ? 0 : 6)
                         .allowsHitTesting(selectedTab == .info)
+                        .accessibilityHidden(selectedTab != .info)
                     if hasPresentedPreview {
                         ModulePreviewPane(module: module)
                             .opacity(selectedTab == .preview ? 1 : 0)
                             .offset(y: selectedTab == .preview ? 0 : 6)
                             .allowsHitTesting(selectedTab == .preview)
+                            .accessibilityHidden(selectedTab != .preview)
                     }
                 }
             }

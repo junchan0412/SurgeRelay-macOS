@@ -24,10 +24,10 @@ struct ModuleEditorBasicInfoSection: View {
                 ModuleEditorStorageTargetsPicker(storageTargets: $storageTargets)
             }
             ModuleEditorInfoRow(
-                relationshipIsWarning ? "发布目标未开启" : "关系",
+                relationshipIsWarning ? "发布目标未开启" : "初始来源",
                 icon: relationshipIsWarning ? "exclamationmark.triangle" : initialSource.systemImage
             ) {
-                Text(relationshipHint)
+                Text(relationshipIsWarning ? relationshipHint : initialSource.title)
                     .font(.caption)
                     .foregroundStyle(relationshipIsWarning ? .orange : .secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -133,8 +133,8 @@ struct ModuleEditorSourceSection: View {
                 .labelsHidden()
                 .frame(maxWidth: 220, alignment: .leading)
             }
-            ModuleEditorInfoRow("初始来源规则", icon: "info.circle") {
-                Text("更新后解析模块中的 #SUBSCRIBED originalURL；存在时显示订阅来源，没有该记录时远程地址归类为远程来源，仅本地文件归类为自写模块。")
+            ModuleEditorInfoRow("支持格式", icon: "info.circle") {
+                Text("自动识别 Surge、Loon 与 Quantumult X，也支持本地模块文件。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

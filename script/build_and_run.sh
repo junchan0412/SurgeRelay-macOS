@@ -27,6 +27,9 @@ open_app() {
   local arguments=(-n -F)
   if [[ "${SURGE_RELAY_RUN_UI_QA:-0}" == "1" ]]; then
     arguments+=(--env SURGE_RELAY_UI_QA=1)
+    if [[ -n "${SURGE_RELAY_UI_QA_APPEARANCE:-}" ]]; then
+      arguments+=(--env "SURGE_RELAY_UI_QA_APPEARANCE=$SURGE_RELAY_UI_QA_APPEARANCE")
+    fi
   fi
   /usr/bin/open "${arguments[@]}" "$APP_BUNDLE"
 }

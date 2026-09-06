@@ -113,6 +113,7 @@ extension AppModel {
         guard let index = modules.firstIndex(where: { $0.id == id }) else { return }
         registerLocalChange()
         let module = modules.remove(at: index)
+        modulePreviewDrafts.removeValue(forKey: id)
         invalidateModuleSummaryCache()
         try? await fileStore.removeComponent(id: id)
         try? await fileStore.removeAssets(id: id)
@@ -320,6 +321,8 @@ extension AppModel {
 
     func registerLocalChange() {
         localChangeGeneration &+= 1
+        moduleUpdateTask?.cancel()
+        updatePreparationTask?.cancel()
         cancelAutomaticPublishSchedule()
         pendingPublishPreview = nil
     }

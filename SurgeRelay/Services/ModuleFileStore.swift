@@ -1,28 +1,38 @@
 import Foundation
 
 actor ModuleFileStore {
+    private let cacheRoot: URL?
+    private let configurationRoot: URL?
+
+    init(cacheDirectory: URL? = nil, configurationDirectory: URL? = nil) {
+        cacheRoot = cacheDirectory
+        configurationRoot = configurationDirectory
+    }
+
+    private var cacheDirectory: URL { cacheRoot ?? PersistenceStore.cacheDirectoryURL }
+    private var snapshotDirectory: URL { cacheDirectory.appending(path: "Snapshots", directoryHint: .isDirectory) }
     private final class CoordinationOutcome<Value>: @unchecked Sendable {
         var result: Result<Value, Error>?
     }
 
     private var componentDirectory: URL {
-        PersistenceStore.cacheDirectoryURL.appending(path: "Components", directoryHint: .isDirectory)
+        cacheDirectory.appending(path: "Components", directoryHint: .isDirectory)
     }
 
     private var overrideDirectory: URL {
-        PersistenceStore.configurationDirectoryURL.appending(path: "Overrides", directoryHint: .isDirectory)
+        (configurationRoot ?? PersistenceStore.configurationDirectoryURL).appending(path: "Overrides", directoryHint: .isDirectory)
     }
 
     private var assetDirectory: URL {
-        PersistenceStore.cacheDirectoryURL.appending(path: "Assets", directoryHint: .isDirectory)
+        cacheDirectory.appending(path: "Assets", directoryHint: .isDirectory)
     }
 
     private var combinedCacheURL: URL {
-        PersistenceStore.cacheDirectoryURL.appending(path: "Combined.cache")
+        cacheDirectory.appending(path: "Combined.cache")
     }
 
     private var combinedOverrideURL: URL {
-        PersistenceStore.cacheDirectoryURL.appending(path: "CombinedOverride.cache")
+        cacheDirectory.appending(path: "CombinedOverride.cache")
     }
 
     func writeComponent(_ content: String, id: UUID) throws {
@@ -30,12 +40,36 @@ actor ModuleFileStore {
         try Data(SurgeModuleSanitizer.sanitize(content).utf8).write(to: componentURL(for: id), options: .atomic)
     }
 
+    func commitConversion(_ result: ConversionResult, id: UUID) throws {
+        try Task.checkCancellation()
+        let manager = FileManager.default
+        try manager.createDirectory(at: snapshotDirectory, withIntermediateDirectories: true)
+        let staging = snapshotDirectory.appending(path: ".\(id.uuidString)-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try manager.createDirectory(at: staging, withIntermediateDirectories: true)
+        defer { try? manager.removeItem(at: staging) }
+        try Data(SurgeModuleSanitizer.sanitize(result.content).utf8).write(to: staging.appending(path: "Content.cache"))
+        try stageAssets(result.assets, id: id, at: staging.appending(path: "Assets", directoryHint: .isDirectory))
+        try Task.checkCancellation()
+        let destination = snapshotURL(for: id)
+        if manager.fileExists(atPath: destination.path) {
+            _ = try manager.replaceItemAt(destination, withItemAt: staging)
+        } else {
+            try manager.moveItem(at: staging, to: destination)
+        }
+    }
+
+    func prepareConversion(_ result: ConversionResult, id: UUID) throws -> (converted: String, effective: String, hasOverride: Bool) {
+        let converted = SurgeModuleSanitizer.sanitize(result.content)
+        let hasOverride = hasOverride(id: id)
+        return (converted, hasOverride ? try readComponent(id: id) : converted, hasOverride)
+    }
+
     func hasComponent(id: UUID) -> Bool {
         let legacyURL = FileManager.default.homeDirectoryForCurrentUser
             .appending(path: "Library/Application Support/Surge Relay/Components/\(id.uuidString).sgmodule")
         return FileManager.default.fileExists(atPath: componentOverrideURL(for: id).path)
             || FileManager.default.fileExists(atPath: componentURL(for: id).path)
-            || FileManager.default.fileExists(atPath: legacyURL.path)
+            || (!AppRuntimeOptions.isUIQAMode && cacheRoot == nil && FileManager.default.fileExists(atPath: legacyURL.path))
     }
 
     func hasOverride(id: UUID) -> Bool {
@@ -44,7 +78,7 @@ actor ModuleFileStore {
 
     func readComponent(id: UUID) throws -> String {
         let overrideURL = componentOverrideURL(for: id)
-        let legacyOverrideURL = PersistenceStore.cacheDirectoryURL
+        let legacyOverrideURL = cacheDirectory
             .appending(path: "Overrides/\(id.uuidString).cache")
         if !FileManager.default.fileExists(atPath: overrideURL.path),
            FileManager.default.fileExists(atPath: legacyOverrideURL.path) {
@@ -62,7 +96,7 @@ actor ModuleFileStore {
         if !FileManager.default.fileExists(atPath: url.path) {
             let legacyURL = FileManager.default.homeDirectoryForCurrentUser
                 .appending(path: "Library/Application Support/Surge Relay/Components/\(id.uuidString).sgmodule")
-            if FileManager.default.fileExists(atPath: legacyURL.path) {
+            if !AppRuntimeOptions.isUIQAMode, cacheRoot == nil, FileManager.default.fileExists(atPath: legacyURL.path) {
                 try FileManager.default.createDirectory(at: componentDirectory, withIntermediateDirectories: true)
                 try FileManager.default.copyItem(at: legacyURL, to: url)
             }
@@ -84,8 +118,9 @@ actor ModuleFileStore {
     }
 
     func removeComponent(id: UUID) throws {
-        let url = componentURL(for: id)
-        if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+        for url in [snapshotURL(for: id), componentDirectory.appending(path: "\(id.uuidString).cache")] {
+            if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+        }
         let overrideURL = componentOverrideURL(for: id)
         if FileManager.default.fileExists(atPath: overrideURL.path) { try FileManager.default.removeItem(at: overrideURL) }
     }
@@ -147,53 +182,60 @@ actor ModuleFileStore {
     }
 
     func replaceAssets(_ assets: [GeneratedAsset], id: UUID) throws {
-        let relativeRoot = "assets/\(id.uuidString.lowercased())"
-        let root = assetDirectory.appending(path: id.uuidString.lowercased(), directoryHint: .isDirectory)
-        if FileManager.default.fileExists(atPath: root.path) {
-            try FileManager.default.removeItem(at: root)
-        }
-        guard !assets.isEmpty else { return }
-
-        for asset in assets {
-            guard asset.relativePath.hasPrefix(relativeRoot + "/") else {
-                throw RelayError.invalidOutput("生成脚本的保存路径无效。")
-            }
-            let fileName = String(asset.relativePath.dropFirst((relativeRoot + "/").count))
-            let destination = root.appending(path: fileName)
-            try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try asset.data.write(to: destination, options: .atomic)
+        let manager = FileManager.default
+        let root = assetsURL(for: id)
+        try manager.createDirectory(at: root.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let staging = root.deletingLastPathComponent().appending(path: ".assets-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? manager.removeItem(at: staging) }
+        try stageAssets(assets, id: id, at: staging)
+        if manager.fileExists(atPath: root.path) {
+            _ = try manager.replaceItemAt(root, withItemAt: staging)
+        } else {
+            try manager.moveItem(at: staging, to: root)
         }
     }
 
     func removeAssets(id: UUID) throws {
-        let root = assetDirectory.appending(path: id.uuidString.lowercased(), directoryHint: .isDirectory)
+        let root = assetsURL(for: id)
         if FileManager.default.fileExists(atPath: root.path) {
             try FileManager.default.removeItem(at: root)
         }
     }
 
     func generatedAssetFiles(for moduleIDs: Set<UUID>? = nil) throws -> [PublishFile] {
-        guard FileManager.default.fileExists(atPath: assetDirectory.path),
-              let enumerator = FileManager.default.enumerator(
-                at: assetDirectory,
-                includingPropertiesForKeys: [.isRegularFileKey],
-                options: [.skipsHiddenFiles]
-              ) else { return [] }
-
-        var files: [PublishFile] = []
-        for case let fileURL as URL in enumerator {
-            let values = try fileURL.resourceValues(forKeys: [.isRegularFileKey])
-            guard values.isRegularFile == true else { continue }
-            let relative = fileURL.path.replacingOccurrences(of: assetDirectory.path + "/", with: "")
-            if let moduleIDs {
-                let components = relative.split(separator: "/", maxSplits: 1).map(String.init)
-                guard let idValue = components.first,
-                      let id = UUID(uuidString: idValue),
-                      moduleIDs.contains(id) else { continue }
+        let ids: Set<UUID>
+        if let moduleIDs { ids = moduleIDs }
+        else {
+            let directories = [assetDirectory, snapshotDirectory].flatMap {
+                (try? FileManager.default.contentsOfDirectory(atPath: $0.path)) ?? []
             }
-            files.append(PublishFile(name: "assets/\(relative)", data: try Data(contentsOf: fileURL)))
+            ids = Set(directories.compactMap(UUID.init(uuidString:)))
+        }
+        var files: [PublishFile] = []
+        for id in ids {
+            let root = assetsURL(for: id).resolvingSymlinksInPath().standardizedFileURL
+            guard let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]) else { continue }
+            for case let fileURL as URL in enumerator {
+                guard try fileURL.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true else { continue }
+                let relative = String(fileURL.standardizedFileURL.path.dropFirst(root.path.count + 1))
+                files.append(PublishFile(name: "assets/\(id.uuidString.lowercased())/\(relative)", data: try Data(contentsOf: fileURL)))
+            }
         }
         return files.sorted { $0.name < $1.name }
+    }
+
+    private func stageAssets(_ assets: [GeneratedAsset], id: UUID, at root: URL) throws {
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let prefix = "assets/\(id.uuidString.lowercased())/"
+        var paths: Set<String> = []
+        for asset in assets {
+            guard asset.relativePath.hasPrefix(prefix) else { throw RelayError.invalidOutput("生成脚本的保存路径无效。") }
+            let relative = String(asset.relativePath.dropFirst(prefix.count))
+            let destination = try exportURL(root: root, relativePath: relative)
+            guard paths.insert(destination.path.lowercased()).inserted else { throw RelayError.invalidOutput("生成脚本包含重复保存路径。") }
+            try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try asset.data.write(to: destination)
+        }
     }
 
     func removeLegacyPublishedFiles(in directoryPath: String, relativePaths: [String]) throws -> [String] {
@@ -211,7 +253,22 @@ actor ModuleFileStore {
     }
 
     private func componentURL(for id: UUID) -> URL {
-        componentDirectory.appending(path: "\(id.uuidString).cache")
+        let snapshot = snapshotURL(for: id)
+        if FileManager.default.fileExists(atPath: snapshot.path) {
+            return snapshot.appending(path: "Content.cache")
+        }
+        return componentDirectory.appending(path: "\(id.uuidString).cache")
+    }
+
+    private func snapshotURL(for id: UUID) -> URL {
+        snapshotDirectory.appending(path: id.uuidString.lowercased(), directoryHint: .isDirectory)
+    }
+
+    private func assetsURL(for id: UUID) -> URL {
+        let snapshot = snapshotURL(for: id)
+        return FileManager.default.fileExists(atPath: snapshot.path)
+            ? snapshot.appending(path: "Assets", directoryHint: .isDirectory)
+            : assetDirectory.appending(path: id.uuidString.lowercased(), directoryHint: .isDirectory)
     }
 
     private func componentOverrideURL(for id: UUID) -> URL {

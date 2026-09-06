@@ -74,9 +74,9 @@
 
   function detailToolbar(selectedTab = 'info', hasModule = false) {
     return `<div class="detail-toolbar">
-    <div class="segmented-control" aria-label="显示方式">
-      <button data-action="tab-info" class="${selectedTab === 'info' ? 'selected' : ''}"><span class="symbol" data-symbol="info.circle"></span><span>详情</span></button>
-      <button data-action="tab-preview" class="${selectedTab === 'preview' ? 'selected' : ''}"><span class="symbol" data-symbol="curlybraces"></span><span>预览</span></button>
+    <div class="segmented-control" role="tablist" aria-label="显示方式">
+      <button data-action="tab-info" class="${selectedTab === 'info' ? 'selected' : ''}" role="tab" aria-selected="${selectedTab === 'info'}"><span class="symbol" data-symbol="info.circle"></span><span>详情</span></button>
+      <button data-action="tab-preview" class="${selectedTab === 'preview' ? 'selected' : ''}" role="tab" aria-selected="${selectedTab === 'preview'}"><span class="symbol" data-symbol="curlybraces"></span><span>预览</span></button>
     </div>
     ${hasModule ? `<button class="button" data-action="edit"><span class="symbol" data-symbol="pencil"></span>编辑</button><button class="button destructive" data-action="delete"><span class="symbol" data-symbol="trash"></span>删除</button>` : ''}
   </div>`;
@@ -142,9 +142,13 @@
     const localStorageRow = module.localStorageRelativePath
       ? detailRow('folder', '本地相对路径', module.localStorageRelativePath, false, module.localStorageRelativePath)
       : '';
-    return `${detailToolbar(selectedTab, true)}
-    ${error}
+    return `${moduleHeaderMarkup(module, context.activity)}${detailToolbar(selectedTab, true)}
+    ${error}${conflict}${syncConflict}
     <section class="form-section-view"><h3 class="section-heading">管理关系</h3><div class="group-box">
+      ${updateSourceRow || initialSourceRow}
+      ${detailRow('doc.on.doc', '输出路径', outputPath || '未开启独立发布', false, outputPath || null)}
+      ${detailRow('clock', '上次更新', formatDate(module.lastUpdatedAt, '从未更新'))}
+      <details class="metadata-details"><summary>来源与同步详情<span class="symbol" data-symbol="chevron.right"></span></summary>
       ${detailRow(module.publishesStandalone ? (module.storageLocationIcon || 'folder') : 'folder', '独立模块存放', module.storageLocationDetail || module.storageLocationTitle || '未开启独立发布')}
       ${detailRow(module.initialSourceIcon || 'link', '初始来源', module.initialSourceTitle || '自写模块')}
       ${initialSourceRow}
@@ -168,8 +172,9 @@
       ${sourceETagRow}
       ${sourceLastModifiedRow}
       ${detailRow('gearshape', '转换引擎', module.conversionEngineRevision ? module.conversionEngineRevision.slice(0, 12) : '原生 Surge 模块', false, module.conversionEngineRevision || null)}
+      </details>
     </div></section>
-    ${advanced}<div id="arguments-section"></div>${conflict}${syncConflict}${published}`;
+    <div id="arguments-section"></div>${published}${advanced}`;
   }
 
   function argumentMarkup(argument) {
@@ -220,8 +225,45 @@
     }).map(folder => `<option value="${escapeAttribute(folder)}">${escapeHTML(logic.folderTitle(folder))}</option>`).join('');
   }
 
+  function historyMarkup(entries = [], options = {}) {
+    const outcomes = { updated: ['已更新', 'success'], unchanged: ['没有变化', 'neutral'], cachedAfterFailure: ['沿用缓存', 'warning'], failed: ['更新失败', 'error'], published: ['已发布', 'success'] };
+    if (!entries.length) return '<div class="workspace-empty"><span class="symbol" data-symbol="clock"></span><p>更新模块或发布后，操作记录会出现在这里。</p></div>';
+    return `<div class="history-list">${entries.map(entry => {
+      const [title, tone] = outcomes[entry.outcome] || [entry.outcome || '活动', 'neutral'];
+      const id = String(entry.moduleID || '').toLowerCase();
+      const moduleLink = id ? `<button class="text-button" data-action="show-module" data-id="${escapeAttribute(id)}">查看模块<span class="symbol" data-symbol="chevron.right"></span></button>` : '';
+      return `<article class="history-item"><span class="history-marker ${tone}"><span class="symbol" data-symbol="${tone === 'error' || tone === 'warning' ? 'exclamationmark.triangle' : entry.outcome === 'published' ? 'square.and.arrow.up' : 'checkmark'}"></span></span><div class="history-copy"><div class="history-title"><strong>${escapeHTML(entry.moduleName || 'Surge Relay')}</strong><span class="status-label ${tone}">${escapeHTML(title)}</span><time>${escapeHTML(formatDate(entry.date, '—'))}</time></div><p>${escapeHTML(entry.message || '')}</p>${options.detailed ? `<div class="history-meta"><span>耗时 ${Number(entry.duration || 0).toFixed(2)} 秒</span>${moduleLink}</div>` : ''}</div></article>`;
+    }).join('')}</div>`;
+  }
+
+  function workspaceMarkup(snapshot) {
+    const modules = snapshot.modules || [];
+    const attention = modules.filter(module => module.state === 'failed' || module.hasOverrideConflict || module.hasSyncConflict);
+    const standalone = modules.filter(module => module.publishesStandalone).length;
+    const workspace = snapshot.workspace || {};
+    const targets = snapshot.moduleEditor || {};
+    const metric = (label, value, action = '', tone = '') => `<${action ? 'button' : 'div'} class="workspace-metric ${tone}" ${action ? `data-action="${action}"` : ''}><span>${label}</span><strong>${value}</strong></${action ? 'button' : 'div'}>`;
+    const issueRows = attention.slice(0, 3).map(module => `<button class="attention-item" data-action="show-module" data-id="${escapeAttribute(module.id)}"><span class="symbol" data-symbol="exclamationmark.triangle"></span><span><strong>${escapeHTML(module.name)}</strong><small>${escapeHTML(module.lastError ? logic.failureSummary(module.lastError) : '本地内容与更新版本存在冲突')}</small></span><span class="symbol" data-symbol="chevron.right"></span></button>`).join('');
+    const normal = `<div class="workspace-healthy"><span class="symbol" data-symbol="checkmark"></span><div><strong>没有需要处理的问题</strong><p>更新失败和内容冲突会集中显示在这里。</p></div><button class="button" data-action="update-all" ${snapshot.activity?.canStartUpdate === false ? 'disabled' : ''}>检查更新</button></div>`;
+    const onboarding = '<div class="workspace-empty"><span class="symbol" data-symbol="square.stack.3d.up"></span><h2>把第一个模块交给 Relay</h2><p>添加 Surge、Loon 或 Quantumult X 来源，维护转换结果与稳定订阅地址。</p><button class="button primary" data-action="add-module">添加来源</button></div>';
+    const target = (title, icon, enabled, detail, note) => `<article class="destination-card"><div><span class="symbol" data-symbol="${icon}"></span><h3>${title}</h3><span class="status-label ${enabled ? 'success' : 'neutral'}">${enabled ? '已开启' : '未开启'}</span></div><strong title="${escapeAttribute(detail)}">${escapeHTML(detail)}</strong><p>${escapeHTML(note)}</p></article>`;
+    return `<div class="workspace-heading"><div class="eyebrow">SURGE RELAY</div><div class="workspace-heading-line"><div><h1>模块工作台</h1><p>从来源更新到稳定发布，每一步都在这里。</p></div><button class="button primary" data-action="add-module"><span class="symbol" data-symbol="plus"></span>添加模块</button></div></div>
+      <section class="workspace-metrics" aria-label="模块概况">${metric('模块总数', modules.length)}${metric('可更新', snapshot.activity?.enabledModuleCount ?? modules.length)}${metric('独立发布', standalone)}${metric('需要处理', attention.length, 'show-attention', attention.length ? 'warning' : '')}</section>
+      <section class="workspace-section"><div class="workspace-section-heading"><h2>运行状态</h2>${attention.length ? '<button class="text-button" data-action="show-attention">查看全部</button>' : ''}</div><div class="workspace-panel">${!modules.length ? onboarding : attention.length ? issueRows : normal}</div></section>
+      <section class="workspace-section"><div class="workspace-section-heading"><h2>发布去向</h2><span>在 Mac App 的设置中管理</span></div><div class="destination-grid">${target('本地目录', 'externaldrive', targets.publishToLocal, workspace.localDirectory || '选择 Surge 模块目录', `${modules.filter(m => (m.storageTargets || [m.storageLocation]).includes('local')).length} 个模块存放在本地`)}${target('GitHub', 'network', targets.publishToGitHub, workspace.githubRepository || '连接仓库以分发模块', workspace.githubBranch ? `分支 ${workspace.githubBranch}` : '配置仓库后可自动发布更新')}</div></section>
+      <section class="workspace-section"><div class="workspace-section-heading"><h2>最近活动</h2><button class="text-button" data-action="show-activity">全部记录<span class="symbol" data-symbol="chevron.right"></span></button></div><div class="workspace-panel">${historyMarkup(workspace.recentHistory || [])}</div></section>`;
+  }
+
+  function moduleHeaderMarkup(module, activity = {}) {
+    const icon = module.iconURL ? `<img src="${escapeAttribute(module.iconURL)}" alt="">` : '<span class="symbol" data-symbol="shippingbox"></span>';
+    return `<header class="module-heading"><div class="module-heading-title"><span class="module-hero-icon">${icon}</span><div><p class="eyebrow">${escapeHTML(module.initialSourceTitle || '模块来源')}</p><h1>${escapeHTML(module.name)}</h1><p>${escapeHTML(module.category || module.sourceFormatTitle || 'Surge 模块')}</p></div></div><div class="module-heading-meta"><span class="status-label ${module.state === 'failed' ? 'error' : module.state === 'current' ? 'success' : 'neutral'}">${escapeHTML(logic.moduleStatusTitle(module))}</span><span>更新于 ${escapeHTML(formatDate(module.lastUpdatedAt, '尚未更新'))}</span><button class="button primary" data-action="update-module" ${activity.isWorking ? 'disabled' : ''}><span class="symbol" data-symbol="refresh"></span>更新模块</button></div></header>`;
+  }
+
   global.SurgeRelayWebMarkup = {
     emptyStateMarkup,
+    workspaceMarkup,
+    historyMarkup,
+    moduleHeaderMarkup,
     moduleRowMarkup,
     detailRow,
     copyableValueSection,
