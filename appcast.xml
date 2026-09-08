@@ -3,6 +3,23 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>2.0.1</title>
+            <pubDate>Tue, 08 Sep 2026 20:04:54 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v2.0.1</link>
+            <sparkle:version>104</sparkle:version>
+            <sparkle:shortVersionString>2.0.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 2.0.1
+
+
+- 视觉：中和了各区域背景的青绿色偏色，画布、卡片与描边统一为中性冷灰，与系统侧栏、材质和代码编辑区自然衔接，显著降低区域之间的明显色差；品牌青绿色收敛为唯一强调色。
+- 视觉：统一全应用卡片样式——汇总详情、本地模块导入等页面的半透明材质卡片改为与详情 / 设置一致的实心卡片；侧栏底部状态区移除叠加材质，改为贴合侧栏的分隔线页脚。
+- 视觉：拷贝按钮改用品牌强调色，与主操作按钮保持一致，不再回落到系统蓝。
+- 验证：Debug / Release 构建、代码签名与 Sparkle 签名通过；浅色与深色外观均已核对。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v2.0.1/Surge-Relay-2.0.1.app.zip" length="10058927" type="application/zip" sparkle:edSignature="hBJzsEV7dXcPxhR4GtKGzkcMZ8EIsfP1GHoGY+1VCQ3QEt5wYQUhG6IPIl5r1T4QhMVxGVuhPt9opad9bxvLCw=="/>
+        </item>
+        <item>
             <title>2.0.0</title>
             <pubDate>Mon, 07 Sep 2026 01:57:42 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v2.0.0</link>

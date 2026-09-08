@@ -171,7 +171,7 @@ struct TextCopyButton: View {
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
-        .tint(copied ? .green : .accentColor)
+        .tint(copied ? Design.Palette.success : Design.Palette.accent)
         .disabled(text.isEmpty)
     }
 }
@@ -205,9 +205,14 @@ struct SheetActionFooter<Content: View>: View {
 enum Design {
     enum Palette {
         static let accent = adaptive(0x207566, 0x79CDBA)
-        static let canvas = adaptive(0xF4F6F5, 0x181C1C)
-        static let surface = adaptive(0xFFFFFF, 0x232827)
-        static let stroke = adaptive(0xDDE3E0, 0x3C4441)
+        // Neutral, faintly-cool grays (B ≥ G ≥ R by a hair) so custom regions sit
+        // naturally beside the neutral system chrome (sidebar, materials, code
+        // editor) instead of clashing with the old teal-tinted grays. canvas and
+        // surface are kept close in tone so cards read as gently raised, not as
+        // separate color zones.
+        static let canvas = adaptive(0xF4F5F7, 0x1B1D20)
+        static let surface = adaptive(0xFFFFFF, 0x25272B)
+        static let stroke = adaptive(0xE3E5EA, 0x34373C)
         static let success = adaptive(0x28734D, 0x81CCA0)
         static let warning = adaptive(0x9A5D13, 0xEDBE72)
         static let error = adaptive(0xB34036, 0xF59387)

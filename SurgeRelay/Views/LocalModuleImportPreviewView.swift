@@ -121,11 +121,7 @@ struct LocalModuleImportPreviewView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.24), lineWidth: 0.5)
-        }
+        .detailCard()
     }
 
     @ViewBuilder
@@ -237,10 +233,10 @@ struct LocalModuleImportPreviewView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(Design.Palette.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(isSelected ? 0.22 : 0.12), lineWidth: 0.5)
+                .strokeBorder(isSelected ? Design.Palette.accent.opacity(0.55) : Design.Palette.stroke, lineWidth: Design.Separator.hairline)
         }
         .opacity(isSelected ? 1 : 0.58)
     }

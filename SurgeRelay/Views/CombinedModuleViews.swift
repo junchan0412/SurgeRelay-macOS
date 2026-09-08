@@ -78,11 +78,7 @@ struct CombinedModuleDetailView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.24), lineWidth: 0.5)
-        }
+        .detailCard()
     }
 
     @ViewBuilder

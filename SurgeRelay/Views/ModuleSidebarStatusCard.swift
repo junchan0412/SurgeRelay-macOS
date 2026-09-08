@@ -113,23 +113,18 @@ struct ModuleSidebarStatusCard: View {
                     .contentTransition(.opacity)
             }
         }
-        .padding(12)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.regularMaterial, in: statusCardShape)
-        .overlay {
-            statusCardShape
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.24), lineWidth: 0.5)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Design.Separator.color.opacity(Design.Separator.opacity))
+                .frame(height: Design.Separator.hairline)
         }
-        .padding(.horizontal, 10)
-        .padding(.bottom, 10)
         .animation(.snappy(duration: 0.22), value: model.workActivity.kind)
         .animation(.snappy(duration: 0.22), value: model.workActivity.isActive)
         .animation(.snappy(duration: 0.22), value: model.presentedError != nil)
         .animation(.snappy(duration: 0.22), value: model.automaticPublishRunsAt)
-    }
-
-    private var statusCardShape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
     }
 
     private var latestUpdateText: String {
