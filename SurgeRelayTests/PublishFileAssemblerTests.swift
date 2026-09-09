@@ -48,7 +48,7 @@ final class PublishFileAssemblerTests: XCTestCase {
             materialize: { content, overrides in
                 "\(content):\(overrides["mode"] ?? "")"
             },
-            applyingModuleMetadata: { name, category, iconURL, content in
+            applyingModuleMetadata: { name, category, _, iconURL, content in
                 "\(name)|\(category)|\(iconURL ?? "nil")|\(content)"
             },
             cancellationCheckpoint: {}
@@ -93,7 +93,7 @@ final class PublishFileAssemblerTests: XCTestCase {
             readComponent: { _ in source },
             generatedAssetFiles: { _ in [] },
             materialize: { content, _ in content },
-            applyingModuleMetadata: { _, _, _, content in content },
+            applyingModuleMetadata: { _, _, _, _, content in content },
             cancellationCheckpoint: {}
         )
 
@@ -134,7 +134,7 @@ final class PublishFileAssemblerTests: XCTestCase {
             readComponent: { _ in source },
             generatedAssetFiles: { _ in [] },
             materialize: { content, _ in content },
-            applyingModuleMetadata: { _, _, _, content in content },
+            applyingModuleMetadata: { _, _, _, _, content in content },
             cancellationCheckpoint: {}
         )
 
@@ -170,7 +170,7 @@ final class PublishFileAssemblerTests: XCTestCase {
             readComponent: { _ in "source" },
             generatedAssetFiles: { _ in [] },
             materialize: { content, _ in content },
-            applyingModuleMetadata: { _, _, _, content in content },
+            applyingModuleMetadata: { _, _, _, _, content in content },
             cancellationCheckpoint: {}
         )
         let gitHubFiles = try await PublishFileAssembler.files(
@@ -185,7 +185,7 @@ final class PublishFileAssemblerTests: XCTestCase {
             readComponent: { _ in "source" },
             generatedAssetFiles: { _ in [] },
             materialize: { content, _ in content },
-            applyingModuleMetadata: { _, _, _, content in content },
+            applyingModuleMetadata: { _, _, _, _, content in content },
             cancellationCheckpoint: {}
         )
 

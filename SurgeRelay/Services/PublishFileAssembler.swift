@@ -13,7 +13,7 @@ enum PublishFileAssembler {
     typealias ComponentReader = (UUID) async -> String?
     typealias AssetReader = (Set<UUID>) async throws -> [PublishFile]
     typealias Materializer = (String, [String: String]) async -> String
-    typealias MetadataApplier = (String, String, String?, String) async -> String
+    typealias MetadataApplier = (String, String, String, String?, String) async -> String
     typealias CancellationCheckpoint = @MainActor () async throws -> Void
 
     @MainActor
@@ -47,6 +47,7 @@ enum PublishFileAssembler {
             let namedContent = await applyingModuleMetadata(
                 module.name,
                 module.category,
+                module.moduleDescription,
                 module.customIconURL,
                 materialized
             )

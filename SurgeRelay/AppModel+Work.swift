@@ -49,9 +49,13 @@ extension AppModel {
         return true
     }
 
-    func clearUpdateHistory() {
-        updateHistory.removeAll()
-        PersistenceStore.saveUpdateHistory([])
+    func clearUpdateHistory(issuesOnly: Bool = false) {
+        if issuesOnly {
+            updateHistory.removeAll { $0.outcome == .failed || $0.outcome == .cachedAfterFailure }
+        } else {
+            updateHistory.removeAll()
+        }
+        PersistenceStore.saveUpdateHistory(updateHistory)
     }
 
     func shouldContinueCurrentWork(

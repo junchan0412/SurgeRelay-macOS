@@ -1,9 +1,26 @@
-import Foundation
+import AppKit
 
 @MainActor
 extension AppModel {
     var configurationDirectoryPath: String {
         ConfigurationManager.configurationDirectoryPath
+    }
+
+    /// Applies the user's appearance choice to the whole app (windows + menu bar
+    /// extra). `.system` clears the override so the app follows macOS again.
+    func applyAppearancePreference() {
+        switch settings.appearancePreference {
+        case .system: NSApp.appearance = nil
+        case .light: NSApp.appearance = NSAppearance(named: .aqua)
+        case .dark: NSApp.appearance = NSAppearance(named: .darkAqua)
+        }
+    }
+
+    func setAppearancePreference(_ preference: AppearancePreference) {
+        guard settings.appearancePreference != preference else { return }
+        settings.appearancePreference = preference
+        saveSettings()
+        applyAppearancePreference()
     }
 
     func useConfigurationDirectory(_ path: String) {

@@ -208,12 +208,14 @@ actor ModuleProcessingWorker {
     func applyingModuleMetadata(
         name: String,
         category: String,
+        desc: String = "",
         iconURL: String? = nil,
         to content: String
     ) -> String {
         ModuleMetadataParser.applyingModuleMetadata(
             name: name,
             category: category,
+            desc: desc,
             iconURL: iconURL,
             to: content
         )

@@ -11,6 +11,7 @@ struct ModuleDraft: Sendable {
     var sourceFormat: ModuleSourceFormat = .automatic
     var outputFileName = ""
     var category = ""
+    var moduleDescription = ""
     var outputFolder = ModuleOutputFolder.root
     var storageTargets: Set<ModuleStorageLocation> = [.gitHub]
     var storageLocation: ModuleStorageLocation {
@@ -32,6 +33,7 @@ struct ModuleDraft: Sendable {
         sourceFormat = module.sourceFormat
         outputFileName = module.outputFileName
         category = module.category
+        moduleDescription = module.moduleDescription
         outputFolder = module.outputFolder
         storageTargets = module.storageTargets
         publishesStandalone = module.publishesStandalone

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ModuleEditorBasicInfoSection: View {
     @Binding var name: String
+    @Binding var moduleDescription: String
     @Binding var storageTargets: Set<ModuleStorageLocation>
     @Binding var category: String
     @Binding var outputFolder: String
@@ -19,6 +20,12 @@ struct ModuleEditorBasicInfoSection: View {
                 text: $name,
                 prompt: "例如：YouTube 去广告",
                 accessibilityIdentifier: "module-editor.name"
+            )
+            ModuleEditorTextFieldRow(
+                title: "注释",
+                icon: "text.alignleft",
+                text: $moduleDescription,
+                prompt: "模块说明，写入 #!desc（留空保留来源说明）"
             )
             ModuleEditorControlRow("模块存放", icon: "arrow.triangle.2.circlepath") {
                 ModuleEditorStorageTargetsPicker(storageTargets: $storageTargets)

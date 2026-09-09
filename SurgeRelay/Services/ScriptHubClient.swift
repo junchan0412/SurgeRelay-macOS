@@ -76,6 +76,7 @@ actor ScriptHubClient {
             let namedContent = ModuleMetadataParser.applyingModuleMetadata(
                 name: module.name,
                 category: module.category,
+                desc: module.moduleDescription,
                 iconURL: module.customIconURL,
                 to: content
             )
@@ -103,6 +104,7 @@ actor ScriptHubClient {
         let namedContent = ModuleMetadataParser.applyingModuleMetadata(
             name: module.name,
             category: module.category,
+            desc: module.moduleDescription,
             iconURL: module.customIconURL,
             to: materialized.content
         )

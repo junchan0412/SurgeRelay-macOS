@@ -182,6 +182,7 @@ struct ModuleEditorView: View {
     private var basicInfoSection: some View {
         ModuleEditorBasicInfoSection(
             name: $draft.name,
+            moduleDescription: $draft.moduleDescription,
             storageTargets: $draft.storageTargets,
             category: $draft.category,
             outputFolder: $draft.outputFolder,

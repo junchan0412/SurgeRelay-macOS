@@ -139,6 +139,7 @@ enum ModuleDraftPlanner {
             sourceFormat: draft.sourceFormat,
             outputFileName: normalizedDraft.outputFileName,
             category: normalizedDraft.category,
+            moduleDescription: normalizedDraft.moduleDescription,
             outputFolder: normalizedDraft.outputFolder,
             storageLocation: draft.storageLocation,
             storageTargets: draft.storageTargets,
@@ -186,6 +187,7 @@ enum ModuleDraftPlanner {
             current.sourceFormat != draft.sourceFormat ||
             current.outputFileName != normalizedDraft.outputFileName ||
             current.category != normalizedDraft.category ||
+            current.moduleDescription != normalizedDraft.moduleDescription ||
             current.outputFolder != normalizedDraft.outputFolder ||
             current.storageTargets != draft.storageTargets ||
             current.localStorageRelativePath != normalizedDraft.localStorageRelativePath ||
@@ -215,6 +217,7 @@ enum ModuleDraftPlanner {
         module.sourceFormat = draft.sourceFormat
         module.outputFileName = normalizedDraft.outputFileName
         module.category = normalizedDraft.category
+        module.moduleDescription = normalizedDraft.moduleDescription
         module.outputFolder = normalizedDraft.outputFolder
         module.storageTargets = draft.storageTargets
         module.localStorageRelativePath = normalizedDraft.localStorageRelativePath
@@ -259,6 +262,7 @@ enum ModuleDraftPlanner {
         var name: String
         var source: String
         var category: String
+        var moduleDescription: String
         var outputFolder: String
         var outputFileName: String
         var customIconURL: String?
@@ -293,6 +297,7 @@ enum ModuleDraftPlanner {
             name: draft.name.trimmingCharacters(in: .whitespacesAndNewlines),
             source: source,
             category: draft.category.trimmingCharacters(in: .whitespacesAndNewlines),
+            moduleDescription: draft.moduleDescription.trimmingCharacters(in: .whitespacesAndNewlines),
             outputFolder: outputFolder,
             outputFileName: outputFileName,
             customIconURL: draft.normalizedCustomIconURL,

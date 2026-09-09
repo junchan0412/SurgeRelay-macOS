@@ -15,6 +15,19 @@ struct SettingsGeneralView: View {
 
     private var generalSection: some View {
         SettingsSection("通用") {
+            SettingsControlRow("外观", icon: "circle.lefthalf.filled") {
+                Picker("外观", selection: Binding(
+                    get: { model.settings.appearancePreference },
+                    set: { model.setAppearancePreference($0) }
+                )) {
+                    Text("跟随系统").tag(AppearancePreference.system)
+                    Text("浅色").tag(AppearancePreference.light)
+                    Text("深色").tag(AppearancePreference.dark)
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 260, alignment: .leading)
+            }
             SettingsControlRow("配置储存目录", icon: "folder") {
                 HStack(spacing: 8) {
                     SettingsPathSelectionControl(

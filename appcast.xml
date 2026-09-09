@@ -3,6 +3,23 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>2.1.0</title>
+            <pubDate>Thu, 10 Sep 2026 00:14:58 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v2.1.0</link>
+            <sparkle:version>105</sparkle:version>
+            <sparkle:shortVersionString>2.1.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 2.1.0
+
+
+- 外观：新增浅色 / 深色 / 跟随系统的主题选择（设置 › 通用），选择即时应用到窗口与菜单栏并持久保存；「跟随系统」恢复由 macOS 决定。
+- 活动记录：在「需要关注」筛选下，「清空」仅清除更新失败与缓存回退记录，其他活动记录保留；「全部活动」下仍清空全部。
+- 模块编辑：视图编辑器新增「注释」字段，写入 Surge 模块的 `#!desc=`（留空则保留来源自带说明），与显示名称、模块标签、图标一并覆盖到输出。
+- 验证：Debug / Release 构建、代码签名与 Sparkle 签名通过；改动面单元测试（元数据、预览内容、发布组装、草稿规划、设置）全部通过。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v2.1.0/Surge-Relay-2.1.0.app.zip" length="10075105" type="application/zip" sparkle:edSignature="jgl7fFHZuQLYQ09/v+lyAmpGNeZSPjJCktiBY5ZOarguB2bjzUy5OXkyR4h4x72QsVk0fBzHH/TPJsJzp4ufCw=="/>
+        </item>
+        <item>
             <title>2.0.1</title>
             <pubDate>Tue, 08 Sep 2026 20:04:54 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v2.0.1</link>

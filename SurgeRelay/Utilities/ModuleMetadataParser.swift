@@ -39,6 +39,7 @@ enum ModuleMetadataParser {
     // 头部字段的正则均为固定字面量，缓存编译结果避免每次刷新/发布重复编译。
     private static let nameExpression = try? NSRegularExpression(pattern: #"(?im)^\s*#!name\s*=.*$"#)
     private static let categoryExpression = try? NSRegularExpression(pattern: #"(?im)^\s*#!category\s*=.*$"#)
+    private static let descExpression = try? NSRegularExpression(pattern: #"(?im)^\s*#!desc\s*=.*$"#)
     private static let iconExpression = try? NSRegularExpression(pattern: #"(?im)^\s*#!icon\s*=.*$"#)
     private static let subscribedExpression = try? NSRegularExpression(pattern: #"(?im)^\s*#SUBSCRIBED\b.*$"#)
 
@@ -164,6 +165,25 @@ enum ModuleMetadataParser {
         return insertingHeaderLine(line, into: normalized)
     }
 
+    static func applyingDescription(_ desc: String, to content: String) -> String {
+        let value = desc.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized = content.replacingOccurrences(of: "\r\n", with: "\n")
+        guard !value.isEmpty else { return normalized }
+        let line = "#!desc=\(value)"
+        guard let expression = descExpression else {
+            return insertingHeaderLine(line, into: normalized)
+        }
+        let range = NSRange(normalized.startIndex..., in: normalized)
+        if expression.firstMatch(in: normalized, range: range) != nil {
+            return expression.stringByReplacingMatches(
+                in: normalized,
+                range: range,
+                withTemplate: NSRegularExpression.escapedTemplate(for: line)
+            )
+        }
+        return insertingHeaderLine(line, into: normalized)
+    }
+
     static func applyingIcon(_ iconURL: String?, to content: String) -> String {
         let normalized = content.replacingOccurrences(of: "\r\n", with: "\n")
         guard let iconURL = iconURL?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -188,12 +208,13 @@ enum ModuleMetadataParser {
     static func applyingModuleMetadata(
         name: String,
         category: String,
+        desc: String = "",
         iconURL: String? = nil,
         to content: String
     ) -> String {
         applyingIcon(
             iconURL,
-            to: applyingCategory(category, to: applyingDisplayName(name, to: content))
+            to: applyingDescription(desc, to: applyingCategory(category, to: applyingDisplayName(name, to: content)))
         )
     }
 

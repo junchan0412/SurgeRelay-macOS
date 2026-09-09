@@ -148,6 +148,7 @@ struct AppSettings: Codable, Equatable, Sendable {
     var webServerEnabled = false
     var webServerPort = 8787
     var webServerAllowRemoteAccess = false
+    var appearancePreference: AppearancePreference = .system
 
     init() {}
 
@@ -185,6 +186,7 @@ struct AppSettings: Codable, Equatable, Sendable {
         webServerEnabled = try container.decodeIfPresent(Bool.self, forKey: .webServerEnabled) ?? false
         webServerPort = try container.decodeIfPresent(Int.self, forKey: .webServerPort) ?? 8787
         webServerAllowRemoteAccess = try container.decodeIfPresent(Bool.self, forKey: .webServerAllowRemoteAccess) ?? false
+        appearancePreference = try container.decodeIfPresent(AppearancePreference.self, forKey: .appearancePreference) ?? .system
     }
 
     static var defaultOutputDirectory: String {
@@ -235,6 +237,13 @@ struct AppSettings: Codable, Equatable, Sendable {
 enum StorageMode: String, Codable, Sendable {
     case local
     case gitHub
+}
+
+/// 用户可选的界面外观：跟随系统、强制浅色、强制深色。
+enum AppearancePreference: String, Codable, Sendable, CaseIterable {
+    case system
+    case light
+    case dark
 }
 
 struct ScriptHubUpstreamState: Codable, Equatable, Sendable {

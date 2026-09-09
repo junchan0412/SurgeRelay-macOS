@@ -167,6 +167,7 @@ final class AppModel {
             statusMessage = "UI QA 模式：自动任务已暂停"
             return
         }
+        applyAppearancePreference()
         applyWebServerSettings(persist: false)
         startNetworkRecoveryMonitor()
         restartScheduler()
@@ -244,10 +245,11 @@ final class AppModel {
             argumentInfo: { [processingWorker] content in
                 await processingWorker.argumentInfo(in: content)
             },
-            applyingModuleMetadata: { [processingWorker] name, category, iconURL, content in
+            applyingModuleMetadata: { [processingWorker] name, category, desc, iconURL, content in
                 await processingWorker.applyingModuleMetadata(
                     name: name,
                     category: category,
+                    desc: desc,
                     iconURL: iconURL,
                     to: content
                 )

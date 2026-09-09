@@ -109,10 +109,11 @@ extension AppModel {
             materialize: { [processingWorker] content, overrides in
                 await processingWorker.materialize(content, overrides: overrides)
             },
-            applyingModuleMetadata: { [processingWorker] name, category, iconURL, content in
+            applyingModuleMetadata: { [processingWorker] name, category, desc, iconURL, content in
                 await processingWorker.applyingModuleMetadata(
                     name: name,
                     category: category,
+                    desc: desc,
                     iconURL: iconURL,
                     to: content
                 )

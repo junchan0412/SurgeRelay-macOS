@@ -24,8 +24,8 @@ struct ActivityHistoryView: View {
                     }.pickerStyle(.segmented).frame(width: 220)
                     Spacer()
                     Text("\(entries.count) 条记录").font(.callout).foregroundStyle(.secondary)
-                    Button("清空记录", systemImage: "trash") { confirmsClear = true }
-                        .buttonStyle(.borderless).disabled(model.updateHistory.isEmpty)
+                    Button(issuesOnly ? "清空需要关注" : "清空记录", systemImage: "trash") { confirmsClear = true }
+                        .buttonStyle(.borderless).disabled(entries.isEmpty)
                 }
                 if entries.isEmpty {
                     ContentUnavailableView(
@@ -49,9 +49,13 @@ struct ActivityHistoryView: View {
         }
         .background(Design.Palette.canvas)
         .accessibilityIdentifier("workspace.activity")
-        .confirmationDialog("清空所有活动记录？", isPresented: $confirmsClear) {
-            Button("清空记录", role: .destructive) { model.clearUpdateHistory() }
-        } message: { Text("模块和发布文件会保留。") }
+        .confirmationDialog(issuesOnly ? "清空需要关注的记录？" : "清空所有活动记录？", isPresented: $confirmsClear) {
+            Button("清空记录", role: .destructive) { model.clearUpdateHistory(issuesOnly: issuesOnly) }
+        } message: {
+            Text(issuesOnly
+                 ? "仅清除更新失败与缓存回退记录；其他活动记录、模块与发布文件都会保留。"
+                 : "所有活动记录会被清除，模块和发布文件会保留。")
+        }
     }
 }
 

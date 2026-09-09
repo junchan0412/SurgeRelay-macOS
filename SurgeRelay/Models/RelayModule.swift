@@ -7,6 +7,10 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     var sourceFormat: ModuleSourceFormat
     var outputFileName: String
     var category: String
+    /// User-facing module description written to the `#!desc=` header. Empty
+    /// preserves whatever the source already declares (override semantics, like
+    /// `customIconURL`).
+    var moduleDescription: String
     var outputFolder: String
     /// A module may be materialized in more than one destination.
     var storageTargets: Set<ModuleStorageLocation>
@@ -57,6 +61,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         sourceFormat: ModuleSourceFormat = .automatic,
         outputFileName: String,
         category: String = "",
+        moduleDescription: String = "",
         outputFolder: String = ModuleOutputFolder.root,
         storageLocation: ModuleStorageLocation? = nil,
         storageTargets: Set<ModuleStorageLocation>? = nil,
@@ -99,6 +104,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
             preservesExistingFileName: shouldPreserveOutputFileName
         )
         self.category = category.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.moduleDescription = moduleDescription.trimmingCharacters(in: .whitespacesAndNewlines)
         self.outputFolder = ModuleOutputFolder.normalized(outputFolder)
         self.storageTargets = storageTargets?.isEmpty == false ? storageTargets! : [inferredStorageLocation]
         self.localStorageRelativePath = normalizedLocalStorageRelativePath
@@ -128,6 +134,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, name, sourceURL, sourceFormat, outputFileName, category, outputFolder
+        case moduleDescription
         case storageLocation, storageTargets, localStorageRelativePath, preservesOutputFileName
         case publishesStandalone, isEnabled, scriptHubOptions, argumentOverrides, iconURL, customIconURL, scriptHubSubscription, detectedSourceFormat
         case createdAt, lastUpdatedAt, contentHash, sourceETag, sourceLastModified, sourceContentHash, sourceCheckedAt
@@ -142,6 +149,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         try container.encode(sourceFormat, forKey: .sourceFormat)
         try container.encode(outputFileName, forKey: .outputFileName)
         try container.encode(category, forKey: .category)
+        try container.encode(moduleDescription, forKey: .moduleDescription)
         try container.encode(outputFolder, forKey: .outputFolder)
         try container.encode(storageLocation, forKey: .storageLocation)
         try container.encode(storageTargets, forKey: .storageTargets)
@@ -195,6 +203,8 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
             preservesExistingFileName: preservesOutputFileName
         )
         category = try container.decodeIfPresent(String.self, forKey: .category)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        moduleDescription = try container.decodeIfPresent(String.self, forKey: .moduleDescription)?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         outputFolder = ModuleOutputFolder.normalized(
             try container.decodeIfPresent(String.self, forKey: .outputFolder) ?? ModuleOutputFolder.root
