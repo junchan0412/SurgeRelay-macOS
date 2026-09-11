@@ -3,6 +3,29 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>2.2.0</title>
+            <pubDate>Sat, 12 Sep 2026 02:03:14 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v2.2.0</link>
+            <sparkle:version>106</sparkle:version>
+            <sparkle:shortVersionString>2.2.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 2.2.0
+
+
+- 工作台与详情：指标在窄窗口自动调整布局，发布去向区分未开启与待配置，明确显示总模块参与关系、冲突类型和不可更新原因；侧栏直接展示搜索与筛选条件，支持一键重置并补齐无障碍标签。
+- 活动记录：新增后台即时搜索，覆盖模块名、结果、详情、commit 与发布文件名；支持展开文件变更、拷贝完整记录，清空确认明确显示条数及搜索之外的清空范围。
+- Web 交互：支持搜索快捷键、方向键 / Home / End 列表导航，实时更新保留焦点并复用未变动行；移动端改进工具栏、触控目标、输入字号和弹窗取消行为。
+- 草稿与恢复：Web 内容页明确显示未保存、写入中和失败重试状态，支持 ⌘ / Ctrl + S，保存或恢复期间继续输入不会被旧响应覆盖；服务端阻止重复写入，缺失转换缓存时保留手动覆盖。
+- 原生编辑器：查找与批量替换移到可取消的后台任务，隔离过期结果；行号位图只绘制可见区域，复用行索引与尺寸缓存，修复重复排版引起的滚动回跳，降低长文档滚动与编辑的开销。
+- 查找替换：修复普通“全部替换”超过 5,000 处时漏改、正则 lookaround 捕获替换与选区锚点错误；高亮上限不再限制批量替换范围。
+- 搜索一致性：更改模块名称、分类、注释、图标、订阅元数据或双发布目标后，内容搜索与列表索引及时失效，避免旧结果残留。
+- 输出可靠性：部分更新遇到缺缓存或本地导出失败时保留错误状态，避免误报完成；切换本地发布根目录后不再复用旧目录的覆盖权限或受管文件清单。
+- 性能验证：4.872 MB 文本、4,800 处普通替换的本机 Release 优化基准，5 次中位数由 197.89 ms 降到 17.87 ms，输出逐字一致；该数据为受控微基准，实际耗时随内容与设备变化。
+- 验证：362 项 Swift 单元测试及 Web 行为 / DOM 测试通过，完成深浅色、活动搜索、侧栏操作与 12,000 行滚动 / 替换 / 撤销的桌面验证。原生 UI test target 构建通过；当前 macOS automation mode 超时，XCTest UI runner 未执行，相关流程已通过桌面操作补验。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v2.2.0/Surge-Relay-2.2.0.app.zip" length="10294958" type="application/zip" sparkle:edSignature="TYJluAFmHwtRnyEMREX6BVMZBBuO5HB3L9PE+tEu2MundkC07+wkT4Va6n1brfJ+YC/AEPdU8rj6qn22nLQnBg=="/>
+        </item>
+        <item>
             <title>2.1.0</title>
             <pubDate>Thu, 10 Sep 2026 00:14:58 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v2.1.0</link>

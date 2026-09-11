@@ -12,6 +12,16 @@
     let toastTimer = null;
     let confirmResolver = null;
 
+    ui.confirmDialog?.addEventListener?.('cancel', event => {
+      event.preventDefault();
+      resolveConfirmation(false);
+    });
+    ui.confirmDialog?.addEventListener?.('close', () => {
+      const resolver = confirmResolver;
+      confirmResolver = null;
+      resolver?.(false);
+    });
+
     function openDialog(dialog) {
       dialog?.classList?.remove('is-closing');
       dialog?.showModal?.();
@@ -30,6 +40,7 @@
     }
 
     function askConfirmation(title, message, acceptLabel = '确认') {
+      confirmResolver?.(false);
       if (ui.confirmTitle) ui.confirmTitle.textContent = title;
       if (ui.confirmMessage) ui.confirmMessage.textContent = message;
       if (ui.confirmAccept) ui.confirmAccept.textContent = acceptLabel;
@@ -52,14 +63,27 @@
 
     async function copyText(text, button = null) {
       try {
-        if (navigatorRef.clipboard?.writeText) await navigatorRef.clipboard.writeText(text || '');
-        else {
+        let copied = false;
+        if (navigatorRef.clipboard?.writeText) {
+          try { await navigatorRef.clipboard.writeText(text || ''); copied = true; }
+          catch (_) {}
+        }
+        if (!copied) {
+          const focused = documentRef.activeElement;
           const textarea = documentRef.createElement('textarea');
           textarea.value = text || '';
-          documentRef.body?.append?.(textarea);
-          textarea.select?.();
-          documentRef.execCommand?.('copy');
-          textarea.remove?.();
+          textarea.className = 'clipboard-buffer';
+          textarea.readOnly = true;
+          textarea.tabIndex = -1;
+          const container = documentRef.querySelector?.('dialog[open]') || documentRef.body;
+          container.append(textarea);
+          try {
+            textarea.select();
+            if (documentRef.execCommand?.('copy') !== true) throw new Error('copy failed');
+          } finally {
+            textarea.remove();
+            focused?.focus?.({ preventScroll: true });
+          }
         }
         showCopySuccess(button);
         return true;
@@ -91,7 +115,7 @@
       ui.toast.textContent = message;
       ui.toast.classList.toggle('error', isError);
       ui.toast.classList.add('visible');
-      toastTimer = setTimeoutImpl(() => ui.toast.classList.remove('visible'), toastDelay);
+      toastTimer = setTimeoutImpl(() => ui.toast.classList.remove('visible'), isError ? toastDelay * 2 : toastDelay);
     }
 
     return {

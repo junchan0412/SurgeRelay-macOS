@@ -4,6 +4,8 @@ import Foundation
 extension AppModel {
     func savePreviewContent(_ content: String, for module: RelayModule) async throws {
         guard !isWorking else { throw RelayError.invalidOutput("当前正在更新，请稍后再写入。") }
+        beginWork(.savingPreview)
+        defer { endWork(.savingPreview) }
         let namedContent = await processingWorker.applyingModuleMetadata(
             name: module.name,
             category: module.category,
@@ -23,8 +25,6 @@ extension AppModel {
             statusMessage = plan.statusMessage
             return
         }
-        beginWork(.savingPreview)
-        defer { endWork(.savingPreview) }
         registerLocalChange()
         let convertedContent = try? await modulePreviewProvider.convertedComponentContent(for: module)
         let moduleForPlan = modules.first(where: { $0.id == module.id }) ?? module
@@ -39,9 +39,9 @@ extension AppModel {
         if let index = modules.firstIndex(where: { $0.id == module.id }) {
             modules[index] = plan.module
         }
-        await rebuildCombinedFromCache()
+        let refreshedOutput = await rebuildCombinedFromCache()
         try persistModules()
-        statusMessage = plan.statusMessage
+        statusMessage = refreshedOutput ? plan.statusMessage : "文本修改已保存，输出刷新未完成"
     }
 
     func restorePreviewContent(for module: RelayModule) async throws -> String {
@@ -49,8 +49,8 @@ extension AppModel {
         beginWork(.restoringPreview)
         defer { endWork(.restoringPreview) }
         registerLocalChange()
-        try await fileStore.removeComponentOverride(id: module.id)
         let content = try await modulePreviewProvider.convertedComponentContent(for: module)
+        try await fileStore.removeComponentOverride(id: module.id)
         let moduleForPlan = modules.first(where: { $0.id == module.id }) ?? module
         let plan = ModulePreviewEditPlanner.restorePlan(
             module: moduleForPlan,
@@ -60,8 +60,8 @@ extension AppModel {
             modules[index] = plan.module
             try? persistModules()
         }
-        await rebuildCombinedFromCache()
-        statusMessage = plan.statusMessage
+        let refreshedOutput = await rebuildCombinedFromCache()
+        statusMessage = refreshedOutput ? plan.statusMessage : "已恢复转换结果，输出刷新未完成"
         let materialized = await processingWorker.materialize(content, overrides: module.argumentOverrides)
         return await processingWorker.applyingModuleMetadata(
             name: module.name,

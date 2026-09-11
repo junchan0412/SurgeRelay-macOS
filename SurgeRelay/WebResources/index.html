@@ -13,20 +13,20 @@
   <link rel="manifest" href="/manifest.webmanifest?v=2">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Surge Relay">
-  <link rel="stylesheet" href="/app.css?v=200">
-  <script src="/web-logic.js?v=2" defer></script>
-  <script src="/web-options.js?v=1" defer></script>
-  <script src="/web-format.js?v=1" defer></script>
-  <script src="/web-markup.js?v=200" defer></script>
-  <script src="/web-sidebar.js?v=200" defer></script>
-  <script src="/web-activity.js?v=1" defer></script>
-  <script src="/web-api.js?v=1" defer></script>
-  <script src="/web-state.js?v=200" defer></script>
-  <script src="/web-editor.js?v=1" defer></script>
-  <script src="/web-feedback.js?v=1" defer></script>
-  <script src="/web-preview.js?v=1" defer></script>
-  <script src="/web-detail.js?v=200" defer></script>
-  <script src="/app.js?v=200" defer></script>
+  <link rel="stylesheet" href="/app.css?v=220">
+  <script src="/web-logic.js?v=220" defer></script>
+  <script src="/web-options.js?v=220" defer></script>
+  <script src="/web-format.js?v=220" defer></script>
+  <script src="/web-markup.js?v=220" defer></script>
+  <script src="/web-sidebar.js?v=220" defer></script>
+  <script src="/web-activity.js?v=220" defer></script>
+  <script src="/web-api.js?v=220" defer></script>
+  <script src="/web-state.js?v=220" defer></script>
+  <script src="/web-editor.js?v=220" defer></script>
+  <script src="/web-feedback.js?v=220" defer></script>
+  <script src="/web-preview.js?v=220" defer></script>
+  <script src="/web-detail.js?v=220" defer></script>
+  <script src="/app.js?v=220" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -44,13 +44,14 @@
           <button id="overview-button" class="workspace-nav-item" type="button"><span class="symbol" data-symbol="sidebar.left"></span><span>工作台</span></button>
           <button id="history-button" class="workspace-nav-item" type="button"><span class="symbol" data-symbol="clock"></span><span>活动记录</span></button>
         </nav>
-        <label class="search-field"><span class="symbol" data-symbol="magnifyingglass"></span><input id="search-input" type="search" placeholder="搜索模块" autocomplete="off"></label>
+        <div class="search-field" role="search"><span class="symbol" data-symbol="magnifyingglass" aria-hidden="true"></span><input id="search-input" type="search" placeholder="搜索模块" aria-label="搜索模块" aria-controls="module-list" aria-describedby="search-status" aria-keyshortcuts="Meta+k Control+k /" autocomplete="off"><kbd class="search-shortcut" aria-hidden="true">/</kbd><button id="clear-search" class="clear-search" type="button" aria-label="清除搜索" title="清除搜索（Esc）" hidden><span class="symbol" data-symbol="xmark"></span></button></div>
+        <span id="search-status" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></span>
         <div class="filter-row" id="filter-row" hidden>
           <button class="filter-chip" id="failure-filter" type="button" hidden aria-pressed="false"><span class="symbol" data-symbol="exclamationmark.triangle"></span><span>失败</span></button>
         </div>
       </div>
 
-      <nav class="module-navigation">
+      <nav class="module-navigation" aria-label="模块库">
         <button class="summary-row" id="summary-row" type="button">
           <span class="module-icon summary-icon"><img class="app-icon" src="/app-icon.png?v=1" alt=""></span>
           <span class="module-copy"><strong>总模块</strong><small id="summary-subtitle">正在载入…</small></span>
@@ -80,7 +81,7 @@
     </main>
   </div>
 
-  <dialog id="module-dialog" class="sheet-dialog">
+  <dialog id="module-dialog" class="sheet-dialog" aria-labelledby="dialog-title">
     <form id="module-form">
       <div class="dialog-header">
         <div><h2 id="dialog-title">添加模块</h2><p>更新地址可以随时修改，已发布的稳定地址不会改变。</p></div>
@@ -126,9 +127,9 @@
     </form>
   </dialog>
 
-  <dialog id="confirm-dialog" class="confirm-dialog">
+  <dialog id="confirm-dialog" class="confirm-dialog" aria-labelledby="confirm-title" aria-describedby="confirm-message">
     <div class="confirm-content"><span class="confirm-icon symbol" data-symbol="exclamationmark.triangle"></span><h2 id="confirm-title">确认操作</h2><p id="confirm-message"></p></div>
-    <div class="dialog-actions"><button class="button secondary" id="confirm-cancel" type="button">取消</button><button class="button destructive" id="confirm-accept" type="button">确认</button></div>
+    <div class="dialog-actions"><button class="button secondary" id="confirm-cancel" type="button" autofocus>取消</button><button class="button destructive" id="confirm-accept" type="button">确认</button></div>
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>

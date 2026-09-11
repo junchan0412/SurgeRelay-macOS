@@ -8,7 +8,9 @@ struct WorkspaceOverviewView: View {
 
     private var summary: ModuleCollectionSummary { model.moduleSummary }
     private var attention: [RelayModule] {
-        model.modules.filter { ModuleFilter.attention.matches($0, combinedModuleEnabled: model.settings.combinedModuleEnabled) }
+        Array(model.modules.lazy.filter {
+            ModuleFilter.attention.matches($0, combinedModuleEnabled: model.settings.combinedModuleEnabled)
+        }.prefix(3))
     }
 
     var body: some View {
@@ -62,14 +64,22 @@ struct WorkspaceOverviewView: View {
     }
 
     private var metrics: some View {
-        HStack(spacing: 0) {
-            metric("模块总数", count: summary.totalCount, filter: .all)
-            Divider().padding(.vertical, 22)
-            metric("可更新", count: summary.updateableCount, filter: .updatable)
-            Divider().padding(.vertical, 22)
-            metric("独立发布", count: summary.standaloneCount, filter: .standalone)
-            Divider().padding(.vertical, 22)
-            metric("需要处理", count: summary.attentionCount, filter: .attention)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 0) {
+                metric("模块总数", count: summary.totalCount, filter: .all)
+                Divider().padding(.vertical, 22)
+                metric("可更新", count: summary.updateableCount, filter: .updatable)
+                Divider().padding(.vertical, 22)
+                metric("独立发布", count: summary.standaloneCount, filter: .standalone)
+                Divider().padding(.vertical, 22)
+                metric("需要处理", count: summary.attentionCount, filter: .attention)
+            }
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 0), GridItem(.flexible())], spacing: 0) {
+                metric("模块总数", count: summary.totalCount, filter: .all)
+                metric("可更新", count: summary.updateableCount, filter: .updatable)
+                metric("独立发布", count: summary.standaloneCount, filter: .standalone)
+                metric("需要处理", count: summary.attentionCount, filter: .attention)
+            }
         }
         .fixedSize(horizontal: false, vertical: true)
         .detailCard(radius: Design.Radius.large)
@@ -84,7 +94,7 @@ struct WorkspaceOverviewView: View {
                     .monospacedDigit()
                     .foregroundStyle(filter == .attention && count > 0 ? Design.Palette.warning : Color.primary)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minWidth: 110, maxWidth: .infinity, alignment: .leading)
             .padding(22)
             .contentShape(Rectangle())
         }
@@ -115,12 +125,14 @@ struct WorkspaceOverviewView: View {
     }
 
     private var attentionSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            WorkspaceSectionHeader(title: "运行状态", actionTitle: attention.isEmpty ? nil : "查看全部") {
+        let visibleAttention = attention
+        let lastAttentionID = visibleAttention.last?.id
+        return VStack(alignment: .leading, spacing: 14) {
+            WorkspaceSectionHeader(title: "运行状态", actionTitle: visibleAttention.isEmpty ? nil : "查看全部 \(summary.attentionCount) 项") {
                 filterModules(.attention)
             }
             VStack(alignment: .leading, spacing: 0) {
-                if attention.isEmpty {
+                if visibleAttention.isEmpty {
                     HStack(spacing: 14) {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 28)).foregroundStyle(Design.Palette.success)
@@ -133,22 +145,28 @@ struct WorkspaceOverviewView: View {
                         Button("检查更新") { model.startUpdateAll() }
                             .buttonStyle(.bordered)
                             .disabled(!model.updateAdmission.isAccepted)
+                            .help(model.updateAdmission.message)
+                            .fixedSize()
                     }.padding(20)
                 } else {
-                    ForEach(Array(attention.prefix(3))) { module in
+                    ForEach(visibleAttention) { module in
                         Button { model.selectedModuleID = module.id } label: {
                             HStack(spacing: 12) {
                                 ModuleIconView(module: module, size: 32)
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(module.name).font(.system(size: 14, weight: .medium)).lineLimit(1)
-                                    Text(module.failureSummary ?? "本地内容与更新版本存在冲突")
+                                        .help(module.name)
+                                    Text(attentionMessage(for: module))
                                         .font(.system(size: 13)).foregroundStyle(.secondary).lineLimit(2)
+                                        .help(attentionMessage(for: module))
                                 }
                                 Spacer()
                                 Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                             }.padding(18).contentShape(Rectangle())
                         }.buttonStyle(.plain)
-                        if module.id != attention.prefix(3).last?.id { Divider().padding(.leading, 62) }
+                        .accessibilityLabel("\(module.name)，\(attentionMessage(for: module))")
+                        .accessibilityHint("查看模块详情")
+                        if module.id != lastAttentionID { Divider().padding(.leading, 62) }
                     }
                 }
             }.detailCard()
@@ -162,17 +180,19 @@ struct WorkspaceOverviewView: View {
                 WorkspaceDestinationCard(
                     title: "本地目录", symbol: "externaldrive",
                     enabled: model.settings.publishToLocal,
+                    configured: !model.settings.localModuleDirectory.isEmpty,
                     detail: model.settings.localModuleDirectory.isEmpty ? "选择 Surge 模块目录" : model.settings.localModuleDirectory,
-                    caption: "\(model.modules.filter(\.hasLocalStorageTarget).count) 个模块存放在本地",
+                    caption: "\(model.modules.lazy.filter(\.hasLocalStorageTarget).count) 个模块存放在本地",
                     action: openPublishingSettings
                 )
                 WorkspaceDestinationCard(
                     title: "GitHub", symbol: "cloud",
-                    enabled: model.settings.publishToGitHub && model.settings.github.isConfigured,
+                    enabled: model.settings.publishToGitHub,
+                    configured: model.settings.github.isConfigured,
                     detail: model.settings.github.isConfigured
                         ? "\(model.settings.github.owner)/\(model.settings.github.repository)" : "连接仓库以分发模块",
                     caption: model.settings.publishToGitHub
-                        ? "\(model.modules.filter(\.hasGitHubStorageTarget).count) 个模块 · \(model.settings.github.branch)" : "配置仓库后可自动发布更新",
+                        ? "\(model.modules.lazy.filter(\.hasGitHubStorageTarget).count) 个模块 · \(model.settings.github.branch)" : "开启后可自动发布更新",
                     action: openPublishingSettings
                 )
             }
@@ -204,6 +224,12 @@ struct WorkspaceOverviewView: View {
         model.settingsPage = .publishing
         model.presentsSettings = true
     }
+
+    private func attentionMessage(for module: RelayModule) -> String {
+        if module.state == .failed { return module.failureSummary ?? "更新失败，请查看错误详情" }
+        if module.hasSyncConflict { return "本地发布文件与 GitHub 内容不同，需要选择保留的版本" }
+        return "上游内容已变化，需要检查本地编辑"
+    }
 }
 
 struct WorkspaceSectionHeader: View {
@@ -226,9 +252,13 @@ private struct WorkspaceDestinationCard: View {
     let title: String
     let symbol: String
     let enabled: Bool
+    let configured: Bool
     let detail: String
     let caption: String
     let action: () -> Void
+
+    private var statusTitle: String { enabled ? (configured ? "已开启" : "待配置") : "未开启" }
+    private var statusColor: Color { enabled ? (configured ? Design.Palette.success : Design.Palette.warning) : .secondary }
 
     var body: some View {
         Button(action: action) {
@@ -237,8 +267,8 @@ private struct WorkspaceDestinationCard: View {
                     Image(systemName: symbol).font(.title3).foregroundStyle(Design.Palette.accent)
                     Text(title).font(.system(size: 15, weight: .semibold))
                     Spacer()
-                    Label(enabled ? "已开启" : "未开启", systemImage: enabled ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 12)).foregroundStyle(enabled ? Design.Palette.success : Color.secondary)
+                    Label(statusTitle, systemImage: enabled ? (configured ? "checkmark.circle.fill" : "exclamationmark.circle") : "circle")
+                        .font(.system(size: 12)).foregroundStyle(statusColor).fixedSize()
                 }
                 VStack(alignment: .leading, spacing: 6) {
                     Text(detail).font(.system(size: 14, weight: .medium)).lineLimit(1).truncationMode(.middle)
@@ -250,5 +280,8 @@ private struct WorkspaceDestinationCard: View {
         }
         .buttonStyle(.plain).detailCard()
         .help(detail)
+        .accessibilityLabel("\(title)，\(statusTitle)")
+        .accessibilityValue(detail)
+        .accessibilityHint("打开发布设置")
     }
 }

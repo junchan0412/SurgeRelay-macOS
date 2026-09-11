@@ -8,7 +8,7 @@
   function moduleListSignature(module) {
     return JSON.stringify([
       module.id, module.name, module.sourceURL, module.initialSourceURL, module.updateSourceURL,
-      module.sourceFormatTitle, module.outputFolder, module.publishedRelativePath,
+      module.sourceFormatTitle, module.category, module.outputFileName, module.outputFolder, module.publishedRelativePath,
       module.storageLocation, module.storageLocationTitle, module.storageLocationDetail, module.initialSourceTitle,
       module.storageTargets, module.hasOverrideConflict, module.hasSyncConflict, module.syncConflictLocalUpdatedAt, module.syncConflictGitHubUpdatedAt,
       module.relationshipSummary, module.localStorageRelativePath,

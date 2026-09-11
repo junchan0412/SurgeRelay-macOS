@@ -21,11 +21,27 @@ final class CodeTextView: NSTextView {
     /// 查找栏与菜单命令的目标；由 `ModuleCodeEditorController.attach(_:)` 建立。
     weak var editorController: ModuleCodeEditorController?
     private var hasSearchHighlights = false
+    private weak var observedClipView: NSClipView?
+    private var explicitViewport: NSRect?
+    private var isGutterRefreshScheduled = false
+    private var measuredContentSizes: [CGFloat: CGSize] = [:]
+
+    override var string: String {
+        didSet {
+            gutterView.invalidateLineIndex()
+            invalidateContentMeasurement()
+        }
+    }
+
+    override func didChangeText() {
+        gutterView.invalidateLineIndex()
+        invalidateContentMeasurement()
+        super.didChangeText()
+    }
 
     override init(frame frameRect: NSRect, textContainer container: NSTextContainer?) {
         super.init(frame: frameRect, textContainer: container)
         gutterView.textView = self
-        gutterView.autoresizingMask = [.height]
         addSubview(gutterView)
     }
 
@@ -34,17 +50,105 @@ final class CodeTextView: NSTextView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    /// The gutter is a sibling layer inside the text view; keep it pinned to the
-    /// left edge and spanning the full document height so it scrolls with content.
+    /// Keep the gutter bitmap bounded to the visible document viewport.
     override func layout() {
         super.layout()
-        gutterView.frame = NSRect(x: 0, y: 0, width: Self.gutterWidth, height: bounds.height)
-        gutterView.render()
+        observeScrolling()
+        refreshGutter()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        observeScrolling()
+        refreshGutter()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refreshGutter()
+    }
+
+    func updateViewport(_ viewport: NSRect) {
+        guard explicitViewport != viewport else { return }
+        explicitViewport = viewport
+        scheduleGutterRefresh()
     }
 
     func refreshGutter() {
-        gutterView.frame = NSRect(x: 0, y: 0, width: Self.gutterWidth, height: bounds.height)
+        guard window != nil else { return }
+        let viewport = (explicitViewport
+            ?? enclosingScrollView.map { convert($0.contentView.bounds, from: $0.contentView) }
+            ?? visibleRect).intersection(bounds)
+        guard !viewport.isNull, viewport.height > 0 else { return }
+        let frame = NSRect(x: 0, y: viewport.minY, width: Self.gutterWidth, height: viewport.height)
+        if gutterView.frame != frame { gutterView.frame = frame }
         gutterView.render()
+    }
+
+    func measuredContentSize(forWidth width: CGFloat) -> CGSize? {
+        guard width > 0, width.isFinite, let textStorage, let textContainer else { return nil }
+        if let cached = measuredContentSizes[width] { return cached }
+        let storage = NSTextStorage(attributedString: textStorage)
+        let layout = NSLayoutManager()
+        let container = NSTextContainer(containerSize: NSSize(
+            width: max(1, width - textContainerInset.width * 2),
+            height: .greatestFiniteMagnitude
+        ))
+        container.lineFragmentPadding = textContainer.lineFragmentPadding
+        container.lineBreakMode = textContainer.lineBreakMode
+        if let layoutManager {
+            layout.usesFontLeading = layoutManager.usesFontLeading
+            layout.typesetterBehavior = layoutManager.typesetterBehavior
+        }
+        storage.addLayoutManager(layout)
+        layout.addTextContainer(container)
+        layout.ensureLayout(for: container)
+        var height = layout.usedRect(for: container).maxY
+        if layout.extraLineFragmentTextContainer === container {
+            height = max(height, layout.extraLineFragmentRect.maxY)
+        }
+        let size = CGSize(width: width, height: max(ceil(height + textContainerInset.height * 2), 40))
+        if measuredContentSizes.count >= 8 { measuredContentSizes.removeAll(keepingCapacity: true) }
+        measuredContentSizes[width] = size
+        return size
+    }
+
+    func invalidateContentMeasurement() {
+        measuredContentSizes.removeAll(keepingCapacity: true)
+        invalidateIntrinsicContentSize()
+    }
+
+    var cursorPosition: ModuleCodeCursorPosition {
+        gutterView.cursorPosition(at: selectedRange().location)
+    }
+
+    private func observeScrolling() {
+        let clipView = enclosingScrollView?.contentView
+        guard observedClipView !== clipView else { return }
+        NotificationCenter.default.removeObserver(self, name: NSView.boundsDidChangeNotification, object: observedClipView)
+        observedClipView = clipView
+        guard let clipView else { return }
+        clipView.postsBoundsChangedNotifications = true
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(scrollPositionDidChange(_:)),
+            name: NSView.boundsDidChangeNotification,
+            object: clipView
+        )
+    }
+
+    @objc private func scrollPositionDidChange(_ notification: Notification) {
+        scheduleGutterRefresh()
+    }
+
+    private func scheduleGutterRefresh() {
+        guard !isGutterRefreshScheduled else { return }
+        isGutterRefreshScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.isGutterRefreshScheduled = false
+            self.refreshGutter()
+        }
     }
 
     /// 执行一次可撤销的文本替换。
@@ -147,6 +251,7 @@ final class CodeTextView: NSTextView {
 final class GutterView: NSView {
     weak var textView: CodeTextView?
     private var lineStarts = [0]
+    private var indexedText: String?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -162,6 +267,12 @@ final class GutterView: NSView {
     override var isFlipped: Bool { true }
 
     func render() {
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            renderBitmap()
+        }
+    }
+
+    private func renderBitmap() {
         guard let textView,
               let layoutManager = textView.layoutManager,
               let textContainer = textView.textContainer,
@@ -201,12 +312,16 @@ final class GutterView: NSView {
         let origin = textView.textContainerOrigin
         let nsString = textView.string as NSString
         let selectedLine = lineNumber(at: textView.selectedRange().location)
-        let fullGlyphRange = layoutManager.glyphRange(for: textContainer)
-        layoutManager.enumerateLineFragments(forGlyphRange: fullGlyphRange) {
+        let documentViewport = NSRect(
+            x: 0, y: frame.minY - origin.y,
+            width: textView.bounds.width, height: bounds.height
+        )
+        let visibleGlyphRange = layoutManager.glyphRange(forBoundingRectWithoutAdditionalLayout: documentViewport, in: textContainer)
+        layoutManager.enumerateLineFragments(forGlyphRange: visibleGlyphRange) {
             _, usedRect, _, lineGlyphRange, _ in
             let characterIndex = layoutManager.characterIndexForGlyph(at: lineGlyphRange.location)
             let number = self.lineNumber(at: min(characterIndex, nsString.length))
-            let topY = usedRect.minY + origin.y
+            let topY = usedRect.minY + origin.y - self.frame.minY
             if number == selectedLine {
                 NSColor.controlAccentColor.withAlphaComponent(0.12).setFill()
                 NSRect(
@@ -242,13 +357,31 @@ final class GutterView: NSView {
         NSRect(x: Self.gutterWidth - 1, y: 0, width: 1, height: size.height).fill()
 
         NSGraphicsContext.current = previous
+        layer?.contentsScale = scale
         layer?.contents = rep.cgImage
     }
 
     static var gutterWidth: CGFloat { CodeTextView.gutterWidth }
 
+    func invalidateLineIndex() {
+        indexedText = nil
+    }
+
+    func cursorPosition(at location: Int) -> ModuleCodeCursorPosition {
+        rebuildLineStarts()
+        let string = indexedText as NSString? ?? ""
+        let offset = min(max(0, location), string.length)
+        let line = lineNumber(at: offset)
+        let start = lineStarts[line - 1]
+        let column = string.substring(with: NSRange(location: start, length: offset - start)).count + 1
+        return ModuleCodeCursorPosition(line: line, column: column)
+    }
+
     private func rebuildLineStarts() {
-        let string = textView?.string as NSString? ?? ""
+        guard indexedText == nil else { return }
+        let text = textView?.string ?? ""
+        indexedText = text
+        let string = text as NSString
         var starts = [0]
         var searchRange = NSRange(location: 0, length: string.length)
         while searchRange.length > 0 {
@@ -334,7 +467,7 @@ struct ModuleCodeTextView: NSViewRepresentable {
         textView.isGrammarCheckingEnabled = false
         textView.smartInsertDeleteEnabled = false
         textView.insertionPointColor = .controlAccentColor
-        textView.isVerticallyResizable = true
+        textView.isVerticallyResizable = false
         textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]
         // Reserve the gutter on the left; keep normal padding on the right.
@@ -384,18 +517,7 @@ struct ModuleCodeTextView: NSViewRepresentable {
     /// Report the laid-out content height so an enclosing SwiftUI `ScrollView`
     /// can scroll the full document.
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: CodeTextView, context: Context) -> CGSize? {
-        guard let container = nsView.textContainer, let layoutManager = nsView.layoutManager else {
-            return nil
-        }
-        let width = proposal.width ?? nsView.bounds.width
-        guard width > 0, width.isFinite else { return nil }
-        if abs(nsView.frame.width - width) > 0.5 {
-            nsView.setFrameSize(NSSize(width: width, height: nsView.frame.height))
-        }
-        layoutManager.ensureLayout(for: container)
-        let used = layoutManager.usedRect(for: container)
-        let height = used.height + nsView.textContainerInset.height * 2
-        return CGSize(width: width, height: max(height, 40))
+        nsView.measuredContentSize(forWidth: proposal.width ?? nsView.bounds.width)
     }
 
     @MainActor
@@ -488,7 +610,7 @@ struct ModuleCodeTextView: NSViewRepresentable {
         func textViewDidChangeSelection(_ notification: Notification) {
             publishCursorPosition()
             controller?.selectionDidChange()
-            textView?.needsDisplay = true
+            textView?.refreshGutter()
         }
 
         func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
@@ -520,15 +642,7 @@ struct ModuleCodeTextView: NSViewRepresentable {
 
         func publishCursorPosition() {
             guard let textView, let onCursorPositionChange else { return }
-            let selectedRange = textView.selectedRange()
-            let prefix = (textView.string as NSString).substring(
-                with: NSRange(location: 0, length: min(selectedRange.location, (textView.string as NSString).length))
-            )
-            let line = prefix.reduce(into: 1) { result, character in
-                if character == "\n" { result += 1 }
-            }
-            let column = prefix.split(separator: "\n", omittingEmptySubsequences: false).last?.count ?? 0
-            onCursorPositionChange(ModuleCodeCursorPosition(line: line, column: column + 1))
+            onCursorPositionChange(textView.cursorPosition)
         }
 
         func scheduleHighlighting(modules: [RelayModule], selectedModuleID: UUID?) {
@@ -582,6 +696,7 @@ struct ModuleCodeTextView: NSViewRepresentable {
             )
             textStorage.endEditing()
             textView.typingAttributes = Self.defaultAttributes
+            textView.invalidateContentMeasurement()
             textView.refreshGutter()
         }
 

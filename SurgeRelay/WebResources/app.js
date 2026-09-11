@@ -10,6 +10,8 @@ const ui = {
   summarySubtitle: document.querySelector('#summary-subtitle'),
   detail: document.querySelector('#detail-content'),
   search: document.querySelector('#search-input'),
+  clearSearch: document.querySelector('#clear-search'),
+  searchStatus: document.querySelector('#search-status'),
   filterRow: document.querySelector('#filter-row'),
   failureFilter: document.querySelector('#failure-filter'),
   add: document.querySelector('#add-button'),
@@ -145,6 +147,8 @@ const detailController = webDetail.createDetailController({
 const renderDetail = (animate = true) => detailController.renderDetail(animate);
 const sidebarController = webSidebar.createSidebarController({
   ui,
+  document,
+  selectItem,
   getState: () => state,
   getSelectedID: () => selectedID,
   getFailuresOnly: () => showFailuresOnly,
@@ -180,6 +184,8 @@ initializeHistoryState();
 moduleEditor.installAdvancedOptions();
 
 ui.search.addEventListener('input', sidebarController.render);
+ui.search.addEventListener('keydown', sidebarController.handleSearchKeydown);
+ui.clearSearch?.addEventListener('click', sidebarController.clearSearch);
 ui.failureFilter.addEventListener('click', sidebarController.toggleFailuresOnly);
 ui.add.addEventListener('click', () => openEditor());
 ui.refresh.addEventListener('click', updateAll);
@@ -222,20 +228,33 @@ ui.moduleDialog.addEventListener('click', async event => {
   }
   if (event.target === ui.moduleDialog) closeDialog(ui.moduleDialog);
 });
+ui.moduleDialog.addEventListener('cancel', event => { event.preventDefault(); closeDialog(ui.moduleDialog); });
 ui.moduleForm.addEventListener('submit', saveModule);
 ui.confirmCancel.addEventListener('click', () => resolveConfirmation(false));
 ui.confirmAccept.addEventListener('click', () => resolveConfirmation(true));
 ui.confirmDialog.addEventListener('click', event => { if (event.target === ui.confirmDialog) resolveConfirmation(false); });
 ui.list.addEventListener('click', handleListClick);
 ui.list.addEventListener('change', handleListChange);
-ui.list.addEventListener('keydown', event => {
-  if (event.target.closest('.module-toggle')) return;
-  const row = event.target.closest('.module-row');
-  if (row && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); selectItem(row.dataset.id); }
-});
+ui.list.addEventListener('keydown', sidebarController.handleListKeydown);
 ui.detail.addEventListener('click', handleDetailClick);
 ui.detail.addEventListener('change', handleDetailChange);
+ui.detail.addEventListener('keydown', detailController.handleTabKeydown);
 window.addEventListener('popstate', handleHistoryNavigation);
+window.addEventListener('keydown', event => {
+  if (event.defaultPrevented || event.isComposing || ui.moduleDialog.open || ui.confirmDialog.open) return;
+  const command = (event.metaKey || event.ctrlKey) && !event.altKey;
+  const editable = event.target?.closest?.('input, textarea, select, [contenteditable="true"]');
+  if ((command && event.key.toLowerCase() === 'k') || (!command && !event.altKey && event.key === '/' && !editable)) {
+    event.preventDefault();
+    if (mobileLayout.matches && ui.body.classList.contains('has-selection')) showModuleList(true);
+    ui.search.focus();
+    ui.search.select();
+  }
+  if (command && event.key.toLowerCase() === 's' && detailController.getTab() === 'preview') {
+    const module = state?.modules.find(item => item.id === selectedID);
+    if (module) { event.preventDefault(); previewController.savePreview(module); }
+  }
+});
 mobileLayout.addEventListener?.('change', syncResponsiveNavigation);
 window.addEventListener('pagehide', () => stateEventController.close());
 window.addEventListener('beforeunload', event => {
@@ -374,14 +393,15 @@ async function handleDetailClick(event) {
       catch (error) { showToast(error.message, true); }
     }
     break;
-  case 'tab-info': detailController.setTab('info'); renderDetail(false); break;
-  case 'tab-preview': detailController.setTab('preview'); renderDetail(false); break;
+  case 'tab-info': detailController.showTab('info'); break;
+  case 'tab-preview': detailController.showTab('preview'); break;
   case 'edit': if (module) openEditor(module); break;
   case 'delete': if (module) await deleteModule(module); break;
   case 'copy': await copyText(source.dataset.value, source); break;
   case 'copy-preview': await copyText(previewController.text, source); break;
   case 'save-preview': if (module) await previewController.savePreview(module); break;
   case 'restore-preview': if (module) await previewController.restorePreview(module); break;
+  case 'retry-preview': await previewController.retryPreview(); break;
   case 'reset-arguments': if (module) await resetArguments(module); break;
   case 'accept-override': if (module) await acceptOverride(module); break;
   }

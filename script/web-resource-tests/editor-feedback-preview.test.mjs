@@ -225,9 +225,11 @@ const toastElement = {
 };
 const confirmDialog = {
   open: false,
+  listeners: {},
   classList: makeClassList(),
+  addEventListener(name, callback) { this.listeners[name] = callback; },
   showModal() { this.open = true; },
-  close() { this.open = false; }
+  close() { this.open = false; this.listeners.close?.(); }
 };
 const feedbackDocument = {
   documentElement: { scrollLeft: 12 },
@@ -285,6 +287,14 @@ assert.equal(confirmDialog.open, true);
 await feedbackController.resolveConfirmation(true);
 assert.equal(await confirmPromise, true);
 assert.equal(confirmDialog.open, false);
+const escapeConfirmation = feedbackController.askConfirmation('恢复？', '丢弃修改？');
+let preventedCancel = false;
+confirmDialog.listeners.cancel({ preventDefault() { preventedCancel = true; } });
+assert.equal(await escapeConfirmation, false, 'Escape resolves a pending confirmation as cancelled');
+assert.equal(preventedCancel, true);
+const dismissedConfirmation = feedbackController.askConfirmation('删除？', '删除模块？');
+confirmDialog.close();
+assert.equal(await dismissedConfirmation, false, 'native close cannot leave a confirmation promise pending');
 feedbackController.resetHorizontalScroll();
 assert.equal(feedbackDocument.documentElement.scrollLeft, 0);
 assert.equal(feedbackDocument.body.scrollLeft, 0);
@@ -315,9 +325,14 @@ const failedCopyController = feedbackHelpers.createFeedbackController({
   setTimeout: () => 1,
   clearTimeout: () => {}
 });
+assert.equal(await failedCopyController.copyText('fallback text'), true, 'clipboard permission failures should try the local copy fallback');
+assert.equal(feedbackDocument.body.appended.removed, true);
+assert.equal(feedbackDocument.body.appended.readOnly, true);
+feedbackDocument.execCommand = () => false;
 assert.equal(await failedCopyController.copyText('secret'), false);
 assert.equal(failedToast.textContent, '拷贝失败');
 assert.equal(failedToast.classList.contains('error'), true);
+assert.equal(feedbackDocument.body.appended.removed, true, 'a failed fallback still removes its temporary input');
 
 const previewAPIRequests = [];
 const previewToasts = [];

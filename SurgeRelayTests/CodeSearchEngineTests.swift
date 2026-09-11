@@ -145,6 +145,70 @@ final class CodeSearchEngineTests: XCTestCase {
         XCTAssertFalse(result.text.contains("PROXY"))
     }
 
+    func testReplacingAllIncludesMatchesBeyondTheHighlightLimit() {
+        let occurrences = CodeSearchEngine.maximumMatchCount + 37
+        let text = String(repeating: "DOMAIN,example.com,DIRECT\n", count: occurrences)
+        let query = CodeSearchQuery(text: "DOMAIN")
+
+        XCTAssertEqual(CodeSearchEngine.matches(in: text, query: query).count, CodeSearchEngine.maximumMatchCount)
+
+        let result = CodeSearchEngine.replacingAll(in: text, query: query, template: "DOMAIN-SUFFIX")
+
+        XCTAssertEqual(result.count, occurrences)
+        XCTAssertEqual(result.text, String(repeating: "DOMAIN-SUFFIX,example.com,DIRECT\n", count: occurrences))
+    }
+
+    func testLiteralReplacementPreservesUnicodeAndDoesNotExpandTemplates() {
+        let text = "🌊中文 Example.example EXAMPLE"
+        let result = CodeSearchEngine.replacingAll(
+            in: text,
+            query: CodeSearchQuery(text: "example"),
+            template: #"$1\literal"#
+        )
+
+        XCTAssertEqual(result.count, 3)
+        XCTAssertEqual(result.text, #"🌊中文 $1\literal.$1\literal $1\literal"#)
+
+        let sensitive = CodeSearchEngine.replacingAll(
+            in: text,
+            query: CodeSearchQuery(text: "Example", isCaseSensitive: true),
+            template: "changed"
+        )
+        XCTAssertEqual(sensitive.count, 1)
+        XCTAssertEqual(sensitive.text, "🌊中文 changed.example EXAMPLE")
+    }
+
+    func testRegularExpressionReplacementIncludesEveryCaptureBeyondTheHighlightLimit() {
+        let occurrences = CodeSearchEngine.maximumMatchCount + 37
+        let text = String(repeating: "🌊 example.org\n", count: occurrences)
+        let result = CodeSearchEngine.replacingAll(
+            in: text,
+            query: CodeSearchQuery(text: #"(example)\.org"#, usesRegularExpression: true),
+            template: #"$1.net\$literal"#
+        )
+
+        XCTAssertEqual(result.count, occurrences)
+        XCTAssertEqual(result.text, String(repeating: "🌊 example.net$literal\n", count: occurrences))
+    }
+
+    func testRegularExpressionReplacementPreservesZeroWidthMatchesAndLookarounds() {
+        let lines = CodeSearchEngine.replacingAll(
+            in: "🌊ab\n中文",
+            query: CodeSearchQuery(text: #"(?m)^|$"#, usesRegularExpression: true),
+            template: "|"
+        )
+        XCTAssertEqual(lines.text, "|🌊ab|\n|中文|")
+        XCTAssertEqual(lines.count, 4)
+
+        let lookaround = CodeSearchEngine.replacingAll(
+            in: "🌊 prefix:Example.org:suffix",
+            query: CodeSearchQuery(text: #"(?<=prefix:)([A-Za-z]+)\.org(?=:suffix)"#, usesRegularExpression: true),
+            template: "$1.net"
+        )
+        XCTAssertEqual(lookaround.text, "🌊 prefix:Example.net:suffix")
+        XCTAssertEqual(lookaround.count, 1)
+    }
+
     func testReplacementForASingleRegularExpressionMatchExpandsCaptureGroups() {
         let match = CodeSearchEngine.matches(
             in: sample,
@@ -169,6 +233,65 @@ final class CodeSearchEngineTests: XCTestCase {
             ),
             "literal"
         )
+    }
+
+    func testSingleRegularExpressionReplacementKeepsLookaroundContext() {
+        let text = "🌊 prefix:Example.org:suffix"
+        let query = CodeSearchQuery(
+            text: #"(?<=prefix:)([A-Za-z]+)\.org(?=:suffix)"#,
+            usesRegularExpression: true
+        )
+        let matches = CodeSearchEngine.matches(in: text, query: query)
+        XCTAssertEqual(matches.count, 1)
+        guard let match = matches.first else { return }
+
+        XCTAssertEqual(
+            CodeSearchEngine.replacement(for: match, in: text, query: query, template: "$1.net"),
+            "Example.net"
+        )
+    }
+
+    func testSingleRegularExpressionReplacementDoesNotAnchorAtTheSelectionBounds() {
+        let text = "abc def"
+        let query = CodeSearchQuery(text: #"(abc)$|(\w+)"#, usesRegularExpression: true)
+        let matches = CodeSearchEngine.matches(in: text, query: query)
+        guard let match = matches.first else { return XCTFail("Expected the first word to match") }
+
+        XCTAssertEqual(
+            CodeSearchEngine.replacement(for: match, in: text, query: query, template: "<$1:$2>"),
+            "<:abc>"
+        )
+    }
+
+    func testCancelledSearchReturnsNoPartialMatches() async {
+        for usesRegularExpression in [false, true] {
+            let task = Task.detached {
+                withUnsafeCurrentTask { $0?.cancel() }
+                return CodeSearchEngine.matches(
+                    in: "example example example",
+                    query: CodeSearchQuery(text: "example", usesRegularExpression: usesRegularExpression)
+                )
+            }
+            let matches = await task.value
+            XCTAssertTrue(matches.isEmpty)
+        }
+    }
+
+    func testCancelledReplacementPreservesOriginalText() async {
+        let text = "example example example"
+        for usesRegularExpression in [false, true] {
+            let task = Task.detached {
+                withUnsafeCurrentTask { $0?.cancel() }
+                return CodeSearchEngine.replacingAll(
+                    in: text,
+                    query: CodeSearchQuery(text: "example", usesRegularExpression: usesRegularExpression),
+                    template: "replacement"
+                )
+            }
+            let result = await task.value
+            XCTAssertEqual(result.text, text)
+            XCTAssertEqual(result.count, 0)
+        }
     }
 
     func testReplacingAllWithoutMatchesKeepsTheOriginalText() {

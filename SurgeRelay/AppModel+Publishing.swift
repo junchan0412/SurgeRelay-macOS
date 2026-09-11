@@ -101,11 +101,13 @@ extension AppModel {
             }
 
             guard shouldContinueCurrentWork() else { return false }
-            guard changedFileCount > 0 else {
+            guard !publishedDestinations.isEmpty else {
                 statusMessage = "所选模块没有可发布的独立输出"
                 return false
             }
-            statusMessage = "已将所选模块发布到\(publishedDestinations.joined(separator: " 和 "))（\(changedFileCount) 个文件变更）"
+            statusMessage = changedFileCount == 0
+                ? "所选模块已是最新，无需重复发布"
+                : "已将所选模块发布到\(publishedDestinations.joined(separator: " 和 "))（\(changedFileCount) 个文件变更）"
             return true
         } catch {
             if isCurrentWorkCancellation(error) { return false }

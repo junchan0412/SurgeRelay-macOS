@@ -46,6 +46,15 @@ function createController(overrides = {}) {
   assert.equal(controller.getTab(), 'preview');
   controller.setTab('nonsense');
   assert.equal(controller.getTab(), 'preview', 'unknown tabs should be ignored');
+  let focusedTab = null;
+  const keyboard = createController({ inject: { ui: { detail: { querySelector: selector => ({ focus() { focusedTab = selector; } }) }, mobileTitle: {} } } }).controller;
+  const event = key => ({ key, target: { closest: () => ({}) }, preventDefault() {} });
+  keyboard.handleTabKeydown(event('ArrowRight'));
+  assert.equal(keyboard.getTab(), 'preview');
+  assert.equal(focusedTab, '#detail-tab-preview');
+  keyboard.handleTabKeydown(event('Home'));
+  assert.equal(keyboard.getTab(), 'info');
+  assert.equal(focusedTab, '#detail-tab-info');
 }
 
 {

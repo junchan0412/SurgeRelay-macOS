@@ -31,10 +31,28 @@ final class ModuleCodeEditorController {
     private(set) var canUndo = false
     private(set) var canRedo = false
     private(set) var replaceAllSummary: String?
+    private(set) var isSearching = false
+    private(set) var isReplacingAll = false
 
     @ObservationIgnored private(set) weak var textView: CodeTextView?
+    @ObservationIgnored private var visibleViewport: CGRect?
     @ObservationIgnored private var matches: [NSRange] = []
     @ObservationIgnored private var currentMatchIndex: Int?
+    @ObservationIgnored private var searchTask: Task<Void, Never>?
+    @ObservationIgnored private var searchGeneration: UInt64 = 0
+    @ObservationIgnored private var textRevision: UInt64 = 0
+    @ObservationIgnored private var matchedRevision: UInt64?
+    @ObservationIgnored private var matchedQuery: CodeSearchQuery?
+    @ObservationIgnored private var pendingRevision: UInt64?
+    @ObservationIgnored private var pendingQuery: CodeSearchQuery?
+    @ObservationIgnored private var pendingSearchAction: (@MainActor () -> Void)?
+    @ObservationIgnored private var replacementTask: Task<Void, Never>?
+    @ObservationIgnored private var replacementGeneration: UInt64 = 0
+
+    deinit {
+        searchTask?.cancel()
+        replacementTask?.cancel()
+    }
 
     var query: CodeSearchQuery {
         CodeSearchQuery(
@@ -45,11 +63,13 @@ final class ModuleCodeEditorController {
     }
 
     var matchSummary: String {
-        CodeSearchEngine.regularExpressionErrorMessage(for: query)
-            ?? (query.isEmpty ? "" : CodeSearchEngine.matchSummary(
-                matchCount: matchCount,
-                currentNumber: currentMatchNumber
-            ))
+        if let error = CodeSearchEngine.regularExpressionErrorMessage(for: query) { return error }
+        if query.isEmpty { return "" }
+        if isSearching { return "正在查找…" }
+        if matchCount >= CodeSearchEngine.maximumMatchCount {
+            return currentMatchNumber.map { "第 \($0) / 前 \(matchCount) 个" } ?? "前 \(matchCount) 个结果"
+        }
+        return CodeSearchEngine.matchSummary(matchCount: matchCount, currentNumber: currentMatchNumber)
     }
 
     var hasInvalidRegularExpression: Bool {
@@ -63,31 +83,49 @@ final class ModuleCodeEditorController {
     // MARK: - Text view binding
 
     func attach(_ textView: CodeTextView) {
+        cancelReplacement()
+        self.textView?.editorController = nil
         self.textView = textView
+        textRevision &+= 1
         textView.editorController = self
+        if let visibleViewport { textView.updateViewport(visibleViewport) }
         refreshEditingState()
         refreshMatches()
+    }
+
+    func updateViewport(_ viewport: CGRect) {
+        visibleViewport = viewport
+        textView?.updateViewport(viewport)
     }
 
     func setEditable(_ isEditable: Bool) {
         guard self.isEditable != isEditable else { return }
         self.isEditable = isEditable
-        if !isEditable { showsReplaceRow = false }
+        if !isEditable {
+            showsReplaceRow = false
+            cancelReplacement()
+        }
     }
 
     /// 文本或选区变化后同步匹配结果和撤销状态。
     func textDidChange() {
+        cancelReplacement()
+        textRevision &+= 1
         replaceAllSummary = nil
         refreshMatches()
         refreshEditingState()
     }
 
     func selectionDidChange() {
-        guard isFindBarPresented, !matches.isEmpty, let textView else { return }
+        guard isFindBarPresented, !isSearching, !matches.isEmpty, let textView else { return }
         if let index = CodeSearchEngine.matchIndex(in: matches, equalTo: textView.selectedRange()) {
             currentMatchIndex = index
             currentMatchNumber = index + 1
             textView.applySearchHighlights(matches, current: matches[index])
+        } else if currentMatchIndex != nil {
+            currentMatchIndex = nil
+            currentMatchNumber = nil
+            textView.applySearchHighlights(matches, current: nil)
         }
     }
 
@@ -99,6 +137,8 @@ final class ModuleCodeEditorController {
 
     /// 载入新内容后重置查找结果与撤销历史。
     func resetForReloadedContent() {
+        cancelReplacement()
+        textRevision &+= 1
         textView?.undoManager?.removeAllActions()
         replaceAllSummary = nil
         currentMatchIndex = nil
@@ -128,12 +168,13 @@ final class ModuleCodeEditorController {
     }
 
     func dismissFindBar() {
+        cancelReplacement()
         isFindBarPresented = false
         showsReplaceRow = false
         showsGoToLineRow = false
         focusTarget = nil
         replaceAllSummary = nil
-        textView?.clearSearchHighlights()
+        refreshMatches()
         returnFocusToText()
     }
 
@@ -147,7 +188,11 @@ final class ModuleCodeEditorController {
     func find(forward: Bool) {
         guard let textView, !query.isEmpty else { return }
         isFindBarPresented = true
-        refreshMatches()
+        refreshMatches(immediately: true)
+        if isSearching {
+            pendingSearchAction = { [weak self] in self?.find(forward: forward) }
+            return
+        }
         guard !matches.isEmpty else {
             NSSound.beep()
             return
@@ -162,7 +207,11 @@ final class ModuleCodeEditorController {
 
     func replaceCurrent() {
         guard let textView, isEditable, !query.isEmpty else { return }
-        refreshMatches()
+        refreshMatches(immediately: true)
+        if isSearching {
+            pendingSearchAction = { [weak self] in self?.replaceCurrent() }
+            return
+        }
         guard let index = CodeSearchEngine.matchIndex(
             in: matches,
             equalTo: textView.selectedRange()
@@ -185,28 +234,48 @@ final class ModuleCodeEditorController {
                 length: 0
             )
         ))
-        refreshMatches()
         find(forward: true)
     }
 
     func replaceAll() {
-        guard let textView, isEditable, !query.isEmpty else { return }
+        guard let textView, isEditable, !query.isEmpty, !hasInvalidRegularExpression, !isReplacingAll else { return }
+        cancelReplacement()
         let text = textView.string
-        let result = CodeSearchEngine.replacingAll(in: text, query: query, template: replacementText)
-        guard result.count > 0 else {
-            replaceAllSummary = "没有可替换的内容"
-            NSSound.beep()
-            return
+        let requestedQuery = query
+        let template = replacementText
+        let revision = textRevision
+        let generation = replacementGeneration
+        isReplacingAll = true
+        replaceAllSummary = "正在替换…"
+        replacementTask = Task { @MainActor [weak self] in
+            let worker = Task.detached(priority: .userInitiated) {
+                CodeSearchEngine.replacingAll(in: text, query: requestedQuery, template: template)
+            }
+            let result = await withTaskCancellationHandler {
+                await worker.value
+            } onCancel: { worker.cancel() }
+            guard !Task.isCancelled, let self, self.replacementGeneration == generation else { return }
+            self.replacementTask = nil
+            self.isReplacingAll = false
+            guard self.textRevision == revision, self.query == requestedQuery, let textView = self.textView else {
+                self.replaceAllSummary = "内容或查找条件已更改，请重新替换"
+                return
+            }
+            guard result.count > 0 else {
+                self.replaceAllSummary = "没有可替换的内容"
+                NSSound.beep()
+                return
+            }
+            // 整篇替换合并成一次撤销步骤，⌘Z 可以一次性还原全部替换。
+            guard textView.applyEdit(CodeEditorEdit(
+                range: NSRange(location: 0, length: (text as NSString).length),
+                replacement: result.text,
+                selection: NSRange(location: 0, length: 0)
+            )) else { return }
+            self.replaceAllSummary = "已替换 \(result.count) 处"
+            self.refreshMatches()
+            self.refreshEditingState()
         }
-        // 整篇替换合并成一次撤销步骤，⌘Z 可以一次性还原全部替换。
-        textView.applyEdit(CodeEditorEdit(
-            range: NSRange(location: 0, length: (text as NSString).length),
-            replacement: result.text,
-            selection: NSRange(location: 0, length: 0)
-        ))
-        replaceAllSummary = "已替换 \(result.count) 处"
-        refreshMatches()
-        refreshEditingState()
     }
 
     func toggleComment() {
@@ -252,27 +321,92 @@ final class ModuleCodeEditorController {
 
     // MARK: - Private
 
-    func refreshMatches() {
+    func refreshMatches(immediately: Bool = false) {
         guard let textView, isFindBarPresented, !query.isEmpty else {
+            cancelSearch()
             matches = []
+            matchedRevision = nil
+            matchedQuery = nil
             matchCount = 0
             currentMatchNumber = nil
             currentMatchIndex = nil
             textView?.clearSearchHighlights()
             return
         }
-        matches = CodeSearchEngine.matches(in: textView.string, query: query)
+        let requestedQuery = query
+        if matchedRevision == textRevision, matchedQuery == requestedQuery {
+            updateMatchSelection()
+            return
+        }
+        if isSearching, pendingRevision == textRevision, pendingQuery == requestedQuery {
+            return
+        }
+        cancelSearch()
+        matches = []
+        matchedRevision = nil
+        matchedQuery = nil
+        matchCount = 0
+        currentMatchNumber = nil
+        currentMatchIndex = nil
+        textView.clearSearchHighlights()
+        guard !hasInvalidRegularExpression else { return }
+        let source = textView.string
+        let revision = textRevision
+        isSearching = true
+        pendingRevision = revision
+        pendingQuery = requestedQuery
+        let generation = searchGeneration
+        searchTask = Task { @MainActor [weak self] in
+            if !immediately {
+                do { try await Task.sleep(for: .milliseconds(120)) }
+                catch { return }
+            }
+            guard !Task.isCancelled else { return }
+            let worker = Task.detached(priority: .userInitiated) {
+                CodeSearchEngine.matches(in: source, query: requestedQuery)
+            }
+            let result = await withTaskCancellationHandler {
+                await worker.value
+            } onCancel: { worker.cancel() }
+            guard !Task.isCancelled, let self, self.searchGeneration == generation else { return }
+            self.searchTask = nil
+            self.isSearching = false
+            self.pendingRevision = nil
+            self.pendingQuery = nil
+            self.matches = result
+            self.matchedRevision = revision
+            self.matchedQuery = requestedQuery
+            self.updateMatchSelection()
+            let action = self.pendingSearchAction
+            self.pendingSearchAction = nil
+            action?()
+        }
+    }
+
+    private func cancelSearch() {
+        searchTask?.cancel()
+        searchTask = nil
+        searchGeneration &+= 1
+        isSearching = false
+        pendingRevision = nil
+        pendingQuery = nil
+        pendingSearchAction = nil
+    }
+
+    private func cancelReplacement() {
+        replacementTask?.cancel()
+        replacementTask = nil
+        replacementGeneration &+= 1
+        isReplacingAll = false
+    }
+
+    private func updateMatchSelection() {
+        guard let textView else { return }
         matchCount = matches.count
-        if matches.isEmpty {
-            currentMatchIndex = nil
-        } else if let index = CodeSearchEngine.matchIndex(
+        currentMatchIndex = CodeSearchEngine.matchIndex(
             in: matches,
             equalTo: textView.selectedRange()
-        ) {
-            currentMatchIndex = index
-        } else if let existing = currentMatchIndex, existing >= matches.count {
-            currentMatchIndex = matches.count - 1
-        }
+        )
         currentMatchNumber = currentMatchIndex.map { $0 + 1 }
         textView.applySearchHighlights(
             matches,

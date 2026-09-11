@@ -24,7 +24,7 @@ enum CodeSearchEngine {
     static let maximumMatchCount = 5_000
 
     static func matches(in text: String, query: CodeSearchQuery) -> [NSRange] {
-        guard !query.isEmpty else { return [] }
+        guard !query.isEmpty, !Task.isCancelled else { return [] }
         let string = text as NSString
         let fullRange = NSRange(location: 0, length: string.length)
         guard fullRange.length > 0 else { return [] }
@@ -32,12 +32,16 @@ enum CodeSearchEngine {
         if query.usesRegularExpression {
             guard let expression = regularExpression(for: query) else { return [] }
             var results: [NSRange] = []
-            expression.enumerateMatches(in: text, range: fullRange) { match, _, stop in
+            expression.enumerateMatches(in: text, options: [.reportProgress], range: fullRange) { match, _, stop in
+                guard !Task.isCancelled else {
+                    stop.pointee = true
+                    return
+                }
                 guard let match, match.range.length > 0 else { return }
                 results.append(match.range)
                 if results.count >= maximumMatchCount { stop.pointee = true }
             }
-            return results
+            return Task.isCancelled ? [] : results
         }
 
         var options: NSString.CompareOptions = [.literal]
@@ -45,6 +49,7 @@ enum CodeSearchEngine {
         var results: [NSRange] = []
         var searchRange = fullRange
         while searchRange.length > 0 {
+            guard !Task.isCancelled else { return [] }
             let found = string.range(of: query.text, options: options, range: searchRange)
             guard found.location != NSNotFound, found.length > 0 else { break }
             results.append(found)
@@ -84,9 +89,12 @@ enum CodeSearchEngine {
     ) -> String {
         guard query.usesRegularExpression,
               let expression = regularExpression(for: query),
-              // .anchored 保证取到的就是 match 起点上的那一次匹配，
-              // 而不是范围内的其他匹配。
-              let result = expression.firstMatch(in: text, options: [.anchored], range: match) else {
+              let result = expression.firstMatch(
+                  in: text,
+                  options: [.anchored, .withTransparentBounds, .withoutAnchoringBounds],
+                  range: match
+              ),
+              NSEqualRanges(result.range, match) else {
             return template
         }
         return expression.replacementString(for: result, in: text, offset: 0, template: template)
@@ -98,30 +106,42 @@ enum CodeSearchEngine {
         query: CodeSearchQuery,
         template: String
     ) -> (text: String, count: Int) {
-        guard !query.isEmpty else { return (text, 0) }
+        guard !query.isEmpty, !Task.isCancelled else { return (text, 0) }
         let string = text as NSString
         let fullRange = NSRange(location: 0, length: string.length)
         if query.usesRegularExpression {
             guard let expression = regularExpression(for: query) else { return (text, 0) }
-            let count = expression.numberOfMatches(in: text, range: fullRange)
-            guard count > 0 else { return (text, 0) }
-            return (
-                expression.stringByReplacingMatches(
-                    in: text,
-                    range: fullRange,
-                    withTemplate: template
-                ),
-                count
-            )
+            let result = NSMutableString(capacity: string.length)
+            var nextLocation = 0
+            var count = 0
+            var progressCountdown = 0
+            expression.enumerateMatches(in: text, options: [.reportProgress], range: fullRange) { match, _, stop in
+                if match == nil, progressCountdown > 0 {
+                    progressCountdown -= 1
+                    return
+                }
+                progressCountdown = 63
+                guard !Task.isCancelled else {
+                    stop.pointee = true
+                    return
+                }
+                guard let match else { return }
+                result.append(string.substring(with: NSRange(location: nextLocation, length: match.range.location - nextLocation)))
+                result.append(expression.replacementString(for: match, in: text, offset: 0, template: template))
+                nextLocation = NSMaxRange(match.range)
+                count += 1
+            }
+            guard !Task.isCancelled, count > 0 else { return (text, 0) }
+            result.append(string.substring(from: nextLocation))
+            guard !Task.isCancelled else { return (text, 0) }
+            return (result as String, count)
         }
-        let found = matches(in: text, query: query)
-        guard !found.isEmpty else { return (text, 0) }
-        let result = NSMutableString(string: string)
-        // 从后往前替换，前面的匹配偏移不会被改动影响。
-        for match in found.reversed() {
-            result.replaceCharacters(in: match, with: template)
-        }
-        return (result as String, found.count)
+        var options: NSString.CompareOptions = [.literal]
+        if !query.isCaseSensitive { options.insert(.caseInsensitive) }
+        let result = NSMutableString(string: text)
+        let count = result.replaceOccurrences(of: query.text, with: template, options: options, range: fullRange)
+        guard !Task.isCancelled else { return (text, 0) }
+        return (count > 0 ? result as String : text, count)
     }
 
     static func matchSummary(matchCount: Int, currentNumber: Int?) -> String {

@@ -45,38 +45,46 @@ struct ModuleCodeSearchBar: View {
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(controller.hasInvalidRegularExpression ? .orange : .secondary)
                 .frame(minWidth: 84, alignment: .leading)
+                .help("查找最多高亮前 5,000 处；全部替换会处理整篇文档。")
+                .accessibilityIdentifier("moduleCodeMatchSummary")
             Button {
                 controller.find(forward: false)
             } label: {
                 Image(systemName: "chevron.up")
             }
             .help("查找上一个（⇧⌘G）")
-            .disabled(controller.findText.isEmpty)
+            .accessibilityLabel("查找上一个")
+            .disabled(controller.findText.isEmpty || controller.hasInvalidRegularExpression)
             Button {
                 controller.find(forward: true)
             } label: {
                 Image(systemName: "chevron.down")
             }
             .help("查找下一个（⌘G）")
-            .disabled(controller.findText.isEmpty)
+            .accessibilityLabel("查找下一个")
+            .disabled(controller.findText.isEmpty || controller.hasInvalidRegularExpression)
             Toggle("Aa", isOn: $controller.isCaseSensitive)
                 .toggleStyle(.button)
                 .help("区分大小写")
+                .accessibilityLabel("区分大小写")
             Toggle(".*", isOn: $controller.usesRegularExpression)
                 .toggleStyle(.button)
                 .help("使用正则表达式")
+                .accessibilityLabel("使用正则表达式")
             if controller.isEditable {
                 Toggle(isOn: $controller.showsReplaceRow) {
                     Image(systemName: "arrow.2.squarepath")
                 }
                 .toggleStyle(.button)
                 .help("显示替换（⌥⌘F）")
+                .accessibilityLabel("显示替换")
             }
             Toggle(isOn: $controller.showsGoToLineRow) {
                 Image(systemName: "arrow.right.to.line")
             }
             .toggleStyle(.button)
             .help("跳转到行（⌘L）")
+            .accessibilityLabel("显示跳转到行")
             Spacer(minLength: 0)
             Button {
                 controller.dismissFindBar()
@@ -84,6 +92,7 @@ struct ModuleCodeSearchBar: View {
                 Image(systemName: "xmark")
             }
             .help("关闭查找栏（esc）")
+            .accessibilityLabel("关闭查找栏")
         }
         .buttonStyle(.borderless)
         .controlSize(.small)
@@ -101,9 +110,9 @@ struct ModuleCodeSearchBar: View {
                 .frame(minWidth: 140)
                 .accessibilityIdentifier("moduleCodeReplaceField")
             Button("替换") { controller.replaceCurrent() }
-                .disabled(controller.findText.isEmpty)
+                .disabled(controller.findText.isEmpty || controller.hasInvalidRegularExpression || controller.isReplacingAll)
             Button("全部替换") { controller.replaceAll() }
-                .disabled(controller.findText.isEmpty)
+                .disabled(controller.findText.isEmpty || controller.hasInvalidRegularExpression || controller.isReplacingAll)
             if let summary = controller.replaceAllSummary {
                 Text(summary)
                     .font(.caption)

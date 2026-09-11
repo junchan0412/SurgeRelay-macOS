@@ -293,6 +293,12 @@ assert.match(markup.copyableValueSection('GitHub <地址>', 'https://example.com
 assert.match(markup.copyableValueSection('GitHub <地址>', 'https://example.com?a=1&b=2', '复制 <URL>'), /复制 &lt;URL&gt;/);
 assert.match(markup.previewShell('Demo <Module>', true), /Demo &lt;Module&gt;/);
 assert.match(markup.previewShell('Demo', true), /textarea/);
+assert.match(markup.previewShell('Demo', true), /data-action="retry-preview" hidden/);
+assert.match(markup.previewShell('Demo', true), /aria-keyshortcuts="Meta\+s Control\+s"/);
+assert.match(markup.previewShell('Demo', false), /id="code-view" tabindex="0"/);
+assert.match(markup.previewShell('Demo', true), /role="tabpanel" aria-labelledby="detail-tab-preview"/);
+assert.match(selectedModuleRow, /class="module-open" type="button" aria-current="page"/);
+assert.doesNotMatch(selectedModuleRow, /role="button"/);
 assert.match(markup.argumentMarkup({ key: 'enabled<', value: 'true', defaultValue: 'false' }), /enabled&lt;/);
 assert.equal(markup.argumentsSectionMarkup({ arguments: [] }), '');
 assert.match(markup.argumentsSectionMarkup({

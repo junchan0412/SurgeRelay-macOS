@@ -28,11 +28,11 @@ extension AppModel {
             if rebuildFromCache {
                 // 单模块（过滤）更新：从全部缓存组件重建总模块并发布本地输出，
                 // 避免总模块只包含被更新模块而丢失其他参与者。
-                await rebuildCombinedFromCache()
+                guard await rebuildCombinedFromCache(schedulesAutomaticPublish: false) else { return }
             } else if settings.combinedModuleEnabled {
-                try await writeCombinedModule(result.components)
+                guard try await writeCombinedModule(result.components, generation: generation) else { return }
             } else {
-                try? await fileStore.removeCombined()
+                try await fileStore.removeCombined()
                 try await publishCurrentFiles(combinedData: nil, includeAssets: false)
             }
             guard shouldContinueCurrentWork(generation: generation) else { return }
@@ -64,9 +64,8 @@ extension AppModel {
             statusMessage = completionDecision.statusMessage
         } catch {
             if isCurrentWorkCancellation(error) { return }
-            presentedError = settings.combinedModuleEnabled
-                ? "合并失败，当前总模块未被覆盖：\(error.localizedDescription)"
-                : "刷新模块输出失败：\(error.localizedDescription)"
+            statusMessage = "输出刷新失败，请查看错误详情"
+            presentedError = "刷新模块输出失败：\(error.localizedDescription)"
         }
     }
 }

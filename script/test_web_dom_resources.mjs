@@ -19,7 +19,7 @@ const detailSource = readFileSync(new URL('SurgeRelay/WebResources/web-detail.js
 const appSource = readFileSync(new URL('SurgeRelay/WebResources/app.js', root), 'utf8');
 
 const requiredIDs = [
-  'module-list', 'summary-row', 'summary-subtitle', 'detail-content', 'search-input',
+  'module-list', 'summary-row', 'summary-subtitle', 'detail-content', 'search-input', 'clear-search', 'search-status',
   'filter-row', 'failure-filter', 'add-button', 'refresh-button', 'mobile-back', 'mobile-title', 'activity-status',
   'activity-percent', 'progress-track', 'progress-fill', 'activity-cancel', 'latest-update',
   'module-dialog', 'module-dialog-message', 'module-form', 'icon-url-preview',

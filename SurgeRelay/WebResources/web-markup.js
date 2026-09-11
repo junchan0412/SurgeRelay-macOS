@@ -22,10 +22,12 @@
     const toggle = combinedEnabled
       ? `<label class="module-toggle" title="${module.isEnabled ? '从总模块中停用' : '包含在总模块中'}"><input type="checkbox" data-module-toggle="${escapeAttribute(module.id)}" ${module.isEnabled ? 'checked' : ''} aria-label="包含 ${escapeAttribute(module.name)}"><span class="toggle-track" aria-hidden="true"></span></label>`
       : '';
-    return `<div class="module-row ${selected ? 'selected' : ''} ${disabled ? 'disabled' : ''}" data-id="${escapeAttribute(module.id)}" role="button" tabindex="0">
+    return `<div class="module-row ${selected ? 'selected' : ''} ${disabled ? 'disabled' : ''}" data-id="${escapeAttribute(module.id)}">
+    <button class="module-open" type="button" aria-current="${selected ? 'page' : 'false'}" aria-label="${escapeAttribute(module.name)}，${escapeAttribute(stateTitle)}">
     <span class="module-icon ${module.iconURL ? '' : 'placeholder'}">${icon}</span>
     <span class="module-copy"><strong>${escapeHTML(module.name)}</strong><small>${escapeHTML(logic.moduleSubtitle(module))}</small></span>
-    <span class="module-state-dot ${escapeAttribute(stateClass)}" title="${escapeAttribute(stateTitle)}"></span>
+    <span class="module-state-dot ${escapeAttribute(stateClass)}" title="${escapeAttribute(stateTitle)}" aria-hidden="true"></span>
+    </button>
     ${toggle}
   </div>`;
   }
@@ -45,7 +47,7 @@
   }
 
   function previewShell(label, editable) {
-    return `<section class="preview-shell"><div class="preview-toolbar"><span class="preview-label">${escapeHTML(label)}</span><button class="button" data-action="copy-preview"><span class="symbol" data-symbol="doc.on.doc"></span>拷贝全部</button>${editable ? `<button class="button" data-action="restore-preview"><span class="symbol" data-symbol="arrow.uturn.backward"></span>恢复</button><button class="button primary" data-action="save-preview" disabled>写入</button>` : ''}</div>${editable ? '<textarea class="code-editor" id="code-editor" spellcheck="false" aria-label="模块内容">正在载入…</textarea>' : '<pre class="code-view" id="code-view">正在载入…</pre>'}</section>`;
+    return `<section class="preview-shell" id="detail-panel" role="tabpanel" aria-labelledby="detail-tab-preview"><div class="preview-toolbar"><div class="preview-caption"><span class="preview-label" title="${escapeAttribute(label)}">${escapeHTML(label)}</span><span id="preview-status" class="preview-status" role="status" aria-live="polite" aria-atomic="true" data-state="loading">正在载入</span></div><div class="preview-actions"><button class="button" data-action="copy-preview" disabled><span class="symbol" data-symbol="doc.on.doc"></span>拷贝全部</button>${editable ? `<button class="button" data-action="restore-preview" title="丢弃本地编辑并恢复转换结果" disabled><span class="symbol" data-symbol="arrow.uturn.backward"></span>恢复</button><button class="button primary" data-action="save-preview" aria-keyshortcuts="Meta+s Control+s" title="写入修改（⌘/Ctrl+S）" disabled>写入</button>` : ''}<button class="button" data-action="retry-preview" hidden><span class="symbol" data-symbol="arrow.clockwise"></span>重试</button></div></div><p class="preview-message" id="preview-message" role="alert" hidden></p>${editable ? '<textarea class="code-editor" id="code-editor" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" aria-label="模块内容" disabled>正在载入…</textarea>' : '<pre class="code-view" id="code-view" tabindex="0" aria-label="总模块内容">正在载入…</pre>'}</section>`;
   }
 
   function publishFileList(title, files, destructive = false) {
@@ -75,8 +77,8 @@
   function detailToolbar(selectedTab = 'info', hasModule = false) {
     return `<div class="detail-toolbar">
     <div class="segmented-control" role="tablist" aria-label="显示方式">
-      <button data-action="tab-info" class="${selectedTab === 'info' ? 'selected' : ''}" role="tab" aria-selected="${selectedTab === 'info'}"><span class="symbol" data-symbol="info.circle"></span><span>详情</span></button>
-      <button data-action="tab-preview" class="${selectedTab === 'preview' ? 'selected' : ''}" role="tab" aria-selected="${selectedTab === 'preview'}"><span class="symbol" data-symbol="curlybraces"></span><span>预览</span></button>
+      <button data-action="tab-info" class="${selectedTab === 'info' ? 'selected' : ''}" id="detail-tab-info" role="tab" aria-controls="detail-panel" tabindex="${selectedTab === 'info' ? '0' : '-1'}" aria-selected="${selectedTab === 'info'}"><span class="symbol" data-symbol="info.circle"></span><span>详情</span></button>
+      <button data-action="tab-preview" class="${selectedTab === 'preview' ? 'selected' : ''}" id="detail-tab-preview" role="tab" aria-controls="detail-panel" tabindex="${selectedTab === 'preview' ? '0' : '-1'}" aria-selected="${selectedTab === 'preview'}"><span class="symbol" data-symbol="curlybraces"></span><span>预览</span></button>
     </div>
     ${hasModule ? `<button class="button" data-action="edit"><span class="symbol" data-symbol="pencil"></span>编辑</button><button class="button destructive" data-action="delete"><span class="symbol" data-symbol="trash"></span>删除</button>` : ''}
   </div>`;
@@ -92,12 +94,12 @@
     }
     const subscription = copyableValueSection('总模块订阅地址', combined.subscriptionURL);
     const latestPublish = latestPublishSection(context.latestGitHubPublish);
-    return `${detailToolbar(selectedTab)}
+    return `${detailToolbar(selectedTab)}<div id="detail-panel" role="tabpanel" aria-labelledby="detail-tab-info">
     <section class="form-section-view"><h3 class="section-heading">汇总模块</h3><div class="group-box">
       ${detailRow('square.stack.3d.up.fill', '名称', combined.name)}
       ${detailRow('shippingbox', '包含来源', `${combined.enabledCount} / ${combined.sourceCount}`)}
       ${detailRow('clock', '最新更新', formatDate(combined.lastUpdatedAt, '尚未更新'))}
-    </div></section>${subscription}${latestPublish}`;
+    </div></section>${subscription}${latestPublish}</div>`;
   }
 
   function moduleDetailMarkup(module, context = {}) {
@@ -142,7 +144,7 @@
     const localStorageRow = module.localStorageRelativePath
       ? detailRow('folder', '本地相对路径', module.localStorageRelativePath, false, module.localStorageRelativePath)
       : '';
-    return `${moduleHeaderMarkup(module, context.activity)}${detailToolbar(selectedTab, true)}
+    return `${moduleHeaderMarkup(module, context.activity)}${detailToolbar(selectedTab, true)}<div id="detail-panel" role="tabpanel" aria-labelledby="detail-tab-info">
     ${error}${conflict}${syncConflict}
     <section class="form-section-view"><h3 class="section-heading">管理关系</h3><div class="group-box">
       ${updateSourceRow || initialSourceRow}
@@ -174,7 +176,7 @@
       ${detailRow('gearshape', '转换引擎', module.conversionEngineRevision ? module.conversionEngineRevision.slice(0, 12) : '原生 Surge 模块', false, module.conversionEngineRevision || null)}
       </details>
     </div></section>
-    <div id="arguments-section"></div>${published}${advanced}`;
+    <div id="arguments-section"></div>${published}${advanced}</div>`;
   }
 
   function argumentMarkup(argument) {

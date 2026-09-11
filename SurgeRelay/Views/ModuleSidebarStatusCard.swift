@@ -9,7 +9,8 @@ struct ModuleSidebarStatusCard: View {
             if let error = model.presentedError {
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Design.Palette.warning)
+                        .accessibilityHidden(true)
                     Text(error)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -38,6 +39,7 @@ struct ModuleSidebarStatusCard: View {
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "info.circle.fill")
                         .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
                     Text(model.statusMessage)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -67,11 +69,15 @@ struct ModuleSidebarStatusCard: View {
                             .progressViewStyle(.linear)
                             .controlSize(.small)
                             .animation(.smooth(duration: 0.25), value: synchronizationProgress)
+                            .accessibilityLabel("模块更新进度")
+                            .accessibilityValue("已完成 \(model.synchronizationCompletedCount) 个，共 \(model.synchronizationTotalCount) 个模块")
+                            .accessibilityIdentifier("work.progress")
                     }
                 } else {
                     HStack(spacing: 8) {
                         ProgressView()
                             .controlSize(.small)
+                            .accessibilityHidden(true)
                         Text(workActivityStatusText)
                             .font(.caption)
                             .lineLimit(2)
@@ -87,6 +93,7 @@ struct ModuleSidebarStatusCard: View {
                     .buttonStyle(.borderless)
                     .controlSize(.small)
                     .disabled(!model.canCancelCurrentWork)
+                    .accessibilityIdentifier("work.cancel")
                 }
                 Divider()
             }
@@ -94,7 +101,8 @@ struct ModuleSidebarStatusCard: View {
             if let automaticPublishText {
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "paperplane.circle.fill")
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(Design.Palette.accent)
+                        .accessibilityHidden(true)
                     Text(automaticPublishText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -112,6 +120,7 @@ struct ModuleSidebarStatusCard: View {
                     .foregroundStyle(.secondary)
                     .contentTransition(.opacity)
             }
+            .accessibilityElement(children: .combine)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -125,6 +134,7 @@ struct ModuleSidebarStatusCard: View {
         .animation(.snappy(duration: 0.22), value: model.workActivity.isActive)
         .animation(.snappy(duration: 0.22), value: model.presentedError != nil)
         .animation(.snappy(duration: 0.22), value: model.automaticPublishRunsAt)
+        .accessibilityIdentifier("work.status")
     }
 
     private var latestUpdateText: String {
@@ -159,4 +169,3 @@ struct ModuleSidebarStatusCard: View {
     }
 
 }
-

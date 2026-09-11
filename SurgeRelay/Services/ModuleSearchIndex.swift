@@ -42,9 +42,17 @@ enum ModuleSearchIndex {
     }
 
     static func contentCacheKey(for module: RelayModule) -> String {
-        guard !module.argumentOverrides.isEmpty else { return module.contentHash ?? "" }
         var hash = Hasher()
         hash.combine(module.argumentOverrides)
+        hash.combine(module.name)
+        hash.combine(module.category)
+        hash.combine(module.moduleDescription)
+        hash.combine(module.customIconURL)
+        hash.combine(module.sourceURL)
+        hash.combine(module.sourceFormat)
+        hash.combine(module.outputFileName)
+        hash.combine(module.scriptHubSubscription)
+        hash.combine(module.scriptHubOptions)
         return "\(module.contentHash ?? "")|\(hash.finalize())"
     }
 
@@ -59,8 +67,9 @@ enum ModuleSearchIndex {
         hash.combine(module.sourceFormat)
         hash.combine(module.detectedSourceFormat)
         hash.combine(module.category)
+        hash.combine(module.moduleDescription)
         hash.combine(module.outputFolder)
-        hash.combine(module.storageLocation)
+        hash.combine(module.storageTargets)
         hash.combine(module.localStorageRelativePath)
         hash.combine(module.publishesStandalone)
         hash.combine(module.isIncludedInCombined)
@@ -108,6 +117,7 @@ enum ModuleSearchIndex {
             module.publishedRelativePath,
             module.sourceFormatDisplayTitle,
             module.category,
+            module.moduleDescription,
             module.outputFolder,
             ModuleOutputFolder.displayTitle(for: module.outputFolder),
             module.displayStorageLocationTitle,

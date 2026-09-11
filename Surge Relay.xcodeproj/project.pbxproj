@@ -17,6 +17,7 @@
 		F41000000000000000000001 /* LocalSourceSyncPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F41000000000000000000002 /* LocalSourceSyncPlannerTests.swift */; };
 		F42000000000000000000001 /* CodeSearchEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F42000000000000000000002 /* CodeSearchEngineTests.swift */; };
 		F43000000000000000000001 /* CodeEditorTextTransformTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F43000000000000000000002 /* CodeEditorTextTransformTests.swift */; };
+		F44000000000000000000001 /* ModuleCodeEditorControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F44000000000000000000002 /* ModuleCodeEditorControllerTests.swift */; };
 		F20000000000000000000001 /* ModuleSidebarFilterBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000002 /* ModuleSidebarFilterBar.swift */; };
 		F10000000000000000000001 /* SurgeRelayUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000002 /* SurgeRelayUITests.swift */; };
 		D116D116D116D116D116D116 /* BoundedRemoteDataFetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = E116E116E116E116E116E116 /* BoundedRemoteDataFetcher.swift */; };
@@ -231,6 +232,7 @@
 		F41000000000000000000002 /* LocalSourceSyncPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalSourceSyncPlannerTests.swift; sourceTree = "<group>"; };
 		F42000000000000000000002 /* CodeSearchEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeSearchEngineTests.swift; sourceTree = "<group>"; };
 		F43000000000000000000002 /* CodeEditorTextTransformTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeEditorTextTransformTests.swift; sourceTree = "<group>"; };
+		F44000000000000000000002 /* ModuleCodeEditorControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleCodeEditorControllerTests.swift; sourceTree = "<group>"; };
 		F20000000000000000000002 /* ModuleSidebarFilterBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleSidebarFilterBar.swift; sourceTree = "<group>"; };
 		F10000000000000000000002 /* SurgeRelayUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurgeRelayUITests.swift; sourceTree = "<group>"; };
 		F10000000000000000000003 /* SurgeRelayUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SurgeRelayUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -627,6 +629,7 @@
 				F41000000000000000000002 /* LocalSourceSyncPlannerTests.swift */,
 				F42000000000000000000002 /* CodeSearchEngineTests.swift */,
 				F43000000000000000000002 /* CodeEditorTextTransformTests.swift */,
+				F44000000000000000000002 /* ModuleCodeEditorControllerTests.swift */,
 				40A1B2C3D4E5F60718293A4B /* AppSettingsTests.swift */,
 				4C7A8B9C0D1E2F3041526374 /* AutomaticPublishPlannerTests.swift */,
 				4A4B5C6D7E8F901122334455 /* ConfigurationMigrationTests.swift */,
@@ -844,6 +847,7 @@
 				F41000000000000000000001 /* LocalSourceSyncPlannerTests.swift in Sources */,
 				F42000000000000000000001 /* CodeSearchEngineTests.swift in Sources */,
 				F43000000000000000000001 /* CodeEditorTextTransformTests.swift in Sources */,
+				F44000000000000000000001 /* ModuleCodeEditorControllerTests.swift in Sources */,
 				30A1B2C3D4E5F60718293A4B /* AppSettingsTests.swift in Sources */,
 				3C7A8B9C0D1E2F3041526374 /* AutomaticPublishPlannerTests.swift in Sources */,
 				3A4B5C6D7E8F901122334455 /* ConfigurationMigrationTests.swift in Sources */,
@@ -1122,7 +1126,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-			CURRENT_PROJECT_VERSION = 105;
+			CURRENT_PROJECT_VERSION = 106;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1136,7 +1140,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-			MARKETING_VERSION = 2.1.0;
+			MARKETING_VERSION = 2.2.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1220,7 +1224,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-			CURRENT_PROJECT_VERSION = 105;
+			CURRENT_PROJECT_VERSION = 106;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -1240,7 +1244,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-			MARKETING_VERSION = 2.1.0;
+			MARKETING_VERSION = 2.2.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

@@ -66,14 +66,14 @@ final class ModuleSearchIndexTests: XCTestCase {
             ModuleSearchIndex.cachedContent(
                 for: module,
                 contentIndex: [id: "domain-suffix,example.com"],
-                contentIndexCacheKeys: [id: "hash-1"]
+                contentIndexCacheKeys: [id: ModuleSearchIndex.contentCacheKey(for: module)]
             ),
             "domain-suffix,example.com"
         )
         XCTAssertNil(ModuleSearchIndex.cachedContent(
             for: updatedModule,
             contentIndex: [id: "domain-suffix,example.com"],
-            contentIndexCacheKeys: [id: "hash-1"]
+            contentIndexCacheKeys: [id: ModuleSearchIndex.contentCacheKey(for: module)]
         ))
     }
 
@@ -90,7 +90,7 @@ final class ModuleSearchIndexTests: XCTestCase {
         XCTAssertEqual(ModuleSearchIndex.contentIndexToken(for: [module], query: "  "), "idle")
         XCTAssertEqual(
             ModuleSearchIndex.contentIndexToken(for: [module], query: "  Rule  "),
-            "active|rule|11111111-1111-1111-1111-111111111111:hash-1"
+            "active|rule|11111111-1111-1111-1111-111111111111:\(ModuleSearchIndex.contentCacheKey(for: module))"
         )
     }
 
@@ -105,7 +105,7 @@ final class ModuleSearchIndexTests: XCTestCase {
         )
         let state = ModuleSearchContentIndexState(
             contentIndex: [id: "domain-suffix,example.com"],
-            contentIndexCacheKeys: [id: "hash-1"]
+            contentIndexCacheKeys: [id: ModuleSearchIndex.contentCacheKey(for: module)]
         )
 
         let plan = ModuleSearchIndex.contentLoadPlan(
@@ -144,7 +144,7 @@ final class ModuleSearchIndexTests: XCTestCase {
         )
         let state = ModuleSearchContentIndexState(
             contentIndex: [cached.id: "domain-suffix,cached.example.com"],
-            contentIndexCacheKeys: [cached.id: "hash-cached"]
+            contentIndexCacheKeys: [cached.id: ModuleSearchIndex.contentCacheKey(for: cached)]
         )
 
         let plan = ModuleSearchIndex.contentLoadPlan(
@@ -154,7 +154,7 @@ final class ModuleSearchIndexTests: XCTestCase {
         )
 
         XCTAssertEqual(plan.retainedState.contentIndex, [cached.id: "domain-suffix,cached.example.com"])
-        XCTAssertEqual(plan.retainedState.contentIndexCacheKeys, [cached.id: "hash-cached"])
+        XCTAssertEqual(plan.retainedState.contentIndexCacheKeys, state.contentIndexCacheKeys)
         XCTAssertEqual(plan.modulesToLoad.map(\.id), [metadataHit.id, contentMiss.id])
 
         let metadataPlan = ModuleSearchIndex.contentLoadPlan(
@@ -174,9 +174,11 @@ final class ModuleSearchIndexTests: XCTestCase {
             outputFileName: "Video.sgmodule",
             contentHash: "hash-2"
         )
+        var previous = changed
+        previous.contentHash = "hash-1"
         let state = ModuleSearchContentIndexState(
             contentIndex: [id: "domain-suffix,example.com"],
-            contentIndexCacheKeys: [id: "hash-1"]
+            contentIndexCacheKeys: [id: ModuleSearchIndex.contentCacheKey(for: previous)]
         )
 
         let plan = ModuleSearchIndex.contentLoadPlan(
@@ -188,7 +190,6 @@ final class ModuleSearchIndexTests: XCTestCase {
         XCTAssertEqual(plan.retainedState, .empty)
         XCTAssertEqual(plan.modulesToLoad.map(\.id), [id])
     }
-}
 
     func testModuleSearchIndexFilterPlanReusesMetadataCache() {
         let module = RelayModule(
@@ -235,3 +236,107 @@ final class ModuleSearchIndexTests: XCTestCase {
             ModuleSearchIndex.metadataCacheKey(for: failed)
         )
     }
+
+    func testSearchDropsOldPreviewHeadersAfterRenaming() {
+        let original = RelayModule(
+            name: "PreviousName",
+            sourceURL: "https://example.com/source.sgmodule",
+            outputFileName: "Source.sgmodule",
+            contentHash: "unchanged-body"
+        )
+        let contentState = ModuleSearchContentIndexState(
+            contentIndex: [original.id: "#!name=previousname\n[rule]\nfinal,direct"],
+            contentIndexCacheKeys: [original.id: ModuleSearchIndex.contentCacheKey(for: original)]
+        )
+        var renamed = original
+        renamed.name = "CurrentName"
+
+        let filtered = ModuleSearchIndex.filterPlan(
+            modules: [renamed], query: "previousname", contentState: contentState, metadataState: .empty
+        )
+        let load = ModuleSearchIndex.contentLoadPlan(modules: [renamed], query: "final,direct", state: contentState)
+
+        XCTAssertTrue(filtered.matches.isEmpty)
+        XCTAssertEqual(load.modulesToLoad.map(\.id), [renamed.id])
+        XCTAssertEqual(load.retainedState, .empty)
+    }
+
+    func testDescriptionEditsAreSearchableWithoutLoadingContent() {
+        var module = RelayModule(
+            name: "Source",
+            sourceURL: "https://example.com/source.sgmodule",
+            outputFileName: "Source.sgmodule",
+            moduleDescription: "Previous description"
+        )
+        let previous = ModuleSearchIndex.filterPlan(
+            modules: [module], query: "previous description", contentState: .empty, metadataState: .empty
+        )
+        XCTAssertEqual(previous.matches.map(\.id), [module.id])
+        module.moduleDescription = "Revised description"
+
+        let updated = ModuleSearchIndex.filterPlan(
+            modules: [module], query: "revised description", contentState: .empty, metadataState: previous.metadataState
+        )
+        XCTAssertEqual(updated.matches.map(\.id), [module.id])
+        XCTAssertFalse(ModuleSearchIndex.shouldLoadContent(for: module, query: "revised description", cachedContent: nil))
+        XCTAssertFalse(updated.metadataState.metadataIndex[module.id]?.contains("previous description") ?? true)
+    }
+
+    func testSearchRefreshesWhenAddingAGitHubTargetToALocalModule() {
+        var module = RelayModule(
+            name: "Source",
+            sourceURL: "file:///tmp/source.sgmodule",
+            outputFileName: "Source.sgmodule",
+            storageTargets: [.local]
+        )
+        let previous = ModuleSearchIndex.filterPlan(
+            modules: [module], query: "同时储存", contentState: .empty, metadataState: .empty
+        )
+        XCTAssertTrue(previous.matches.isEmpty)
+        module.storageTargets.insert(.gitHub)
+
+        let updated = ModuleSearchIndex.filterPlan(
+            modules: [module], query: "同时储存", contentState: .empty, metadataState: previous.metadataState
+        )
+
+        XCTAssertEqual(updated.matches.map(\.id), [module.id])
+    }
+
+    func testPreviewMetadataEditsInvalidateContentButProgressChangesDoNot() {
+        let original = RelayModule(
+            name: "Source",
+            sourceURL: "https://example.com/source.sgmodule",
+            outputFileName: "Source.sgmodule",
+            contentHash: "unchanged-body"
+        )
+        let state = ModuleSearchContentIndexState(
+            contentIndex: [original.id: "[rule]\nfinal,direct"],
+            contentIndexCacheKeys: [original.id: ModuleSearchIndex.contentCacheKey(for: original)]
+        )
+        let previewEdits: [(inout RelayModule) -> Void] = [
+            { $0.category = "Updated category" },
+            { $0.moduleDescription = "Updated description" },
+            { $0.customIconURL = "https://example.com/updated.png" },
+            { $0.outputFileName = "Updated.sgmodule" },
+            { $0.sourceURL = "https://example.com/updated.sgmodule" },
+            { $0.sourceFormat = .surge },
+            { $0.scriptHubOptions.policy = "Updated policy" },
+            { $0.argumentOverrides = ["Mode": "PROXY"] }
+        ]
+        for edit in previewEdits {
+            var updated = original
+            edit(&updated)
+            let plan = ModuleSearchIndex.contentLoadPlan(modules: [updated], query: "final,direct", state: state)
+            XCTAssertEqual(plan.modulesToLoad.map(\.id), [original.id])
+            XCTAssertEqual(plan.retainedState, .empty)
+        }
+
+        var updating = original
+        updating.state = .updating
+        updating.sourceCheckedAt = .now
+        updating.storageTargets = [.local, .gitHub]
+        let retained = ModuleSearchIndex.contentLoadPlan(modules: [updating], query: "final,direct", state: state)
+        XCTAssertTrue(retained.modulesToLoad.isEmpty)
+        XCTAssertEqual(retained.retainedState, state)
+    }
+}

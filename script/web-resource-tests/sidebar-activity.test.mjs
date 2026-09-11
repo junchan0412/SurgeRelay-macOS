@@ -35,6 +35,7 @@ const sidebarUI = {
   summarySubtitle: { textContent: '' },
   list: {
     innerHTML: '',
+    querySelectorAll: () => [],
     querySelector: selector => selector.includes('module-1') ? sidebarRow : null
   }
 };

@@ -35,6 +35,19 @@
       detailTab = tab;
     }
 
+    function showTab(tab) {
+      setTab(tab);
+      renderDetail(false);
+      ui.detail.querySelector?.(`#detail-tab-${detailTab}`)?.focus?.({ preventScroll: true });
+    }
+
+    function handleTabKeydown(event) {
+      if (event.isComposing || event.altKey || event.metaKey || event.ctrlKey || !event.target.closest('[role="tab"]')) return;
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      showTab(event.key === 'Home' ? 'info' : event.key === 'End' ? 'preview' : detailTab === 'info' ? 'preview' : 'info');
+    }
+
     function renderDetail(animate = true) {
       const state = getState();
       const selectedID = getSelectedID();
@@ -64,6 +77,7 @@
     }
 
     function setDetailHTML(content, animate = true) {
+      previewController.deactivate?.();
       ui.detail.innerHTML = `<div class="detail-stage ${animate ? 'page-enter' : ''}">${content}</div>`;
     }
 
@@ -171,6 +185,8 @@
     return {
       getTab,
       setTab,
+      showTab,
+      handleTabKeydown,
       renderDetail,
       renderModuleDetail,
       patchLiveDetail

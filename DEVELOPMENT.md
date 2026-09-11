@@ -272,6 +272,12 @@ The active maintenance machine may print CoreSimulator version warnings even for
 
 ## Performance Notes
 
+`ModuleCodeEditorController` performs find and replace computation off the main actor, including explicit keyboard commands. Keep request generations and text revisions around asynchronous results so queries, reloaded content, and new edits cannot receive stale highlights or replacements. Regular-expression enumeration must remain cancellable. `CodeSearchEngine.maximumMatchCount` limits highlights only, never the scope of replace-all.
+
+`CodeTextView` renders the gutter bitmap for the viewport reported by SwiftUI scroll geometry through its controller; direct AppKit containers fall back to clip-view bounds. Do not allocate a bitmap as tall as the document. SwiftUI alone controls the live text view frame: measure wrapping using the isolated TextKit size cache, because changing the live frame during sizeThatFits creates layout and forced-scroll loops. Invalidate the shared UTF-16 line index on content mutation or reload, not by Swift String equality: canonically equivalent strings can have different UTF-16 offsets. `ModuleCodeEditorControllerTests` covers asynchronous commands, draft protection, Unicode cursor positions, stable size measurement, and the viewport allocation bound.
+
+Output rebuilds report success explicitly. Callers must preserve missing-cache/export errors and only schedule publishing after a successful rebuild. Selected local publishing must derive managed paths through `LocalPublishedFilesPlanner` to avoid carrying overwrite permission across local roots. Read the converted source before deleting a preview override during restoration.
+
 The module list should not eagerly read every converted preview at launch. `ModulesView` keeps metadata-only search available immediately and builds the heavier converted-content search index only after the user enters a search query. Preserve that lazy behavior when changing search or preview code.
 
 `ModuleIconView` must not synchronously read and decode cached icon files from `body`; icon data is loaded on a utility task keyed by module/icon revision. Keep disk I/O out of SwiftUI redraw paths.

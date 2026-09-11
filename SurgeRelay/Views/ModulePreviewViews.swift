@@ -63,6 +63,11 @@ struct ModulePreviewPane: View {
                     )
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
+                .onScrollGeometryChange(for: CGRect.self) { geometry in
+                    geometry.visibleRect
+                } action: { _, viewport in
+                    editor.updateViewport(viewport)
+                }
                 .background(Color(nsColor: .textBackgroundColor))
                 if isLoading {
                     ProgressView("正在载入模块内容…")
@@ -272,6 +277,11 @@ struct CombinedPreviewPane: View {
                 )
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             }
+            .onScrollGeometryChange(for: CGRect.self) { geometry in
+                geometry.visibleRect
+            } action: { _, viewport in
+                editor.updateViewport(viewport)
+            }
             .background(Color(nsColor: .textBackgroundColor))
         }
         .overlay {
@@ -365,6 +375,11 @@ struct ModuleTextEditorView: View {
                         onCursorPositionChange: { cursorPosition = $0 }
                     )
                     .frame(maxWidth: .infinity, alignment: .topLeading)
+                }
+                .onScrollGeometryChange(for: CGRect.self) { geometry in
+                    geometry.visibleRect
+                } action: { _, viewport in
+                    editor.updateViewport(viewport)
                 }
                 .background(Color(nsColor: .textBackgroundColor))
                 if isLoading {

@@ -26,25 +26,40 @@ struct ModuleSidebarView: View {
         @Bindable var model = model
 
         VStack(spacing: 0) {
-            List(selection: $model.selectedModuleID) {
-                Section {
+            VStack(spacing: 4) {
+                Button { model.selectedModuleID = AppModel.overviewSelectionID } label: {
                     Label("工作台", systemImage: "square.grid.2x2")
-                        .font(.system(size: 14, weight: .medium))
-                        .padding(.vertical, 6)
-                        .tag(AppModel.overviewSelectionID)
-                        .accessibilityIdentifier("navigation.overview")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(8)
+                        .contentShape(Rectangle())
+                        .background(model.selectedModuleID == AppModel.overviewSelectionID ? Design.Palette.accent.opacity(0.12) : .clear,
+                                    in: .rect(cornerRadius: 6))
+                }
+                .accessibilityAddTraits(model.selectedModuleID == AppModel.overviewSelectionID ? .isSelected : [])
+                .accessibilityIdentifier("navigation.overview")
+                Button { model.selectedModuleID = AppModel.activitySelectionID } label: {
                     Label("活动记录", systemImage: "clock.arrow.circlepath")
-                        .font(.system(size: 14, weight: .medium))
-                        .padding(.vertical, 6)
-                        .tag(AppModel.activitySelectionID)
-                        .accessibilityIdentifier("navigation.activity")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(8)
+                        .contentShape(Rectangle())
+                        .background(model.selectedModuleID == AppModel.activitySelectionID ? Design.Palette.accent.opacity(0.12) : .clear,
+                                    in: .rect(cornerRadius: 6))
                 }
-                Section {
-                    ModuleSidebarFilterBar(selection: $sidebarFilter, sortOrder: $sortOrder,
-                                           counts: filterCounts, resultCount: resultCount)
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                }
+                .accessibilityAddTraits(model.selectedModuleID == AppModel.activitySelectionID ? .isSelected : [])
+                .accessibilityIdentifier("navigation.activity")
+            }
+            .font(.system(size: 14, weight: .medium))
+            .buttonStyle(.plain)
+            .padding(.horizontal, 8)
+            .padding(.top, 8)
+
+            ModuleSidebarFilterBar(selection: $sidebarFilter, sortOrder: $sortOrder,
+                                   searchText: $searchText,
+                                   counts: filterCounts, resultCount: resultCount)
+                .padding(.horizontal, 14)
+                .padding(.top, 8)
+
+            List(selection: $model.selectedModuleID) {
                 if combinedModuleEnabled {
                     Section {
                         CombinedModuleRow()
@@ -88,7 +103,7 @@ struct ModuleSidebarView: View {
 
     private var emptyStateDescription: String {
         if allModulesAreEmpty { return "添加第一个更新地址，或扫描现有本地模块。" }
-        if sidebarFilter != .all { return "可点击“清除筛选”或“全部”查看所有模块。" }
+        if sidebarFilter != .all { return "可点击“重置”清除筛选与搜索，或切换“全部”筛选。" }
         if hasSearchQuery { return "换个关键词试试。" }
         return "可切换“全部”或其他筛选条件。"
     }
@@ -150,6 +165,8 @@ struct ModuleSidebarView: View {
                 Button("在访达中显示") { revealModuleInFinder(module) }
             }
             Button("更新") { model.startUpdate(moduleID: module.id) }
+                .disabled(!model.updateAdmission(for: module).isAccepted)
+                .help(model.updateAdmission(for: module).message)
             Button("复制模块") { try? model.duplicateModule(id: module.id) }
             Button("拷贝更新地址") { copyToPasteboard(module.updateSourceURL) }
             Button("拷贝输出路径") { copyToPasteboard(module.publishedRelativePath) }
@@ -254,6 +271,7 @@ private struct ModuleSidebarSectionHeader: View {
         .buttonStyle(.plain)
         .help(isExpanded ? "收起\(title)" : "展开\(title)")
         .accessibilityLabel("\(isExpanded ? "收起" : "展开")\(title)")
+        .accessibilityValue("\(count) 个模块，\(isExpanded ? "已展开" : "已收起")")
     }
 }
 
@@ -272,11 +290,13 @@ private struct ModuleRow: View {
                 Text(module.name)
                     .font(.system(size: 14, weight: .medium))
                     .lineLimit(1)
+                    .help(module.name)
                 Text(subtitle)
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .contentTransition(.opacity)
+                    .help(subtitle)
             }
             Spacer(minLength: 4)
             ZStack {
@@ -304,6 +324,8 @@ private struct ModuleRow: View {
                 .labelsHidden()
                 .toggleStyle(.switch)
                 .controlSize(.mini)
+                .help("将 \(module.name) 包含在总模块中")
+                .accessibilityLabel("\(module.name) 参与总模块")
             }
         }
         .padding(.vertical, 7)
