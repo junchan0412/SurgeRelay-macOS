@@ -77,7 +77,7 @@ struct SettingsCredentialsView: View {
             if let result = connectionResult {
                 Label(result.message, systemImage: result.isError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
                     .font(.caption)
-                    .foregroundStyle(result.isError ? .red : .green)
+                    .foregroundStyle(result.isError ? Design.Palette.error : Design.Palette.success)
                     .textSelection(.enabled)
             }
         }
@@ -174,9 +174,9 @@ struct SettingsCredentialsView: View {
 
     private var githubTokenStorageColor: Color {
         switch model.githubTokenStorageStatus {
-        case .encrypted: .green
+        case .encrypted: Design.Palette.success
         case .notChecked, .notConfigured: .secondary
-        case .legacyConfigurationFallback, .memoryOnly, .unavailable: .orange
+        case .legacyConfigurationFallback, .memoryOnly, .unavailable: Design.Palette.warning
         }
     }
 
@@ -190,16 +190,16 @@ struct SettingsCredentialsView: View {
 
     private var webAccessTokenStorageColor: Color {
         switch model.webAccessTokenStorageStatus {
-        case .encrypted: .green
+        case .encrypted: Design.Palette.success
         case .notChecked, .notConfigured: .secondary
-        case .legacyConfigurationFallback, .memoryOnly, .unavailable: .orange
+        case .legacyConfigurationFallback, .memoryOnly, .unavailable: Design.Palette.warning
         }
     }
 
     private func credentialProbeColor(_ state: LocalCredentialProbeState) -> Color {
         switch state {
-        case .available: .green
-        case .unavailable: .orange
+        case .available: Design.Palette.success
+        case .unavailable: Design.Palette.warning
         case .checking, .notChecked: .secondary
         }
     }
@@ -216,7 +216,7 @@ struct SettingsCredentialsView: View {
                         ? "checkmark.circle.fill"
                         : (neutral ? "questionmark.circle" : "exclamationmark.triangle.fill")
                 )
-                .foregroundStyle(storedLocally ? .green : (neutral ? .secondary : .orange))
+                .foregroundStyle(storedLocally ? Design.Palette.success : (neutral ? .secondary : Design.Palette.warning))
                 Text(account)
                     .font(.caption2)
                     .foregroundStyle(.tertiary)

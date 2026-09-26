@@ -83,12 +83,14 @@ struct ModuleSidebarView: View {
                 }
             }
             .listStyle(.sidebar)
+            .scrollContentBackground(.hidden)
             .animation(.snappy(duration: 0.2), value: sections.map(\.id))
             .animation(.snappy(duration: 0.2), value: collapsedSectionIDsRaw)
         }
+        .background(Design.Palette.canvas)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             ModuleSidebarStatusCard()
-                .background(.bar)
+                .background(Design.Palette.canvas)
         }
         .searchable(text: $searchText, placement: .sidebar, prompt: "搜索模块")
     }
@@ -148,7 +150,7 @@ struct ModuleSidebarView: View {
                 module: module,
                 isSelected: model.selectedModuleID == module.id,
                 combinedModuleEnabled: combinedModuleEnabled,
-                onIncludedChange: { @MainActor included in
+                onIncludedChange: { @MainActor @Sendable included in
                     model.setModuleIncludedInCombined(id: module.id, included: included)
                 }
             )
@@ -281,7 +283,7 @@ private struct ModuleRow: View {
     let module: RelayModule
     let isSelected: Bool
     let combinedModuleEnabled: Bool
-    let onIncludedChange: @MainActor (Bool) -> Void
+    let onIncludedChange: @MainActor @Sendable (Bool) -> Void
 
     var body: some View {
         HStack(spacing: 10) {

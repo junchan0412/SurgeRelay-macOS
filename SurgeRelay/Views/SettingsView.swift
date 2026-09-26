@@ -34,6 +34,8 @@ struct SettingsView: View {
                 }
             }
             .listStyle(.sidebar)
+            .scrollContentBackground(.hidden)
+            .background(Design.Palette.canvas)
             .navigationSplitViewColumnWidth(min: 160, ideal: 180, max: 190)
         } detail: {
             VStack(alignment: .leading, spacing: 0) {
@@ -48,6 +50,7 @@ struct SettingsView: View {
             .background(Design.Palette.canvas)
         }
         .navigationSplitViewStyle(.balanced)
+        .background(Design.Palette.canvas)
         .frame(minWidth: 760, minHeight: 480)
         .tint(Design.Palette.accent)
         .task {

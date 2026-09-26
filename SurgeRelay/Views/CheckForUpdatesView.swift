@@ -106,7 +106,7 @@ struct CheckForUpdatesSheet: View {
     private func failureView(_ message: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Label("无法读取最新版本", systemImage: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
+                .foregroundStyle(Design.Palette.warning)
                 .font(.headline)
             Text(message)
                 .foregroundStyle(.secondary)
@@ -189,7 +189,7 @@ struct CheckForUpdatesSheet: View {
             Text("安装建议")
                 .font(.headline)
             Label(guidance.updateRecommendation, systemImage: guidance.updateSystemImage)
-                .foregroundStyle(guidance.updateNeedsAttention ? .orange : .secondary)
+                .foregroundStyle(guidance.updateNeedsAttention ? Design.Palette.warning : .secondary)
             Label(guidance.firstInstallRecommendation, systemImage: "arrow.down.app")
                 .foregroundStyle(.secondary)
             Label(guidance.trustNotice, systemImage: "exclamationmark.triangle")
@@ -223,8 +223,8 @@ struct CheckForUpdatesSheet: View {
 
     private func checksumValidationColor(_ status: ReleaseAssetChecksumStatus) -> Color {
         switch status {
-        case .matched: .green
-        case .missingChecksum, .missingDigest, .mismatched, .unreadable: .orange
+        case .matched: Design.Palette.success
+        case .missingChecksum, .missingDigest, .mismatched, .unreadable: Design.Palette.warning
         }
     }
 
@@ -248,8 +248,8 @@ private enum UpdateCheckPhase {
 private extension ReleaseUpdateAvailability {
     var color: Color {
         switch self {
-        case .newerAvailable: .blue
-        case .upToDate: .green
+        case .newerAvailable: Design.Palette.accent
+        case .upToDate: Design.Palette.success
         case .olderThanCurrent, .unknown: .secondary
         }
     }

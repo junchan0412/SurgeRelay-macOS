@@ -30,7 +30,7 @@ struct ModuleEditorPreviewCard: View {
                     .textSelection(.enabled)
                 Label(iconSourceTitle, systemImage: iconIsInvalid ? "exclamationmark.triangle" : "photo")
                     .font(.caption)
-                    .foregroundStyle(iconIsInvalid ? .orange : .secondary)
+                    .foregroundStyle(iconIsInvalid ? Design.Palette.warning : .secondary)
             }
             Spacer(minLength: 0)
         }
@@ -165,7 +165,7 @@ struct ModuleEditorOutputPathRow: View {
             if let notice {
                 Label(notice.message, systemImage: notice.isWarning ? "exclamationmark.triangle" : "info.circle")
                     .font(.caption)
-                    .foregroundStyle(notice.isWarning ? .orange : .secondary)
+                    .foregroundStyle(notice.isWarning ? Design.Palette.warning : .secondary)
             }
         }
     }
@@ -277,12 +277,12 @@ struct DraftModuleIconPreview: View {
     private func previewContainer<Content: View>(_ content: Content, isWarning: Bool) -> some View {
         content
         .frame(width: size, height: size)
-        .background(.quaternary.opacity(0.35), in: iconShape)
+        .background(Design.Palette.surface, in: iconShape)
         .clipShape(iconShape)
         .overlay {
             iconShape
                 .strokeBorder(
-                    isWarning ? Color.orange.opacity(0.72) : Color(nsColor: .separatorColor).opacity(0.45),
+                    isWarning ? Design.Palette.warning.opacity(0.72) : Design.Palette.stroke,
                     lineWidth: isWarning ? 1 : 0.5
                 )
         }
@@ -291,14 +291,14 @@ struct DraftModuleIconPreview: View {
     private var placeholder: some View {
         Image(systemName: isInvalid ? "exclamationmark.triangle" : "photo")
             .font(.system(size: size * 0.45))
-            .foregroundStyle(isInvalid ? .orange : .secondary)
+            .foregroundStyle(isInvalid ? Design.Palette.warning : Design.Palette.icon)
             .frame(width: size, height: size)
     }
 
     private var warningPlaceholder: some View {
         Image(systemName: "exclamationmark.triangle")
             .font(.system(size: size * 0.45))
-            .foregroundStyle(.orange)
+            .foregroundStyle(Design.Palette.warning)
             .frame(width: size, height: size)
     }
 

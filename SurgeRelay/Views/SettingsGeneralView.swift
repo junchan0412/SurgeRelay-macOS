@@ -183,7 +183,7 @@ struct SettingsGeneralView: View {
             }
             if let error = model.upstreamState.lastError {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Design.Palette.warning)
                     .textSelection(.enabled)
             }
         }

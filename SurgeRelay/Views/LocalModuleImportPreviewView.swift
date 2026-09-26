@@ -89,7 +89,7 @@ struct LocalModuleImportPreviewView: View {
                 Spacer()
                 Text(selectionSummary)
                     .font(.caption)
-                    .foregroundStyle(hasInvalidSelection ? .red : .secondary)
+                    .foregroundStyle(hasInvalidSelection ? Design.Palette.error : .secondary)
                 Button("取消", role: .cancel) { dismiss() }
                 Button("导入") {
                     Task { await importSelectedCandidates() }
@@ -106,9 +106,9 @@ struct LocalModuleImportPreviewView: View {
         HStack(alignment: .center, spacing: 14) {
             Image(systemName: "tray.and.arrow.down")
                 .font(.system(size: 28, weight: .semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Design.Palette.icon)
                 .frame(width: 52, height: 52)
-                .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(Design.Palette.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             VStack(alignment: .leading, spacing: 8) {
                 Text("本地模块扫描")
                     .font(.title3.weight(.semibold))
@@ -175,9 +175,9 @@ struct LocalModuleImportPreviewView: View {
 
             Image(systemName: "doc.text")
                 .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(isSelected ? .secondary : .tertiary)
+                .foregroundStyle(isSelected ? Design.Palette.icon : Design.Palette.icon.opacity(0.6))
                 .frame(width: 34, height: 34)
-                .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(Design.Palette.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .padding(.top, 7)
 
             VStack(alignment: .leading, spacing: 10) {
@@ -264,10 +264,10 @@ struct LocalModuleImportPreviewView: View {
         Label(title, systemImage: systemImage)
             .font(.caption)
             .lineLimit(1)
-            .foregroundStyle(isWarning ? .orange : .secondary)
+            .foregroundStyle(isWarning ? Design.Palette.warning : .secondary)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(.quaternary.opacity(0.45), in: Capsule())
+            .background(Design.Palette.surface, in: Capsule())
     }
 
     private func importSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {

@@ -17,7 +17,7 @@ struct ModuleCodeSearchBar: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(.bar)
+        .background(Design.Palette.canvas)
         .overlay(alignment: .bottom) { Divider() }
         .onChange(of: controller.focusTarget) { _, target in
             guard let target else { return }
@@ -43,7 +43,7 @@ struct ModuleCodeSearchBar: View {
                 .accessibilityIdentifier("moduleCodeFindField")
             Text(controller.matchSummary)
                 .font(.caption.monospacedDigit())
-                .foregroundStyle(controller.hasInvalidRegularExpression ? .orange : .secondary)
+                .foregroundStyle(controller.hasInvalidRegularExpression ? Design.Palette.warning : .secondary)
                 .frame(minWidth: 84, alignment: .leading)
                 .help("查找最多高亮前 5,000 处；全部替换会处理整篇文档。")
                 .accessibilityIdentifier("moduleCodeMatchSummary")

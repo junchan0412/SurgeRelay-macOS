@@ -36,7 +36,7 @@ struct ModuleEditorBasicInfoSection: View {
             ) {
                 Text(relationshipIsWarning ? relationshipHint : initialSource.title)
                     .font(.caption)
-                    .foregroundStyle(relationshipIsWarning ? .orange : .secondary)
+                    .foregroundStyle(relationshipIsWarning ? Design.Palette.warning : .secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             ModuleEditorTextFieldRow(title: "模块标签", icon: "tag", text: $category, prompt: "Surge category，例如：广告过滤")
@@ -85,7 +85,7 @@ struct ModuleEditorIconSection: View {
             ModuleEditorInfoRow(customIconInputIsInvalid ? "检查" : "兼容性", icon: customIconInputIsInvalid ? "exclamationmark.triangle" : "info.circle") {
                 Text(iconURLHint)
                     .font(.caption)
-                    .foregroundStyle(customIconInputIsInvalid ? .orange : .secondary)
+                    .foregroundStyle(customIconInputIsInvalid ? Design.Palette.warning : .secondary)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
             }

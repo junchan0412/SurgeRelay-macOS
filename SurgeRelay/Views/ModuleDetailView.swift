@@ -210,7 +210,7 @@ struct ModuleDetailView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(alignment: .center, spacing: 8) {
                         Label("更新失败", systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.red)
+                            .foregroundStyle(Design.Palette.error)
                         Spacer(minLength: 0)
                         TextCopyButton(text: error, title: "复制错误")
                     }
@@ -225,7 +225,7 @@ struct ModuleDetailView: View {
         if module.hasOverrideConflict {
             detailSection("本地编辑冲突") {
                 Label("上游模块已经变化，本地编辑仍在使用。请前往“预览”比较后决定保留或恢复。", systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Design.Palette.warning)
             }
         }
 
@@ -233,7 +233,7 @@ struct ModuleDetailView: View {
             detailSection("本地与 GitHub 内容冲突") {
                 VStack(alignment: .leading, spacing: 10) {
                     Label("检测到本地发布文件与 GitHub 文件内容不同。请选择要保留的版本。", systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Design.Palette.warning)
                     Text("本地最后更新：\(conflict.localUpdatedAtText)")
                     Text("GitHub 最后更新：\(conflict.githubUpdatedAtText)")
                     HStack {

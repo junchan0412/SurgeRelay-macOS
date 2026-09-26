@@ -37,7 +37,7 @@ struct ModulePreviewPane: View {
             if currentModule.hasOverrideConflict {
                 HStack(spacing: 10) {
                     Label("上游内容已变化，请确认本地编辑", systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Design.Palette.warning)
                     Spacer()
                     Button("比较…") { showsComparison = true }
                     Button("保留本地编辑") {
@@ -45,7 +45,7 @@ struct ModulePreviewPane: View {
                     }
                 }
                 .padding(10)
-                .background(.orange.opacity(0.08))
+                .background(Design.Palette.warning.opacity(0.08))
                 Divider()
             }
             if editor.isFindBarPresented {
@@ -68,11 +68,11 @@ struct ModulePreviewPane: View {
                 } action: { _, viewport in
                     editor.updateViewport(viewport)
                 }
-                .background(Color(nsColor: .textBackgroundColor))
+                .background(Design.Palette.canvas)
                 if isLoading {
                     ProgressView("正在载入模块内容…")
                         .padding(16)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                        .background(Design.Palette.surface, in: RoundedRectangle(cornerRadius: 8))
                 } else if text.isEmpty, let loadErrorMessage {
                     ContentUnavailableView {
                         Label("暂时无法显示模块内容", systemImage: "doc.text.magnifyingglass")
@@ -282,7 +282,7 @@ struct CombinedPreviewPane: View {
             } action: { _, viewport in
                 editor.updateViewport(viewport)
             }
-            .background(Color(nsColor: .textBackgroundColor))
+            .background(Design.Palette.canvas)
         }
         .overlay {
             if !isLoading, text.isEmpty {
@@ -381,11 +381,11 @@ struct ModuleTextEditorView: View {
                 } action: { _, viewport in
                     editor.updateViewport(viewport)
                 }
-                .background(Color(nsColor: .textBackgroundColor))
+                .background(Design.Palette.canvas)
                 if isLoading {
                     ProgressView("正在载入模块内容…")
                         .padding(16)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                        .background(Design.Palette.surface, in: RoundedRectangle(cornerRadius: 8))
                 } else if text.isEmpty, let loadErrorMessage {
                     ContentUnavailableView {
                         Label("暂时无法显示模块内容", systemImage: "doc.text.magnifyingglass")
@@ -403,7 +403,7 @@ struct ModuleTextEditorView: View {
                 if !isLoading, text != savedText {
                     Label("有尚未写入的修改", systemImage: "square.and.pencil")
                         .font(.caption)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Design.Palette.warning)
                 }
                 Spacer()
             }
