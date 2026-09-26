@@ -6,7 +6,7 @@
 
 | 项目 | 当前值 |
 | --- | --- |
-| 版本 | 2.2.0 (106) |
+| 版本 | 2.2.1 (107) |
 | macOS deployment target | 26.0 |
 | Swift | 6.0，strict concurrency complete |
 
@@ -41,9 +41,9 @@
 | Swift 测试文件（unit / UI） | 47 / 1 |
 | 源码中的 XCTest 方法 | 364 |
 | Services / Models / Views / Utilities / App-Core | 63 / 20 / 33 / 3 / 23 |
-| 应用 Swift 行数 | 23,299 |
+| 应用 Swift 行数 | 23,312 |
 | 测试 Swift 行数 | 9,331 |
-| CHANGELOG release 段落 | 106 |
+| CHANGELOG release 段落 | 107 |
 
 ## 主要维护热点
 
@@ -51,7 +51,7 @@
 
 | 文件 | 行数 |
 | --- | --- |
-| SurgeRelay/Views/ModuleCodeTextView.swift | 763 |
+| SurgeRelay/Views/ModuleCodeTextView.swift | 764 |
 | SurgeRelay/Utilities/ModuleMetadataParser.swift | 517 |
 | SurgeRelay/Views/ModulePreviewViews.swift | 473 |
 | SurgeRelay/Views/ModuleCodeEditorController.swift | 468 |
@@ -59,8 +59,8 @@
 | SurgeRelay/Models/RelayModule.swift | 436 |
 | SurgeRelay/Services/EmbeddedScriptHubEngine.swift | 397 |
 | SurgeRelay/Views/ModuleDetailView.swift | 393 |
-| SurgeRelay/Views/ModuleSidebarView.swift | 367 |
-| SurgeRelay/Views/Components.swift | 351 |
+| SurgeRelay/Views/ModuleSidebarView.swift | 369 |
+| SurgeRelay/Views/Components.swift | 355 |
 
 ## 当前优化顺序
 
@@ -80,7 +80,7 @@ git diff --check
 node script/generate_project_status.mjs --check
 node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs
-VERSION=2.2.0 BUILD=106 ./script/check_release_configuration.sh
+VERSION=2.2.1 BUILD=107 ./script/check_release_configuration.sh
 
 DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
 xcodebuild test \

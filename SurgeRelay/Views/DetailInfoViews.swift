@@ -38,7 +38,7 @@ struct DetailInfoRow: View {
         HStack(alignment: .top, spacing: Design.Row.spacing) {
             Image(systemName: icon)
                 .font(.callout)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Design.Palette.icon)
                 .frame(width: Design.Row.iconWidth, alignment: .center)
             Text(label)
                 .font(.system(size: 13, weight: .medium))

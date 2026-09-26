@@ -54,13 +54,13 @@ struct SettingsWebManagementView: View {
                         model.webManagementAccessModeTitle,
                         systemImage: model.settings.webServerAllowRemoteAccess ? "network" : "desktopcomputer"
                     )
-                    .foregroundStyle(model.settings.webServerAllowRemoteAccess ? .orange : .secondary)
+                    .foregroundStyle(model.settings.webServerAllowRemoteAccess ? Design.Palette.warning : .secondary)
                 }
             }
             if let failure = model.webServerState.failureMessage {
                 Label(failure, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Design.Palette.error)
                     .textSelection(.enabled)
             }
         }
@@ -89,7 +89,7 @@ struct SettingsWebManagementView: View {
                 if model.settings.webServerAllowRemoteAccess {
                     Label("局域网访问会暴露模块管理入口，请只在可信网络中启用。", systemImage: "lock.open.fill")
                         .font(.caption)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Design.Palette.warning)
                 }
             } else {
                 Text("启用 Web 管理后会显示访问地址。")
@@ -100,8 +100,8 @@ struct SettingsWebManagementView: View {
 
     private var webServerStateColor: Color {
         switch model.webServerState {
-        case .running: .green
-        case .failed: .red
+        case .running: Design.Palette.success
+        case .failed: Design.Palette.error
         case .starting, .stopped: .secondary
         }
     }

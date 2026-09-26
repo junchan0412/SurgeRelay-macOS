@@ -121,7 +121,7 @@ struct SettingsPublishingView: View {
             }
             SettingsInfoRow("写入权限", icon: diagnostics.isWritable ? "pencil" : "lock.fill") {
                 Label(diagnostics.isWritable ? "可写" : "不可写", systemImage: diagnostics.isWritable ? "pencil" : "lock.fill")
-                    .foregroundStyle(diagnostics.isWritable ? .green : .orange)
+                    .foregroundStyle(diagnostics.isWritable ? Design.Palette.success : Design.Palette.warning)
             }
             SettingsCopyableInfoRow(
                 "目录内容",
@@ -131,7 +131,7 @@ struct SettingsPublishingView: View {
             if let error = diagnostics.error {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Design.Palette.warning)
                     .textSelection(.enabled)
             }
             HStack(spacing: 8) {
@@ -155,8 +155,8 @@ struct SettingsPublishingView: View {
 
     private func localRootDiagnosticColor(_ diagnostics: LocalModuleRootDiagnosticSnapshot) -> Color {
         diagnostics.exists && diagnostics.isDirectory && diagnostics.isWritable && diagnostics.error == nil
-            ? .green
-            : .orange
+            ? Design.Palette.success
+            : Design.Palette.warning
     }
 
     private func githubBinding(_ keyPath: WritableKeyPath<GitHubSettings, String>) -> Binding<String> {

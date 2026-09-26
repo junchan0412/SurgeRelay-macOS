@@ -60,20 +60,20 @@ struct ModuleIconView: View {
             .resizable()
             .scaledToFill()
             .frame(width: size, height: size)
-            .background(.quaternary.opacity(0.35), in: iconShape)
+            .background(Design.Palette.surface, in: iconShape)
             .clipShape(iconShape)
             .overlay {
                 iconShape
-                    .stroke(Color(nsColor: .separatorColor).opacity(0.45), lineWidth: 0.5)
+                    .stroke(Design.Palette.stroke, lineWidth: Design.Separator.hairline)
             }
     }
 
     private var placeholder: some View {
         Image(systemName: "shippingbox")
             .font(.system(size: size * 0.48, weight: .regular))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Design.Palette.icon)
             .frame(width: size, height: size)
-            .background(.quaternary.opacity(0.55), in: iconShape)
+            .background(Design.Palette.surface, in: iconShape)
     }
 
     private var iconShape: RoundedRectangle {
@@ -186,10 +186,10 @@ struct SheetActionFooter<Content: View>: View {
         .padding(.horizontal, Design.Spacing.xl)
         .padding(.vertical, Design.Spacing.md + 2)
         .frame(maxWidth: .infinity)
-        .background(.bar)
+        .background(Design.Palette.canvas)
         .overlay(alignment: .top) {
             Rectangle()
-                .fill(Design.Separator.color.opacity(0.14))
+                .fill(Design.Separator.color)
                 .frame(height: Design.Separator.hairline)
         }
     }
@@ -205,25 +205,29 @@ struct SheetActionFooter<Content: View>: View {
 enum Design {
     enum Palette {
         static let accent = adaptive(0x207566, 0x79CDBA)
-        // Neutral, faintly-cool grays (B ≥ G ≥ R by a hair) so custom regions sit
-        // naturally beside the neutral system chrome (sidebar, materials, code
-        // editor) instead of clashing with the old teal-tinted grays. canvas and
-        // surface are kept close in tone so cards read as gently raised, not as
-        // separate color zones.
-        static let canvas = adaptive(0xF4F5F7, 0x1B1D20)
-        static let surface = adaptive(0xFFFFFF, 0x25272B)
-        static let stroke = adaptive(0xE3E5EA, 0x34373C)
+        static let canvas = adaptive(0xF2F2F2, 0x242424)
+        static let surface = adaptive(0xF8F8F8, 0x292929)
+        static let stroke = adaptive(0xDEDEDE, 0x383838)
+        static let icon = adaptive(0x62666A, 0xB2B6BA)
         static let success = adaptive(0x28734D, 0x81CCA0)
         static let warning = adaptive(0x9A5D13, 0xEDBE72)
         static let error = adaptive(0xB34036, 0xF59387)
 
+        static let nsCanvas = adaptiveNSColor(light: 0xF2F2F2, dark: 0x242424)
+        static let nsStroke = adaptiveNSColor(light: 0xDEDEDE, dark: 0x383838)
+        static let nsAccent = adaptiveNSColor(light: 0x207566, dark: 0x79CDBA)
+
         private static func adaptive(_ light: UInt32, _ dark: UInt32) -> Color {
-            Color(nsColor: NSColor(name: nil) { appearance in
+            Color(nsColor: adaptiveNSColor(light: light, dark: dark))
+        }
+
+        private static func adaptiveNSColor(light: UInt32, dark: UInt32) -> NSColor {
+            NSColor(name: nil) { appearance in
                 let value = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : light
                 return NSColor(srgbRed: CGFloat((value >> 16) & 0xFF) / 255,
                                green: CGFloat((value >> 8) & 0xFF) / 255,
                                blue: CGFloat(value & 0xFF) / 255, alpha: 1)
-            })
+            }
         }
     }
 
@@ -246,8 +250,8 @@ enum Design {
     }
 
     enum Separator {
-        static let color = Color(nsColor: .separatorColor)
-        static let opacity: Double = 0.16
+        static let color = Design.Palette.stroke
+        static let opacity: Double = 1
         static let hairline: CGFloat = 0.5
     }
 
@@ -281,7 +285,7 @@ enum SemanticStatus {
     var color: Color {
         switch self {
         case .neutral: .secondary
-        case .info: .blue
+        case .info: Design.Palette.accent
         case .success: Design.Palette.success
         case .warning: Design.Palette.warning
         case .error: Design.Palette.error

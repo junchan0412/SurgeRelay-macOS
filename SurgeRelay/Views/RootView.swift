@@ -7,6 +7,7 @@ struct RootView: View {
 
     var body: some View {
         ModulesView()
+            .background(Design.Palette.canvas)
             .background(MainWindowCloseBehavior())
             .tint(Design.Palette.accent)
             .transaction { transaction in

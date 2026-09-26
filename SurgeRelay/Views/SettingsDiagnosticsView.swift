@@ -49,7 +49,7 @@ struct SettingsDiagnosticsView: View {
                     diagnostics.sparkleAutomaticChecksEnabled ? "开启" : "关闭",
                     systemImage: diagnostics.sparkleAutomaticChecksEnabled ? "checkmark.circle.fill" : "pause.circle"
                 )
-                .foregroundStyle(diagnostics.sparkleAutomaticChecksEnabled ? .green : .secondary)
+                .foregroundStyle(diagnostics.sparkleAutomaticChecksEnabled ? Design.Palette.success : .secondary)
             }
             if let feedURL = diagnostics.sparkleFeedURL {
                 SettingsCopyableInfoRow(

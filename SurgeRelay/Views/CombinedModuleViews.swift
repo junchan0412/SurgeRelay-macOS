@@ -6,14 +6,15 @@ struct CombinedModuleRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image("SummaryIcon")
-                .resizable()
-                .scaledToFit()
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .font(.system(size: 17))
+                .foregroundStyle(Design.Palette.icon)
                 .frame(width: 32, height: 32)
+                .background(Design.Palette.surface)
                 .clipShape(summaryIconShape)
                 .overlay {
                     summaryIconShape
-                        .stroke(Color(nsColor: .separatorColor).opacity(0.45), lineWidth: 0.5)
+                        .stroke(Design.Palette.stroke, lineWidth: Design.Separator.hairline)
                 }
             VStack(alignment: .leading, spacing: 3) {
                 Text("Surge Relay 汇总")
@@ -59,10 +60,11 @@ struct CombinedModuleDetailView: View {
 
     private var summaryHeader: some View {
         HStack(alignment: .center, spacing: 16) {
-            Image("SummaryIcon")
-                .resizable()
-                .scaledToFit()
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .font(.system(size: 28))
+                .foregroundStyle(Design.Palette.icon)
                 .frame(width: 56, height: 56)
+                .background(Design.Palette.surface)
                 .clipShape(RoundedRectangle(cornerRadius: 56 * ModuleIconView.cornerRadiusRatio, style: .continuous))
             VStack(alignment: .leading, spacing: 8) {
                 Text("Surge Relay 汇总")
@@ -197,10 +199,10 @@ struct CombinedModuleDetailView: View {
         Label(title, systemImage: systemImage)
             .font(.caption)
             .lineLimit(1)
-            .foregroundStyle(isWarning ? .orange : .secondary)
+            .foregroundStyle(isWarning ? Design.Palette.warning : .secondary)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(.quaternary.opacity(0.45), in: Capsule())
+            .background(Design.Palette.surface, in: Capsule())
     }
 
     private func detailSection<Content: View>(_ title: String, @ViewBuilder content: @escaping () -> Content) -> some View {
@@ -256,7 +258,7 @@ private struct PublishPreviewSummaryView: View {
         VStack(alignment: .leading, spacing: 5) {
             Label("\(title) \(files.count) 个文件", systemImage: isDestructive ? "trash" : "arrow.up.doc")
                 .font(.caption.weight(.medium))
-                .foregroundStyle(isDestructive ? .orange : .primary)
+                .foregroundStyle(isDestructive ? Design.Palette.warning : .primary)
             ForEach(Array(files.prefix(8)), id: \.self) { file in
                 Text(file)
                     .font(.caption2.monospaced())
@@ -283,7 +285,7 @@ private func publishFileList(
             VStack(alignment: .leading, spacing: 5) {
                 Label("\(title) \(files.count) 个文件", systemImage: systemImage)
                     .font(.caption.weight(.medium))
-                    .foregroundStyle(isDestructive ? .orange : .primary)
+                    .foregroundStyle(isDestructive ? Design.Palette.warning : .primary)
                 ForEach(Array(files.prefix(10)), id: \.self) { file in
                     Text(file)
                         .font(.caption2.monospaced())

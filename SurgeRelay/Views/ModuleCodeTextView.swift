@@ -306,7 +306,7 @@ final class GutterView: NSView {
         // and draw text upright without flipping the CTM.
         let height = size.height
 
-        NSColor.controlBackgroundColor.setFill()
+        NSColor(Design.Palette.canvas).setFill()
         NSRect(origin: .zero, size: size).fill()
 
         let origin = textView.textContainerOrigin
@@ -353,7 +353,7 @@ final class GutterView: NSView {
             )
         }
 
-        NSColor.separatorColor.setFill()
+        Design.Palette.nsStroke.setFill()
         NSRect(x: Self.gutterWidth - 1, y: 0, width: 1, height: size.height).fill()
 
         NSGraphicsContext.current = previous
@@ -451,6 +451,7 @@ struct ModuleCodeTextView: NSViewRepresentable {
         )
         textView.delegate = context.coordinator
         textView.isRichText = false
+        textView.backgroundColor = NSColor(Design.Palette.canvas)
         textView.isEditable = isEditable
         textView.isSelectable = true
         textView.allowsUndo = true
@@ -675,18 +676,18 @@ struct ModuleCodeTextView: NSViewRepresentable {
                 .foregroundColor: NSColor.secondaryLabelColor,
             ], to: textStorage)
             apply(expression: Self.subscribedExpression, attributes: [
-                .foregroundColor: NSColor.systemBlue,
+                .foregroundColor: Design.Palette.nsAccent,
                 .font: NSFont.monospacedSystemFont(ofSize: 13, weight: .semibold),
             ], to: textStorage)
             apply(expression: Self.sectionExpression, attributes: [
-                .foregroundColor: NSColor.systemPurple,
+                .foregroundColor: Design.Palette.nsAccent,
                 .font: NSFont.monospacedSystemFont(ofSize: 13, weight: .semibold),
             ], to: textStorage)
             apply(expression: Self.metadataExpression, attributes: [
-                .foregroundColor: NSColor.systemTeal,
+                .foregroundColor: Design.Palette.nsAccent,
             ], to: textStorage)
             apply(expression: Self.urlExpression, attributes: [
-                .foregroundColor: NSColor.systemOrange,
+                .foregroundColor: NSColor.secondaryLabelColor,
             ], to: textStorage)
 
             applyModuleColors(
@@ -719,7 +720,7 @@ struct ModuleCodeTextView: NSViewRepresentable {
             selectedModuleID: UUID?,
             textStorage: NSTextStorage
         ) {
-            let palette: [NSColor] = [.systemBlue, .systemPurple, .systemOrange, .systemGreen, .systemPink, .systemTeal]
+            let palette: [NSColor] = [.controlAccentColor]
             let colors = Dictionary(uniqueKeysWithValues: modules.enumerated().map {
                 (ModuleMerger.toggleKey(for: $0.element), palette[$0.offset % palette.count])
             })

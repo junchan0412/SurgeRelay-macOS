@@ -264,7 +264,7 @@ private struct WorkspaceDestinationCard: View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(spacing: 10) {
-                    Image(systemName: symbol).font(.title3).foregroundStyle(Design.Palette.accent)
+                    Image(systemName: symbol).font(.title3).foregroundStyle(Design.Palette.icon)
                     Text(title).font(.system(size: 15, weight: .semibold))
                     Spacer()
                     Label(statusTitle, systemImage: enabled ? (configured ? "checkmark.circle.fill" : "exclamationmark.circle") : "circle")

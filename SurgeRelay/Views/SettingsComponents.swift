@@ -74,7 +74,7 @@ struct SettingsInfoRow<Content: View>: View {
         HStack(alignment: .top, spacing: Design.Row.spacing) {
             Image(systemName: icon)
                 .font(.callout)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Design.Palette.icon)
                 .frame(width: Design.Row.iconWidth, alignment: .center)
             Text(title)
                 .font(.system(size: 14, weight: .medium))
