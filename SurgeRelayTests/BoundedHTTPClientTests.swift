@@ -1,4 +1,5 @@
 import Foundation
+import Network
 import XCTest
 @testable import SurgeRelay
 
@@ -53,7 +54,12 @@ final class BoundedHTTPClientTests: XCTestCase {
 
     func testAlreadyCancelledRequestDoesNotStartNetwork() async throws {
         let fixture = HTTPFixture(data: Data("unused".utf8))
-        let (client, request) = makeRequest(fixture)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [BoundedFixtureProtocol.self]
+        let client = BoundedHTTPClient(configuration: configuration, validateRequest: { _ in
+            XCTFail("An already cancelled request must not run source validation")
+        })
+        let request = BoundedFixtureProtocol.register(fixture)
         let task = Task {
             withUnsafeCurrentTask { $0?.cancel() }
             return try await client.data(for: request)
@@ -63,10 +69,83 @@ final class BoundedHTTPClientTests: XCTestCase {
         BoundedFixtureProtocol.unregister(request)
     }
 
+    func testConfiguredResourceTimeoutStopsTricklingResponse() async throws {
+        let server = try TrickleHTTPServer()
+        defer { server.stop() }
+        let listening = expectation(description: "loopback server listening")
+        server.start { listening.fulfill() }
+        await fulfillment(of: [listening], timeout: 3)
+        let port = try XCTUnwrap(server.port)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.connectionProxyDictionary = [:]
+        configuration.timeoutIntervalForRequest = 10
+        configuration.timeoutIntervalForResource = 1
+        let client = BoundedHTTPClient(configuration: configuration)
+        let request = URLRequest(url: try XCTUnwrap(URL(string: "http://127.0.0.1:\(port)/trickle")), timeoutInterval: 10)
+
+        do {
+            _ = try await client.data(for: request)
+            XCTFail("A response that keeps sending bytes must still obey the total resource deadline")
+        } catch let error as URLError {
+            XCTAssertEqual(error.code, .timedOut)
+        }
+    }
+
     private func makeRequest(_ fixture: HTTPFixture, limit: Int = 1024) -> (BoundedHTTPClient, URLRequest) {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [BoundedFixtureProtocol.self]
         return (BoundedHTTPClient(maximumResponseSize: limit, configuration: configuration), BoundedFixtureProtocol.register(fixture))
+    }
+}
+
+private final class TrickleHTTPServer: @unchecked Sendable {
+    private let listener: NWListener
+    private let queue = DispatchQueue(label: "SurgeRelayTests.TrickleHTTPServer")
+    private var connections: [NWConnection] = []
+    private var stopped = false
+
+    var port: UInt16? { listener.port?.rawValue }
+
+    init() throws {
+        let parameters = NWParameters.tcp
+        parameters.requiredLocalEndpoint = .hostPort(host: .ipv4(.loopback), port: .any)
+        listener = try NWListener(using: parameters)
+    }
+
+    func start(onReady: @escaping @Sendable () -> Void) {
+        listener.stateUpdateHandler = { if case .ready = $0 { onReady() } }
+        listener.newConnectionHandler = { [weak self] connection in
+            guard let self, !self.stopped else { connection.cancel(); return }
+            self.connections.append(connection)
+            connection.start(queue: self.queue)
+            connection.receive(minimumIncompleteLength: 1, maximumLength: 4096) { [weak self] _, _, _, error in
+                guard error == nil else { return }
+                let header = Data("HTTP/1.1 200 OK\r\nContent-Length: 50\r\nConnection: close\r\n\r\n".utf8)
+                connection.send(content: header, completion: .contentProcessed { [weak self] error in
+                    if error == nil { self?.sendByte(connection, remaining: 50) }
+                })
+            }
+        }
+        listener.start(queue: queue)
+    }
+
+    func stop() {
+        queue.sync {
+            stopped = true
+            listener.cancel()
+            connections.forEach { $0.cancel() }
+            connections.removeAll()
+        }
+    }
+
+    private func sendByte(_ connection: NWConnection, remaining: Int) {
+        guard !stopped, remaining > 0 else { connection.cancel(); return }
+        connection.send(content: Data([120]), completion: .contentProcessed { [weak self] error in
+            guard let self, error == nil else { return }
+            self.queue.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                self?.sendByte(connection, remaining: remaining - 1)
+            }
+        })
     }
 }
 

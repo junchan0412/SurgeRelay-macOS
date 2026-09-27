@@ -128,6 +128,22 @@ final class ModulePlanningTests: XCTestCase {
         XCTAssertEqual(BoundedRemoteDataFetcherURLProtocol.requestedTimeouts, [3])
     }
 
+    func testAlreadyCancelledBoundedFetcherSkipsSourceValidation() async throws {
+        let fetcher = BoundedRemoteDataFetcher(maximumResponseSize: 64, timeoutInterval: 1)
+        let request = URLRequest(url: try XCTUnwrap(URL(string: "http://127.0.0.1/private.sgmodule")))
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try await fetcher.data(for: request)
+        }
+
+        do {
+            _ = try await task.value
+            XCTFail("An already cancelled fetch must not succeed")
+        } catch {
+            XCTAssertTrue(error is CancellationError)
+        }
+    }
+
     func testBoundedRemoteDataFetcherRejectsLargeBodyWithoutContentLength() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [BoundedRemoteDataFetcherURLProtocol.self]

@@ -22,17 +22,9 @@ extension AppModel {
                 try? await Task.sleep(for: .milliseconds(250))
             }
             guard !Task.isCancelled else { return }
-            let runAdmission = AutomaticPublishPlanner.runAdmission(
-                context: self.automaticPublishContext(),
-                plan: self.githubPublishPlan,
-                hasCachedStandaloneOutput: await self.hasAnyCachedGitHubStandaloneOutput()
-            )
-            guard runAdmission.isAccepted else {
-                self.applyAutomaticPublishAdmission(runAdmission)
-                return
-            }
-            self.clearAutomaticPublishSchedule()
-            self.beginWork(.automaticPublishing)
+            guard await self.beginAutomaticPublish(hasCachedStandaloneOutput: {
+                await self.hasAnyCachedGitHubStandaloneOutput()
+            }) else { return }
             defer {
                 self.endWork(.automaticPublishing)
                 self.automaticPublishTask = nil
@@ -61,6 +53,27 @@ extension AppModel {
                 self.presentedError = "GitHub 自动发布失败：\(error.localizedDescription)"
             }
         }
+    }
+
+    func beginAutomaticPublish(hasCachedStandaloneOutput: () async -> Bool) async -> Bool {
+        let hasCachedOutput = await hasCachedStandaloneOutput()
+        guard !Task.isCancelled else { return false }
+        guard !isWorking else {
+            scheduleAutomaticPublish()
+            return false
+        }
+        let admission = AutomaticPublishPlanner.runAdmission(
+            context: automaticPublishContext(),
+            plan: githubPublishPlan,
+            hasCachedStandaloneOutput: hasCachedOutput
+        )
+        guard admission.isAccepted else {
+            applyAutomaticPublishAdmission(admission)
+            return false
+        }
+        clearAutomaticPublishSchedule()
+        beginWork(.automaticPublishing)
+        return true
     }
 
     func cancelAutomaticPublishSchedule() {

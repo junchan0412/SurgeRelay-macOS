@@ -200,6 +200,23 @@ final class LocalSourceSyncPlannerTests: XCTestCase {
         )
     }
 
+    func testContentHashesSkipOversizedFiles() throws {
+        let source = FileManager.default.temporaryDirectory
+            .appending(path: "LocalSourceSyncOversized-\(UUID().uuidString).sgmodule")
+        XCTAssertTrue(FileManager.default.createFile(atPath: source.path, contents: nil))
+        defer { try? FileManager.default.removeItem(at: source) }
+        let file = try FileHandle(forWritingTo: source)
+        try file.truncate(atOffset: UInt64(20 * 1024 * 1024 + 1))
+        try file.close()
+        let oversized = module(name: "Oversized", sourceURL: source.absoluteString)
+
+        let hashes = LocalSourceSyncPlanner.contentHashes(
+            for: LocalSourceSyncPlanner.sourceFiles(in: [oversized])
+        )
+
+        XCTAssertNil(hashes[oversized.id])
+    }
+
     func testDetectedStatusNamesTheSingleChangedModule() {
         XCTAssertEqual(
             LocalSourceSyncPlanner.detectedStatus(changedCount: 1, firstModuleName: "Applications"),

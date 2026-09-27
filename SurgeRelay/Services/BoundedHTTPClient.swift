@@ -9,7 +9,7 @@ final class BoundedHTTPClient: Sendable {
         delegate = ResponseDelegate(maximumSize: maximumResponseSize, validateRequest: validateRequest)
         let configuration = configuration.copy() as! URLSessionConfiguration
         configuration.httpMaximumConnectionsPerHost = 4
-        configuration.timeoutIntervalForResource = 90
+        configuration.timeoutIntervalForResource = min(configuration.timeoutIntervalForResource, 90)
         session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
     }
 
@@ -18,6 +18,7 @@ final class BoundedHTTPClient: Sendable {
     }
 
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        try Task.checkCancellation()
         try delegate.validateRequest(request)
         let cancellation = RequestCancellation()
         return try await withTaskCancellationHandler {

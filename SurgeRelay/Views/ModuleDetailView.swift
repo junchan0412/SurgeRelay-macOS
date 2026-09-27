@@ -245,6 +245,7 @@ struct ModuleDetailView: View {
                         }
                     }
                     .buttonStyle(.bordered)
+                    .disabled(model.isWorking)
                 }
                 .font(.caption)
             }

@@ -183,6 +183,117 @@ final class RelayRuntimeTests: XCTestCase {
         try await model.fileStore.removeComponent(id: module.id)
     }
 
+    func testAutomaticPublishWaitsWhenWorkStartsDuringCacheCheck() async throws {
+        guard AppRuntimeOptions.isUIQAMode else { throw XCTSkip("Requires isolated QA configuration") }
+        let model = automaticPublishingModel()
+        defer { model.cancelAutomaticPublishSchedule() }
+
+        let started = await model.beginAutomaticPublish {
+            model.beginWork(.updatingModules)
+            return true
+        }
+
+        XCTAssertFalse(started)
+        XCTAssertEqual(model.workActivity.kind, .updatingModules)
+        XCTAssertTrue(model.isWorking)
+        XCTAssertNotNil(model.automaticPublishRunsAt)
+    }
+
+    func testAutomaticPublishDoesNotStartAfterCacheCheckIsCancelled() async throws {
+        guard AppRuntimeOptions.isUIQAMode else { throw XCTSkip("Requires isolated QA configuration") }
+        let model = automaticPublishingModel()
+
+        let started = await Task { @MainActor in
+            await model.beginAutomaticPublish {
+                withUnsafeCurrentTask { $0?.cancel() }
+                return true
+            }
+        }.value
+
+        XCTAssertFalse(started)
+        XCTAssertFalse(model.workActivity.isActive)
+        XCTAssertFalse(model.isWorking)
+    }
+
+    func testAutomaticPublishRechecksSettingsAndSelectionAfterCacheCheck() async throws {
+        guard AppRuntimeOptions.isUIQAMode else { throw XCTSkip("Requires isolated QA configuration") }
+        let disabledModel = automaticPublishingModel()
+        let startedAfterDisabling = await disabledModel.beginAutomaticPublish {
+            disabledModel.settings.automaticallyPublish = false
+            return true
+        }
+        XCTAssertFalse(startedAfterDisabling)
+        XCTAssertFalse(disabledModel.isWorking)
+
+        let emptyModel = automaticPublishingModel()
+        let startedAfterRemovingSelection = await emptyModel.beginAutomaticPublish {
+            emptyModel.modules = []
+            return true
+        }
+        XCTAssertFalse(startedAfterRemovingSelection)
+        XCTAssertFalse(emptyModel.isWorking)
+        XCTAssertEqual(emptyModel.statusMessage, AutomaticPublishPlanner.noStandaloneModulesStatus)
+    }
+
+    private func automaticPublishingModel() -> AppModel {
+        let model = isolatedModel()
+        model.settings.publishToGitHub = true
+        model.settings.automaticallyPublish = true
+        model.settings.github.owner = "test-owner"
+        model.settings.github.repository = "test-repository"
+        model.githubToken = "isolated-test-token"
+        model.githubTokenStorageStatus = .memoryOnly
+        model.modules = [RelayModule(
+            name: "Automatic",
+            sourceURL: "https://test.invalid/automatic.sgmodule",
+            outputFileName: "Automatic",
+            publishesStandalone: true
+        )]
+        return model
+    }
+
+    func testSyncConflictResolutionCannotInterruptActiveWork() async throws {
+        guard AppRuntimeOptions.isUIQAMode else { throw XCTSkip("Requires isolated QA configuration") }
+        let model = isolatedModel()
+        let module = moduleWithSyncConflict()
+        model.modules = [module]
+        model.beginWork(.updatingModules)
+        let activity = model.workActivity
+
+        await model.resolveModuleSyncConflict(moduleID: module.id, resolution: .localWins)
+
+        XCTAssertEqual(model.workActivity, activity)
+        XCTAssertTrue(model.isWorking)
+        XCTAssertNil(model.presentedError)
+        XCTAssertEqual(model.modules, [module])
+        model.endWork(.updatingModules)
+    }
+
+    func testAlreadyCancelledSyncConflictResolutionDoesNotReadOrWriteFiles() async throws {
+        guard AppRuntimeOptions.isUIQAMode else { throw XCTSkip("Requires isolated QA configuration") }
+        let model = isolatedModel()
+        let module = moduleWithSyncConflict()
+        model.modules = [module]
+
+        await Task { @MainActor in
+            withUnsafeCurrentTask { $0?.cancel() }
+            await model.resolveModuleSyncConflict(moduleID: module.id, resolution: .localWins)
+        }.value
+
+        XCTAssertFalse(model.isWorking)
+        XCTAssertNil(model.presentedError)
+        XCTAssertEqual(model.modules, [module])
+    }
+
+    private func moduleWithSyncConflict() -> RelayModule {
+        var module = RelayModule(name: "Conflict", sourceURL: "https://test.invalid/source.sgmodule", outputFileName: UUID().uuidString)
+        module.syncConflict = ModuleSyncConflictMetadata(
+            localHash: "local", githubHash: "remote", localUpdatedAt: .now,
+            githubUpdatedAt: .now, detectedAt: .now
+        )
+        return module
+    }
+
     private func isolatedModel() -> AppModel {
         let model = AppModel()
         model.settings.publishToLocal = false

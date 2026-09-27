@@ -8,7 +8,7 @@ For the current version, capability summary, code metrics, optimization order, a
 The 2.0 refactor and reproducible validation are described in `docs/RELAY_2_0.md`.
 
 - `ModuleUpdatePipeline` bounds concurrency to four and restores source order. `AppModel+Updates` owns admission, cancellable preparation, aggregation and persistence; `AppModel+ModuleUpdate` owns one module's refresh. Keep cancellation and generation checks before cache/model commits.
-- `BoundedHTTPClient` reuses URLSession connections, limits bytes before appending, and propagates cancellation. Native conversion accepts the bytes already read by `SourceRevisionService`.
+- `BoundedHTTPClient` reuses URLSession connections, limits bytes before appending, and propagates cancellation. Preserve caller resource deadlines shorter than the 90-second cap, and check cancellation before source validation. Native conversion accepts the bytes already read by `SourceRevisionService`; local source hashing reuses its size-bounded reader.
 - `ModuleFileStore.commitConversion` stages `Content.cache` and `Assets` together and atomically replaces `Cache/Snapshots/<module-id>`. Legacy component/asset caches remain readable; manual overrides stay outside the snapshot. Normalize enumerated URLs before deriving relative paths on macOS (`/var` and `/private/var`).
 - Module summaries invalidate on `moduleRevision`; `WebModuleProjectionCache` also accounts for settings. The progress endpoint builds activity only. Asset fingerprints must remain byte-compatible with existing SHA-256 values.
 - `WorkspaceOverviewView`, `ActivityHistoryView`, `ModuleSidebarStatusCard` and `SettingsPage` define the new workspace. Keep list filtering/grouping off the main actor and keep editors lazy. Unsaved preview drafts are in-memory and are retained across module selection, not across app restarts.
@@ -53,27 +53,33 @@ Keep cross-service models in focused files rather than reintroducing a shared ca
 - `publishToLocal`
 - `publishToGitHub`
 
-Both can be enabled at the same time. Local export and GitHub publishing share `RelayModule.publishedRelativePath`, so folder handling must stay destination-neutral. When adding code that generates publish files, pass a `PublishDestination` so local self-export protection does not accidentally remove files from the GitHub publish set.
+Both can be enabled at the same time. Each module's `storageTargets` chooses local, GitHub, or both; publishing uses the intersection of those targets and the globally enabled destinations. Local export and GitHub publishing share `RelayModule.publishedRelativePath`, so folder handling must stay destination-neutral. When adding code that generates publish files, pass a `PublishDestination` so local self-export protection does not accidentally remove files from the GitHub publish set.
 
 Keep these two axes separate:
 
-- `RelayModule.storageLocation`: which destination owns the standalone output (`local` or `gitHub`).
+- `RelayModule.storageTargets`: the set of standalone output destinations (`local`, `gitHub`, or both).
 - `RelayModule.initialSource`: whether converted content contains a valid Script-Hub `#SUBSCRIBED originalURL` (subscribed), whether the module is updated from an HTTP/HTTPS remote address without that marker (remote), or whether a local file has no subscription metadata (self-authored).
 
-Resolve `#SUBSCRIBED` metadata from converted content, never from a user override. When it is present and valid, classify the module as subscribed and use `originalURL` for updates. When it is absent, classify an HTTP/HTTPS source as a remote source and only classify a local file as self-authored; do not label a remote update address as self-authored. A local file can restore a remote `originalURL` while still being managed as a local module. For local modules, preserve `localStorageRelativePath` whenever it is known.
+`RelayModule.storageLocation` is a compatibility accessor and persisted legacy field. It returns `.local` for dual-target modules, and assigning it replaces the target set with a single destination. New selection, grouping, and publishing code must use `storageTargets`, `hasLocalStorageTarget`, or `hasGitHubStorageTarget` so it cannot silently drop one destination.
 
-Treat local physical module metadata as authoritative for initial-source discovery and repair. Once a valid `#SUBSCRIBED originalURL` has been discovered, a later upstream/cache payload without that marker must not erase it: native upstream modules commonly omit the Script-Hub wrapper comment. Clear persisted subscription metadata only when the user changes the registered source. When `localStorageRelativePath` conflicts with a persisted GitHub storage value, the local path wins; when the exact path is missing, metadata recovery may uniquely match a sibling `.sgmodule` after normalizing spaces and hyphens, then persist the real relative path.
+Resolve `#SUBSCRIBED` metadata from converted content, never from a user override. When it is present and valid, classify the module as subscribed and use `originalURL` for updates. When it is absent, classify an HTTP/HTTPS source as a remote source and only classify a local file as self-authored; do not label a remote update address as self-authored. A local file can restore a remote `originalURL` while retaining its local target and an optional GitHub target. Preserve `localStorageRelativePath` whenever it is known.
 
-`publishesStandalone` controls whether an independent output is produced; it does not define a storage kind. Sidebar groups and relationship labels must always use `storageLocation` (`local` or `gitHub`) and must not reintroduce a derived “remote module” category.
+Treat local physical module metadata as authoritative for initial-source discovery and repair. Once a valid `#SUBSCRIBED originalURL` has been discovered, a later upstream/cache payload without that marker must not erase it: native upstream modules commonly omit the Script-Hub wrapper comment. Clear persisted subscription metadata only when the user changes the registered source. Decode a nonempty `storageTargets` set as stored. For legacy data without that set, `localStorageRelativePath` takes precedence over the old `storageLocation` value when inferring the initial target. Subscription recovery from a local file inserts `.local` without removing `.gitHub`. When the exact path is missing, metadata recovery may uniquely match a sibling `.sgmodule` after normalizing spaces and hyphens, then persist the real relative path.
+
+`publishesStandalone` controls whether an independent output is produced; it does not define a storage kind. Sidebar groups and relationship labels use the target set: a dual-target module appears in both local and GitHub groups unless attention or invalid-source grouping takes precedence. Relationship labels show “本地 + GitHub” for both targets; do not reintroduce a derived “remote module” category.
 
 Manual GitHub publishing has two paths:
 
 - publish all current outputs, with stale managed file deletion preview and confirmation
 - publish selected standalone modules only, with no stale deletion and with the selected modules' generated assets included
 
+The toolbar's publish-all action uses the GitHub destination, including dual-target modules. Selected-module publishing runs local and GitHub plans independently according to each selected module's targets and the global settings. A local file source remains eligible for GitHub publishing when `.gitHub` is selected; the local self-overwrite guard applies only to local output.
+
 All publishable module selection should flow through `PublishPlan` / `PublishCoordinator`. Do not recalculate publishable IDs ad hoc in UI, Web API, or `AppModel`: the same plan owns standalone modules, combined-module contributors, generated asset IDs, scope labels, and the "nothing to publish" decision.
 
 Automatic GitHub publish readiness belongs in `AutomaticPublishPlanner`. Keep the settings/token/standalone-module/cache-output admission checks there so update completion, delayed scheduling, and scheduled execution do not drift into different skip rules. `AppModel+AutomaticPublishing.swift` owns only queue/cancel/run orchestration; keep manual preview/publish and published-file assembly in `AppModel+Publishing.swift`.
+
+Recheck cancellation, active work, settings, and selection after awaiting cached-output availability. Conflict resolution shares foreground-work admission, captures its destination settings, and checks the module generation before writing. Enter the non-cancellable phase only at the write boundary; do not clear conflict state if the module or destination changed while the write was in flight.
 
 Keep the selected publish path conservative: it should merge new paths into the known GitHub publish list but must not prune paths that belong to unselected modules.
 
@@ -209,7 +215,7 @@ Module editor presentation primitives live in `Views/ModuleEditorComponents.swif
 ./script/build_and_run.sh
 ```
 
-脚本支持 `--debug`、`--logs`、`--telemetry` 和 `--verify`。Codex Run action 由 `.codex/environments/environment.toml` 指向该脚本。需要隔离配置做界面检查时使用：
+脚本默认使用 `xcode-select -p` 选中的 Xcode；需要其他工具链时，设置 `DEVELOPER_DIR=/path/to/Xcode.app/Contents/Developer` 覆盖。脚本支持 `--debug`、`--logs`、`--telemetry` 和 `--verify`。Codex Run action 由 `.codex/environments/environment.toml` 指向该脚本。需要隔离配置做界面检查时使用：
 
 ```bash
 SURGE_RELAY_RUN_UI_QA=1 ./script/build_and_run.sh --verify
@@ -220,7 +226,6 @@ UI QA 模式使用临时配置与本地模块目录，并暂停启动期和编�
 原生设置、模块编辑与详情 smoke test 使用独立 scheme，避免系统 UI automation 权限影响日常单元测试：
 
 ```bash
-DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
 xcodebuild test \
   -project "Surge Relay.xcodeproj" \
   -scheme "Surge Relay UI Tests" \
@@ -238,9 +243,12 @@ xcodebuild test \
 
 `AppSettingsTests.swift` owns settings decoding, migration defaults, and combined-module setting defaults. `SecurityDiagnosticsTests.swift` owns local credential round trips, credential diagnostics, local credential probe snapshots, and installation diagnostics. `SourceRevisionServiceTests.swift` owns source revision network checks and resolved update-source selection. `ScriptHubTests.swift` owns Script-Hub conversion URLs, upstream pinning and script hashes, embedded-engine bridge safety, native Surge conversion, argument materialization, advanced option summaries, and sanitizer behavior. `WebManagementTests.swift` owns Web management request parsing, API payload, session cookie, same-origin, throttling, response hardening, and icon content-type coverage. `WebManagementStateBuilderTests.swift` owns Web management state payload field mapping, combined-module visibility, and activity progress rules. `GitHubReleaseTests.swift` owns GitHub settings, remote directory discovery, release asset parsing, checksum validation, and install guidance coverage. `GitHubPublishTests.swift` owns GitHub publish diffing, preview, duplicate path rejection, commit snapshots, and reference-move retry coverage; GitHub network fakes belong in `GitHubTestSupport.swift`. Keep shrinking the larger test files by moving similarly cohesive tests into focused files instead of adding more unrelated cases there.
 
-Use the local Xcode beta explicitly:
+Check the selected toolchain before running the regular validation commands:
 
 ```bash
+xcode-select -p
+xcodebuild -version
+xcrun swift --version
 node --check SurgeRelay/WebResources/web-logic.js
 node --check SurgeRelay/WebResources/web-options.js
 node --check SurgeRelay/WebResources/web-format.js
@@ -261,7 +269,6 @@ node script/test_web_dom_resources.mjs
 `Surge Relay.xcodeproj/project.pbxproj` is maintained alongside `project.yml`. When adding a Swift source file, also add its file reference/build file entries to the Xcode project, or regenerate the project with the project's preferred tooling; `script/check_release_configuration.sh` fails the release preflight if any Swift file under `SurgeRelay/`, `SurgeRelayTests/`, or `SurgeRelayUITests/` is missing from the project.
 
 ```bash
-DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
 xcodebuild test \
   -project "Surge Relay.xcodeproj" \
   -scheme "Surge Relay" \
@@ -269,6 +276,20 @@ xcodebuild test \
 ```
 
 The active maintenance machine may print CoreSimulator version warnings even for macOS builds. Treat them as environmental warnings unless the command exits non-zero.
+
+Run the DNS-independent network regression suites separately when changing remote fetch or source-name lookup behavior:
+
+```bash
+xcodebuild test \
+  -project "Surge Relay.xcodeproj" \
+  -scheme "Surge Relay" \
+  -destination "platform=macOS,arch=arm64" \
+  -only-testing:'Surge RelayTests/ModulePlanningTests' \
+  -only-testing:'Surge RelayTests/WebManagementTests' \
+  -skipPackagePluginValidation
+```
+
+Mocked remote URLs use literal public IP addresses such as `8.8.8.8`. `BoundedRemoteDataFetcher` parses those addresses directly before calling `URLProtocol` or the injected fetch closure, avoiding `getaddrinfo`; the mock supplies the response without contacting the public IP. Do not replace these fixtures with domain names such as `public.example`, which can resolve to a blocked Fake-IP or private address before the mock runs. Keep private/reserved-address rejection tests separate from successful mocked requests. After behavior changes, run the relevant tests, refresh the generated status page, and synchronize the affected user and development documentation.
 
 ## Performance Notes
 
@@ -292,7 +313,7 @@ Web management list updates use `sidebarListSignature(snapshot)` from `WebResour
 
 Release builds require:
 
-- Sparkle EdDSA private key in the keychain
+- Sparkle EdDSA private key in the keychain or supplied through `SPARKLE_ED_KEY`
 - stable self-signed signing identity: `Surge Relay Self-Signed Code Signing`
 - unchanged bundle identifier: `com.allenmiao.SurgeRelay`
 
@@ -311,9 +332,17 @@ REQUIRE_SPARKLE_SIGNATURES=1 \
 REQUIRE_STABLE_CODESIGN=1 \
 VERIFY_APPCAST=1 \
 UPDATE_APPCAST=1 \
-DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
 ./script/build_release_assets.sh
 ```
+
+For compiler checks after a runner/toolchain update, dispatch the current workflow with the existing release tag and `verify_only=true`:
+
+```bash
+gh workflow run package-release-app.yml --repo junchan0412/SurgeRelay-macOS --ref main \
+  -f tag=v2.2.1 -F verify_only=true -F launch_smoke_test=true
+```
+
+This preserves signed package verification and records toolchain/build diagnostics while skipping release creation and asset replacement. Always specify this fork with `--repo`; local `gh` repository defaults may point to upstream. `verify_only=false` remains the normal publishing default. See [CI compiler tracking](./docs/RELEASE_HARDENING.md#ci-compiler-tracking) for the Xcode 26.6 / Swift 6.3.3 incident, related upstream work, and the unverified reduction candidate.
 
 After creating a GitHub Release, verify remote assets:
 

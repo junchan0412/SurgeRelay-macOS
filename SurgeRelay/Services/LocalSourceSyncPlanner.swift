@@ -15,9 +15,6 @@ struct LocalModuleSourceFile: Identifiable, Equatable, Sendable {
 /// 这些规则和 `SourceRevisionService.check(_:)` 使用同一个判据（来源内容的
 /// sha256），因此监听到的改动集合与随后 `updateAll(only:)` 的实际转换结果一致。
 enum LocalSourceSyncPlanner {
-    /// 单次扫描允许读取的来源文件大小上限，与来源检查保持一致。
-    static let maximumSourceFileBytes = 20 * 1024 * 1024
-
     /// 可以从本地文件刷新的模块来源。
     ///
     /// 只有“转换前来源”本身就是本地文件的模块才在此列：带 Script-Hub
@@ -84,9 +81,7 @@ enum LocalSourceSyncPlanner {
     static func contentHashes(for sourceFiles: [LocalModuleSourceFile]) -> [UUID: String] {
         var hashes: [UUID: String] = [:]
         for source in sourceFiles {
-            guard let data = try? Data(contentsOf: source.url),
-                  !data.isEmpty,
-                  data.count <= maximumSourceFileBytes else { continue }
+            guard let data = try? SourceRevisionService.readLocalSource(source.url) else { continue }
             hashes[source.moduleID] = data.sha256String
         }
         return hashes

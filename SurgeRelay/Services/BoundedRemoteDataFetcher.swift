@@ -42,6 +42,7 @@ struct BoundedRemoteDataFetcher {
     }
 
     func data(for request: URLRequest) async throws -> Data {
+        try Task.checkCancellation()
         try Self.validateRemoteRequest(request)
         var request = request
         request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData

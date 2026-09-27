@@ -2,39 +2,40 @@
 
 本文件记录本 fork（`junchan0412/SurgeRelay-macOS`）相对 upstream（`EEliberto/SurgeRelay-macOS`）的提交分叉情况，以及后续如何更精准地同步。
 
-最后审查日期：2026-08-30（基于本地 remote-tracking refs，未执行 fetch）
-审查基线：
+最后跟踪日期：2026-09-27（已执行 `git fetch upstream main`）
+本轮以 fork `main=386bc2e` 为固定基线，只完成新增提交的标题初筛；历史逐项审查边界仍为 `a3e667c`。
 
 | 引用 | SHA | 说明 |
 | --- | --- | --- |
-| fork `HEAD` / 当前审查点 | `4b591fc56d7d` | 当前工作分支 HEAD |
-| upstream `main` | `a3e667c` | `Revert "Fix macOS 27 toolbar layout"` |
+| fork `main` / 本轮基线 | `386bc2e` | 2.2.1 基础上的维护基线 |
+| upstream `main` / 最新跟踪点 | `9141966` | `Update appcast for 260922 build 27092202` |
+| 历史审查 upstream tip | `a3e667c` | 新增 25 个提交尚未逐文件审查 |
 | 共同祖先 `merge-base` | `30203ef732e1` | `Update README.md` |
 
 对比命令：
 
 ```bash
-git rev-parse HEAD
+git rev-parse 386bc2e
 git rev-parse upstream/main
-git merge-base HEAD upstream/main
-git rev-list --left-right --count upstream/main...HEAD   # behind, ahead
-git log --oneline HEAD..upstream/main
+git merge-base 386bc2e upstream/main
+git rev-list --left-right --count upstream/main...386bc2e   # behind, ahead
+git log --oneline a3e667c..9141966
 ```
 
-本地引用审查时计数：**behind 51 / ahead 256**。需要判断远端最新状态时，先显式执行 `git fetch upstream main`，再更新本节证据。
+本轮跟踪快照为 **behind 76 / ahead 296**；该数值只对应上表固定基线，不随后续提交自动更新。新增范围 `a3e667c..9141966` 共 25 个提交，以下记录只根据标题判断后续方向，不能视为代码审查完成，也未在本轮移植 upstream 功能。2026-08-30 的 **behind 51 / ahead 256** 是未 fetch 时的历史快照。
 
 ## 1. 分叉模型（先读这个）
 
 本 fork 不是 upstream 的快进分支，而是从 `30203ef` 之后各自演进：
 
 - fork 侧大量重构：本地/GitHub 双发布、`#SUBSCRIBED` 初始来源、Script-Hub 固定 revision、AppModel/Web 资源拆分、自签名 + Sparkle 发布链路。
-- upstream 侧主要演进：iCloud 输出、Web 视觉/移动端、欢迎向导、**Surge Ponte 客户端/服务端远程管理**、以及大量 release/appcast/图标杂项提交。
+- upstream 侧主要演进：iCloud 输出、Web 视觉/移动端、欢迎向导、**Surge Ponte 客户端/服务端远程管理**；本轮新增标题还涉及机场订阅同步，以及 release/appcast/图标杂项提交。
 
 因此默认策略是：
 
 1. **不要**对 upstream 做无过滤 merge / rebase。
 2. 按“主题/能力”挑选可移植补丁，移植到本 fork 的现有模块边界中。
-3. 每次同步后更新本文件的“已审查 upstream tip”和“已移植/跳过”清单。
+3. 每次同步后分别更新“最新跟踪点”“逐文件审查范围”和“已移植/跳过”清单，不把 fetch 或标题初筛写成已完成代码审查。
 
 ## 2. 本 fork 不可被 upstream 覆盖的边界
 
@@ -42,16 +43,17 @@ git log --oneline HEAD..upstream/main
 
 | 边界 | 本 fork 现状 | 不要直接采用的 upstream 方向 |
 | --- | --- | --- |
-| 模块关系模型 | `storageLocation` × `initialSource(#SUBSCRIBED)` | 把 iCloud/GitHub/远程来源揉成单一 `storageMode` 语义 |
-| 发布模型 | `publishToLocal` + `publishToGitHub` 可并存；独立模块按 `storageLocation` 输出 | 仅 iCloud 或仅 GitHub 的旧路径假设 |
+| 模块关系模型 | `storageTargets` × `initialSource(#SUBSCRIBED)`；`storageLocation` 仅用于旧数据兼容 | 把 iCloud/GitHub/远程来源揉成单一 `storageMode` 语义 |
+| 发布模型 | `publishToLocal` + `publishToGitHub` 可并存；每个模块的 `storageTargets` 可同时包含 `local` 和 `gitHub` | 单目标假设，或通过兼容字段赋值丢失另一个目标 |
 | 架构 | AppModel 扩展拆分、planner/service 化、Web 资源拆分（`web-*.js`） | 重新塞回巨大 `AppModel.swift` / 单体 `RootView` / 单体 `app.js` |
 | 远程管理 | 本机 Web 管理 + 本地加密 token | Surge Ponte 服务端/客户端整套模式（除非明确立项） |
+| 功能范围 | 现有模块管理、转换与发布稳定性 | 机场订阅、节点或策略文件管理功能 |
 | 发布产物 | 固定自签名 + Sparkle EdDSA + `script/build_release_assets.sh` | upstream 自己的 build 号、appcast 私钥、误提交图标/README 回滚链 |
 | Worker 示例 | 保留 `Deployment/CloudflareWorker` | upstream `2dbd992` 删除 Deployment 目录 |
 
-## 3. 落后 51 个提交总表
+## 3. 历史审查：截至 `a3e667c` 的 51 个提交
 
-按时间从新到旧。分类：
+以下表格保留历史审查结论，不代表最新 76 个差异提交均已审查。按时间从新到旧。分类：
 
 - `port`：值得移植或已移植
 - `adapt`：概念有价值，但必须按本 fork 模型重写
@@ -113,7 +115,7 @@ git log --oneline HEAD..upstream/main
 | `3111632` | 2026-07-01 | Update README.md | skip-noise | README |
 | `3fc72a6` | 2026-07-01 | Release 1.1.1 | **port** | 引入 `MainWindowCloseBehavior`：关闭主窗口隐藏到菜单栏；已移植 |
 
-### 统计
+### 历史统计
 
 | 分类 | 约计 |
 | --- | --- |
@@ -122,9 +124,41 @@ git log --oneline HEAD..upstream/main
 | port / 已吸收 | ~10 |
 | adapt / 后续候选 | ~4 个主题 |
 
-## 4. 本次已选择性移植到本 fork
+### 本轮新增 25 个提交：仅标题初筛
 
-审查分支：`codex/upstream-sync-review`
+本表未查看每个提交的文件 diff。“候选”需要进一步核对实现、测试和本 fork 是否已覆盖；“不移植”表示产品范围决定，不表示已检查提交中的全部代码。尤其不能因标题含 `Release` 就假定只修改了版本文件。
+
+| SHA | 标题 | 标题初筛方向 |
+| --- | --- | --- |
+| `9141966` | Update appcast for 260922 build 27092202 | 发布元数据，不同步 upstream feed |
+| `397dd04` | Remove temporary release uploader | 临时发布工具，不直接采用 |
+| `72c12c7` | Add temporary release asset uploader | 临时发布工具，不直接采用 |
+| `143399d` | Store airport nodes in local policy files | 机场功能，不移植 |
+| `4a0f8d9` | Publish signed 260922 update to existing Sparkle feed | 发布链路，不同步 upstream feed |
+| `5afd7cd` | Automatically manage direct rules for airport subscription URLs | 机场功能，不移植 |
+| `bbb0ef1` | Release Surge Relay 260922 build 27092201 | 发版标题，内容未逐文件审查 |
+| `7e32e3a` | Remove images from GitHub Cloudflare Guide | 文档资源变更，不跟随删除本 fork 指南资源 |
+| `272a133` | Release Surge Relay 260906 build 27090605 | 发版标题，内容未逐文件审查 |
+| `4e6afec` | Release Surge Relay 260906 build 27090604 | 发版标题，内容未逐文件审查 |
+| `30110da` | Release Surge Relay 260906 build 27090603 | 发版标题，内容未逐文件审查 |
+| `cdb19a8` | Delete RELEASE.md | 发布文档变更，保留本 fork 维护文档 |
+| `d1a2bfe` | Fix image source in README.md | README 资源修正，待有需要时核对 |
+| `c42e61c` | Fix image tag in README.md | README 资源修正，待有需要时核对 |
+| `069b7df` | Fix image tag formatting in README.md | README 格式修正，待有需要时核对 |
+| `dcb31cb` | Update README.md | 文档标题，内容未逐文件审查 |
+| `436e0b7` | Use adaptive SF Symbol for menu bar icon | 可用性候选，需先核对本 fork 是否已覆盖；本轮不微调配色 |
+| `25d7b74` | Release Surge Relay 260906 build 27090601 | 发版标题，内容未逐文件审查 |
+| `aafd115` | Re-release Surge Relay 260905 build 27090503 | 发版标题，内容未逐文件审查 |
+| `3bde313` | Re-release Surge Relay 260905 build 27090502 | 发版标题，内容未逐文件审查 |
+| `1c5a144` | Release Surge Relay 260905 build 27090501 | 发版标题，内容未逐文件审查 |
+| `2ae029a` | Release Surge Relay 260904 build 27090401 | 发版标题，内容未逐文件审查 |
+| `21b1d25` | Fix updater termination and restore window size | 稳定性候选，需对照当前更新与窗口行为逐文件核查 |
+| `ae6aa63` | Fix airport synchronization in client mode | 机场功能，不移植 |
+| `37d6719` | Release Surge Relay 260810 build 27072302 | 发版标题，内容未逐文件审查 |
+
+## 4. 历史已选择性移植到本 fork
+
+历史审查分支：`codex/upstream-sync-review`（已完成工作的来源记录，不要求保留该分支）。
 
 | 主题 | upstream 来源 | 本 fork 落地 | 说明 |
 | --- | --- | --- | --- |
@@ -182,6 +216,10 @@ git log --oneline HEAD..upstream/main
 
 原因：无产品价值，只会污染历史。
 
+### 5.5 机场订阅、节点与策略文件管理
+
+新增标题涉及 `ae6aa63`、`5afd7cd` 和 `143399d`。这些能力不在当前模块转换与发布稳定性工作范围内，不移植；如含可独立修复现有问题的通用代码，也须先逐文件审查并单独说明必要性。
+
 ## 6. 后续精准同步流程
 
 每次准备吸收 upstream 时按此清单执行：
@@ -191,11 +229,11 @@ git log --oneline HEAD..upstream/main
 git fetch upstream main
 git fetch origin main
 
-# 2. 看新增落后提交（相对上次记录的 upstream tip）
-git log --oneline a3e667c..upstream/main
+# 2. 看上次跟踪点之后的新增标题
+git log --oneline 9141966..upstream/main
 
-# 3. 只看源码路径，过滤发版噪声
-git log --oneline --name-only a3e667c..upstream/main -- \
+# 3. 本轮标题初筛留下的 25 个提交，按候选主题继续做文件级核查
+git log --oneline --name-only a3e667c..9141966 -- \
   SurgeRelay docs Deployment script
 
 # 4. 对可疑提交做文件级 diff，而不是整提交 cherry-pick
@@ -208,15 +246,15 @@ git show <sha> -- SurgeRelay/path/of/interest
 #    - 文档 -> docs/
 
 # 6. 验证
-DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
-  xcodebuild test -project "Surge Relay.xcodeproj" -scheme "Surge Relay" \
+xcode-select -p
+xcodebuild test -project "Surge Relay.xcodeproj" -scheme "Surge Relay" \
   -destination 'platform=macOS,arch=arm64'
 node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs
 
 # 7. 更新本文件
-#    - 刷新 “已审查 upstream tip”
-#    - 把新提交写入分类表
+#    - 分别刷新 “最新跟踪点” 与 “逐文件审查范围”
+#    - 把新提交写入标题初筛表，逐文件审查后再记录结论
 #    - 记录移植/跳过原因
 ```
 
@@ -229,6 +267,7 @@ node script/test_web_dom_resources.mjs
 - 删除 `Deployment/`
 - 只改 `appcast.xml` / 版本号 / 图标 asset 来回
 - 依赖 upstream 的 iCloud-only 或 Ponte 设置字段
+- 引入机场订阅、节点或策略文件管理
 
 ## 7. adapt 候选跟进状态
 
@@ -251,8 +290,9 @@ node script/test_web_dom_resources.mjs
 
 ## 9. 变更记录
 
-| 日期 | upstream tip 已审查到 | 动作 |
+| 日期 | upstream 引用 / 审查范围 | 动作 |
 | --- | --- | --- |
 | 2026-07-25 | `a3e667c` | 首份分叉审查；移植 MainWindowCloseBehavior、Web toast/copy 样式、Cloudflare 指南；明确跳过 Ponte 与 Deployment 删除 |
 | 2026-07-25 | `a3e667c` | 完成 5 项 adapt：`/api/activity`、NetworkPathMonitor、PWA 图标、设置历史、侧边栏切换；发布 1.3.20 |
 | 2026-08-30 | `a3e667c` | 基于本地 refs 复核分叉计数与当前 HEAD；未 fetch，behind 51 / ahead 256 |
+| 2026-09-27 | 跟踪至 `9141966`；新增范围 `a3e667c..9141966` 仅标题初筛 | 已 fetch；相对 fork `main=386bc2e` 为 behind 76 / ahead 296；记录新增 25 个标题，不移植机场功能，未宣称完成逐文件审查 |

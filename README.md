@@ -15,8 +15,8 @@ Surge Relay 面向需要长期维护大量 `.sgmodule` / `.module`、从 Loon/Qu
    ```bash
    xattr -dr com.apple.quarantine "/Applications/Surge Relay.app"
    ```
-3. 在设置中开启“发布到本地”并选择 Surge 模块根目录（如 iCloud Surge 目录），或开启“发布到 GitHub”并配置仓库与 Token。
-4. 添加模块、扫描本地 `.sgmodule`，或使用“多选 / 发布所选”按模块存放位置发布。
+3. 在设置中开启“发布到本地”并选择 Surge 模块根目录（如 iCloud Surge 目录），或开启“发布到 GitHub”并配置仓库与 Token；两个目标可以同时开启。
+4. 添加模块或扫描本地 `.sgmodule`，为每个模块勾选本地、GitHub 或两者，再使用“多选 / 发布所选”发布。
 
 > 后续更新推荐在 App 内使用“查看更新…”，通过 Sparkle 2 自动拉取并校验签名，无需再次执行 `xattr`。
 
@@ -27,8 +27,8 @@ Surge Relay 面向需要长期维护大量 `.sgmodule` / `.module`、从 Loon/Qu
 - 更新流水线最多同时处理 4 个模块，保持总模块合并顺序；来源检查与原生转换复用下载结果，内容和脚本资源以完整快照提交。
 - macOS 与 Web 内容页支持在切换模块时保留未保存草稿；退出 App 或刷新网页前请保存修改。
 - 内置 Script-Hub 本地引擎，转换 Quantumult X、Loon、Surge 模块；远程 Surge 模块直接抓取并自动写入 `#SUBSCRIBED` 标记。
-- 模块“存放位置”与“初始来源”分离建模：本地 / GitHub 存放，订阅 / 远程 / 自写来源，避免混淆。
-- 本地与 GitHub 发布可同时开启，每个独立模块只写入自己选择的存放目标。
+- 模块“存放位置”与“初始来源”分离建模：可勾选本地、GitHub 或两者，初始来源为订阅 / 远程 / 自写。
+- 本地与 GitHub 发布可同时开启，每个独立模块按勾选的目标分别写出，同一模块可同时发布到两处。
 - 侧边栏多维度筛选（更新状态、来源、存放位置、发布行为、状态）+ 排序，筛选与搜索叠加。
 - 本地模块源文件在磁盘上被修改后自动重新转换并刷新输出，无需等待刷新间隔（可在设置中关闭）。
 - 模块内容编辑器支持撤销/重做、查找与替换（含正则）、跳转到行和切换注释。
@@ -60,8 +60,8 @@ Surge Relay 面向需要长期维护大量 `.sgmodule` / `.module`、从 Loon/Qu
 - `.sgmodule` 与 `.module` 都按 Surge 模块识别，远程 Surge 模块直接抓取并自动写入 `#SUBSCRIBED` 标记，便于 Script-Hub 解析更新。
 - Script-Hub 上游默认固定到明确 commit；更新时会记录上游 revision 与脚本 SHA-256 hash。
 - 为每个模块配置 Surge `category` 标签、输出文件名、输出文件夹、自定义图标和 Script-Hub 参数。
-- 模块关系明确分为“模块存放位置”和“初始来源”：模块可以存放在本地或 GitHub；初始来源优先由 `#SUBSCRIBED originalURL` 判定，存在该记录时归类为订阅来源，没有该记录但更新地址为 HTTP/HTTPS 时归类为远程来源，只有本地文件且无记录时归类为自写模块。
-- 本地发布和 GitHub 发布可以同时开启；每个独立模块只写入自己选择的存放位置，本地根目录和 GitHub 模块目录共用一套相对输出路径逻辑。
+- 模块关系明确分为“模块存放位置”和“初始来源”：模块可以存放在本地、GitHub 或同时存放到两处；初始来源优先由 `#SUBSCRIBED originalURL` 判定，存在该记录时归类为订阅来源，没有该记录但更新地址为 HTTP/HTTPS 时归类为远程来源，只有本地文件且无记录时归类为自写模块。
+- 本地发布和 GitHub 发布可以同时开启；每个独立模块写入已勾选且全局已启用的目标，本地根目录和 GitHub 模块目录共用一套相对输出路径逻辑。
 - 本地发布根目录可配置，例如 iCloud Surge 目录；输出文件夹菜单会读取根目录下已有文件夹，也可以新建文件夹。
 - GitHub 发布可发布到公开或私有仓库；公开仓库使用 Raw 地址，私有仓库需要配置公共转发地址。
 - 总模块功能默认关闭，可在设置中手动开启；关闭后相关界面和“包含在总模块中”开关会隐藏，独立模块仍可转换和发布。
@@ -97,11 +97,11 @@ xattr -dr com.apple.quarantine "/Applications/Surge Relay.app"
 左侧模块列表按维护状态分组：
 
 - “需要处理”：最近更新失败或本地编辑与上游更新发生冲突。
-- “本地模块”：独立输出只写入本地模块根目录，初始来源可以是订阅来源、远程来源或自写模块。
-- “GitHub 模块”：独立输出只写入 GitHub 模块目录，初始来源可以是订阅来源、远程来源或自写模块。
+- “本地模块”：已勾选本地存放目标，初始来源可以是订阅来源、远程来源或自写模块。
+- “GitHub 模块”：已勾选 GitHub 存放目标，初始来源可以是订阅来源、远程来源或自写模块。
 - “未分类”：`#SUBSCRIBED` 来源记录无效，或更新地址不是有效的 HTTP/HTTPS/本地文件，需要检查模块内容或更新地址。
 
-未开启“发布为独立模块”只表示转换结果保存在 App 缓存，不会产生第三种“远程模块”存放类型；模块仍按配置归入“本地模块”或“GitHub 模块”。
+双目标模块会同时出现在“本地模块”和“GitHub 模块”组；存在失败、冲突或无效来源时，优先进入“需要处理”或“未分类”。未开启“发布为独立模块”只表示转换结果保存在 App 缓存，模块仍按勾选目标分组。
 
 模块详情页和 Web 管理端都会优先显示“管理关系”：模块存放、初始来源、订阅原始地址、更新地址、登记地址和本地相对路径会按需分开展示。订阅模块从 `originalURL` 更新，远程来源从登记更新地址更新；如果用户最初登记的是另一个转换后地址，则额外显示为“登记地址”，避免把它误认为实际更新地址。判断独立文件写到哪里时看“模块存放”；判断它是由订阅转换、远程更新还是本地编写时看“初始来源”；判断后续从哪里读取内容时看“更新地址”或“订阅原始地址”。
 
@@ -119,7 +119,7 @@ xattr -dr com.apple.quarantine "/Applications/Surge Relay.app"
 
 ## 发布目标
 
-在设置的“发布”页可以分别开启“发布到本地”和“发布到 GitHub”。两者可以同时开启，但每个独立模块只进入自己选择的存放目标；总模块仍可同时发布到两个目标。工具栏的“发布全部”只提交 GitHub 模块与总模块；“多选 / 发布所选”会按每个模块的存放位置分别发布到本地或 GitHub，不会删除其他已发布文件。未完成 GitHub 配置时点击“发布全部”会直接打开设置页；模块搜索框位于左侧边栏，和筛选条件一起作用于模块列表。
+在设置的“发布”页可以分别开启“发布到本地”和“发布到 GitHub”。添加或编辑模块时，可勾选本地、GitHub 或两者；独立模块会写入已勾选且全局已启用的目标，总模块也可同时发布到两个目标。工具栏的“发布全部”提交已勾选 GitHub 的模块与总模块，其中也包括双目标模块；“多选 / 发布所选”按各模块的勾选目标分别发布到本地和 GitHub，不会删除其他已发布文件。未完成 GitHub 配置时点击“发布全部”会直接打开设置页；模块搜索框位于左侧边栏，和筛选条件一起作用于模块列表。
 
 开启本地发布后，需要配置本地模块根目录。常见路径类似：
 
@@ -183,8 +183,8 @@ Surge Relay 不再访问系统钥匙串：
 ## ❓ 常见问题
 
 - **添加模块后内容为空？** 添加 / 编辑模块后会自动更新（约 2 秒后）；若首次抓取遇到瞬时 404 / 5xx / 网络抖动，App 会自动重试一次。仍为空可点击“更新全部”或模块右键“更新”手动刷新。
-- **本地模块没写入指定目录？** 确认已在“设置 > 发布”开启“发布到本地”并配置根目录；独立模块需开启“发布为独立模块”，本地发布时才会写出对应 `.sgmodule`。远程来源本地模块的 `localStorageRelativePath` 是输出路径，只要发布就会写入。
-- **GitHub 发布没有反应？** 确认“发布到 GitHub”已开启、仓库与 Token 已配置；如果模块详情显示“本地模块”，全局“发布全部”不会上传它，请编辑模块并将“模块存放”改为“GitHub”后再发布。“发布所选”会按模块存放位置分别发布；GitHub 模块根目录无需预先创建，首次提交文件时会自动建立路径。
+- **本地模块没写入指定目录？** 确认已在“设置 > 发布”开启“发布到本地”并配置根目录；模块还需勾选本地目标并开启“发布为独立模块”。源文件与本地输出路径相同时会跳过写入，保护原模块。
+- **GitHub 发布没有反应？** 确认“发布到 GitHub”已开启、仓库与 Token 已配置，模块已勾选 GitHub 目标并开启“发布为独立模块”。可以保留本地目标，同时增加 GitHub 目标；本地来源也能发布到 GitHub。“发布所选”会按已勾选目标分别发布；GitHub 模块根目录无需预先创建，首次提交文件时会自动建立路径。
 - **首次打开被系统拦截？** 因为当前使用固定自签名证书，未做 Apple Developer ID 公证。执行 `xattr -dr com.apple.quarantine "/Applications/Surge Relay.app"` 一次即可；后续用 App 内“查看更新…”无需再处理。
 - **更新失败提示 404 / 403 / 429？** 检查来源链接是否已改名 / 删除 / 分支变化，或仓库访问权限与触发频率限制；网络恢复后重试。
 
@@ -209,7 +209,7 @@ project.yml            # XcodeGen / 工程版本配置
 ./script/build_and_run.sh
 ```
 
-该入口默认执行 Debug 构建并启动 App；可使用 `--debug`、`--logs`、`--telemetry` 和 `--verify`。隔离 UI 验证使用：
+该入口默认使用 `xcode-select -p` 选中的 Xcode，执行 Debug 构建并启动 App；需要其他工具链时可设置 `DEVELOPER_DIR=/path/to/Xcode.app/Contents/Developer`。可使用 `--debug`、`--logs`、`--telemetry` 和 `--verify`。隔离 UI 验证使用：
 
 ```bash
 SURGE_RELAY_RUN_UI_QA=1 ./script/build_and_run.sh --verify
@@ -218,7 +218,6 @@ SURGE_RELAY_RUN_UI_QA=1 ./script/build_and_run.sh --verify
 需要直接调用 Xcode 时使用：
 
 ```bash
-DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
 xcodebuild build \
   -project "Surge Relay.xcodeproj" \
   -scheme "Surge Relay" \
@@ -243,7 +242,6 @@ node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs
 ./script/check_release_configuration.sh
 
-DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
 xcodebuild build-for-testing \
   -project "Surge Relay.xcodeproj" \
   -scheme "Surge Relay" \
@@ -251,6 +249,20 @@ xcodebuild build-for-testing \
   -derivedDataPath build/DerivedDataTest \
   -skipPackagePluginValidation
 ```
+
+DNS 独立回归单独运行：
+
+```bash
+xcodebuild test \
+  -project "Surge Relay.xcodeproj" \
+  -scheme "Surge Relay" \
+  -destination "platform=macOS,arch=arm64" \
+  -only-testing:'Surge RelayTests/ModulePlanningTests' \
+  -only-testing:'Surge RelayTests/WebManagementTests' \
+  -skipPackagePluginValidation
+```
+
+网络 mock 使用 `8.8.8.8` 这类字面 public IP，使地址检查直接解析 IP，再进入 `URLProtocol` 或注入的 mock，不经过 `getaddrinfo`，也不实际访问该地址；避免测试受系统 DNS、Fake-IP 或 VPN 影响。详细维护规则见 [DEVELOPMENT.md](./DEVELOPMENT.md)。
 
 ## 发布
 
@@ -267,11 +279,19 @@ REQUIRE_SPARKLE_SIGNATURES=1 \
 REQUIRE_STABLE_CODESIGN=1 \
 VERIFY_APPCAST=1 \
 UPDATE_APPCAST=1 \
-DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
 ./script/build_release_assets.sh
 ```
 
 本地验证会检查版本号、构建号、签名身份、Sparkle 签名、动态库依赖、zip 元数据、pkg payload 和安装脚本。
+
+跟踪 CI 编译器问题时，使用 `main` 上的最新 workflow，并开启只验证模式，避免替换已发布资产：
+
+```bash
+gh workflow run package-release-app.yml --repo junchan0412/SurgeRelay-macOS --ref main \
+  -f tag=v2.2.1 -F verify_only=true -F launch_smoke_test=true
+```
+
+该模式保留签名构建与包验证，跳过 GitHub Release 上传。诊断 artifact、runner 升级条件及 Swift 崩溃跟踪见 [Release Hardening](./docs/RELEASE_HARDENING.md#ci-compiler-tracking)。
 
 本地构建产生的 appcast 条目先随版本提交并打 tag，`Package Release App` workflow 再用同一 tag 构建并上传自己的资产。两次构建的 zip 不会逐字节相同，因此上传完成后必须把 `appcast.xml` 中该版本 `<enclosure>` 的 `length` 和 `sparkle:edSignature` 同步成 Release 上实际资产的值，否则 Sparkle 会因为签名不匹配拒绝更新：
 

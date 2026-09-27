@@ -253,31 +253,61 @@ extension AppModel {
         moduleID: UUID,
         resolution: ModuleSyncResolution
     ) async {
+        guard !isWorking, !Task.isCancelled else { return }
         guard let module = modules.first(where: { $0.id == moduleID }), module.hasSyncConflict else { return }
+        cancelAutomaticPublishSchedule()
+        beginWork(.confirmingPublish)
+        defer { endWork(.confirmingPublish) }
+        let generation = localChangeGeneration
+        let githubSettings = settings.github
+        let localDirectory = settings.localModuleDirectory
+        let token = githubToken
         do {
             switch resolution {
             case .localWins:
                 guard let data = try await fileStore.readPublishedFile(
                     relativePath: module.publishedRelativePath,
-                    rootDirectoryPath: settings.localModuleDirectory
+                    rootDirectoryPath: localDirectory
                 ) else { throw RelayError.invalidOutput("找不到本地发布文件。") }
+                guard shouldContinueCurrentWork(generation: generation) else { return }
+                guard settings.github == githubSettings,
+                      settings.localModuleDirectory == localDirectory else {
+                    statusMessage = "发布设置已改变，请重新检查冲突"
+                    return
+                }
+                try enterNonCancellableWorkPhase(statusMessage: "正在用本地版本覆盖 GitHub…")
                 let report = try await githubClient.publish(
                     files: [PublishFile(name: module.publishedRelativePath, data: normalizedPublishedData(data))],
-                    settings: settings.github,
-                    token: githubToken
+                    settings: githubSettings,
+                    token: token
                 )
                 recordGitHubPublish(report)
             case .githubWins:
                 guard let remote = try await githubClient.fileSnapshot(
                     fileName: module.publishedRelativePath,
-                    settings: settings.github,
-                    token: githubToken
+                    settings: githubSettings,
+                    token: token
                 ) else { throw RelayError.invalidOutput("找不到 GitHub 发布文件。") }
+                guard shouldContinueCurrentWork(generation: generation) else { return }
+                guard settings.github == githubSettings,
+                      settings.localModuleDirectory == localDirectory else {
+                    statusMessage = "发布设置已改变，请重新检查冲突"
+                    return
+                }
+                try enterNonCancellableWorkPhase(statusMessage: "正在用 GitHub 版本覆盖本地…")
                 _ = try await fileStore.exportPublishedFiles(
                     [PublishFile(name: module.publishedRelativePath, data: remote.data)],
-                    toRootDirectory: settings.localModuleDirectory,
-                    knownManagedRelativePaths: settings.localPublishedFilePaths
+                    toRootDirectory: localDirectory,
+                    knownManagedRelativePaths: settings.localPublishedRootDirectory == localDirectory
+                        ? settings.localPublishedFilePaths : []
                 )
+            }
+            guard shouldContinueCurrentWork(generation: generation),
+                  modules.first(where: { $0.id == moduleID }) == module else { return }
+            guard settings.github == githubSettings,
+                  settings.localModuleDirectory == localDirectory else {
+                statusMessage = "已写入原发布目标；发布设置已改变，请重新检查冲突"
+                return
             }
             var updated = module
             updated.syncConflict = nil
@@ -290,6 +320,7 @@ extension AppModel {
             case .githubWins: statusMessage = "已用 GitHub 版本覆盖本地"
             }
         } catch {
+            if isCurrentWorkCancellation(error) { return }
             presentedError = error.localizedDescription
         }
     }
