@@ -121,6 +121,11 @@
     const applyActivity = dependencies.applyActivity;
     const fetchActivity = dependencies.fetchActivity;
     const isWorking = dependencies.isWorking || (() => false);
+    const getWorkspaceID = dependencies.getWorkspaceID || (() => null);
+    const getRuntimeID = dependencies.getRuntimeID || (() => null);
+    const eventURL = new URL(dependencies.eventsURL || '/api/events', 'http://relay.invalid');
+    eventURL.searchParams.set('activity', '1');
+    const eventPath = `${eventURL.pathname}${eventURL.search}`;
     const establishSession = dependencies.establishSession || (() => Promise.resolve());
     const onConnectionChange = dependencies.onConnectionChange || (() => {});
     const reconnectDelay = dependencies.reconnectDelay ?? 3000;
@@ -131,8 +136,8 @@
     let reconnectTimer = null;
     let generation = 0;
     let running = false;
-    let stateInFlight = false;
-    let activityInFlight = false;
+    let stateInFlight = null;
+    let activityInFlight = null;
     let reconnectAttempts = 0;
     let softReconnectUntil = 0;
 
@@ -149,6 +154,7 @@
     function close() {
       running = false;
       generation += 1;
+      stateInFlight = null; activityInFlight = null;
       disconnect();
       stopActivityPolling();
       if (pollingTimer != null) clearIntervalImpl(pollingTimer);
@@ -160,8 +166,8 @@
 
     function pollState(epoch) {
       if (!running || epoch !== generation || documentRef?.hidden || stateInFlight) return;
-      stateInFlight = true;
-      Promise.resolve().then(() => loadState(false, false)).catch(() => {}).finally(() => { stateInFlight = false; });
+      const request = {}; stateInFlight = request;
+      Promise.resolve().then(() => loadState(false, false)).catch(() => {}).finally(() => { if (stateInFlight === request) stateInFlight = null; });
     }
 
     function syncActivityPolling() {
@@ -172,10 +178,16 @@
       activityTimer = setIntervalImpl(() => {
         if (!running || epoch !== generation || documentRef?.hidden || !isWorking()) { stopActivityPolling(); return; }
         if (activityInFlight) return;
-        activityInFlight = true;
+        const request = {}; activityInFlight = request;
+        const workspaceID = getWorkspaceID();
+        const runtimeID = getRuntimeID();
         Promise.resolve().then(fetchActivity).then(activity => {
-          if (activity && running && epoch === generation && !stateEvents && !documentRef?.hidden) applyActivity(activity);
-        }).catch(() => {}).finally(() => { activityInFlight = false; });
+          if (!activity || !running || epoch !== generation || stateEvents || documentRef?.hidden || getWorkspaceID() !== workspaceID || getRuntimeID() !== runtimeID) return;
+          const responseWorkspaceID = activity.workspaceID ?? workspaceID;
+          const responseRuntimeID = activity.runtimeID ?? runtimeID;
+          if (responseWorkspaceID !== workspaceID || responseRuntimeID !== runtimeID) return;
+          applyActivity(activity, { source: 'poll', workspaceID: responseWorkspaceID, runtimeID: responseRuntimeID, revision: activity.revision });
+        }).catch(() => {}).finally(() => { if (activityInFlight === request) activityInFlight = null; });
       }, activityPollInterval);
     }
 
@@ -189,16 +201,69 @@
         return;
       }
       onConnectionChange(reconnectAttempts ? 'reconnecting' : 'connecting');
-      const stream = new EventSourceImpl('/api/events');
+      const stream = new EventSourceImpl(eventPath);
       stateEvents = stream;
+      let stateSequence = 0;
+      let stateWorkspaceID = null;
+      let stateRuntimeID = null;
+      let lastStateRevision = -1;
+      let lastActivityRevision = -1;
+      const retiredRuntimes = new Set();
+      let receivedState = false;
+      let stateReady = false;
+      let pendingActivity = null;
+      const isCurrent = () => running && epoch === generation && stateEvents === stream && !documentRef?.hidden;
+      function deliverActivity(envelope) {
+        if (!applyActivity || !isCurrent() || !stateReady || envelope.workspaceID !== stateWorkspaceID) return;
+        const currentWorkspaceID = getWorkspaceID();
+        if (currentWorkspaceID && currentWorkspaceID !== envelope.workspaceID) return;
+        const runtimeID = envelope.runtimeID || null;
+        if (runtimeID !== stateRuntimeID || (getRuntimeID() && getRuntimeID() !== runtimeID)) return;
+        applyActivity(envelope.activity, { source: 'sse', workspaceID: envelope.workspaceID, runtimeID, revision: envelope.revision });
+      }
       stream.addEventListener('state', event => {
-        if (!running || epoch !== generation || stateEvents !== stream || documentRef?.hidden) return;
+        if (!isCurrent()) return;
         try {
-          applyState(JSON.parse(event.data), false, false);
-          reconnectAttempts = 0;
-          softReconnectUntil = 0;
-          onConnectionChange('connected');
-          syncActivityPolling();
+          const snapshot = JSON.parse(event.data);
+          const runtimeID = snapshot.runtimeID || null;
+          const revision = Number.isSafeInteger(snapshot.revision) ? snapshot.revision : null;
+          if (runtimeID && retiredRuntimes.has(runtimeID)) return;
+          if (runtimeID !== stateRuntimeID) {
+            if (stateRuntimeID) retiredRuntimes.add(stateRuntimeID);
+            stateRuntimeID = runtimeID; lastStateRevision = -1; lastActivityRevision = -1;
+          }
+          if (revision != null && revision <= lastStateRevision) return;
+          if (revision != null) { lastStateRevision = revision; lastActivityRevision = Math.max(lastActivityRevision, revision); }
+          const sequence = ++stateSequence;
+          stateWorkspaceID = snapshot.workspace?.id || null;
+          receivedState = true; stateReady = false;
+          if (pendingActivity && (pendingActivity.workspaceID !== stateWorkspaceID || (pendingActivity.runtimeID || null) !== stateRuntimeID || (revision != null && pendingActivity.revision < revision))) pendingActivity = null;
+          if (Number.isSafeInteger(pendingActivity?.revision)) lastActivityRevision = Math.max(lastActivityRevision, pendingActivity.revision);
+          const complete = accepted => {
+            if (!isCurrent() || sequence !== stateSequence || accepted === false) return;
+            stateReady = true;
+            reconnectAttempts = 0; softReconnectUntil = 0;
+            onConnectionChange('connected');
+            if (pendingActivity) { const latest = pendingActivity; pendingActivity = null; deliverActivity(latest); }
+            syncActivityPolling();
+          };
+          const result = applyState(snapshot, false, false);
+          if (result && typeof result.then === 'function') Promise.resolve(result).then(complete).catch(() => {});
+          else complete(result);
+        } catch (_) {}
+      });
+      stream.addEventListener('activity', event => {
+        if (!isCurrent() || !applyActivity) return;
+        try {
+          const envelope = JSON.parse(event.data);
+          if (!envelope || typeof envelope.workspaceID !== 'string' || !envelope.activity || typeof envelope.activity !== 'object') return;
+          if (receivedState && (envelope.workspaceID !== stateWorkspaceID || (envelope.runtimeID || null) !== stateRuntimeID)) return;
+          if (Number.isSafeInteger(envelope.revision)) {
+            if (envelope.revision <= lastActivityRevision) return;
+            lastActivityRevision = envelope.revision;
+          }
+          if (!stateReady) pendingActivity = envelope;
+          else deliverActivity(envelope);
         } catch (_) {}
       });
       stream.onerror = () => {

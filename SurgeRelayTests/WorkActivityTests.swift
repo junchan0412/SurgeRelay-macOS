@@ -2,6 +2,58 @@ import XCTest
 @testable import SurgeRelay
 
 final class WorkActivityTests: XCTestCase {
+    func testStageMetricsAggregateAttemptsAndKeepUnknownBytesAbsent() async throws {
+        let recorder = StageMetricsRecorder()
+        recorder.record(StageMetric(stage: .download, duration: 0.1, failedAttempts: 1, result: .failed, isPartial: true))
+        recorder.record(StageMetric(stage: .download, duration: 0.2, bytesRead: 64, reason: "HTTP 200"))
+        let metric = try XCTUnwrap(recorder.snapshot.first)
+        XCTAssertEqual(metric.duration, 0.3, accuracy: 0.0001)
+        XCTAssertEqual(metric.attempts, 2)
+        XCTAssertEqual(metric.failedAttempts, 1)
+        XCTAssertEqual(metric.bytesRead, 64)
+        XCTAssertNil(metric.bytesWritten)
+        XCTAssertTrue(metric.isPartial)
+        XCTAssertEqual(metric.result, .completed)
+        let encoded = try JSONEncoder().encode(metric)
+        XCTAssertEqual(try JSONDecoder().decode(StageMetric.self, from: encoded), metric)
+    }
+
+    func testStageMeasurePreservesFailureAndTaskLocalContext() async throws {
+        let recorder = StageMetricsRecorder()
+        do {
+            try await StageMetricsContext.$current.withValue(recorder) {
+                try await recorder.measure(.cache, reason: "缓存缺失") {
+                    XCTAssertTrue(StageMetricsContext.current === recorder)
+                    throw CocoaError(.fileNoSuchFile)
+                }
+            }
+            XCTFail("Measured operations must preserve failures")
+        } catch let error as CocoaError { XCTAssertEqual(error.code, .fileNoSuchFile) }
+        let metric = try XCTUnwrap(recorder.snapshot.first)
+        XCTAssertEqual(metric.stage, .cache)
+        XCTAssertEqual(metric.result, .failed)
+        XCTAssertEqual(metric.failedAttempts, 1)
+        XCTAssertTrue(metric.isPartial)
+        XCTAssertNil(StageMetricsContext.current)
+    }
+
+    func testCancelledStageIsNotCountedAsFailure() async {
+        let recorder = StageMetricsRecorder()
+        do { try await recorder.measure(.conversion) { throw CancellationError() } }
+        catch {}
+        XCTAssertEqual(recorder.snapshot.first?.result, .cancelled)
+        XCTAssertEqual(recorder.snapshot.first?.failedAttempts, 0)
+    }
+
+    func testOldHistoryWithoutStageMetricsStillDecodes() throws {
+        let data = Data(#"{"moduleName":"old","outcome":"updated","message":"before metrics"}"#.utf8)
+        let old = try JSONDecoder().decode(UpdateHistoryEntry.self, from: data)
+        XCTAssertNil(old.stageMetrics)
+        var entry = old
+        entry.stageMetrics = [StageMetric(stage: .cache, duration: 0.01, bytesRead: 0, reason: "HTTP 304")]
+        XCTAssertEqual(try JSONDecoder().decode(UpdateHistoryEntry.self, from: JSONEncoder().encode(entry)).stageMetrics, entry.stageMetrics)
+    }
+
     func testWorkActivityDescribesActiveAndNonBlockingWork() {
         let startedAt = Date(timeIntervalSince1970: 1_800)
         let publishing = WorkActivity(kind: .publishing, startedAt: startedAt)

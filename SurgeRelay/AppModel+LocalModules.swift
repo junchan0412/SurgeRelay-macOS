@@ -84,8 +84,11 @@ extension AppModel {
         selectedModuleID = imported.first?.id
         do {
             try persistModules()
+            try await flushPersistence()
         } catch {
             presentedError = "保存导入模块失败：\(error.localizedDescription)"
+            statusMessage = "模块已导入内存，但尚未保存到磁盘"
+            return
         }
         refreshLocalSourceWatching()
         await rebuildCombinedFromCache()

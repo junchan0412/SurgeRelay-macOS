@@ -1,19 +1,24 @@
 import Foundation
 
-struct WebStatePayload: Encodable {
+struct WebStatePayload: Encodable, Sendable {
     let combined: WebCombinedPayload
     let moduleEditor: WebModuleEditorPayload
     let modules: [WebModulePayload]
-    let activity: WebActivityPayload
+    var activity: WebActivityPayload
+    var runtimeID: String? = nil
+    var revision: UInt64? = nil
     var workspace: WebWorkspacePayload? = nil
 }
 
-struct WebWorkspacePayload: Encodable {
+struct WebWorkspacePayload: Encodable, Sendable {
     let localDirectory: String
     let githubRepository: String
     let githubBranch: String
     let historyCount: Int
     let recentHistory: [UpdateHistoryEntry]
+    var id: String? = nil
+    var name: String? = nil
+    var isLegacyDefault = false
 }
 
 struct WebModuleProjectionCache {
@@ -22,7 +27,7 @@ struct WebModuleProjectionCache {
     let modules: [WebModulePayload]
 }
 
-struct WebModuleEditorPayload: Encodable {
+struct WebModuleEditorPayload: Encodable, Sendable {
     let defaultStorageLocation: String
     let localOutputFolders: [String]
     let githubOutputFolders: [String]
@@ -30,7 +35,7 @@ struct WebModuleEditorPayload: Encodable {
     let publishToGitHub: Bool
 }
 
-struct WebCombinedPayload: Encodable {
+struct WebCombinedPayload: Encodable, Sendable {
     let name: String
     let isEnabled: Bool
     let fileName: String
@@ -40,7 +45,7 @@ struct WebCombinedPayload: Encodable {
     let subscriptionURL: String?
 }
 
-struct WebModulePayload: Encodable {
+struct WebModulePayload: Encodable, Sendable {
     let id: String
     let name: String
     let sourceURL: String
@@ -72,6 +77,10 @@ struct WebModulePayload: Encodable {
     let sourceETag: String?
     let sourceLastModified: String?
     let sourceContentHash: String?
+    var refreshIntervalMinutes: Int? = nil
+    var nextRetryAt: Date? = nil
+    var serverRetryAfter: Date? = nil
+    var consecutiveFailureCount: Int = 0
     let conversionEngineRevision: String?
     let lastError: String?
     let iconURL: String?
@@ -92,7 +101,10 @@ struct WebModulePayload: Encodable {
     let enableJQ: Bool
 }
 
-struct WebActivityPayload: Encodable {
+struct WebActivityPayload: Encodable, Sendable {
+    var runtimeID: String? = nil
+    var revision: UInt64? = nil
+    var workspaceID: String? = nil
     let isWorking: Bool
     let kind: String
     let title: String?
@@ -112,11 +124,13 @@ struct WebActivityPayload: Encodable {
     let automaticPublishRunsAt: Date?
     let latestGitHubPublish: GitHubPublishSnapshot?
     let error: String?
+    var activeStages: [WorkStageProgress]? = nil
 }
 
 struct ActionPayload: Encodable {
     let ok: Bool
     let message: String
+    var content: String? = nil
 }
 
 struct WebEnabledRequest: Decodable {
@@ -167,6 +181,37 @@ struct WebModuleMutation: Decodable {
     let noResolve: Bool?
     let enableJQ: Bool?
     let scriptHubOptions: ScriptHubOptions?
+    let refreshIntervalMinutes: Int?
+    let changesRefreshInterval: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case name, sourceURL, sourceFormat, storageLocation, storageTargets, category, iconURL, outputFolder, outputFileName, publishesStandalone, isEnabled, policy, includeKeywords, excludeKeywords, mitmAdd, mitmRemove, noResolve, enableJQ, scriptHubOptions, refreshIntervalMinutes
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        name = try values.decode(String.self, forKey: .name)
+        sourceURL = try values.decode(String.self, forKey: .sourceURL)
+        sourceFormat = try values.decodeIfPresent(String.self, forKey: .sourceFormat)
+        storageLocation = try values.decodeIfPresent(String.self, forKey: .storageLocation)
+        storageTargets = try values.decodeIfPresent([String].self, forKey: .storageTargets)
+        category = try values.decodeIfPresent(String.self, forKey: .category)
+        iconURL = try values.decodeIfPresent(String.self, forKey: .iconURL)
+        outputFolder = try values.decodeIfPresent(String.self, forKey: .outputFolder)
+        outputFileName = try values.decodeIfPresent(String.self, forKey: .outputFileName)
+        publishesStandalone = try values.decodeIfPresent(Bool.self, forKey: .publishesStandalone)
+        isEnabled = try values.decodeIfPresent(Bool.self, forKey: .isEnabled)
+        policy = try values.decodeIfPresent(String.self, forKey: .policy)
+        includeKeywords = try values.decodeIfPresent(String.self, forKey: .includeKeywords)
+        excludeKeywords = try values.decodeIfPresent(String.self, forKey: .excludeKeywords)
+        mitmAdd = try values.decodeIfPresent(String.self, forKey: .mitmAdd)
+        mitmRemove = try values.decodeIfPresent(String.self, forKey: .mitmRemove)
+        noResolve = try values.decodeIfPresent(Bool.self, forKey: .noResolve)
+        enableJQ = try values.decodeIfPresent(Bool.self, forKey: .enableJQ)
+        scriptHubOptions = try values.decodeIfPresent(ScriptHubOptions.self, forKey: .scriptHubOptions)
+        refreshIntervalMinutes = try values.decodeIfPresent(Int.self, forKey: .refreshIntervalMinutes)
+        changesRefreshInterval = values.contains(.refreshIntervalMinutes)
+    }
 
     func draft(
         existing: RelayModule? = nil,
@@ -186,7 +231,9 @@ struct WebModuleMutation: Decodable {
             guard let location = ModuleStorageLocation(rawValue: storageLocation) else {
                 throw WebAPIError.invalidStorageLocation
             }
-            draft.storageLocation = location
+            if storageTargets != nil || existing?.storageTargets.count != 2 || existing?.storageLocation != location {
+                draft.storageLocation = location
+            }
         }
         if let storageTargets {
             let targets = Set(storageTargets.compactMap(ModuleStorageLocation.init(rawValue:)))
@@ -194,6 +241,10 @@ struct WebModuleMutation: Decodable {
                 throw WebAPIError.invalidStorageLocation
             }
             draft.storageTargets = targets
+        }
+        if changesRefreshInterval {
+            if let refreshIntervalMinutes, !(0...10080).contains(refreshIntervalMinutes) { throw WebAPIError.invalidArgument }
+            draft.refreshIntervalMinutes = refreshIntervalMinutes
         }
         if let category { draft.category = category }
         if let iconURL { draft.iconURL = iconURL }
@@ -243,4 +294,22 @@ enum WebAPIError: LocalizedError {
         case .invalidSourceURL: "来源地址无效。"
         }
     }
+}
+
+struct WebActivityEventPayload: Encodable, Sendable {
+    let workspaceID: String
+    let runtimeID: String
+    let revision: UInt64
+    let activity: WebActivityPayload
+}
+
+struct WebEventMessage: Sendable {
+    let data: Data
+    let revision: UInt64?
+}
+
+struct WebEventPayload: Sendable {
+    let state: WebEventMessage
+    let activity: WebEventMessage?
+    let legacyState: WebEventMessage?
 }

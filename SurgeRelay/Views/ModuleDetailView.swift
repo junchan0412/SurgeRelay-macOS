@@ -3,6 +3,11 @@ import SwiftUI
 struct ModuleDetailView: View {
     @Environment(AppModel.self) private var model
     @State private var argumentInfo = ModuleArgumentInfo()
+    @State private var syncComparison: ModuleSyncComparison?
+    @State private var showsVersionHistory = false
+    @State private var showsLint = false
+    @State private var showsTemplateName = false
+    @State private var templateName = ""
     let module: RelayModule
     let onEdit: () -> Void
 
@@ -15,6 +20,18 @@ struct ModuleDetailView: View {
                 argumentsSection
                 publishingSection
                 synchronizationSection
+                detailSection("发布前检查") {
+                    Button("检查规则结构与脚本资源…") { showsLint = true }
+                        .disabled(model.isWorking)
+                }
+                detailSection("复用模块设置") {
+                    Button("保存为模块模板…") { templateName = module.name; showsTemplateName = true }
+                        .disabled(model.isWorking)
+                }
+                detailSection("版本历史") {
+                    Button("查看历史、比较与回退…") { showsVersionHistory = true }
+                        .disabled(model.isWorking)
+                }
                 advancedSection
             }
             .frame(maxWidth: 940, alignment: .topLeading)
@@ -24,6 +41,25 @@ struct ModuleDetailView: View {
         }
         .background(Design.Palette.canvas)
         .accessibilityIdentifier("module-detail.root")
+        .alert("保存模块模板", isPresented: $showsTemplateName) {
+            TextField("模板名称", text: $templateName)
+            Button("取消", role: .cancel) {}
+            Button("保存") {
+                Task {
+                    do { try await model.saveModuleTemplate(moduleID: module.id, name: templateName) }
+                    catch { model.presentedError = error.localizedDescription }
+                }
+            }
+        } message: { Text("保存格式、分类、输出和常用转换选项，不复制来源地址或凭据。") }
+        .sheet(isPresented: $showsLint) {
+            ModuleLintView(moduleID: module.id).environment(model)
+        }
+        .sheet(isPresented: $showsVersionHistory) {
+            ModuleVersionHistoryView(moduleID: module.id).environment(model)
+        }
+        .sheet(item: $syncComparison) { comparison in
+            ModuleSyncComparisonView(comparison: comparison).environment(model)
+        }
         .task(id: "\(module.id.uuidString)-\(module.contentHash ?? "")") {
             argumentInfo = await model.moduleArgumentInfo(for: module)
         }
@@ -92,6 +128,17 @@ struct ModuleDetailView: View {
             detailRow("更新状态", value: module.state.title, icon: module.state.systemImage)
             detailRow("上次更新", value: module.lastUpdatedAt?.formatted(date: .long, time: .standard) ?? "从未更新", icon: "clock")
             detailRow("来源检查", value: module.sourceCheckedAt?.formatted(date: .long, time: .standard) ?? "尚未检查", icon: "dot.radiowaves.left.and.right")
+            detailRow("刷新策略", value: module.refreshIntervalMinutes.map { ModuleRefreshPlanner.intervalTitle($0) }
+                ?? "继承全局（\(ModuleRefreshPlanner.intervalTitle(model.settings.refreshIntervalMinutes))）", icon: "clock.arrow.circlepath")
+            if module.consecutiveFailureCount > 0 {
+                detailRow("连续失败", value: "\(module.consecutiveFailureCount) 次；手动更新可跳过普通退避", icon: "exclamationmark.triangle")
+            }
+            if let date = ModuleRefreshPlanner.nextDueDate(for: module, among: model.modules, globalIntervalMinutes: model.settings.refreshIntervalMinutes) {
+                detailRow("下次自动检查", value: date.formatted(date: .long, time: .standard), icon: "calendar.badge.clock")
+            }
+            if let date = ModuleRefreshPlanner.serverDeadline(for: module, among: model.modules), date > .now {
+                detailRow("服务器限流", value: "不早于 \(date.formatted(date: .long, time: .standard))；手动更新也会等待", icon: "hourglass")
+            }
             DisclosureGroup("技术信息与校验值") {
             detailRow("创建时间", value: module.createdAt.formatted(date: .long, time: .standard), icon: "calendar")
                 detailRow(
@@ -232,22 +279,28 @@ struct ModuleDetailView: View {
         if let conflict = module.syncConflict {
             detailSection("本地与 GitHub 内容冲突") {
                 VStack(alignment: .leading, spacing: 10) {
-                    Label("检测到本地发布文件与 GitHub 文件内容不同。请选择要保留的版本。", systemImage: "exclamationmark.triangle.fill")
+                    Label(conflict.comparisonState.title + "。请选择要保留的版本。", systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(Design.Palette.warning)
                     Text("本地最后更新：\(conflict.localUpdatedAtText)")
                     Text("GitHub 最后更新：\(conflict.githubUpdatedAtText)")
-                    HStack {
-                        Button("本地覆盖 GitHub") {
-                            Task { await model.resolveModuleSyncConflict(moduleID: module.id, resolution: .localWins) }
-                        }
-                        Button("GitHub 覆盖本地") {
-                            Task { await model.resolveModuleSyncConflict(moduleID: module.id, resolution: .githubWins) }
-                        }
-                    }
+                    Button("比较差异并选择覆盖方向…") { loadSyncComparison() }
+                        .disabled(model.isWorking)
                     .buttonStyle(.bordered)
                 }
                 .font(.caption)
             }
+        } else if module.hasLocalStorageTarget && module.hasGitHubStorageTarget {
+            detailSection("本地与 GitHub 同步") {
+                Button("比较两端内容…") { loadSyncComparison() }
+                    .disabled(model.isWorking)
+            }
+        }
+    }
+
+    private func loadSyncComparison() {
+        Task {
+            do { syncComparison = try await model.moduleSyncComparison(moduleID: module.id) }
+            catch { model.presentedError = error.localizedDescription }
         }
     }
 
@@ -389,5 +442,99 @@ struct ModuleDetailView: View {
         copyValue: String? = nil
     ) -> some View {
         DetailInfoRow(label: label, value: value, icon: icon, monospaced: monospaced, copyValue: copyValue)
+    }
+}
+
+private struct ModuleSyncComparisonView: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    @State var comparison: ModuleSyncComparison
+    @State private var pendingResolution: ModuleSyncResolution?
+    @State private var confirmsOverwrite = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(comparison.metadata.comparisonState.title).font(.headline)
+                    Text("本地 −\(comparison.diff.removedCount) 行 · GitHub +\(comparison.diff.addedCount) 行")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("重新比较") {
+                    Task {
+                        do { comparison = try await model.moduleSyncComparison(moduleID: comparison.moduleID) }
+                        catch { errorMessage = error.localizedDescription }
+                    }
+                }
+                .disabled(model.isWorking)
+                Button("完成") { dismiss() }.keyboardShortcut(.cancelAction)
+            }
+            if comparison.diff.usesCoarseComparison {
+                Text("变化范围较大，按整块删除/新增显示；数量不代表最小编辑次数。")
+                    .font(.caption).foregroundStyle(Design.Palette.warning)
+            }
+            if comparison.diff.hasFinalNewlineDifference {
+                Text("两端文件的末尾换行不同。")
+                    .font(.caption).foregroundStyle(Design.Palette.warning)
+            }
+            if comparison.diff.isTruncated {
+                Text("差异较多，已省略超出 2,000 行的显示内容。")
+                    .font(.caption).foregroundStyle(Design.Palette.warning)
+            }
+            ScrollView([.horizontal, .vertical]) {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(comparison.diff.rows.enumerated()), id: \.offset) { _, row in
+                        HStack(alignment: .top, spacing: 10) {
+                            Text(row.localLine.map(String.init) ?? "–").frame(width: 52, alignment: .trailing)
+                            Text(row.githubLine.map(String.init) ?? "–").frame(width: 52, alignment: .trailing)
+                            Text(row.kind == .added ? "+" : row.kind == .removed ? "−" : " ").frame(width: 12)
+                            Text(String(row.text.prefix(4_000))).textSelection(.enabled)
+                        }
+                        .font(.system(size: 12, design: .monospaced))
+                        .padding(.vertical, 3)
+                        .padding(.horizontal, 8)
+                        .frame(minWidth: 840, alignment: .leading)
+                        .background(row.kind == .added ? Color.green.opacity(0.10) : row.kind == .removed ? Color.red.opacity(0.10) : Color.clear)
+                    }
+                }
+                .fixedSize(horizontal: true, vertical: false)
+            }
+            .background(Design.Palette.canvas)
+            Text("左列为本地行号，右列为 GitHub 行号。长行仅显示前 4,000 个字符；覆盖会使用完整文件。")
+                .font(.caption).foregroundStyle(.secondary)
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("不会自动覆盖单边更新，请选择要保留的版本。")
+                    Text("所选内容会保留为本地编辑；后续发布仍会应用模块名称、参数和格式规范化。")
+                }
+                .font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button("本地覆盖 GitHub") { pendingResolution = .localWins; confirmsOverwrite = true }
+                Button("GitHub 覆盖本地") { pendingResolution = .githubWins; confirmsOverwrite = true }
+            }
+            .disabled(model.isWorking || comparison.metadata.comparisonState == .same)
+        }
+        .padding(20)
+        .frame(minWidth: 920, minHeight: 560)
+        .confirmationDialog("确认按所选方向覆盖？", isPresented: $confirmsOverwrite) {
+            Button(pendingResolution == .localWins ? "本地覆盖 GitHub" : "GitHub 覆盖本地", role: .destructive) {
+                guard let resolution = pendingResolution else { return }
+                Task {
+                    if await model.resolveModuleSyncConflict(moduleID: comparison.moduleID, resolution: resolution, comparison: comparison) {
+                        dismiss()
+                    } else {
+                        errorMessage = model.presentedError ?? "未完成同步，请重新比较后再试。"
+                        model.presentedError = nil
+                    }
+                }
+            }
+        } message: {
+            Text("执行前将重新核验两端版本；比较后发生变化时会停止，并要求重新比较。")
+        }
+        .alert("无法完成同步", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+            Button("好", role: .cancel) {}
+        } message: { Text(errorMessage ?? "") }
     }
 }

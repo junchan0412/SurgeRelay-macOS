@@ -10,19 +10,23 @@ extension AppModel {
         CredentialDiagnosticSnapshot.current(
             githubTokenStatus: githubTokenStorageStatus,
             webAccessTokenStatus: webAccessTokenStorageStatus,
-            credentialProbe: credentialProbe
+            credentialProbe: credentialProbe,
+            storageDirectory: configurationStorageDirectory
         )
     }
 
     func refreshCredentialProbe() {
+        guard !isWorking, workspaceIsActive else { statusMessage = PreviewContentSaveError.busy.localizedDescription; return }
         credentialProbe = .checking
         let tracksActivity = !workActivity.blocksUpdates
         if tracksActivity {
             beginWork(.checkingLocalCredentials, blocksUpdates: false)
         }
+        let directory = configurationStorageDirectory
         Task { @MainActor in
             let snapshot = await Task.detached(priority: .utility) {
-                LocalCredentialProbeSnapshot.current()
+                LocalCredentialProbeSnapshot.current(fileURL: directory.appending(path: "credentials.encrypted"),
+                                                     keyURL: directory.appending(path: "credentials.key"))
             }.value
             credentialProbe = snapshot
             if tracksActivity {

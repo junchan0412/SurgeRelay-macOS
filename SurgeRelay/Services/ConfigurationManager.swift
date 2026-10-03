@@ -5,17 +5,11 @@ enum ConfigurationManager {
         PersistenceStore.configurationDirectoryURL.path
     }
 
-    static func migrateConfiguration(
-        to path: String,
-        modules: [RelayModule],
-        settings: AppSettings,
-        upstreamState: ScriptHubUpstreamState,
-        updateHistory: [UpdateHistoryEntry]
-    ) throws {
-        try PersistenceStore.useConfigurationDirectory(path)
-        try PersistenceStore.saveModules(modules)
-        PersistenceStore.saveSettings(settings)
-        PersistenceStore.saveUpstreamState(upstreamState)
-        PersistenceStore.saveUpdateHistory(updateHistory)
+    static func migrateConfiguration(to path: String, writer: ConfigurationPersistenceWriter,
+                                     commit: @escaping @Sendable (URL) throws -> Void = PersistenceStore.selectConfigurationDirectory) async throws -> URL {
+        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw CocoaError(.fileNoSuchFile) }
+        let destination = URL(filePath: trimmed, directoryHint: .isDirectory).standardizedFileURL
+        return try await writer.migrate(to: destination, commit: commit)
     }
 }

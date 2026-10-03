@@ -10,6 +10,7 @@ struct SettingsPublishingView: View {
             storageLocationSection
             cloudflareWorkerSection
         }
+        .disabled(model.isWorking)
         .task {
             refreshLocalRootDiagnostics()
         }

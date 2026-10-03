@@ -3,6 +3,7 @@ import Foundation
 @MainActor
 extension AppModel {
     func scheduleAutomaticPublish() {
+        guard workspaceIsActive, !isWorkspaceTransitioning, !startupRecoveryPending, !startupRecoveryFailed else { return }
         let admission = AutomaticPublishPlanner.scheduleAdmission(
             context: automaticPublishContext(),
             plan: githubPublishPlan
@@ -33,22 +34,25 @@ extension AppModel {
             }
             self.clearAutomaticPublishSchedule()
             self.beginWork(.automaticPublishing)
+            self.setWorkStage(.publish, moduleID: Self.combinedModuleSelectionID, moduleName: "GitHub 自动发布")
             defer {
+                self.setWorkStage(nil, moduleID: Self.combinedModuleSelectionID, moduleName: "GitHub 自动发布")
                 self.endWork(.automaticPublishing)
                 self.automaticPublishTask = nil
             }
+            let recorder = StageMetricsRecorder()
+            let started = ContinuousClock.now
             do {
                 guard self.shouldContinueCurrentWork() else { return }
                 let preview = try await self.githubPublishPreview()
                 guard self.shouldContinueCurrentWork() else { return }
                 if preview.requiresDeletionConfirmation {
-                    self.pendingPublishPreview = preview
-                    self.statusMessage = GitHubPublishPlanner.automaticDeletionConfirmationStatus(
-                        deletedFileCount: preview.deletedFiles.count
-                    )
+                    self.endWork(.automaticPublishing)
+                    let payload = try await self.webPublishPreview(WebPublishPreviewRequest(scope: "githubAll"), retainsForNativeUI: true)
+                    self.retainNativePublishPreview(payload)
                     return
                 }
-                let report = try await self.publishAllInternal()
+                let report = try await StageMetricsContext.$current.withValue(recorder) { try await self.publishAllInternal() }
                 guard self.shouldContinueCurrentWork() else { return }
                 self.statusMessage = GitHubPublishPlanner.automaticReportStatus(report)
                 self.recordGitHubPublish(report)
@@ -58,6 +62,9 @@ extension AppModel {
                     self.statusMessage = AutomaticPublishPlanner.noStandaloneFilesStatus
                     return
                 }
+                self.recordHistory([UpdateHistoryEntry(moduleName: "GitHub 自动发布", outcome: .failed,
+                    duration: StageMetricsRecorder.elapsed(since: started), message: error.localizedDescription,
+                    publishDestination: .gitHub, stageMetrics: recorder.snapshot)])
                 self.presentedError = "GitHub 自动发布失败：\(error.localizedDescription)"
             }
         }

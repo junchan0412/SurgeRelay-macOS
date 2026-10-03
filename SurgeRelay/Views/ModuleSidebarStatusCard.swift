@@ -49,6 +49,25 @@ struct ModuleSidebarStatusCard: View {
                 Divider()
             }
 
+            if let attempt = model.selectedPublishAttempt, !attempt.retryDestinations.isEmpty {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("所选模块发布结果").font(.caption.weight(.medium))
+                    ForEach(attempt.results) { result in
+                        Text("\(result.destination.title)：\(result.message)")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    Button("重试未完成目标") {
+                        Task { await model.retrySelectedPublish() }
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(model.isWorking)
+                    .help("使用当前模块内容，只重试未完成的发布目标")
+                    .accessibilityIdentifier("publish.retry-targets")
+                }
+                Divider()
+            }
+
             if model.workActivity.isActive {
                 if model.workActivity.kind == .updatingModules,
                    let name = synchronizingModuleName,
@@ -83,6 +102,19 @@ struct ModuleSidebarStatusCard: View {
                             .lineLimit(2)
                             .contentTransition(.opacity)
                     }
+                }
+                if let stages = model.workActivity.activeStages, !stages.isEmpty {
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        let counts = WorkStage.allCases.compactMap { stage -> String? in
+                            let count = stages.filter { $0.stage == stage }.count
+                            return count == 0 ? nil : "\(stage.title) \(count)"
+                        }.joined(separator: " · ")
+                        let elapsed = stages.map { max(0, Int(context.date.timeIntervalSince($0.startedAt))) }.max() ?? 0
+                        Text("\(counts) · \(elapsed) 秒")
+                            .font(.caption2).monospacedDigit().foregroundStyle(.secondary)
+                    }
+                    .help(stages.map { "\($0.moduleName)：\($0.detail ?? $0.stage.title)" }.joined(separator: "\n"))
+                    .accessibilityIdentifier("work.stages")
                 }
                 if model.workActivity.canCancel {
                     Button {

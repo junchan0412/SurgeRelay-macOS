@@ -26,6 +26,15 @@ struct ModuleSidebarView: View {
         @Bindable var model = model
 
         VStack(spacing: 0) {
+            Label(model.workspaceName, systemImage: "square.stack.3d.up")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .help("当前工作区：" + model.workspaceName)
+                .accessibilityIdentifier("workspace.current")
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
             VStack(spacing: 4) {
                 Button { model.selectedModuleID = AppModel.overviewSelectionID } label: {
                     Label("工作台", systemImage: "square.grid.2x2")
@@ -157,6 +166,54 @@ struct ModuleSidebarView: View {
         }
         .tag(module.id)
         .contextMenu {
+            ModuleSidebarContextMenu(moduleID: module.id, model: model, deleteCandidate: $deleteCandidate,
+                                     editModule: editModule, textEditModule: textEditModule)
+        }
+    }
+
+    private func batchSelectionBinding(for id: UUID) -> Binding<Bool> {
+        Binding(
+            get: { batchSelectedModuleIDs.contains(id) },
+            set: { selected in
+                if selected {
+                    batchSelectedModuleIDs.insert(id)
+                } else {
+                    batchSelectedModuleIDs.remove(id)
+                }
+            }
+        )
+    }
+
+    private var collapsedSectionIDs: Set<String> {
+        Set(collapsedSectionIDsRaw.split(separator: ",").map(String.init))
+    }
+
+    private func isSectionExpanded(_ id: String) -> Bool {
+        !collapsedSectionIDs.contains(id)
+    }
+
+    private func setSection(_ id: String, expanded: Bool) {
+        var ids = collapsedSectionIDs
+        if expanded {
+            ids.remove(id)
+        } else {
+            ids.insert(id)
+        }
+        collapsedSectionIDsRaw = ids.sorted().joined(separator: ",")
+    }
+}
+
+@MainActor
+private struct ModuleSidebarContextMenu: View {
+    let moduleID: UUID
+    let model: AppModel
+    @Binding var deleteCandidate: ModuleDeleteCandidate?
+    let editModule: (RelayModule) -> Void
+    let textEditModule: (RelayModule) -> Void
+
+    var body: some View {
+        if let module = model.modules.first(where: { $0.id == moduleID }) {
+            let admission = model.updateAdmission(for: module)
             Menu("编辑") {
                 Button("视图编辑") { editModule(module) }
                     .help("在表单编辑器中修改模块来源、输出等设置")
@@ -167,8 +224,8 @@ struct ModuleSidebarView: View {
                 Button("在访达中显示") { revealModuleInFinder(module) }
             }
             Button("更新") { model.startUpdate(moduleID: module.id) }
-                .disabled(!model.updateAdmission(for: module).isAccepted)
-                .help(model.updateAdmission(for: module).message)
+                .disabled(!admission.isAccepted)
+                .help(admission.message)
             Button("复制模块") { try? model.duplicateModule(id: module.id) }
             Button("拷贝更新地址") { copyToPasteboard(module.updateSourceURL) }
             Button("拷贝输出路径") { copyToPasteboard(module.publishedRelativePath) }
@@ -208,36 +265,6 @@ struct ModuleSidebarView: View {
         }
     }
 
-    private func batchSelectionBinding(for id: UUID) -> Binding<Bool> {
-        Binding(
-            get: { batchSelectedModuleIDs.contains(id) },
-            set: { selected in
-                if selected {
-                    batchSelectedModuleIDs.insert(id)
-                } else {
-                    batchSelectedModuleIDs.remove(id)
-                }
-            }
-        )
-    }
-
-    private var collapsedSectionIDs: Set<String> {
-        Set(collapsedSectionIDsRaw.split(separator: ",").map(String.init))
-    }
-
-    private func isSectionExpanded(_ id: String) -> Bool {
-        !collapsedSectionIDs.contains(id)
-    }
-
-    private func setSection(_ id: String, expanded: Bool) {
-        var ids = collapsedSectionIDs
-        if expanded {
-            ids.remove(id)
-        } else {
-            ids.insert(id)
-        }
-        collapsedSectionIDsRaw = ids.sorted().joined(separator: ",")
-    }
 }
 
 @MainActor

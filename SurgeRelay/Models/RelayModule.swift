@@ -41,8 +41,16 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     var sourceContentHash: String?
     var sourceCheckedAt: Date?
     var conversionEngineRevision: String?
+    var refreshIntervalMinutes: Int?
+    var lastRefreshAttemptAt: Date?
+    var consecutiveFailureCount: Int
+    var nextRetryAt: Date?
+    var serverRetryAfter: Date?
+    var serverRetrySourceURL: String?
     var overrideBaseHash: String?
     var hasOverrideConflict: Bool
+    var syncBaseHash: String?
+    var syncBaseScope: String?
     var syncConflict: ModuleSyncConflictMetadata?
     var state: ModuleUpdateState
     var lastError: String?
@@ -83,8 +91,16 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         sourceContentHash: String? = nil,
         sourceCheckedAt: Date? = nil,
         conversionEngineRevision: String? = nil,
+        refreshIntervalMinutes: Int? = nil,
+        lastRefreshAttemptAt: Date? = nil,
+        consecutiveFailureCount: Int = 0,
+        nextRetryAt: Date? = nil,
+        serverRetryAfter: Date? = nil,
+        serverRetrySourceURL: String? = nil,
         overrideBaseHash: String? = nil,
         hasOverrideConflict: Bool = false,
+        syncBaseHash: String? = nil,
+        syncBaseScope: String? = nil,
         syncConflict: ModuleSyncConflictMetadata? = nil,
         state: ModuleUpdateState = .never,
         lastError: String? = nil
@@ -125,8 +141,16 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         self.sourceContentHash = sourceContentHash
         self.sourceCheckedAt = sourceCheckedAt
         self.conversionEngineRevision = conversionEngineRevision
+        self.refreshIntervalMinutes = refreshIntervalMinutes.map { min(max($0, 0), 10_080) }
+        self.lastRefreshAttemptAt = lastRefreshAttemptAt
+        self.consecutiveFailureCount = min(max(0, consecutiveFailureCount), 30)
+        self.nextRetryAt = nextRetryAt
+        self.serverRetryAfter = serverRetryAfter
+        self.serverRetrySourceURL = serverRetrySourceURL
         self.overrideBaseHash = overrideBaseHash
         self.hasOverrideConflict = hasOverrideConflict
+        self.syncBaseHash = syncBaseHash
+        self.syncBaseScope = syncBaseScope
         self.syncConflict = syncConflict
         self.state = state
         self.lastError = lastError
@@ -138,7 +162,8 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         case storageLocation, storageTargets, localStorageRelativePath, preservesOutputFileName
         case publishesStandalone, isEnabled, scriptHubOptions, argumentOverrides, iconURL, customIconURL, scriptHubSubscription, detectedSourceFormat
         case createdAt, lastUpdatedAt, contentHash, sourceETag, sourceLastModified, sourceContentHash, sourceCheckedAt
-        case conversionEngineRevision, overrideBaseHash, hasOverrideConflict, syncConflict, state, lastError
+        case refreshIntervalMinutes, lastRefreshAttemptAt, consecutiveFailureCount, nextRetryAt, serverRetryAfter, serverRetrySourceURL
+        case conversionEngineRevision, overrideBaseHash, hasOverrideConflict, syncBaseHash, syncBaseScope, syncConflict, state, lastError
     }
 
     func encode(to encoder: Encoder) throws {
@@ -171,8 +196,16 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         try container.encodeIfPresent(sourceContentHash, forKey: .sourceContentHash)
         try container.encodeIfPresent(sourceCheckedAt, forKey: .sourceCheckedAt)
         try container.encodeIfPresent(conversionEngineRevision, forKey: .conversionEngineRevision)
+        try container.encodeIfPresent(serverRetrySourceURL, forKey: .serverRetrySourceURL)
+        try container.encodeIfPresent(serverRetryAfter, forKey: .serverRetryAfter)
+        try container.encodeIfPresent(nextRetryAt, forKey: .nextRetryAt)
+        try container.encode(consecutiveFailureCount, forKey: .consecutiveFailureCount)
+        try container.encodeIfPresent(lastRefreshAttemptAt, forKey: .lastRefreshAttemptAt)
+        try container.encodeIfPresent(refreshIntervalMinutes, forKey: .refreshIntervalMinutes)
         try container.encodeIfPresent(overrideBaseHash, forKey: .overrideBaseHash)
         try container.encode(hasOverrideConflict, forKey: .hasOverrideConflict)
+        try container.encodeIfPresent(syncBaseHash, forKey: .syncBaseHash)
+        try container.encodeIfPresent(syncBaseScope, forKey: .syncBaseScope)
         try container.encodeIfPresent(syncConflict, forKey: .syncConflict)
         try container.encode(state, forKey: .state)
         try container.encodeIfPresent(lastError, forKey: .lastError)
@@ -227,8 +260,16 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         sourceContentHash = try container.decodeIfPresent(String.self, forKey: .sourceContentHash)
         sourceCheckedAt = try container.decodeIfPresent(Date.self, forKey: .sourceCheckedAt)
         conversionEngineRevision = try container.decodeIfPresent(String.self, forKey: .conversionEngineRevision)
+        serverRetrySourceURL = try container.decodeIfPresent(String.self, forKey: .serverRetrySourceURL)
+        serverRetryAfter = try container.decodeIfPresent(Date.self, forKey: .serverRetryAfter)
+        nextRetryAt = try container.decodeIfPresent(Date.self, forKey: .nextRetryAt)
+        consecutiveFailureCount = min(max(0, try container.decodeIfPresent(Int.self, forKey: .consecutiveFailureCount) ?? 0), 30)
+        lastRefreshAttemptAt = try container.decodeIfPresent(Date.self, forKey: .lastRefreshAttemptAt)
+        refreshIntervalMinutes = (try container.decodeIfPresent(Int.self, forKey: .refreshIntervalMinutes)).map { min(max($0, 0), 10_080) }
         overrideBaseHash = try container.decodeIfPresent(String.self, forKey: .overrideBaseHash)
         hasOverrideConflict = try container.decodeIfPresent(Bool.self, forKey: .hasOverrideConflict) ?? false
+        syncBaseHash = try container.decodeIfPresent(String.self, forKey: .syncBaseHash)
+        syncBaseScope = try container.decodeIfPresent(String.self, forKey: .syncBaseScope)
         syncConflict = try container.decodeIfPresent(ModuleSyncConflictMetadata.self, forKey: .syncConflict)
         state = try container.decodeIfPresent(ModuleUpdateState.self, forKey: .state) ?? .never
         lastError = try container.decodeIfPresent(String.self, forKey: .lastError)

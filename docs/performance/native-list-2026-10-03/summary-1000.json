@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 1,
+  "percentileMethod": "nearest-rank",
+  "results": [
+    {
+      "label": "1000-scroll-filter",
+      "capture": "/private/tmp/surge-relay-list-matrix-20261003/frames-1000.jsonl",
+      "actionWindowEpochMilliseconds": [
+        1791009360007.0,
+        1791009393203.0
+      ],
+      "windowSelection": "CUA epoch action window",
+      "boundary": "Main-thread CADisplayLink callback cadence, NOT GPU presentation FPS or verified rendered frames",
+      "clockMapping": "Per-session epochMs = (wallTimeEpochSeconds + record.uptimeSeconds - session.uptimeSeconds) * 1000; no cross-clock sleep assumptions",
+      "complete": false,
+      "issues": [
+        "Capture limit reached; capture is incomplete",
+        "No mapped frame callbacks in the requested window"
+      ],
+      "parseIssues": [],
+      "missingAnchorSessionIDs": [],
+      "captureLimitRecords": [
+        {
+          "type": "capture-limit",
+          "reason": "64 MiB output budget reached"
+        }
+      ],
+      "sessionIDs": [],
+      "selectedCallbackEpochRangeMilliseconds": null,
+      "callbackCounts": {
+        "total": 0,
+        "windowVisible": 0,
+        "applicationActive": 0,
+        "occlusionVisible": 0,
+        "cadenceEligible": 0,
+        "ineligible": 0
+      },
+      "eligibleCallbackIntervals": {
+        "count": 0,
+        "p50Milliseconds": null,
+        "p95Milliseconds": null,
+        "maxMilliseconds": null,
+        "intervalsOver50Milliseconds": 0
+      },
+      "intervalsCrossingWindowStartExcluded": 0,
+      "missedCadenceEstimate": {
+        "comparableIntervals": 0,
+        "sum": 0,
+        "maximumPerInterval": null,
+        "note": "Estimate only; null/reset/unstable cadence records excluded. Not a GPU dropped-frame count."
+      },
+      "rss": {
+        "method": "Host mach task_info, sampled by background timer at nominal 1Hz; transient peaks may be missed",
+        "windowEmittedResidentPeakBytes": null,
+        "captureCumulativeSampledPeakAsOfWindowBytes": null,
+        "wholeRelevantSessionSampledPeakBytes": null,
+        "coverage": [],
+        "note": "Cumulative peak may precede action window. When main thread is blocked, intermediate 1Hz samples have no individual rows; their peak survives only in cumulative peak. Do not label cumulative peak as exact window peak."
+      },
+      "writeLoss": [],
+      "limitations": [
+        "Callback gaps above 50ms indicate scheduling gaps, not direct proof of CPU long tasks",
+        "An abrupt process exit without capture-limit or loss marker cannot be detected reliably from JSONL alone",
+        "Per-session wall/uptime mapping assumes wall clock is not adjusted within that capture; restart capture after sleep/clock changes when precise action alignment matters"
+      ]
+    },
+    {
+      "label": "1000-expand",
+      "capture": "/private/tmp/surge-relay-list-matrix-20261003/frames-1000.jsonl",
+      "actionWindowEpochMilliseconds": [
+        1791009721331.0,
+        1791009728335.0
+      ],
+      "windowSelection": "CUA epoch action window",
+      "boundary": "Main-thread CADisplayLink callback cadence, NOT GPU presentation FPS or verified rendered frames",
+      "clockMapping": "Per-session epochMs = (wallTimeEpochSeconds + record.uptimeSeconds - session.uptimeSeconds) * 1000; no cross-clock sleep assumptions",
+      "complete": false,
+      "issues": [
+        "Capture limit reached; capture is incomplete",
+        "No mapped frame callbacks in the requested window"
+      ],
+      "parseIssues": [],
+      "missingAnchorSessionIDs": [],
+      "captureLimitRecords": [
+        {
+          "type": "capture-limit",
+          "reason": "64 MiB output budget reached"
+        }
+      ],
+      "sessionIDs": [],
+      "selectedCallbackEpochRangeMilliseconds": null,
+      "callbackCounts": {
+        "total": 0,
+        "windowVisible": 0,
+        "applicationActive": 0,
+        "occlusionVisible": 0,
+        "cadenceEligible": 0,
+        "ineligible": 0
+      },
+      "eligibleCallbackIntervals": {
+        "count": 0,
+        "p50Milliseconds": null,
+        "p95Milliseconds": null,
+        "maxMilliseconds": null,
+        "intervalsOver50Milliseconds": 0
+      },
+      "intervalsCrossingWindowStartExcluded": 0,
+      "missedCadenceEstimate": {
+        "comparableIntervals": 0,
+        "sum": 0,
+        "maximumPerInterval": null,
+        "note": "Estimate only; null/reset/unstable cadence records excluded. Not a GPU dropped-frame count."
+      },
+      "rss": {
+        "method": "Host mach task_info, sampled by background timer at nominal 1Hz; transient peaks may be missed",
+        "windowEmittedResidentPeakBytes": null,
+        "captureCumulativeSampledPeakAsOfWindowBytes": null,
+        "wholeRelevantSessionSampledPeakBytes": null,
+        "coverage": [],
+        "note": "Cumulative peak may precede action window. When main thread is blocked, intermediate 1Hz samples have no individual rows; their peak survives only in cumulative peak. Do not label cumulative peak as exact window peak."
+      },
+      "writeLoss": [],
+      "limitations": [
+        "Callback gaps above 50ms indicate scheduling gaps, not direct proof of CPU long tasks",
+        "An abrupt process exit without capture-limit or loss marker cannot be detected reliably from JSONL alone",
+        "Per-session wall/uptime mapping assumes wall clock is not adjusted within that capture; restart capture after sleep/clock changes when precise action alignment matters"
+      ]
+    }
+  ],
+  "sourceCaptureSHA256": "b14db162b887a863823b51f44bb73116c0f616743fd00437d58499b429a280d1",
+  "sourceCaptureBytes": 67107446,
+  "retainedWindowsEpochMilliseconds": [
+    [
+      1791009360007,
+      1791009393203
+    ],
+    [
+      1791009721331,
+      1791009728335
+    ]
+  ],
+  "retainedCapture": "/Users/qidewei/Documents/Surge Relay/docs/performance/native-list-2026-10-03/frames-1000-window.jsonl",
+  "rawCaptureRemovedAfterExtraction": true
+}

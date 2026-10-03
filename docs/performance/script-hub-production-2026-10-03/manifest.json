@@ -1,0 +1,56 @@
+{
+  "productionScriptOrigin": "/Users/qidewei/Library/Application Support/Surge Relay/Cache/ScriptHubEngine",
+  "scriptSHA256": {
+    "Rewrite-Parser.js": "c5e46afa219424e22bcba151dbd6f5e4c6caf518cfdf3317381f4c7e2068e51b",
+    "script-converter.js": "27fc22ac5a40364fbe0728d7264e163431656e7b142cde6337ecad11e5d60b78"
+  },
+  "inputBytes": {
+    "qx": 64917,
+    "loon": 104345
+  },
+  "fixtureSHA256": {
+    "qx": "24c2b0e362e7e7e02e3792ab19e5f8c00c0c88e6ca5a824214c424c9cb88aaea",
+    "loon": "e22886e5790338b7106ed137f6f69d81b59e85c40bc25a8042d7f5b8fe5a7838"
+  },
+  "status": "smoke-8x1-and-formal-24x5-off-on-passed",
+  "recordedAtUTC": "2026-10-03T00:29:33.994762+00:00",
+  "binarySHA256": {
+    "worker": "b827407e77bed605cd58a2aeaf81026a9a10c57eafee238f3b929783013f6125",
+    "benchmark": "9fe62c866e97a1f3df3873aa633be57cdcae2a80fae397ca8fa6415f3f41533b"
+  },
+  "sourceSHA256": {
+    "SurgeRelay/Models/StageMetric.swift": "fb928ac9794db776863243a41ece0e39f03b6b677f26e1925d2745a58b3c750d",
+    "SurgeRelay/Models/RelayError.swift": "0c62e7e1198de29a2eef8c45bb0685f6caf739c2e7e4520e97b60d02b3e53fa8",
+    "SurgeRelay/Services/ScriptHubNetworkPolicy.swift": "d91d932abcad67d8e38efdc37eead78191c2dcd6b9297a07929093b04aed4f90",
+    "SurgeRelay/Services/ScriptHubWorkerFiles.swift": "5f36e7c05dfeefd4f7c4886d5c3b5799568e9a69deb968e548b3051ebfbcb653",
+    "SurgeRelay/Services/SourceRetryAfter.swift": "29b22cfc5b5ee160be846dfdc033232bb20cb8c284f3d8ce910c4e5b1432b856",
+    "SurgeRelayScriptWorker/ScriptHubJavaScriptRuntime.swift": "b97fd3225ec16b1a071fea2fafd6b26f139d79a1950ecb55cb049252abcc68a4",
+    "SurgeRelayScriptWorker/ScriptHubWorkerMain.swift": "955e33c1993c375453c7cbb612681bfc8616682d9b228f9f9bcdfa1779a42adc",
+    "SurgeRelay/Services/EmbeddedScriptHubEngine.swift": "90e29d4aac02532b28287128f4f82905ebc2165b2c9ccef02c67e022605c0564",
+    "SurgeRelay/Services/SurgeModuleSanitizer.swift": "0c38e6e548bc8e52b15b646ee263fd60b8ffeb5579a0e76e51285fd51201fb5a"
+  },
+  "artifactSHA256": {
+    "smoke-off.json": "252d6d8fac55067c3c7324a119787a20132388e3316774e1df0faa84809c0cae",
+    "validated-qx-0.sgmodule": "5748f1145cb83e285b70fd7262356ae021762e739a48e78f229da56c7dadd523",
+    "off.json": "eb3a304aabae5645e61c330ebc76449e4742fd605e1fd9e46db264e19c634114",
+    "qx.conf": "24c2b0e362e7e7e02e3792ab19e5f8c00c0c88e6ca5a824214c424c9cb88aaea",
+    "benchmark_production_scripts.swift": "b2091085a6a5e346d21e6fd15ff9a6fc8b8a34192533ab4a5e55dbf184fafec1",
+    "run.sh": "d0b74547268f3e2a18e8907a1b540671b50a8af04afb3a64d0d0c8a819aa5ed1",
+    "smoke-on.json": "4d8df17fa5d177ade1c285b0b7061fcc4050b9b43acf081574df55ad74887465",
+    "validated-loon-2.sgmodule": "270f51985e21dd685efa227770d1c1f65f6987589569b505205b74bdd9f25a0f",
+    "on.json": "3897a9c4ef271ceb4ddc14ac6c9892bdd430adfcdf68dbe82d9d3b1e70408af0",
+    "loon.plugin": "e22886e5790338b7106ed137f6f69d81b59e85c40bc25a8042d7f5b8fe5a7838"
+  },
+  "scriptVersion": "Cached production scripts identified by exact SHA-256; upstream commit was not independently established.",
+  "productionNetworkBridge": "Replaced only inside test input with exact-URL fixture callback; product security policy unchanged.",
+  "outputs": {
+    "QX": {
+      "rules": 1500,
+      "bytes": 61968
+    },
+    "Loon": {
+      "rules": 1500,
+      "bytes": 104372
+    }
+  }
+}

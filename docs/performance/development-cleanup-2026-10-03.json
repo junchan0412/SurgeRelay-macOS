@@ -1,0 +1,147 @@
+{
+  "date": "2026-10-03",
+  "reason": "User-requested cleanup of completed development intermediates; no active build/trace/QA process",
+  "freeBytesBefore": 89758212096,
+  "removed": [
+    {
+      "path": "/Users/qidewei/Documents/Surge Relay/.build/maintenance",
+      "allocatedKiBBefore": 1024652
+    },
+    {
+      "path": "/Users/qidewei/Documents/Surge Relay/.build/web-load-benchmark",
+      "allocatedKiBBefore": 262996
+    },
+    {
+      "path": "/private/tmp/surge-relay-list-matrix-20261003/list-100.trace",
+      "allocatedKiBBefore": 2011148
+    },
+    {
+      "path": "/private/tmp/surge-relay-list-matrix-20261003/list-100-bounded.trace",
+      "allocatedKiBBefore": 604320
+    },
+    {
+      "path": "/private/tmp/surge-relay-native-smoke-20261002-hitches-memory.trace",
+      "allocatedKiBBefore": 409108
+    },
+    {
+      "path": "/private/tmp/surge-relay-native-smoke-20261002.trace",
+      "allocatedKiBBefore": 760
+    },
+    {
+      "path": "/private/tmp/surge-relay-audit-build",
+      "allocatedKiBBefore": 516484
+    },
+    {
+      "path": "/private/tmp/surge-relay-goal-ui-build",
+      "allocatedKiBBefore": 435756
+    },
+    {
+      "path": "/private/tmp/SurgeRelay-web-load-diagnostics",
+      "allocatedKiBBefore": 266836
+    },
+    {
+      "path": "/private/tmp/surge-relay-web-load-release",
+      "allocatedKiBBefore": 267452
+    },
+    {
+      "path": "/private/tmp/SurgeRelay-worker-release",
+      "allocatedKiBBefore": 84968
+    },
+    {
+      "path": "/private/tmp/surge-relay-native-qa-unique",
+      "allocatedKiBBefore": 35484
+    },
+    {
+      "path": "/private/tmp/surge-relay-native-qa",
+      "allocatedKiBBefore": 33656
+    },
+    {
+      "path": "/private/tmp/surge-relay-native-fixtures-ee0456877e",
+      "allocatedKiBBefore": 91064
+    },
+    {
+      "path": "/private/tmp/surge-relay-release-qa-20261003-85ecaa2c/Surge Relay QA 20261003 85ecaa2c.app",
+      "allocatedKiBBefore": 20816
+    },
+    {
+      "path": "/private/tmp/surge-relay-release-fixture-20261003-c4667f4e/modules-1000",
+      "allocatedKiBBefore": 21276
+    },
+    {
+      "path": "/private/tmp/surge-relay-release-fixture-20261003-c4667f4e/modules-5000",
+      "allocatedKiBBefore": 56456
+    },
+    {
+      "path": "/private/tmp/surge-relay-release-fixture-20261003-c4667f4e/modules-100/Configuration/Backups",
+      "allocatedKiBBefore": 226408
+    },
+    {
+      "path": "/private/tmp/SurgeRelay-web-load-5000-2026-10-02.xcresult",
+      "allocatedKiBBefore": 81492
+    },
+    {
+      "path": "/private/tmp/SurgeRelay-web-load-attachments",
+      "allocatedKiBBefore": 10172
+    },
+    {
+      "path": "/private/tmp/surge-relay-production-script-fixture",
+      "allocatedKiBBefore": 1520
+    },
+    {
+      "path": "/private/tmp/surge-relay-native-string-attribution",
+      "allocatedKiBBefore": 84
+    },
+    {
+      "path": "/private/tmp/surge-relay-native-recorder-model-check",
+      "allocatedKiBBefore": 236
+    },
+    {
+      "path": "/private/tmp/surge-relay-editor-benchmark",
+      "allocatedKiBBefore": 8
+    },
+    {
+      "path": "/private/tmp/surge-relay-audit-benchmark",
+      "allocatedKiBBefore": 8
+    },
+    {
+      "path": "/private/tmp/SurgeRelay-stage-benchmark",
+      "allocatedKiBBefore": 496
+    },
+    {
+      "path": "/private/tmp/SurgeRelay-stage-worker",
+      "allocatedKiBBefore": 280
+    },
+    {
+      "path": "/private/tmp/SurgeRelayScriptWorker-integration",
+      "allocatedKiBBefore": 268
+    },
+    {
+      "path": "/private/var/folders/dp/stn1d8h114x2wz9dnk4r0bjh0000gn/T/surge-relay-web-tests-026cppsh",
+      "allocatedKiBBefore": 126468
+    },
+    {
+      "path": "/private/var/folders/dp/stn1d8h114x2wz9dnk4r0bjh0000gn/T/SurgeRelay-persistence-tests-zgx_2gc1",
+      "allocatedKiBBefore": 119324
+    },
+    {
+      "path": "/private/var/folders/dp/stn1d8h114x2wz9dnk4r0bjh0000gn/T/SurgeRelay-worker-release-preflight-t03_snta",
+      "allocatedKiBBefore": 20872
+    },
+    {
+      "path": "/private/var/folders/dp/stn1d8h114x2wz9dnk4r0bjh0000gn/T/SurgeRelay-worker-release-final-8ks7v6no",
+      "allocatedKiBBefore": 380
+    }
+  ],
+  "absent": [
+    "/private/var/folders/dp/stn1d8h114x2wz9dnk4r0bjh0000gn/T/SurgeRelay-ScriptWorker-4703A39C-E040-41F9-B68F-9B9CDFD87657"
+  ],
+  "retained": [
+    "Current /tmp/surge-relay-goal-build and release DerivedData for remaining tests",
+    "Current List QA app and 100/1000/5000 list fixtures",
+    "Current attribution QA app and modules-100 editor fixture",
+    "Repository source, docs and compact raw evidence",
+    "Pre-existing September build/dist/codex-run artifacts"
+  ],
+  "freeBytesAfter": 96339787776,
+  "allocatedKiBRemoved": 6731248
+}

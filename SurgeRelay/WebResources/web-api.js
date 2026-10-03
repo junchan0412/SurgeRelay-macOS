@@ -63,10 +63,13 @@
         try {
           message = (await response.json()).message || message;
         } catch (_) {}
-        throw new Error(message);
+        const error = new Error(message);
+        error.status = response.status;
+        throw error;
       }
       const contentType = response.headers.get('content-type') || '';
-      return contentType.includes('application/json') ? response.json() : response.text();
+      const result = await (contentType.includes('application/json') ? response.json() : response.text());
+      return options.withResponseMetadata ? { body: result, etag: response.headers.get('etag') } : result;
     }
 
     return {

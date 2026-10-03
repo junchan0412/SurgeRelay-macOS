@@ -391,3 +391,69 @@ const refusedPreviewController = previewHelpers.createPreviewController({
 });
 await refusedPreviewController.restorePreview({ id: 'module-1', name: 'Demo Module' });
 assert.equal(refusedRestoreRequests.length, 0);
+
+
+const dualState = { moduleEditor: { localOutputFolders: ['', 'Local'], githubOutputFolders: ['', 'Remote'] } };
+editorController.populateModuleForm({ name: 'Dual Name', storageLocation: 'local', storageTargets: ['gitHub', 'local'] }, { state: dualState });
+assert.equal(editorFormElements.storageLocation.value, 'both', 'editing dual-target modules retains both destinations');
+assert.deepEqual(Array.from(editorController.outputFoldersForStorage(dualState, 'both')), ['', 'Local', 'Remote']);
+let dualPayload = logic.moduleEditorPayload(editorController.collectModuleFields());
+assert.deepEqual(Array.from(dualPayload.storageTargets), ['local', 'gitHub']);
+assert.equal(dualPayload.storageLocation, 'local', 'legacy location stays a valid API enum');
+assert.equal(editorController.updateOutputPathPreview({ state: dualState }).path, 'Dual Name.sgmodule');
+assert.match(logic.outputPathNotice('Dual.sgmodule', true, { storageLocation: 'both', publishToLocal: false, publishToGitHub: false }).message, /本地、GitHub/);
+for (const location of ['local', 'gitHub']) {
+  editorController.populateModuleForm({ name: 'Legacy', storageLocation: location }, { state: dualState });
+  assert.equal(editorFormElements.storageLocation.value, location);
+  assert.deepEqual(Array.from(logic.moduleEditorPayload(editorController.collectModuleFields()).storageTargets), [location]);
+}
+
+let reduceMotion = true;
+const animations = [];
+function fakeAnimation() {
+  let complete;
+  const animation = { finished: new Promise(resolve => { complete = resolve; }), cancel() { this.cancelled = true; complete(); }, complete() { complete(); } };
+  animations.push(animation);
+  return animation;
+}
+const groupContent = { style: {}, scrollHeight: 100, getBoundingClientRect: () => ({ height: 40 }), animate: fakeAnimation };
+const group = { open: false, querySelector: () => groupContent };
+const motionDialog = { open: true, style: {}, getBoundingClientRect: () => ({ height: editorUI.advancedContent.classList.contains('expanded') ? 400 : 200 }), animate: fakeAnimation };
+const motionEditor = editorHelpers.createModuleEditorController({ ui: { ...editorUI, moduleDialog: motionDialog }, logic, markup, window: { matchMedia: () => ({ matches: reduceMotion }) }, mobileLayout: { matches: true } });
+await motionEditor.animateOptionGroup(group);
+assert.equal(group.open, true);
+assert.equal(animations.length, 0, 'reduced motion skips WAAPI');
+reduceMotion = false;
+const closingGroup = motionEditor.animateOptionGroup(group);
+const cancelledGroup = animations.at(-1);
+const reopeningGroup = motionEditor.animateOptionGroup(group);
+assert.equal(cancelledGroup.cancelled, true);
+animations.at(-1).complete();
+await Promise.all([closingGroup, reopeningGroup]);
+assert.equal(group.open, true, 'latest rapid toggle wins');
+const expanding = motionEditor.animateAdvancedResize(true);
+const cancelledResize = animations.at(-1);
+const collapsing = motionEditor.animateAdvancedResize(false);
+assert.equal(cancelledResize.cancelled, true);
+animations.at(-1).complete();
+await Promise.all([expanding, collapsing]);
+assert.equal(editorUI.advancedContent.classList.contains('expanded'), false);
+assert.equal(motionDialog.style.height, '');
+
+let restoredFocus = 0;
+const opener = { isConnected: true, focus() { restoredFocus += 1; } };
+const closeTimers = [];
+const motionFeedback = feedbackHelpers.createFeedbackController({ document: { activeElement: opener }, window: { matchMedia: () => ({ matches: reduceMotion }) }, setTimeout: callback => { closeTimers.push(callback); return closeTimers.length; }, clearTimeout() {} });
+const motionFeedbackDialog = { open: false, classList: makeClassList(), showModal() { this.open = true; }, close() { this.open = false; } };
+motionFeedback.openDialog(motionFeedbackDialog);
+const firstClose = motionFeedback.closeDialog(motionFeedbackDialog);
+assert.equal(motionFeedback.closeDialog(motionFeedbackDialog), firstClose, 'repeated close shares completion');
+motionFeedback.openDialog(motionFeedbackDialog);
+closeTimers[0]();
+await firstClose;
+assert.equal(motionFeedbackDialog.open, true, 'stale close cannot dismiss a reopened dialog');
+reduceMotion = true;
+await motionFeedback.closeDialog(motionFeedbackDialog);
+assert.equal(motionFeedbackDialog.open, false);
+assert.equal(closeTimers.length, 1, 'reduced motion closes without a timer');
+assert.equal(restoredFocus, 1, 'closing returns focus to the connected opener');

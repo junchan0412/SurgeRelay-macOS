@@ -1,7 +1,7 @@
 import Foundation
 
 /// 触发本地来源同步的原因，只用于状态文案与日志语义。
-enum LocalSourceSyncReason: Sendable {
+enum LocalSourceSyncReason: Equatable, Sendable {
     /// App 启动后的补扫：覆盖 App 未运行期间发生的改动。
     case launch
     /// FSEvents 报告本地目录发生改动。
@@ -14,7 +14,7 @@ enum LocalSourceSyncReason: Sendable {
 extension AppModel {
     /// 按当前模块与设置重建本地来源监听。监听集合没有变化时保持现有事件流。
     func refreshLocalSourceWatching() {
-        guard !AppRuntimeOptions.isUIQAMode else { return }
+        guard workspaceIsActive, !isWorkspaceTransitioning, !startupRecoveryPending, !startupRecoveryFailed, !AppRuntimeOptions.isUIQAMode else { return }
         guard settings.watchesLocalModuleChanges else {
             stopLocalSourceWatching()
             return
@@ -65,6 +65,7 @@ extension AppModel {
     /// iCloud 落地、编辑器保存和 Surge Relay 自己的发布写入都会产生连续事件，
     /// 直接逐事件同步会重复转换同一批模块。
     func scheduleLocalSourceSync(after delay: Duration = .milliseconds(900)) {
+        guard workspaceIsActive, !isWorkspaceTransitioning else { return }
         localSourceSyncTask?.cancel()
         localSourceSyncTask = Task { [weak self] in
             try? await Task.sleep(for: delay)
@@ -78,8 +79,8 @@ extension AppModel {
     /// 判据与 `SourceRevisionService` 一致，因此重复调用是幂等的：转换成功后
     /// `sourceContentHash` 会写回磁盘内容的哈希，下一轮扫描不再认为有改动。
     func syncChangedLocalSources(reason: LocalSourceSyncReason) async {
-        guard !AppRuntimeOptions.isUIQAMode, settings.watchesLocalModuleChanges else { return }
-        let sourceFiles = LocalSourceSyncPlanner.sourceFiles(in: modules)
+        guard workspaceIsActive, !isWorkspaceTransitioning, !AppRuntimeOptions.isUIQAMode, settings.watchesLocalModuleChanges else { return }
+        let sourceFiles = LocalSourceSyncPlanner.sourceFiles(in: modules, includesManualOnly: reason == .manual)
         guard !sourceFiles.isEmpty else { return }
         // 正在执行其他任务时不抢占，稍后重试；否则会被 updateAdmission 直接拒绝。
         guard !isWorking else { return retryLocalSourceSync(reason: reason) }

@@ -9,7 +9,7 @@ PROJECT="$ROOT_DIR/Surge Relay.xcodeproj"
 DERIVED_DATA="$ROOT_DIR/.build/codex-run"
 APP_BUNDLE="$DERIVED_DATA/Build/Products/Debug/$APP_NAME.app"
 APP_BINARY="$APP_BUNDLE/Contents/MacOS/$APP_NAME"
-DEVELOPER_DIR="${DEVELOPER_DIR:-/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer}"
+DEVELOPER_DIR="${DEVELOPER_DIR:-$(xcode-select -p)}"
 
 export DEVELOPER_DIR
 

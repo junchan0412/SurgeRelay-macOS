@@ -3,6 +3,23 @@ import XCTest
 @testable import SurgeRelay
 
 final class ModuleDraftPlannerTests: XCTestCase {
+    func testChangingConversionOptionsDoesNotBypassSameSourceRetryAfter() throws {
+        let deadline = Date.now.addingTimeInterval(600)
+        let module = RelayModule(name: "Policy", sourceURL: "https://example.com/policy.conf", outputFileName: "Policy",
+                                 serverRetryAfter: deadline, serverRetrySourceURL: "https://example.com/policy.conf")
+        var draft = ModuleDraft(module: module)
+        draft.refreshIntervalMinutes = 5
+        draft.scriptHubOptions.policy = "Proxy"
+        let plan = try XCTUnwrap(ModuleDraftPlanner.updatePlan(id: module.id, from: draft, modules: [module],
+                                                               combinedModuleFileName: "Combined.sgmodule", localModuleDirectory: "/tmp"))
+        XCTAssertEqual(plan.module.refreshIntervalMinutes, 5)
+        XCTAssertEqual(plan.module.serverRetryAfter, deadline)
+        draft.sourceURL = "https://other.example/new.conf"
+        let replaced = try XCTUnwrap(ModuleDraftPlanner.updatePlan(id: module.id, from: draft, modules: [module],
+                                                                   combinedModuleFileName: "Combined.sgmodule", localModuleDirectory: "/tmp"))
+        XCTAssertNil(replaced.module.serverRetryAfter)
+    }
+
     func testAddPlanRecoversSubscriptionFromRegisteredScriptHubAddress() throws {
         var draft = ModuleDraft()
         draft.name = "Subscribed"
@@ -353,5 +370,39 @@ final class ModuleDraftPlannerTests: XCTestCase {
         XCTAssertNil(plan.module.scriptHubSubscription)
         XCTAssertEqual(plan.module.lastUpdatedAt, module.lastUpdatedAt)
         XCTAssertEqual(plan.module.contentHash, module.contentHash)
+    }
+}
+
+final class PreviewDraftPersistenceTests: XCTestCase {
+    func testLatestRevisionWinsAndSavedDraftRemovalCannotBeUndone() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let url = root.appending(path: "drafts.json")
+        let id = UUID()
+        let writer = PreviewDraftWriter()
+        try await writer.save([id: ModulePreviewDraft(text: "draft", savedText: "base")], to: url, revision: 2)
+        try await writer.save([:], to: url, revision: 3)
+        try await writer.save([id: ModulePreviewDraft(text: "stale", savedText: "base")], to: url, revision: 1)
+        let restored = try JSONDecoder().decode([UUID: ModulePreviewDraft].self, from: Data(contentsOf: url))
+        XCTAssertTrue(restored.isEmpty)
+    }
+
+    func testLargeUnicodeDraftRoundTripsAndFailedWriteCanRetry() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let blocked = root.appending(path: "blocked")
+        try Data("file".utf8).write(to: blocked)
+        let writer = PreviewDraftWriter()
+        let id = UUID()
+        let draft = ModulePreviewDraft(text: String(repeating: "规则😀\n", count: 500_000), savedText: "baseline")
+        do {
+            try await writer.save([id: draft], to: blocked.appending(path: "drafts.json"), revision: 1)
+            XCTFail("Writing through a file must fail")
+        } catch { }
+        let url = root.appending(path: "drafts.json")
+        try await writer.save([id: draft], to: url, revision: 1)
+        let restored = try JSONDecoder().decode([UUID: ModulePreviewDraft].self, from: Data(contentsOf: url))
+        XCTAssertEqual(restored[id], draft)
     }
 }

@@ -2,6 +2,20 @@ import XCTest
 @testable import SurgeRelay
 
 final class WebManagementTests: XCTestCase {
+    @MainActor
+    func testPreviewIfMatchOnlyAcceptsExactStrongContentVersion() throws {
+        let content = "#!name=测试\n[Rule]\nDOMAIN,example.com,DIRECT"
+        let etag = WebManagementAPI.previewETag(for: content)
+        XCTAssertEqual(try WebManagementAPI.previewContentHash(fromIfMatch: etag), Data(content.utf8).sha256String)
+        XCTAssertNil(try WebManagementAPI.previewContentHash(fromIfMatch: nil))
+        for invalid in ["W/" + etag, "*", "\"not-a-sha256\"", etag + ", " + etag, String(etag.dropFirst().dropLast())] {
+            XCTAssertThrowsError(try WebManagementAPI.previewContentHash(fromIfMatch: invalid)) { error in
+                XCTAssertEqual(error as? PreviewContentSaveError, .changed)
+            }
+        }
+        XCTAssertNotEqual(WebManagementAPI.previewETag(for: content), WebManagementAPI.previewETag(for: content + "\n"))
+    }
+
     func testWebIconContentTypeDetectionOnlyAcceptsRecognizedImages() {
         XCTAssertEqual(WebManagementAssets.imageContentType(Data([0x89, 0x50, 0x4E, 0x47, 0x0D])), "image/png")
         XCTAssertEqual(WebManagementAssets.imageContentType(Data([0xFF, 0xD8, 0xFF, 0xE0])), "image/jpeg")

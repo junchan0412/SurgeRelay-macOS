@@ -1,0 +1,111 @@
+{
+  "notes" : "Standalone -O microbenchmark; real NSTextStorage, changed before each conversion, separate storage per method, alternating order, 3 warmups + 20 samples. Timed conversion only; validation excluded. No app layout\/SwiftUI and no claim of input latency.",
+  "os" : "Version 27.2 (Build 26B5091g)",
+  "results" : [
+    {
+      "actualBytes" : 1048554,
+      "backingClass" : "NSBigMutableString",
+      "fixture" : "ascii",
+      "maxMs" : 17.004958999999999,
+      "meanMs" : 16.415733400000001,
+      "method" : "makeContiguousUTF8",
+      "p50ms" : 16.411959,
+      "p95ms" : 16.778666999999999,
+      "samples" : 20,
+      "targetBytes" : 1048576,
+      "utf16Count" : 1048554
+    },
+    {
+      "actualBytes" : 1048554,
+      "backingClass" : "NSBigMutableString",
+      "fixture" : "ascii",
+      "maxMs" : 2.2737500000000002,
+      "meanMs" : 2.2187831499999997,
+      "method" : "NSString.data_UTF8_then_String_decoding",
+      "p50ms" : 2.2109999999999999,
+      "p95ms" : 2.269333,
+      "samples" : 20,
+      "targetBytes" : 1048576,
+      "utf16Count" : 1048554
+    },
+    {
+      "actualBytes" : 1048576,
+      "backingClass" : "NSBigMutableString",
+      "fixture" : "unicode",
+      "maxMs" : 33.557042000000003,
+      "meanMs" : 23.581197850000002,
+      "method" : "makeContiguousUTF8",
+      "p50ms" : 22.358708,
+      "p95ms" : 32.392249999999997,
+      "samples" : 20,
+      "targetBytes" : 1048576,
+      "utf16Count" : 589824
+    },
+    {
+      "actualBytes" : 1048576,
+      "backingClass" : "NSBigMutableString",
+      "fixture" : "unicode",
+      "maxMs" : 4.4856249999999998,
+      "meanMs" : 2.0230957999999997,
+      "method" : "NSString.data_UTF8_then_String_decoding",
+      "p50ms" : 1.815833,
+      "p95ms" : 2.8152499999999998,
+      "samples" : 20,
+      "targetBytes" : 1048576,
+      "utf16Count" : 589824
+    },
+    {
+      "actualBytes" : 5242874,
+      "backingClass" : "NSBigMutableString",
+      "fixture" : "ascii",
+      "maxMs" : 83.116541999999995,
+      "meanMs" : 82.24214594999998,
+      "method" : "makeContiguousUTF8",
+      "p50ms" : 82.107624999999999,
+      "p95ms" : 83.106750000000005,
+      "samples" : 20,
+      "targetBytes" : 5242880,
+      "utf16Count" : 5242874
+    },
+    {
+      "actualBytes" : 5242874,
+      "backingClass" : "NSBigMutableString",
+      "fixture" : "ascii",
+      "maxMs" : 11.427709,
+      "meanMs" : 11.120260599999998,
+      "method" : "NSString.data_UTF8_then_String_decoding",
+      "p50ms" : 11.215707999999999,
+      "p95ms" : 11.369584,
+      "samples" : 20,
+      "targetBytes" : 5242880,
+      "utf16Count" : 5242874
+    },
+    {
+      "actualBytes" : 5242880,
+      "backingClass" : "NSBigMutableString",
+      "fixture" : "unicode",
+      "maxMs" : 113.2795,
+      "meanMs" : 111.79355639999999,
+      "method" : "makeContiguousUTF8",
+      "p50ms" : 112.04495900000001,
+      "p95ms" : 112.795834,
+      "samples" : 20,
+      "targetBytes" : 5242880,
+      "utf16Count" : 2949120
+    },
+    {
+      "actualBytes" : 5242880,
+      "backingClass" : "NSBigMutableString",
+      "fixture" : "unicode",
+      "maxMs" : 9.7535000000000007,
+      "meanMs" : 9.2007730500000005,
+      "method" : "NSString.data_UTF8_then_String_decoding",
+      "p50ms" : 9.2058750000000007,
+      "p95ms" : 9.70275,
+      "samples" : 20,
+      "targetBytes" : 5242880,
+      "utf16Count" : 2949120
+    }
+  ],
+  "unicodeValidationPassed" : true
+}

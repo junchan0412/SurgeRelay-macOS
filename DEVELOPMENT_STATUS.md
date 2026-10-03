@@ -6,7 +6,7 @@
 
 | 项目 | 当前值 |
 | --- | --- |
-| 版本 | 2.2.1 (107) |
+| 版本 | 2.3.0 (108) |
 | macOS deployment target | 26.0 |
 | Swift | 6.0，strict concurrency complete |
 
@@ -20,16 +20,19 @@
 
 ## 当前能力
 
-- 集中管理远程、本地与 Script-Hub 转换模块，并区分 storageLocation 与 initialSource。
-- 本地与 GitHub 发布可并存；独立模块按自身存放位置发布，总模块可同时发布到两个目标。
+- 集中管理远程、本地与 Script-Hub 转换模块，并区分 storageTargets 与 initialSource（storageLocation 保留旧单目标兼容）。
+- 本地与 GitHub 发布可并存；独立模块可选本地、GitHub 或双目标，总模块可同时发布到两个目标；所选发布记录逐目标结果并支持只重试未完成目标。
 - 支持本地模块扫描、转换预览、文本覆盖、冲突处理、发布预览、受管文件清理和自动发布。
 - 监听本地模块目录，源文件在 App 外改动后按来源内容 sha256 只重新转换改动过的模块。
 - 模块内容编辑器支持撤销/重做、查找与替换（含正则）、跳转到行、切换注释和缩进操作。
-- 原生查找和批量替换在可取消后台任务中计算，长文档行号按可见区域绘制；全部替换不受 5,000 条高亮上限影响。
+- 原生查找和批量替换在可取消后台任务中计算，长文档行号按可见区域绘制；大文件自动使用纯文本和逻辑行尺寸，小文件语法范围后台计算；全部替换不受 5,000 条高亮上限影响。
 - 提供 macOS 与 Web 工作台、活动记录、按需展开的模块详情、菜单栏与分类设置。
 - 活动记录支持模块、提交和发布文件检索；Web 列表复用未变化行并保留键盘焦点，内容页支持保存重试与写入期间的草稿保护。
 - 使用最多 4 个模块的有界并发更新、完整缓存快照、可取消网络请求和流式资源指纹。
-- 两端内容页保留切换模块时的未保存草稿；Web 连接支持退避重连、隐藏页暂停和过期响应隔离。
+- 两端内容页持久保留未保存草稿并核验恢复基线；Web 保存使用 ETag 条件写入，支持退避重连、隐藏页暂停和过期响应隔离。
+- Web 服务可自主开启/关闭；关闭释放监听与连接，开启时使用有界连接、请求期限与共享状态编码缓存。
+- 双目标同步提供共同基线、单边领先分类、行级差异和覆盖前版本核验。
+- Script-Hub 在独立 helper 进程内执行，最多 4 路，支持总执行时限和强制取消；helper 随应用分发。
 - 凭据使用配置目录内 AES-256-GCM 加密文件，不依赖系统钥匙串。
 - Release preflight 覆盖版本、Sparkle、appcast、entitlements、Web 资源、workflow 和 Xcode 工程源文件登记。
 
@@ -37,13 +40,13 @@
 
 | 指标 | 数量 |
 | --- | --- |
-| 应用 Swift 文件 | 142 |
-| Swift 测试文件（unit / UI） | 47 / 1 |
-| 源码中的 XCTest 方法 | 364 |
-| Services / Models / Views / Utilities / App-Core | 63 / 20 / 33 / 3 / 23 |
-| 应用 Swift 行数 | 23,312 |
-| 测试 Swift 行数 | 9,331 |
-| CHANGELOG release 段落 | 107 |
+| 应用 Swift 文件 | 166 |
+| Swift 测试文件（unit / UI） | 53 / 1 |
+| 源码中的 XCTest 方法 | 522 |
+| Services / Models / Views / Utilities / App-Core | 70 / 26 / 38 / 3 / 29 |
+| 应用 Swift 行数 | 28,840 |
+| 测试 Swift 行数 | 13,524 |
+| CHANGELOG release 段落 | 108 |
 
 ## 主要维护热点
 
@@ -51,16 +54,16 @@
 
 | 文件 | 行数 |
 | --- | --- |
-| SurgeRelay/Views/ModuleCodeTextView.swift | 764 |
+| SurgeRelay/Services/ModuleFileStore.swift | 1208 |
+| SurgeRelay/Views/ModuleCodeTextView.swift | 907 |
+| SurgeRelay/Views/ModulePreviewViews.swift | 659 |
+| SurgeRelay/Views/ModuleDetailView.swift | 540 |
 | SurgeRelay/Utilities/ModuleMetadataParser.swift | 517 |
-| SurgeRelay/Views/ModulePreviewViews.swift | 473 |
-| SurgeRelay/Views/ModuleCodeEditorController.swift | 468 |
-| SurgeRelay/Services/ModuleFileStore.swift | 440 |
-| SurgeRelay/Models/RelayModule.swift | 436 |
-| SurgeRelay/Services/EmbeddedScriptHubEngine.swift | 397 |
-| SurgeRelay/Views/ModuleDetailView.swift | 393 |
-| SurgeRelay/Views/ModuleSidebarView.swift | 369 |
-| SurgeRelay/Views/Components.swift | 355 |
+| SurgeRelay/Views/NativeQAPerformanceRecorder.swift | 482 |
+| SurgeRelay/AppModel+ModuleUpdate.swift | 477 |
+| SurgeRelay/Models/RelayModule.swift | 477 |
+| SurgeRelay/Services/PersistenceStore.swift | 476 |
+| SurgeRelay/Views/ModuleCodeEditorController.swift | 472 |
 
 ## 当前优化顺序
 
@@ -80,9 +83,9 @@ git diff --check
 node script/generate_project_status.mjs --check
 node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs
-VERSION=2.2.1 BUILD=107 ./script/check_release_configuration.sh
+VERSION=2.3.0 BUILD=108 ./script/check_release_configuration.sh
 
-DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
+DEVELOPER_DIR="$(xcode-select -p)" \
 xcodebuild test \
   -project "Surge Relay.xcodeproj" \
   -scheme "Surge Relay" \
@@ -90,7 +93,7 @@ xcodebuild test \
   -skipPackagePluginValidation
 
 # 需要允许 Xcode UI automation 的 macOS 桌面会话
-DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
+DEVELOPER_DIR="$(xcode-select -p)" \
 xcodebuild test \
   -project "Surge Relay.xcodeproj" \
   -scheme "Surge Relay UI Tests" \

@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-03",
+  "mode": "CUA native visible UI, isolated Native QA100 workspace,1MiB draft",
+  "build": "Retained Attribution QA app; editor implementation unchanged by subsequent Sidebar/QA-recorder edits",
+  "checks": {
+    "draftMarkerBeforeAndAfter": "TABQA20261003",
+    "dirtyIndicatorRetained": true,
+    "findQueryRetained": "TABQA20261003",
+    "matchSummaryBeforeAndAfter": "第 1 / 1 个",
+    "cursorBeforeAndAfter": {
+      "line": 34957,
+      "column": 177
+    },
+    "horizontalScrollBeforeAndAfter": 0.6004234724742892,
+    "verticalScrollBeforeAndAfter": 1,
+    "findFieldFocusRestored": true,
+    "transition": "预览→详情→预览"
+  },
+  "boundary": "Completed query and selected match retained in real UI; asynchronous cancellation/reload semantics covered by separate component matrix. No frame/FPS claim."
+}

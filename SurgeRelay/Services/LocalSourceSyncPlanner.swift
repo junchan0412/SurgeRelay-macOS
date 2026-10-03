@@ -23,8 +23,9 @@ enum LocalSourceSyncPlanner {
     /// 只有“转换前来源”本身就是本地文件的模块才在此列：带 Script-Hub
     /// `#SUBSCRIBED` 的本地模块其更新来源是远程地址，改动应由来源检查而不是
     /// 文件监听驱动。
-    static func sourceFiles(in modules: [RelayModule]) -> [LocalModuleSourceFile] {
+    static func sourceFiles(in modules: [RelayModule], includesManualOnly: Bool = false) -> [LocalModuleSourceFile] {
         modules.compactMap { module in
+            guard includesManualOnly || module.refreshIntervalMinutes != 0 else { return nil }
             guard let url = URL(string: module.updateSourceURL), url.isFileURL else { return nil }
             return LocalModuleSourceFile(
                 moduleID: module.id,

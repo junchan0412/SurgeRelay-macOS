@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "percentileMethod": "nearest-rank",
+  "results": [
+    {
+      "label": "1000",
+      "capture": "/private/tmp/surge-relay-list-matrix-20261003/frames-1000-active.jsonl",
+      "actionWindowEpochMilliseconds": [
+        1791011220886.0,
+        1791011236350.0
+      ],
+      "windowSelection": "CUA epoch action window",
+      "boundary": "Main-thread CADisplayLink callback cadence, NOT GPU presentation FPS or verified rendered frames",
+      "clockMapping": "Per-session epochMs = (wallTimeEpochSeconds + record.uptimeSeconds - session.uptimeSeconds) * 1000; no cross-clock sleep assumptions",
+      "complete": true,
+      "issues": [],
+      "parseIssues": [],
+      "missingAnchorSessionIDs": [],
+      "captureLimitRecords": [],
+      "sessionIDs": [
+        "52C8A5BC-2B19-4206-BDF5-393933C10692"
+      ],
+      "selectedCallbackEpochRangeMilliseconds": [
+        1791011220886.4333,
+        1791011236343.9746
+      ],
+      "callbackCounts": {
+        "total": 266,
+        "windowVisible": 266,
+        "applicationActive": 266,
+        "occlusionVisible": 266,
+        "cadenceEligible": 266,
+        "ineligible": 0
+      },
+      "eligibleCallbackIntervals": {
+        "count": 264,
+        "p50Milliseconds": 12.976958358194679,
+        "p95Milliseconds": 237.03849996672943,
+        "maxMilliseconds": 577.9150833841413,
+        "intervalsOver50Milliseconds": 85
+      },
+      "intervalsCrossingWindowStartExcluded": 1,
+      "missedCadenceEstimate": {
+        "comparableIntervals": 264,
+        "sum": 1960,
+        "maximumPerInterval": 82,
+        "note": "Estimate only; null/reset/unstable cadence records excluded. Not a GPU dropped-frame count."
+      },
+      "rss": {
+        "method": "Host mach task_info, sampled by background timer at nominal 1Hz; transient peaks may be missed",
+        "windowEmittedResidentPeakBytes": 317702144,
+        "captureCumulativeSampledPeakAsOfWindowBytes": 317702144,
+        "wholeRelevantSessionSampledPeakBytes": 317702144,
+        "coverage": [
+          {
+            "sessionID": "52C8A5BC-2B19-4206-BDF5-393933C10692",
+            "emittedSamplesInWindow": 15,
+            "backgroundSamplesWithoutIndividualRows": 0
+          }
+        ],
+        "note": "Cumulative peak may precede action window. When main thread is blocked, intermediate 1Hz samples have no individual rows; their peak survives only in cumulative peak. Do not label cumulative peak as exact window peak."
+      },
+      "writeLoss": [
+        {
+          "sessionID": "52C8A5BC-2B19-4206-BDF5-393933C10692",
+          "captureCumulativeBatches": 0,
+          "captureCumulativeBytes": 0,
+          "observedWindowBatchDelta": 0,
+          "observedWindowByteDelta": 0
+        }
+      ],
+      "limitations": [
+        "Callback gaps above 50ms indicate scheduling gaps, not direct proof of CPU long tasks",
+        "An abrupt process exit without capture-limit or loss marker cannot be detected reliably from JSONL alone",
+        "Per-session wall/uptime mapping assumes wall clock is not adjusted within that capture; restart capture after sleep/clock changes when precise action alignment matters"
+      ]
+    }
+  ]
+}

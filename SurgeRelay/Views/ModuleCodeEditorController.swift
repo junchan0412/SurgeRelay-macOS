@@ -25,6 +25,7 @@ final class ModuleCodeEditorController {
     var usesRegularExpression = false
     var lineInput = ""
     var focusTarget: ModuleCodeEditorFocusTarget?
+    private(set) var matchesAreTruncated = false
     private(set) var matchCount = 0
     private(set) var currentMatchNumber: Int?
     private(set) var isEditable = false
@@ -66,8 +67,8 @@ final class ModuleCodeEditorController {
         if let error = CodeSearchEngine.regularExpressionErrorMessage(for: query) { return error }
         if query.isEmpty { return "" }
         if isSearching { return "正在查找…" }
-        if matchCount >= CodeSearchEngine.maximumMatchCount {
-            return currentMatchNumber.map { "第 \($0) / 前 \(matchCount) 个" } ?? "前 \(matchCount) 个结果"
+        if matchesAreTruncated {
+            return currentMatchNumber.map { "第 \($0) / \(matchCount)+ 个（仅前 \(matchCount) 个）" } ?? "\(matchCount)+ 个结果（仅前 \(matchCount) 个）"
         }
         return CodeSearchEngine.matchSummary(matchCount: matchCount, currentNumber: currentMatchNumber)
     }
@@ -328,6 +329,7 @@ final class ModuleCodeEditorController {
             matchedRevision = nil
             matchedQuery = nil
             matchCount = 0
+            matchesAreTruncated = false
             currentMatchNumber = nil
             currentMatchIndex = nil
             textView?.clearSearchHighlights()
@@ -346,6 +348,7 @@ final class ModuleCodeEditorController {
         matchedRevision = nil
         matchedQuery = nil
         matchCount = 0
+        matchesAreTruncated = false
         currentMatchNumber = nil
         currentMatchIndex = nil
         textView.clearSearchHighlights()
@@ -363,7 +366,7 @@ final class ModuleCodeEditorController {
             }
             guard !Task.isCancelled else { return }
             let worker = Task.detached(priority: .userInitiated) {
-                CodeSearchEngine.matches(in: source, query: requestedQuery)
+                CodeSearchEngine.search(in: source, query: requestedQuery)
             }
             let result = await withTaskCancellationHandler {
                 await worker.value
@@ -373,7 +376,8 @@ final class ModuleCodeEditorController {
             self.isSearching = false
             self.pendingRevision = nil
             self.pendingQuery = nil
-            self.matches = result
+            self.matches = result.ranges
+            self.matchesAreTruncated = result.isTruncated
             self.matchedRevision = revision
             self.matchedQuery = requestedQuery
             self.updateMatchSelection()

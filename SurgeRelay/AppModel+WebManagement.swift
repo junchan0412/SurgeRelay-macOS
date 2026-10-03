@@ -7,7 +7,11 @@ extension AppModel {
         let current = webAccessToken.trimmingCharacters(in: .whitespacesAndNewlines)
         guard current.isEmpty || webAccessTokenStorageStatus == .notChecked else { return current }
 
-        let tokenLoad = CredentialTokenCoordinator.loadWebAccessToken()
+        let directory = configurationStorageDirectory
+        let tokenLoad = CredentialTokenCoordinator.loadWebAccessToken(
+            loadStoredToken: { try LocalCredentialStore.loadWebAccessToken(directory: directory) },
+            saveStoredToken: { try LocalCredentialStore.saveWebAccessToken($0, directory: directory) }
+        )
         webAccessToken = tokenLoad.token
         webAccessTokenStorageStatus = tokenLoad.storageStatus
         if showStatusMessage, let message = tokenLoad.statusMessage {
@@ -29,7 +33,7 @@ extension AppModel {
             return
         }
         do {
-            try LocalCredentialStore.saveWebAccessToken(webAccessToken)
+            try LocalCredentialStore.saveWebAccessToken(webAccessToken, directory: configurationStorageDirectory)
             webAccessTokenStorageStatus = .encrypted
             statusMessage = "Web 管理访问令牌已保存到本地加密文件"
         } catch {
@@ -44,7 +48,7 @@ extension AppModel {
         let token = CredentialTokenCoordinator.generateWebAccessToken()
         webAccessToken = token
         do {
-            try LocalCredentialStore.saveWebAccessToken(token)
+            try LocalCredentialStore.saveWebAccessToken(token, directory: configurationStorageDirectory)
             webAccessTokenStorageStatus = .encrypted
             statusMessage = "Web 管理访问令牌已重置"
         } catch {
@@ -56,15 +60,17 @@ extension AppModel {
     }
 
     func applyWebServerSettings(persist: Bool = true) {
+        guard workspaceIsActive, !isWorkspaceTransitioning else { webServer.stop(); return }
+        if persist { saveSettings() }
+        webServer.stop()
+        webActionTickets.removeWebActions()
+        guard settings.webServerEnabled, !startupRecoveryPending else {
+            webServerState = .stopped
+            return
+        }
         guard (1...65_535).contains(settings.webServerPort),
               let port = UInt16(exactly: settings.webServerPort) else {
             webServerState = .failed("端口必须在 1–65535 之间。")
-            return
-        }
-        if persist { saveSettings() }
-        webServer.stop()
-        guard settings.webServerEnabled else {
-            webServerState = .stopped
             return
         }
 
@@ -79,15 +85,17 @@ extension AppModel {
             allowRemoteAccess: settings.webServerAllowRemoteAccess,
             accessToken: token
         )
+        let eventSource = WebManagementSnapshotSource(model: self)
+        let eventEncoder = WebManagementJSONEncoder()
         do {
             try webServer.start(
                 configuration: configuration,
                 stateHandler: { [weak self] state in
                     Task { @MainActor [weak self] in self?.webServerState = state }
                 },
-                eventHandler: { [weak self] in
-                    guard let self else { return "{}" }
-                    return await WebManagementAPI.eventPayload(model: self)
+                eventProvider: { includesLegacy in
+                    let snapshot = try await eventSource.snapshot(includingLegacy: includesLegacy)
+                    return try await eventEncoder.encode(snapshot)
                 },
                 requestHandler: { [weak self] request in
                     if !request.path.hasPrefix("/api/") {
@@ -126,6 +134,7 @@ extension AppModel {
     }
 
     func handleNetworkBecameReachable() {
+        guard workspaceIsActive, !isWorkspaceTransitioning else { return }
         // Recover local Web management if it failed after a network drop, and
         // re-queue automatic GitHub publish when connectivity returns.
         if settings.webServerEnabled {

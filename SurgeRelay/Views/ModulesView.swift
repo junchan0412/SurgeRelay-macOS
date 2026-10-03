@@ -151,6 +151,12 @@ struct ModulesView: View {
             )
                 .environment(model)
         }
+        .sheet(item: $model.pendingSelectedPublishLintReview) { review in
+            ModuleLintView(issues: review.issues) {
+                model.pendingSelectedPublishLintReview = nil
+                Task { await model.confirmSelectedPublishReview(review) }
+            }
+        }
         .sheet(item: $textEditModule) { module in
             ModuleTextEditorView(module: module)
                 .environment(model)

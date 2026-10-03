@@ -6,6 +6,12 @@ struct ModuleSyncConflictMetadata: Codable, Equatable, Hashable, Sendable {
     var localUpdatedAt: Date
     var githubUpdatedAt: Date
     var detectedAt: Date
+    var baseHash: String? = nil
+    var githubCommitSHA: String? = nil
+
+    var comparisonState: ModuleSyncState {
+        ModuleSyncPlanner.state(localHash: localHash, githubHash: githubHash, baseHash: baseHash)
+    }
 
     var localUpdatedAtText: String { localUpdatedAt.formatted(date: .numeric, time: .standard) }
     var githubUpdatedAtText: String { githubUpdatedAt.formatted(date: .numeric, time: .standard) }

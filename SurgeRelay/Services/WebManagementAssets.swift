@@ -3,15 +3,15 @@ import Foundation
 enum WebManagementAssets {
     static let webContentSecurityPolicy = "default-src 'self'; img-src 'self' data: http: https:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
 
-    static func iconURL(for module: RelayModule) -> String? {
-        if FileManager.default.fileExists(atPath: ModuleIconStore.cachedURL(for: module.id).path) {
+    static func iconURL(for module: RelayModule, cacheDirectory: URL? = nil) -> String? {
+        if FileManager.default.fileExists(atPath: ModuleIconStore.cachedURL(for: module.id, cacheDirectory: cacheDirectory).path) {
             return "/api/modules/\(module.id.uuidString.lowercased())/icon?v=\(module.lastUpdatedAt?.timeIntervalSince1970 ?? 0)"
         }
         return module.iconURL
     }
 
-    static func iconResponse(for module: RelayModule) -> WebHTTPResponse {
-        guard let icon = cachedIconData(for: module) else {
+    static func iconResponse(for module: RelayModule, cacheDirectory: URL? = nil) -> WebHTTPResponse {
+        guard let icon = cachedIconData(for: module, cacheDirectory: cacheDirectory) else {
             return .error(status: 404, message: "没有可用的模块图标。")
         }
         return WebHTTPResponse(
@@ -83,8 +83,8 @@ enum WebManagementAssets {
         )
     }
 
-    private static func cachedIconData(for module: RelayModule) -> (data: Data, contentType: String)? {
-        let url = ModuleIconStore.cachedURL(for: module.id)
+    private static func cachedIconData(for module: RelayModule, cacheDirectory: URL? = nil) -> (data: Data, contentType: String)? {
+        let url = ModuleIconStore.cachedURL(for: module.id, cacheDirectory: cacheDirectory)
         guard let data = try? Data(contentsOf: url),
               !data.isEmpty,
               let contentType = imageContentType(data) else {

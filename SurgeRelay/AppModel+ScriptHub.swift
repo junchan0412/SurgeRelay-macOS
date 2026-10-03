@@ -6,6 +6,7 @@ extension AppModel {
         guard !isWorking || !showProgress else { return }
         if showProgress { beginWork(.refreshingScriptHub) }
         await refreshScriptHubInternal()
+        try? await flushPersistence()
         if showProgress {
             guard shouldContinueCurrentWork() else {
                 endWork(.refreshingScriptHub)
@@ -35,13 +36,13 @@ extension AppModel {
             upstreamState.scriptHashes = result.scriptHashes
             upstreamState.lastCheckedAt = .now
             upstreamState.lastError = nil
-            PersistenceStore.saveUpstreamState(upstreamState)
+            enqueueConfiguration(upstreamState, fileName: "script-hub-state.json")
             statusMessage = result.changed ? "内置 Script-Hub 引擎已更新至 \(result.revision)" : "内置 Script-Hub 引擎已是最新"
         } catch {
             if isCurrentWorkCancellation(error) { return }
             upstreamState.lastCheckedAt = .now
             upstreamState.lastError = error.localizedDescription
-            PersistenceStore.saveUpstreamState(upstreamState)
+            enqueueConfiguration(upstreamState, fileName: "script-hub-state.json")
             let hasCache = await engineStore.hasScript(named: "Rewrite-Parser.js")
             statusMessage = hasCache ? "上游检查失败，继续使用 App 内缓存引擎" : "内置转换引擎尚不可用"
         }

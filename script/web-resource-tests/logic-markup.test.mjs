@@ -88,6 +88,7 @@ assert.deepEqual(
     sourceURL: 'https://example.com/demo.sgmodule',
     sourceFormat: 'surge',
     storageLocation: 'local',
+    storageTargets: ['local'],
     category: 'Ads',
     iconURL: 'https://example.com/icon.png',
     outputFolder: 'Folder',

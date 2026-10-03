@@ -227,7 +227,23 @@ struct ActivityHistoryRow: View {
         if let commitSHA = entry.commitSHA { lines.append("Commit: \(commitSHA)") }
         if !entry.publishedFiles.isEmpty { lines.append("上传 / 更新：\n" + entry.publishedFiles.joined(separator: "\n")) }
         if !entry.deletedFiles.isEmpty { lines.append("删除：\n" + entry.deletedFiles.joined(separator: "\n")) }
+        if let metrics = entry.stageMetrics, !metrics.isEmpty {
+            lines.append("性能明细（内容字节，非网络线速流量）")
+            lines.append(contentsOf: metrics.map(stageSummary))
+        }
         return lines.joined(separator: "\n")
+    }
+
+    private func stageSummary(_ metric: StageMetric) -> String {
+        var parts = [metric.stage.title + (metric.includesDownload ? " / 下载（未拆分）" : ""),
+                     "\(metric.duration.formatted(.number.precision(.fractionLength(3)))) 秒"]
+        if let count = metric.bytesRead { parts.append("读取 \(ByteCountFormatter.string(fromByteCount: count, countStyle: .file))") }
+        if let count = metric.bytesWritten { parts.append("输出 \(ByteCountFormatter.string(fromByteCount: count, countStyle: .file))") }
+        if metric.attempts > 1 { parts.append("\(metric.attempts) 次操作") }
+        if metric.failedAttempts > 0 { parts.append("\(metric.failedAttempts) 次失败") }
+        if metric.isPartial { parts.append("部分测量") }
+        if let reason = metric.reason { parts.append(reason) }
+        return parts.joined(separator: " · ")
     }
 
     var body: some View {
@@ -267,6 +283,22 @@ struct ActivityHistoryRow: View {
                     if entry.publishedChangeCount > 0 {
                         ActivityPublishedFiles(entry: entry)
                             .padding(.top, 4)
+                    }
+                    if let metrics = entry.stageMetrics, !metrics.isEmpty {
+                        DisclosureGroup("性能明细") {
+                            VStack(alignment: .leading, spacing: 6) {
+                                ForEach(metrics, id: \.stage) { metric in
+                                    Text(stageSummary(metric)).textSelection(.enabled)
+                                }
+                                Text("字节数为内容大小，不含协议、备份与文件系统开销；并行模块阶段时长不能相加作为批量总耗时。")
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .font(.system(size: 12)).foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 6)
+                        }
+                        .font(.system(size: 12))
+                        .accessibilityIdentifier("activity.stage-metrics")
                     }
                     TextCopyButton(text: copyText, title: "拷贝记录")
                         .padding(.top, 4)

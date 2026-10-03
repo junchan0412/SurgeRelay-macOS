@@ -2,6 +2,77 @@ import XCTest
 @testable import SurgeRelay
 
 final class GitHubPublishTests: XCTestCase {
+    func testConditionalPublishRejectsHeadChangedSinceComparisonBeforeWriting() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GitHubMockURLProtocol.self]
+        let client = GitHubClient(session: URLSession(configuration: configuration))
+        GitHubMockURLProtocol.reset()
+        defer { GitHubMockURLProtocol.reset() }
+        GitHubMockURLProtocol.handler = { request in
+            XCTAssertEqual(request.httpMethod, "GET", "Stale confirmation must not write blobs or commits")
+            switch request.url?.path {
+            case "/repos/someone/relay/git/ref/heads/main":
+                return (200, Data(#"{"object":{"sha":"changed-head"}}"#.utf8))
+            case "/repos/someone/relay/git/commits/changed-head":
+                return (200, Data(#"{"sha":"changed-head","tree":{"sha":"tree1"}}"#.utf8))
+            case "/repos/someone/relay/git/trees/tree1":
+                return (200, Data(#"{"tree":[],"truncated":false}"#.utf8))
+            default:
+                XCTFail("Unexpected request")
+                return (500, Data())
+            }
+        }
+        var settings = GitHubSettings()
+        settings.owner = "someone"
+        settings.repository = "relay"
+        do {
+            _ = try await client.publish(files: [PublishFile(name: "Demo.sgmodule", data: Data("winner".utf8))], settings: settings, token: "test", expectedHeadCommitSHA: "reviewed-head")
+            XCTFail("The old comparison must be rejected")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("重新比较"))
+        }
+    }
+
+    func testConditionalPublishDoesNotRetryAfterReferenceMovesDuringWrite() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GitHubMockURLProtocol.self]
+        let client = GitHubClient(session: URLSession(configuration: configuration))
+        GitHubMockURLProtocol.reset()
+        defer { GitHubMockURLProtocol.reset() }
+        GitHubMockURLProtocol.handler = { request in
+            switch (request.httpMethod ?? "GET", request.url?.path ?? "") {
+            case ("GET", "/repos/someone/relay/git/ref/heads/main"):
+                return (200, Data(#"{"object":{"sha":"reviewed-head"}}"#.utf8))
+            case ("GET", "/repos/someone/relay/git/commits/reviewed-head"):
+                return (200, Data(#"{"sha":"reviewed-head","tree":{"sha":"tree1"}}"#.utf8))
+            case ("GET", "/repos/someone/relay/git/trees/tree1"):
+                return (200, Data(#"{"tree":[],"truncated":false}"#.utf8))
+            case ("POST", "/repos/someone/relay/git/blobs"):
+                return (200, Data(#"{"sha":"blob1"}"#.utf8))
+            case ("POST", "/repos/someone/relay/git/trees"):
+                return (200, Data(#"{"sha":"new-tree"}"#.utf8))
+            case ("POST", "/repos/someone/relay/git/commits"):
+                return (200, Data(#"{"sha":"new-commit","tree":{"sha":"new-tree"}}"#.utf8))
+            case ("PATCH", "/repos/someone/relay/git/refs/heads/main"):
+                return (422, Data(#"{"message":"Reference update failed"}"#.utf8))
+            default:
+                XCTFail("Unexpected request")
+                return (500, Data())
+            }
+        }
+        var settings = GitHubSettings()
+        settings.owner = "someone"
+        settings.repository = "relay"
+        do {
+            _ = try await client.publish(files: [PublishFile(name: "Demo.sgmodule", data: Data("winner".utf8))], settings: settings, token: "test", expectedHeadCommitSHA: "reviewed-head")
+            XCTFail("CAS conflict must require another comparison")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("重新比较"))
+        }
+        XCTAssertEqual(GitHubMockURLProtocol.requestedPaths.filter { $0 == "GET /repos/someone/relay/git/ref/heads/main" }.count, 1)
+        XCTAssertEqual(GitHubMockURLProtocol.requestedPaths.filter { $0 == "PATCH /repos/someone/relay/git/refs/heads/main" }.count, 1)
+    }
+
     func testGitHubPublishSnapshotBuildsCommitURLAndFileSummary() throws {
         var settings = GitHubSettings()
         settings.owner = "someone"
@@ -268,5 +339,95 @@ final class GitHubPublishTests: XCTestCase {
             GitHubMockURLProtocol.requestedPaths.filter { $0 == "GET /repos/someone/relay/git/ref/heads/main" }.count,
             2
         )
+    }
+}
+
+extension GitHubPublishTests {
+    @MainActor
+    func testGitHub403AfterLocalSuccessPersistsFailureAndRetriesOnlyRemote() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GitHubMockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let client = GitHubClient(session: session)
+        GitHubMockURLProtocol.reset()
+        defer { GitHubMockURLProtocol.reset() }
+        GitHubMockURLProtocol.handler = { request in
+            switch (request.httpMethod ?? "GET", request.url?.path ?? "") {
+            case ("GET", "/repos/someone/relay/git/ref/heads/main"):
+                return (200, Data(#"{"object":{"sha":"head"}}"#.utf8))
+            case ("GET", "/repos/someone/relay/git/commits/head"):
+                return (200, Data(#"{"sha":"head","tree":{"sha":"tree"}}"#.utf8))
+            case ("GET", "/repos/someone/relay/git/trees/tree"):
+                return (200, Data(#"{"tree":[],"truncated":false}"#.utf8))
+            case ("POST", "/repos/someone/relay/git/blobs"):
+                if request.value(forHTTPHeaderField: "Authorization") == "Bearer denied-test-token" {
+                    return (403, Data(#"{"message":"Resource not accessible by personal access token"}"#.utf8))
+                }
+                return (200, Data(#"{"sha":"blob"}"#.utf8))
+            case ("POST", "/repos/someone/relay/git/trees"):
+                return (200, Data(#"{"sha":"new-tree"}"#.utf8))
+            case ("POST", "/repos/someone/relay/git/commits"):
+                return (200, Data(#"{"sha":"new-commit","tree":{"sha":"new-tree"}}"#.utf8))
+            case ("PATCH", "/repos/someone/relay/git/refs/heads/main"):
+                return (200, Data(#"{"object":{"sha":"new-commit"}}"#.utf8))
+            default:
+                XCTFail("Unexpected GitHub request: \(request.httpMethod ?? "GET") \(request.url?.path ?? "")")
+                return (500, Data())
+            }
+        }
+        var settings = GitHubSettings()
+        settings.owner = "someone"
+        settings.repository = "relay"
+        let file = PublishFile(name: "Module.sgmodule", data: Data("#!name=Fixture\n[Rule]\nDOMAIN,example.invalid,DIRECT\n".utf8))
+        let localURL = root.appending(path: file.name)
+        let recoveryURL = root.appending(path: "selected-publish.json")
+        var calls: [PublishDestination] = []
+        let publish: (PublishDestination, String) async throws -> PublishReport = { destination, token in
+            calls.append(destination)
+            if destination == .local {
+                try file.data.write(to: localURL, options: .atomic)
+                return PublishReport(publishedFiles: [file.name])
+            }
+            return try await client.publish(files: [file], settings: settings, token: token)
+        }
+        let attempt = SelectedPublishAttempt(moduleIDs: [UUID()], results: [
+            PublishTargetResult(destination: .local, target: root.path),
+            PublishTargetResult(destination: .gitHub, target: PublishCoordinator.repositoryKey(settings))
+        ])
+        let failed = await PublishCoordinator.executeSelected(
+            attempt: attempt, destinations: [.local, .gitHub], isCancelled: { false },
+            publish: { try await publish($0, "denied-test-token") },
+            didComplete: { latest, _ in
+                do { try JSONEncoder().encode(latest).write(to: recoveryURL, options: .atomic) }
+                catch { XCTFail("Failed to persist recovery fixture: \(error)") }
+            }
+        )
+        XCTAssertEqual(failed.results.map(\.status), [.succeeded, .failed])
+        XCTAssertTrue(failed.results[1].message.contains("403"))
+        XCTAssertTrue(failed.results[1].message.contains("Resource not accessible"))
+        XCTAssertNil(failed.results[1].commitSHA)
+        XCTAssertTrue(failed.results[1].publishedFiles.isEmpty)
+        XCTAssertEqual(try Data(contentsOf: localURL), file.data)
+        XCTAssertEqual(GitHubMockURLProtocol.requestedPaths.filter { $0 == "POST /repos/someone/relay/git/blobs" }.count, 1)
+        XCTAssertFalse(GitHubMockURLProtocol.requestedPaths.contains { $0.hasPrefix("PATCH ") || $0 == "POST /repos/someone/relay/git/commits" })
+        let restored = try JSONDecoder().decode(SelectedPublishAttempt.self, from: Data(contentsOf: recoveryURL)).restored
+        XCTAssertEqual(restored, failed)
+        XCTAssertEqual(restored.retryDestinations, [.gitHub])
+        let completed = await PublishCoordinator.executeSelected(
+            attempt: restored, destinations: restored.retryDestinations, isCancelled: { false },
+            publish: { try await publish($0, "granted-test-token") }, didComplete: { _, _ in }
+        )
+        XCTAssertEqual(calls, [.local, .gitHub, .gitHub])
+        XCTAssertTrue(completed.succeeded)
+        XCTAssertEqual(completed.results[0], failed.results[0])
+        XCTAssertEqual(completed.results[1].commitSHA, "new-commit")
+        XCTAssertEqual(completed.results[1].publishedFiles, [file.name])
+        XCTAssertEqual(try Data(contentsOf: localURL), file.data)
+        XCTAssertEqual(GitHubMockURLProtocol.requestedPaths.filter { $0 == "POST /repos/someone/relay/git/blobs" }.count, 2)
+        XCTAssertEqual(GitHubMockURLProtocol.requestedPaths.filter { $0 == "PATCH /repos/someone/relay/git/refs/heads/main" }.count, 1)
     }
 }

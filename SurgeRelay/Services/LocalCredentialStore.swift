@@ -4,36 +4,34 @@ import Foundation
 enum LocalCredentialStore {
     static let githubTokenAccount = "github-token"
     static let webAccessTokenAccount = "web-management-token"
-    static let defaultFileURL = PersistenceStore.configurationDirectoryURL
-        .appending(path: "credentials.encrypted")
-    static let defaultKeyURL = PersistenceStore.configurationDirectoryURL
-        .appending(path: "credentials.key")
+    static var defaultFileURL: URL { PersistenceStore.configurationDirectoryURL.appending(path: "credentials.encrypted") }
+    static var defaultKeyURL: URL { PersistenceStore.configurationDirectoryURL.appending(path: "credentials.key") }
 
     private static let storageFormatVersion = 1
 
-    static func loadGitHubToken() throws -> String {
-        try readPassword(account: githubTokenAccount) ?? ""
+    static func loadGitHubToken(directory: URL? = nil) throws -> String {
+        try readPassword(account: githubTokenAccount, fileURL: (directory ?? PersistenceStore.configurationDirectoryURL).appending(path: "credentials.encrypted"), keyURL: (directory ?? PersistenceStore.configurationDirectoryURL).appending(path: "credentials.key")) ?? ""
     }
 
-    static func saveGitHubToken(_ token: String) throws {
+    static func saveGitHubToken(_ token: String, directory: URL? = nil) throws {
         let value = token.trimmingCharacters(in: .whitespacesAndNewlines)
         if value.isEmpty {
-            try deletePassword(account: githubTokenAccount)
+            try deletePassword(account: githubTokenAccount, fileURL: (directory ?? PersistenceStore.configurationDirectoryURL).appending(path: "credentials.encrypted"), keyURL: (directory ?? PersistenceStore.configurationDirectoryURL).appending(path: "credentials.key"))
         } else {
-            try savePassword(value, account: githubTokenAccount)
+            try savePassword(value, account: githubTokenAccount, fileURL: (directory ?? PersistenceStore.configurationDirectoryURL).appending(path: "credentials.encrypted"), keyURL: (directory ?? PersistenceStore.configurationDirectoryURL).appending(path: "credentials.key"))
         }
     }
 
-    static func loadWebAccessToken() throws -> String {
-        try readPassword(account: webAccessTokenAccount) ?? ""
+    static func loadWebAccessToken(directory: URL? = nil) throws -> String {
+        try readPassword(account: webAccessTokenAccount, fileURL: (directory ?? PersistenceStore.configurationDirectoryURL).appending(path: "credentials.encrypted"), keyURL: (directory ?? PersistenceStore.configurationDirectoryURL).appending(path: "credentials.key")) ?? ""
     }
 
-    static func saveWebAccessToken(_ token: String) throws {
+    static func saveWebAccessToken(_ token: String, directory: URL? = nil) throws {
         let value = token.trimmingCharacters(in: .whitespacesAndNewlines)
         if value.isEmpty {
-            try deletePassword(account: webAccessTokenAccount)
+            try deletePassword(account: webAccessTokenAccount, fileURL: (directory ?? PersistenceStore.configurationDirectoryURL).appending(path: "credentials.encrypted"), keyURL: (directory ?? PersistenceStore.configurationDirectoryURL).appending(path: "credentials.key"))
         } else {
-            try savePassword(value, account: webAccessTokenAccount)
+            try savePassword(value, account: webAccessTokenAccount, fileURL: (directory ?? PersistenceStore.configurationDirectoryURL).appending(path: "credentials.encrypted"), keyURL: (directory ?? PersistenceStore.configurationDirectoryURL).appending(path: "credentials.key"))
         }
     }
 

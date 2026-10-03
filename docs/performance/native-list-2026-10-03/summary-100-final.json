@@ -1,0 +1,46 @@
+{
+  "moduleCount": 100,
+  "actionWindowEpochMilliseconds": [
+    1791042216754,
+    1791042223839
+  ],
+  "actions": [
+    {
+      "name": "start",
+      "completed": 0
+    },
+    {
+      "name": "scroll",
+      "time": 1791042219225,
+      "completed": 8
+    },
+    {
+      "name": "filter",
+      "time": 1791042220213,
+      "completed": 12,
+      "visible": 11
+    },
+    {
+      "name": "expand",
+      "time": 1791042223839,
+      "completed": 24
+    }
+  ],
+  "protocol": "Real HTTP updates(1s loopback response delay,4 workers),14 one-page scrolls(7 down/7 up),search0002,clear,collapse/expand; AX verification after groups; QA quit after capture",
+  "boundary": "Active visible main-thread CADisplayLink callbacks, not GPU rendered-frame FPS. Long callback gaps are scheduling gaps, not CPU-task duration proof.",
+  "callbackCount": 529,
+  "eligibleCount": 529,
+  "intervalCount": 527,
+  "p50Milliseconds": 6.9601249997504056,
+  "p95Milliseconds": 41.654083332105074,
+  "maxMilliseconds": 348.2859166670096,
+  "intervalsOver50Milliseconds": 15,
+  "missedCadenceEstimate": 489,
+  "sampledWindowRSSPeakBytes": 275972096,
+  "rssSampleCount": 7,
+  "droppedBatches": 0,
+  "captureLimitReached": false,
+  "rawBytes": 355515,
+  "rawSHA256": "7cfed4c5759e59a623ca585deb012f7a27c66d6e5f7abe35c5ca8016677792ed",
+  "rawRemovedAfterExtraction": true
+}

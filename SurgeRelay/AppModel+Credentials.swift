@@ -11,12 +11,17 @@ extension AppModel {
             return githubToken.trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
-        let tokenLoad = CredentialTokenCoordinator.loadGitHubToken(migratingLegacyToken: settings.githubToken)
+        let directory = configurationStorageDirectory
+        let tokenLoad = CredentialTokenCoordinator.loadGitHubToken(
+            migratingLegacyToken: settings.githubToken,
+            loadStoredToken: { try LocalCredentialStore.loadGitHubToken(directory: directory) },
+            saveStoredToken: { try LocalCredentialStore.saveGitHubToken($0, directory: directory) }
+        )
         githubToken = tokenLoad.token
         githubTokenStorageStatus = tokenLoad.storageStatus
         if tokenLoad.shouldClearLegacyToken {
             settings.githubToken = ""
-            PersistenceStore.saveSettings(settings)
+            enqueueConfiguration(settings, fileName: "settings.json")
         }
         if showStatusMessage, let message = tokenLoad.statusMessage {
             statusMessage = message
@@ -27,10 +32,10 @@ extension AppModel {
     func saveGitHubToken() {
         githubToken = githubToken.trimmingCharacters(in: .whitespacesAndNewlines)
         do {
-            try LocalCredentialStore.saveGitHubToken(githubToken)
+            try LocalCredentialStore.saveGitHubToken(githubToken, directory: configurationStorageDirectory)
             settings.githubToken = ""
             githubTokenStorageStatus = githubToken.isEmpty ? .notConfigured : .encrypted
-            PersistenceStore.saveSettings(settings)
+            enqueueConfiguration(settings, fileName: "settings.json")
             statusMessage = githubToken.isEmpty ? "GitHub Token 已从本地加密存储移除" : "GitHub Token 已保存到本地加密文件"
         } catch {
             githubTokenStorageStatus = githubToken.isEmpty ? .unavailable : .memoryOnly

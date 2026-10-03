@@ -41,13 +41,14 @@ struct ModuleEditorView: View {
         return "留空时保留来源里的 #!icon；填写后会在输出中重写 #!icon，来源缺失或不匹配时自动补齐。"
     }
 
-    init(module: RelayModule?, defaultStorageLocation: ModuleStorageLocation = .gitHub) {
+    init(module: RelayModule?, defaultStorageLocation: ModuleStorageLocation = .gitHub, initialDraft: ModuleDraft? = nil) {
         self.module = module
         _draft = State(
-            initialValue: module.map(ModuleDraft.init(module:))
+            initialValue: initialDraft ?? module.map(ModuleDraft.init(module:))
                 ?? ModuleDraft(defaultStorageLocation: defaultStorageLocation)
         )
-        _isAdvancedExpanded = State(initialValue: module.map { $0.scriptHubOptions != ScriptHubOptions() } ?? false)
+        _isAdvancedExpanded = State(initialValue: initialDraft.map { $0.scriptHubOptions != ScriptHubOptions() }
+                                   ?? module.map { $0.scriptHubOptions != ScriptHubOptions() } ?? false)
     }
 
     var body: some View {
@@ -69,6 +70,7 @@ struct ModuleEditorView: View {
                     sourceSection
                     basicInfoSection
                     publishingSection
+                    refreshPolicySection
                     DisclosureGroup("图标与显示") { iconSection.padding(.top, 12) }
                         .font(.system(size: 14, weight: .medium))
                     advancedEditorSection
@@ -216,6 +218,31 @@ struct ModuleEditorView: View {
             publishedRelativePath: previewPublishedRelativePath,
             outputPathNotice: outputPathNotice
         )
+    }
+
+    private var refreshPolicySection: some View {
+        ModuleEditorSection("刷新策略") {
+            ModuleEditorControlRow("刷新间隔", icon: "clock.arrow.circlepath") {
+                Picker("刷新间隔", selection: Binding(
+                    get: { draft.refreshIntervalMinutes ?? -1 },
+                    set: { draft.refreshIntervalMinutes = $0 < 0 ? nil : $0 }
+                )) {
+                    Text("继承全局（\(ModuleRefreshPlanner.intervalTitle(model.settings.refreshIntervalMinutes))）").tag(-1)
+                    ForEach([0, 5, 15, 60, 360, 1_440], id: \.self) { minutes in
+                        Text(ModuleRefreshPlanner.intervalTitle(minutes)).tag(minutes)
+                    }
+                    if let minutes = draft.refreshIntervalMinutes, ![0, 5, 15, 60, 360, 1_440].contains(minutes) {
+                        Text(ModuleRefreshPlanner.intervalTitle(minutes)).tag(minutes)
+                    }
+                }
+                .labelsHidden()
+                .accessibilityIdentifier("module-editor.refresh-interval")
+            }
+            Text("失败后自动退避 1–60 分钟。手动更新可跳过普通退避，但会遵守服务器 Retry-After 截止时间；单独设置的间隔可覆盖全局手动模式。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     private var sourceSection: some View {

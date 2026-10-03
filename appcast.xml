@@ -3,6 +3,27 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>2.3.0</title>
+            <pubDate>Sun, 04 Oct 2026 04:28:55 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v2.3.0</link>
+            <sparkle:version>108</sparkle:version>
+            <sparkle:shortVersionString>2.3.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 2.3.0
+
+
+- 工作区与模板：新增独立工作区及可复用模块模板，隔离模块、仓库、凭据、草稿和历史；新工作区默认关闭 Web 和发布目标，按需开启。
+- 发布与同步：原生和 Web 共用冻结发布预览、差异比较与确认，支持本地/GitHub 双目标、逐目标结果及只重试未完成目标；修复 Web 编辑使双目标退化的问题。
+- 内容恢复：新增带脚本资源的版本历史、diff 与缓存回退，以及跨重启草稿恢复、条件保存和并发修改保护。回退不会立即发布，并把该模块设为仅手动刷新。
+- 规则检查：发布前检查明确语法错误和缺失资源，重复项及兼容性问题作为提醒；修复资源发布中断后的归属恢复，保留 JS、JSON 与二进制原始内容。
+- 刷新与进度：支持每模块刷新间隔、失败退避与 Retry-After，提供下载、转换、缓存、发布的阶段耗时明细。
+- 性能与稳定性：转换移入有界独立进程，支持超时和强制取消；常规持久化、Web 状态构造和编码移到后台，SSE 分离进度与模块状态；Web 服务可自由开启或关闭。
+- 编辑与交互：改善大文本输入、尺寸测量及行号显示，统一 Reduce Motion 和动画中断；移动端返回列表保留滚动与焦点。
+- 验证：518 项 Release 回归通过、2 项 opt-in 跳过，编辑器矩阵独立通过，Web 行为/DOM 与发布 preflight 通过。三档真实输入响应已达本次 AppKit 更新预算；不宣称实测 GPU 满帧或掉帧数。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v2.3.0/Surge-Relay-2.3.0.app.zip" length="12573599" type="application/zip" sparkle:edSignature="1b20I5zjQtrXSvfkYNNUVBzXuCZcsaU9IJIMG82LxvHPdOwbDY1bv7N1WoSoir5HbYsIY+p16zx4Qn+VROsgDg=="/>
+        </item>
+        <item>
             <title>2.2.1</title>
             <pubDate>Sat, 26 Sep 2026 17:46:25 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v2.2.1</link>

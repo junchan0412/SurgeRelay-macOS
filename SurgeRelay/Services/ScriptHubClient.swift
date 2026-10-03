@@ -48,6 +48,25 @@ actor ScriptHubClient {
     }
 
     func convert(module: RelayModule, github: GitHubSettings? = nil, sourceData: Data? = nil) async throws -> ConversionResult {
+        var result = try await convertMeasured(module: module, github: github, sourceData: sourceData)
+        result.stageMetrics = StageMetricsContext.current?.snapshot
+        return result
+    }
+
+    private func convertMeasured(module: RelayModule, github: GitHubSettings?, sourceData: Data?) async throws -> ConversionResult {
+        let metrics = StageMetricsContext.current
+        let started = ContinuousClock.now
+        let priorDownloads = metrics?.duration(for: .download) ?? 0
+        let priorConversion = metrics?.duration(for: .conversion) ?? 0
+        var completed = false
+        var nativeOutputBytes: Int64?
+        defer {
+            let nested = (metrics?.duration(for: .download) ?? 0) - priorDownloads + (metrics?.duration(for: .conversion) ?? 0) - priorConversion
+            metrics?.record(StageMetric(stage: .conversion, duration: max(0, StageMetricsRecorder.elapsed(since: started) - nested),
+                                        bytesWritten: nativeOutputBytes, failedAttempts: completed || Task.isCancelled ? 0 : 1,
+                                        result: completed ? .completed : Task.isCancelled ? .cancelled : .failed,
+                                        reason: nativeOutputBytes == nil ? "转换后处理" : "原生模块处理", isPartial: !completed))
+        }
         try Task.checkCancellation()
         guard let sourceURL = URL(string: module.updateSourceURL) else { throw RelayError.invalidSourceURL }
         if module.sourceFormat.isNativeSurgeModule(for: sourceURL) {
@@ -62,7 +81,9 @@ actor ScriptHubClient {
                 }
                 var request = URLRequest(url: sourceURL, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: 60)
                 request.setValue("SurgeRelay/2.0", forHTTPHeaderField: "User-Agent")
-                let (responseData, response) = try await httpClient.data(for: request)
+                let (responseData, response) = try await fetchSource(request)
+                if let http = response as? HTTPURLResponse,
+                   let retryAfter = SourceRetryAfterError.response(http, requestedURL: sourceURL) { throw retryAfter }
                 let status = (response as? HTTPURLResponse)?.statusCode ?? 0
                 guard (200..<300).contains(status) else {
                     let body = String(data: responseData, encoding: .utf8) ?? ""
@@ -84,7 +105,9 @@ actor ScriptHubClient {
             let subscribedContent = ModuleMetadataParser.applyingScriptHubSubscription(subscription, to: namedContent)
             let sanitized = SurgeModuleSanitizer.sanitize(subscribedContent)
             try validate(sanitized)
-            return ConversionResult(content: sanitized, requestURL: sourceURL)
+            completed = true
+            nativeOutputBytes = Int64(sanitized.utf8.count)
+            return ConversionResult(content: sanitized, requestURL: sourceURL, stageMetrics: metrics?.snapshot)
         }
         let url = try conversionURL(module: module, baseURL: "http://script.hub")
         let script = try await engineStore.script(named: "Rewrite-Parser.js")
@@ -112,7 +135,22 @@ actor ScriptHubClient {
         let subscribedContent = ModuleMetadataParser.applyingScriptHubSubscription(subscription, to: namedContent)
         let sanitized = SurgeModuleSanitizer.sanitize(subscribedContent)
         try validate(sanitized)
-        return ConversionResult(content: sanitized, requestURL: url, assets: materialized.assets)
+        completed = true
+        return ConversionResult(content: sanitized, requestURL: url, assets: materialized.assets, stageMetrics: metrics?.snapshot)
+    }
+
+    private func fetchSource(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        let started = ContinuousClock.now
+        var bytes: Int64?
+        var status: Int?
+        var failure: (any Error)?
+        defer { StageMetricsContext.current?.recordDownload(since: started, bytesRead: bytes, statusCode: status, error: failure) }
+        do {
+            let response = try await httpClient.data(for: request)
+            bytes = Int64(response.0.count)
+            status = (response.1 as? HTTPURLResponse)?.statusCode
+            return response
+        } catch { failure = error; throw error }
     }
 
     func validate(_ content: String) throws {

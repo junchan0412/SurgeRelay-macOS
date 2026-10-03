@@ -173,10 +173,6 @@ struct AppSettings: Codable, Equatable, Sendable {
         storageMode = try container.decodeIfPresent(StorageMode.self, forKey: .storageMode) ?? .gitHub
         publishToLocal = try container.decodeIfPresent(Bool.self, forKey: .publishToLocal) ?? (storageMode == .local)
         publishToGitHub = try container.decodeIfPresent(Bool.self, forKey: .publishToGitHub) ?? (storageMode == .gitHub)
-        if !publishToLocal && !publishToGitHub {
-            publishToGitHub = true
-            storageMode = .gitHub
-        }
         localModuleDirectory = try container.decodeIfPresent(String.self, forKey: .localModuleDirectory) ?? Self.defaultLocalModuleRootDirectory
         localPublishedRootDirectory = try container.decodeIfPresent(String.self, forKey: .localPublishedRootDirectory)
         localPublishedFilePaths = try container.decodeIfPresent([String].self, forKey: .localPublishedFilePaths) ?? []

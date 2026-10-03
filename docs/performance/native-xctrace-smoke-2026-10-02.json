@@ -1,0 +1,114 @@
+{
+  "purpose": "xctrace permission and exportability smoke only; excluded from all performance baselines",
+  "recordSessionID": 86076,
+  "recordExitCode": 54,
+  "recordingReportedComplete": true,
+  "tracePath": "/tmp/surge-relay-native-smoke-20261002-hitches-memory.trace",
+  "tocPath": "/tmp/surge-relay-native-smoke-20261002-hitches-memory-toc.xml",
+  "requestedExecutable": "/tmp/surge-relay-native-qa/Surge Relay.app/Contents/MacOS/Surge Relay",
+  "recordedTarget": {
+    "arguments": "--surge-relay-ui-qa",
+    "type": "launched",
+    "return-exit-status": "9",
+    "name": "Surge Relay",
+    "pid": "95374",
+    "termination-reason": "SIGKILL"
+  },
+  "recordedProcess": {
+    "name": "Surge Relay",
+    "pid": "95374",
+    "path": "/Applications/Surge Relay.app"
+  },
+  "identityMismatch": true,
+  "observedAdditionalQAPID": 95371,
+  "additionalQACommand": "/Applications/Surge Relay.app/Contents/MacOS/Surge Relay --surge-relay-ui-qa",
+  "cleanup": {
+    "method": "NSRunningApplication.terminate for exact PID 95371",
+    "quitRequested": true,
+    "verifiedBothPIDsAbsent": true
+  },
+  "tables": [
+    {
+      "schema": "hitches",
+      "rowCount": 1,
+      "columns": [
+        "start",
+        "duration",
+        "process",
+        "is-system",
+        "swap-id",
+        "label",
+        "display",
+        "narrative-description"
+      ],
+      "exportPath": "/tmp/surge-relay-native-smoke-hitches.xml"
+    },
+    {
+      "schema": "activity-monitor-process-live",
+      "rowCount": 14,
+      "columns": [
+        "start",
+        "process",
+        "responsible-process",
+        "duration",
+        "pid",
+        "uid",
+        "cpu-percent",
+        "cpu-total",
+        "thread-count",
+        "mach-port-count",
+        "memory-physical-footprint",
+        "memory-real",
+        "memory-real-private",
+        "memory-real-shared",
+        "arch-kind",
+        "sudden-termination",
+        "sandbox",
+        "restricted",
+        "idle-wakeups",
+        "app-nap",
+        "memory-purgeable",
+        "memory-compressed",
+        "disk-bytes-written",
+        "disk-bytes-read",
+        "disk-bytes-written-per-second",
+        "disk-bytes-read-per-second",
+        "preventing-sleep"
+      ],
+      "exportPath": "/tmp/surge-relay-native-smoke-memory.xml"
+    },
+    {
+      "schema": "hitches-frame-lifetimes",
+      "rowCount": 1703,
+      "columns": [
+        "start",
+        "duration",
+        "display",
+        "swap-id",
+        "surface-id",
+        "frame-color",
+        "layout-qualifier",
+        "label"
+      ],
+      "exportPath": "/tmp/surge-relay-native-smoke-frames.xml"
+    },
+    {
+      "schema": "potential-hangs",
+      "rowCount": 1,
+      "columns": [
+        "start",
+        "duration",
+        "hang-type",
+        "thread",
+        "process"
+      ],
+      "exportPath": "/tmp/surge-relay-native-smoke-hangs.xml"
+    }
+  ],
+  "limitations": [
+    "Core Animation FPS instrument is explicitly unsupported on macOS and was excluded.",
+    "Recorded executable identity differs from requested isolated QA copy; sample values must not be used as QA or product performance.",
+    "Frame-lifetimes schema has no process column; its row count is not an application FPS measurement.",
+    "No permission dialogs accepted; no security settings changed; no further launches performed."
+  ]
+}

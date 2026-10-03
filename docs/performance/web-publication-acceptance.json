@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-10-02T04:44:50.731Z",
+  "browser": "154.0.8037.93",
+  "fixtureOnly": true,
+  "checks": [
+    "Selected publication preview has no writes; cancel has no writes; partial result only retries failed GitHub target",
+    "Prior selected publication result is recoverable after reload",
+    "GitHub full preview displays deletions; stale publication ticket requires a new preview",
+    "Two-sided diff, directional cancel, stale sync rejection and refreshed direction confirmation all work",
+    "Mobile sync dialog has no page overflow; identical sides disable destructive actions",
+    "Conditional conversion restore rejects stale ETag, retains draft, then restores only after new confirmation",
+    "Version history diff and assets, cancelled restore, stale ticket recompare, cache-only rollback and unsaved browser draft preservation",
+    "Version-history and publication actions wrap without overflow at 820 px desktop width"
+  ],
+  "pageErrors": []
+}

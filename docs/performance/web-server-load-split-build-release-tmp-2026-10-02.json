@@ -1,0 +1,39 @@
+{
+  "recordedAtUTC": "2026-10-02T14:39:59.309240+00:00",
+  "configuration": "Release",
+  "flags": [
+    "ENABLE_TESTABILITY=YES",
+    "CODE_SIGNING_ALLOWED=NO"
+  ],
+  "gitHead": "386bc2e26409547cd2a1d1d4a47367b4cfc99b56",
+  "coreSourceSHA256": {
+    "SurgeRelay/Services/WebManagementServer.swift": "3b924f1cce7d64bbd04f2e5766ca8c6110595930ec1276aade3386474c86a006",
+    "SurgeRelay/Services/WebManagementController.swift": "584329ecf398a01b54e18deedd423ca874c26591d03c159bc0df36fa55dac44f",
+    "SurgeRelay/Services/WebManagementAPI.swift": "37dc4016344c7ed7cc3c7144633d2ac03fe236760584a1fd761f5b02ac102ca2",
+    "SurgeRelay/Services/WebManagementStateBuilder.swift": "9a1f09ffc4f95810d26248f6bded9cb23b54857bb5d4df766608272adbc5eec9",
+    "SurgeRelay/Services/WebManagementModels.swift": "1498c2f2934a15fdb039ca401b3eb8b5c1393ebb5f9716fcb9b1d9d5ea572dd7",
+    "SurgeRelay/Services/WebManagementAssets.swift": "0aae4bd14401f5180561a52b318ea1e763633c60b5f6c600a88669e4c6c85d35",
+    "SurgeRelay/Services/ModuleIconStore.swift": "7e707601739fc4ac4cada9f55c21568a4cc41256af4f3102a3ace13a628e0c25",
+    "SurgeRelay/AppModel.swift": "c7d34291c0635a8e3c936a25aa37a477cca40a9a61453c819d9adef210e9fbbc",
+    "SurgeRelay/AppModel+ModuleState.swift": "599aff56c5948ca712d57a4cbd8c6301cd5a45a74e5bb75c40231cd8b2d2fae3",
+    "SurgeRelay/AppModel+ModuleOutputFolders.swift": "1e15d38bd372e72f39f57dca8e716397a2179e14256f5573fa8e5c351afa6fe4",
+    "SurgeRelay/AppModel+PreviewAccess.swift": "29181a2a578c4b6f9da89614fe187ba5678b7a1366ae145736c6629f54ea9359",
+    "SurgeRelay/Models/RelayModule.swift": "14e384629213888219c51905511dafb7445eebca4ab8b14d863ce002f20089fb",
+    "SurgeRelay/Models/AppSettings.swift": "e8bfcba2b0154d67b9fea992f6912dbc26ff26b28a851da14d54be5905d24c0d",
+    "SurgeRelay/Models/Workspace.swift": "5f5b2e88e761ff037c7cf6459aab20eeccc0beffa8b94f98e217a04d6c1ad193",
+    "SurgeRelay/Models/WorkActivity.swift": "949ed45fe779cdf1c8f0a894a2178d3a4f4346816ef943add2ab609ab15f46c6",
+    "SurgeRelayTests/WebManagementHTTPTests.swift": "5a2a1dc28bb7dd0d70026663d0c627672c4ef622073d8414cd0cc5f99fcee6cb"
+  },
+  "binarySHA256": {
+    "/tmp/surge-relay-web-load-release/Build/Products/Release/Surge Relay.app/Contents/MacOS/Surge Relay": "8da05de6ca04692d3abca51017e25df24fd0ee880a3b834ebc469141f4828fce",
+    "/tmp/surge-relay-web-load-release/Build/Products/Release/Surge Relay.app/Contents/PlugIns/Surge RelayTests.xctest/Contents/MacOS/Surge RelayTests": "2bc0a94cfc949b8354e6ea59f1cbb6edd3255f29ce9a85b60d5ac1bca786a435"
+  },
+  "testRunSHA256": "99763a52c8e0bd2bce0a3d5d137bf690403ab9d2661de579fba7e2b3499e8388",
+  "xcode": "Xcode 27.0\nBuild version 27A266a",
+  "cpu": "Apple M4",
+  "architecture": "arm64",
+  "notes": "Release split-activity follow-up; same host/configuration/default SSE limit and phases. activity=1 capability negotiation; production snapshot source and background encoder. All regression tests passed before measurement. Source/binary hashes captured before run.",
+  "derivedDataPath": "/tmp/surge-relay-web-load-release",
+  "runtimeExpectedHost": "/tmp/surge-relay-web-load-release/Build/Products/Release/Surge Relay.app/Contents/MacOS/Surge Relay",
+  "runtimeOutput": "/tmp/SurgeRelay-web-load-split-5000-2026-10-02.json"
+}

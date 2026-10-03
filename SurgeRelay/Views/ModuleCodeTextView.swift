@@ -6,6 +6,36 @@ struct ModuleCodeCursorPosition: Equatable {
     let column: Int
 }
 
+struct ModuleCodeLineMetrics {
+    var gutterLineStarts = [0]
+    var plainLineCount = 1
+    var plainLongestLine = 0
+
+    init(text: String) {
+        var offset = 0
+        var width = 0
+        var previousWasCR = false
+        for unit in text.utf16 {
+            offset += 1
+            if unit == 0x0A {
+                gutterLineStarts.append(offset)
+                if previousWasCR { previousWasCR = false; continue }
+            }
+            switch unit {
+            case 0x0A, 0x0D, 0x85, 0x2028, 0x2029:
+                plainLongestLine = max(plainLongestLine, width)
+                width = 0
+                plainLineCount += 1
+                previousWasCR = unit == 0x0D
+            default:
+                previousWasCR = false
+                width += unit == 0x09 ? 4 : 1
+            }
+        }
+        plainLongestLine = max(plainLongestLine, width)
+    }
+}
+
 /// Code text view that draws its own left line-number gutter.
 ///
 /// It intentionally does not live inside an `NSScrollView`: on the current macOS
@@ -16,7 +46,40 @@ struct ModuleCodeCursorPosition: Equatable {
 /// `ScrollView`) sidesteps that clip-view compositing bug, and moving the line
 /// numbers into the text view keeps them aligned and scrolling with the content.
 final class CodeTextView: NSTextView {
-    static let gutterWidth: CGFloat = 44
+    struct MeasurementFullLayoutCounts {
+        var requests = 0
+        var completions = 0
+    }
+    private(set) var qaMeasurementFullLayoutCounts: MeasurementFullLayoutCounts? = {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["SURGE_RELAY_EDITOR_COMPONENT_MATRIX"] == "1"
+            || NativeQAPerformanceRecorder.outputURL(environment: environment) != nil else { return nil }
+        return MeasurementFullLayoutCounts()
+    }()
+
+    static let plainTextThreshold = 256 * 1024
+    static let plainTextLineHeight: CGFloat = 22
+    static func usesPlainTextMode(_ text: String) -> Bool {
+        (text as NSString).length >= plainTextThreshold
+    }
+    private(set) var isPlainTextMode = false
+    private var plainTextSize: CGSize?
+    private var cachedNativeText: String?
+    private var cachedLineMetrics: ModuleCodeLineMetrics?
+    private static let plainTextAttributes: [NSAttributedString.Key: Any] = {
+        let style = NSMutableParagraphStyle()
+        style.minimumLineHeight = plainTextLineHeight
+        style.maximumLineHeight = plainTextLineHeight
+        style.defaultTabInterval = 28
+        style.lineBreakMode = .byClipping
+        return [
+            .font: NSFont.monospacedSystemFont(ofSize: 13, weight: .regular),
+            .foregroundColor: NSColor.labelColor,
+            .paragraphStyle: style,
+        ]
+    }()
+
+    static let gutterWidth: CGFloat = 56
     private let gutterView = GutterView()
     /// 查找栏与菜单命令的目标；由 `ModuleCodeEditorController.attach(_:)` 建立。
     weak var editorController: ModuleCodeEditorController?
@@ -28,12 +91,48 @@ final class CodeTextView: NSTextView {
 
     override var string: String {
         didSet {
+            cachedNativeText = nil
+            cachedLineMetrics = nil
+            configureDocumentMode(resetAttributes: true)
             gutterView.invalidateLineIndex()
             invalidateContentMeasurement()
         }
     }
 
+    var nativeTextSnapshot: String {
+        if let cachedNativeText { return cachedNativeText }
+        let result = NativeQAPerformanceRecorder.measure("nativeTextSnapshot.copyUTF8") {
+            let source = string as NSString
+            if let data = source.data(using: String.Encoding.utf8.rawValue, allowLossyConversion: false) {
+                return String(decoding: data, as: UTF8.self)
+            }
+            var fallback = string
+            fallback.makeContiguousUTF8()
+            return fallback
+        }
+        cachedNativeText = result
+        return result
+    }
+
+    var lineMetrics: ModuleCodeLineMetrics {
+        if let cachedLineMetrics { return cachedLineMetrics }
+        let metrics = NativeQAPerformanceRecorder.measure("document.scanLines") {
+            ModuleCodeLineMetrics(text: nativeTextSnapshot)
+        }
+        cachedLineMetrics = metrics
+        return metrics
+    }
+
+    override func keyDown(with event: NSEvent) {
+        NativeQAPerformanceRecorder.shared?.keyDown(in: self, eventTimestamp: event.timestamp)
+        super.keyDown(with: event)
+    }
+
     override func didChangeText() {
+        cachedNativeText = nil
+        cachedLineMetrics = nil
+        NativeQAPerformanceRecorder.shared?.textChanged(in: self)
+        configureDocumentMode(resetAttributes: false)
         gutterView.invalidateLineIndex()
         invalidateContentMeasurement()
         super.didChangeText()
@@ -43,6 +142,7 @@ final class CodeTextView: NSTextView {
         super.init(frame: frameRect, textContainer: container)
         gutterView.textView = self
         addSubview(gutterView)
+        _ = NativeQAPerformanceRecorder.shared
     }
 
     @available(*, unavailable)
@@ -86,36 +186,84 @@ final class CodeTextView: NSTextView {
     }
 
     func measuredContentSize(forWidth width: CGFloat) -> CGSize? {
-        guard width > 0, width.isFinite, let textStorage, let textContainer else { return nil }
-        if let cached = measuredContentSizes[width] { return cached }
-        let storage = NSTextStorage(attributedString: textStorage)
-        let layout = NSLayoutManager()
-        let container = NSTextContainer(containerSize: NSSize(
-            width: max(1, width - textContainerInset.width * 2),
-            height: .greatestFiniteMagnitude
-        ))
-        container.lineFragmentPadding = textContainer.lineFragmentPadding
-        container.lineBreakMode = textContainer.lineBreakMode
-        if let layoutManager {
-            layout.usesFontLeading = layoutManager.usesFontLeading
-            layout.typesetterBehavior = layoutManager.typesetterBehavior
+        return NativeQAPerformanceRecorder.measure("measuredContentSize") {
+            NativeQAPerformanceRecorder.shared?.recordGeometry(width: width, bounds: bounds,
+                textStorageLength: textStorage?.length, isPlainTextMode: isPlainTextMode,
+                cachedPlainTextSize: plainTextSize, hasTextContainer: textContainer != nil,
+                cachedPlainLineCount: cachedLineMetrics?.plainLineCount)
+            if isPlainTextMode {
+                if plainTextSize == nil { plainTextSize = unwrappedContentSize() }
+                guard let size = plainTextSize else { return nil }
+                let proposedWidth = width > 0 && width.isFinite ? width : size.width
+                return CGSize(width: max(proposedWidth, size.width), height: size.height)
+            }
+            guard width > 0, width.isFinite, let textStorage, let textContainer else { return nil }
+            if let cached = measuredContentSizes[width] { return cached }
+            let storage = NSTextStorage(attributedString: textStorage)
+            let layout = NSLayoutManager()
+            let container = NSTextContainer(containerSize: NSSize(
+                width: max(1, width - textContainerInset.width * 2),
+                height: .greatestFiniteMagnitude
+            ))
+            container.lineFragmentPadding = textContainer.lineFragmentPadding
+            container.lineBreakMode = textContainer.lineBreakMode
+            if let layoutManager {
+                layout.usesFontLeading = layoutManager.usesFontLeading
+                layout.typesetterBehavior = layoutManager.typesetterBehavior
+            }
+            storage.addLayoutManager(layout)
+            layout.addTextContainer(container)
+            qaMeasurementFullLayoutCounts?.requests += 1
+            layout.ensureLayout(for: container)
+            if qaMeasurementFullLayoutCounts != nil, layout.firstUnlaidCharacterIndex() >= storage.length {
+                qaMeasurementFullLayoutCounts?.completions += 1
+            }
+            var height = layout.usedRect(for: container).maxY
+            if layout.extraLineFragmentTextContainer === container {
+                height = max(height, layout.extraLineFragmentRect.maxY)
+            }
+            let size = CGSize(width: width, height: max(ceil(height + textContainerInset.height * 2), 40))
+            if measuredContentSizes.count >= 8 { measuredContentSizes.removeAll(keepingCapacity: true) }
+            measuredContentSizes[width] = size
+            return size
         }
-        storage.addLayoutManager(layout)
-        layout.addTextContainer(container)
-        layout.ensureLayout(for: container)
-        var height = layout.usedRect(for: container).maxY
-        if layout.extraLineFragmentTextContainer === container {
-            height = max(height, layout.extraLineFragmentRect.maxY)
-        }
-        let size = CGSize(width: width, height: max(ceil(height + textContainerInset.height * 2), 40))
-        if measuredContentSizes.count >= 8 { measuredContentSizes.removeAll(keepingCapacity: true) }
-        measuredContentSizes[width] = size
-        return size
     }
 
     func invalidateContentMeasurement() {
         measuredContentSizes.removeAll(keepingCapacity: true)
+        plainTextSize = nil
         invalidateIntrinsicContentSize()
+    }
+
+    private func configureDocumentMode(resetAttributes: Bool) {
+        let nextMode = (textStorage?.length ?? 0) >= Self.plainTextThreshold
+        let changed = nextMode != isPlainTextMode
+        isPlainTextMode = nextMode
+        guard changed || resetAttributes else { return }
+        textContainer?.widthTracksTextView = !nextMode
+        textContainer?.lineBreakMode = nextMode ? .byClipping : .byWordWrapping
+        if nextMode {
+            textContainer?.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+            if let textStorage, textStorage.length > 0 {
+                textStorage.setAttributes(Self.plainTextAttributes, range: NSRange(location: 0, length: textStorage.length))
+            }
+            typingAttributes = Self.plainTextAttributes
+        } else {
+            if let textStorage, textStorage.length > 0 {
+                textStorage.setAttributes(ModuleCodeTextView.Coordinator.defaultAttributes, range: NSRange(location: 0, length: textStorage.length))
+            }
+            typingAttributes = ModuleCodeTextView.Coordinator.defaultAttributes
+        }
+    }
+
+    private func unwrappedContentSize() -> CGSize {
+        return NativeQAPerformanceRecorder.measure("unwrappedContentSize") {
+            let metrics = lineMetrics
+            return CGSize(
+                width: ceil(CGFloat(metrics.plainLongestLine) * 13 + textContainerInset.width * 2 + 16),
+                height: max(40, CGFloat(metrics.plainLineCount) * Self.plainTextLineHeight + textContainerInset.height * 2)
+            )
+        }
     }
 
     var cursorPosition: ModuleCodeCursorPosition {
@@ -273,92 +421,94 @@ final class GutterView: NSView {
     }
 
     private func renderBitmap() {
-        guard let textView,
-              let layoutManager = textView.layoutManager,
-              let textContainer = textView.textContainer,
-              bounds.width > 0, bounds.height > 0 else { return }
+        NativeQAPerformanceRecorder.measure("gutter.render") {
+            guard let textView,
+                  let layoutManager = textView.layoutManager,
+                  let textContainer = textView.textContainer,
+                  bounds.width > 0, bounds.height > 0 else { return }
 
-        rebuildLineStarts()
-        let scale = window?.backingScaleFactor ?? 2
-        let size = bounds.size
-        let pixelWidth = Int((size.width * scale).rounded())
-        let pixelHeight = Int((size.height * scale).rounded())
-        guard pixelWidth > 0, pixelHeight > 0,
-              let rep = NSBitmapImageRep(
-                bitmapDataPlanes: nil,
-                pixelsWide: pixelWidth,
-                pixelsHigh: pixelHeight,
-                bitsPerSample: 8,
-                samplesPerPixel: 4,
-                hasAlpha: true,
-                isPlanar: false,
-                colorSpaceName: .deviceRGB,
-                bytesPerRow: 0,
-                bitsPerPixel: 0
-              ) else { return }
-        rep.size = size
+            rebuildLineStarts()
+            let scale = window?.backingScaleFactor ?? 2
+            let size = bounds.size
+            let pixelWidth = Int((size.width * scale).rounded())
+            let pixelHeight = Int((size.height * scale).rounded())
+            guard pixelWidth > 0, pixelHeight > 0,
+                  let rep = NSBitmapImageRep(
+                    bitmapDataPlanes: nil,
+                    pixelsWide: pixelWidth,
+                    pixelsHigh: pixelHeight,
+                    bitsPerSample: 8,
+                    samplesPerPixel: 4,
+                    hasAlpha: true,
+                    isPlanar: false,
+                    colorSpaceName: .deviceRGB,
+                    bytesPerRow: 0,
+                    bitsPerPixel: 0
+                  ) else { return }
+            rep.size = size
 
-        guard let context = NSGraphicsContext(bitmapImageRep: rep) else { return }
-        let previous = NSGraphicsContext.current
-        NSGraphicsContext.current = context
-        // The bitmap context has a bottom-left origin, so convert each item's
-        // top-down y (matching the flipped text view) with `size.height - y - h`
-        // and draw text upright without flipping the CTM.
-        let height = size.height
+            guard let context = NSGraphicsContext(bitmapImageRep: rep) else { return }
+            let previous = NSGraphicsContext.current
+            NSGraphicsContext.current = context
+            // The bitmap context has a bottom-left origin, so convert each item's
+            // top-down y (matching the flipped text view) with `size.height - y - h`
+            // and draw text upright without flipping the CTM.
+            let height = size.height
 
-        NSColor(Design.Palette.canvas).setFill()
-        NSRect(origin: .zero, size: size).fill()
+            NSColor(Design.Palette.canvas).setFill()
+            NSRect(origin: .zero, size: size).fill()
 
-        let origin = textView.textContainerOrigin
-        let nsString = textView.string as NSString
-        let selectedLine = lineNumber(at: textView.selectedRange().location)
-        let documentViewport = NSRect(
-            x: 0, y: frame.minY - origin.y,
-            width: textView.bounds.width, height: bounds.height
-        )
-        let visibleGlyphRange = layoutManager.glyphRange(forBoundingRectWithoutAdditionalLayout: documentViewport, in: textContainer)
-        layoutManager.enumerateLineFragments(forGlyphRange: visibleGlyphRange) {
-            _, usedRect, _, lineGlyphRange, _ in
-            let characterIndex = layoutManager.characterIndexForGlyph(at: lineGlyphRange.location)
-            let number = self.lineNumber(at: min(characterIndex, nsString.length))
-            let topY = usedRect.minY + origin.y - self.frame.minY
-            if number == selectedLine {
-                NSColor.controlAccentColor.withAlphaComponent(0.12).setFill()
-                NSRect(
-                    x: 0,
-                    y: height - topY - usedRect.height,
-                    width: Self.gutterWidth - 1,
-                    height: usedRect.height
-                ).fill()
-            }
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: NSFont.monospacedDigitSystemFont(
-                    ofSize: 11,
-                    weight: number == selectedLine ? .medium : .regular
-                ),
-                .foregroundColor: number == selectedLine
-                    ? NSColor.controlAccentColor
-                    : NSColor.secondaryLabelColor,
-            ]
-            let label = "\(number)" as NSString
-            let labelSize = label.size(withAttributes: attributes)
-            label.draw(
-                in: NSRect(
-                    x: Self.gutterWidth - labelSize.width - 8,
-                    y: height - topY - labelSize.height,
-                    width: labelSize.width,
-                    height: labelSize.height
-                ),
-                withAttributes: attributes
+            let origin = textView.textContainerOrigin
+            let nsString = textView.string as NSString
+            let selectedLine = lineNumber(at: textView.selectedRange().location)
+            let documentViewport = NSRect(
+                x: 0, y: frame.minY - origin.y,
+                width: textView.bounds.width, height: bounds.height
             )
+            let visibleGlyphRange = layoutManager.glyphRange(forBoundingRectWithoutAdditionalLayout: documentViewport, in: textContainer)
+            layoutManager.enumerateLineFragments(forGlyphRange: visibleGlyphRange) {
+                _, usedRect, _, lineGlyphRange, _ in
+                let characterIndex = layoutManager.characterIndexForGlyph(at: lineGlyphRange.location)
+                let number = self.lineNumber(at: min(characterIndex, nsString.length))
+                let topY = usedRect.minY + origin.y - self.frame.minY
+                if number == selectedLine {
+                    NSColor.controlAccentColor.withAlphaComponent(0.12).setFill()
+                    NSRect(
+                        x: 0,
+                        y: height - topY - usedRect.height,
+                        width: Self.gutterWidth - 1,
+                        height: usedRect.height
+                    ).fill()
+                }
+                let attributes: [NSAttributedString.Key: Any] = [
+                    .font: NSFont.monospacedDigitSystemFont(
+                        ofSize: 11,
+                        weight: number == selectedLine ? .medium : .regular
+                    ),
+                    .foregroundColor: number == selectedLine
+                        ? NSColor.controlAccentColor
+                        : NSColor.secondaryLabelColor,
+                ]
+                let label = "\(number)" as NSString
+                let labelSize = label.size(withAttributes: attributes)
+                label.draw(
+                    in: NSRect(
+                        x: Self.gutterWidth - labelSize.width - 8,
+                        y: height - topY - labelSize.height,
+                        width: labelSize.width,
+                        height: labelSize.height
+                    ),
+                    withAttributes: attributes
+                )
+            }
+
+            Design.Palette.nsStroke.setFill()
+            NSRect(x: Self.gutterWidth - 1, y: 0, width: 1, height: size.height).fill()
+
+            NSGraphicsContext.current = previous
+            layer?.contentsScale = scale
+            layer?.contents = rep.cgImage
         }
-
-        Design.Palette.nsStroke.setFill()
-        NSRect(x: Self.gutterWidth - 1, y: 0, width: 1, height: size.height).fill()
-
-        NSGraphicsContext.current = previous
-        layer?.contentsScale = scale
-        layer?.contents = rep.cgImage
     }
 
     static var gutterWidth: CGFloat { CodeTextView.gutterWidth }
@@ -379,19 +529,11 @@ final class GutterView: NSView {
 
     private func rebuildLineStarts() {
         guard indexedText == nil else { return }
-        let text = textView?.string ?? ""
-        indexedText = text
-        let string = text as NSString
-        var starts = [0]
-        var searchRange = NSRange(location: 0, length: string.length)
-        while searchRange.length > 0 {
-            let newlineRange = string.range(of: "\n", options: [], range: searchRange)
-            guard newlineRange.location != NSNotFound else { break }
-            let nextStart = NSMaxRange(newlineRange)
-            starts.append(nextStart)
-            searchRange = NSRange(location: nextStart, length: string.length - nextStart)
+        NativeQAPerformanceRecorder.measure("gutter.rebuildLineStarts") {
+            guard let textView else { return }
+            indexedText = textView.nativeTextSnapshot
+            lineStarts = textView.lineMetrics.gutterLineStarts
         }
-        lineStarts = starts
     }
 
     private func lineNumber(at characterIndex: Int) -> Int {
@@ -406,6 +548,41 @@ final class GutterView: NSView {
             }
         }
         return max(1, lowerBound)
+    }
+}
+
+enum ModuleCodeSyntaxRanges {
+    private static let commentExpression = try? NSRegularExpression(
+        pattern: #"^(?:#|//|;).*$"#,
+        options: [.anchorsMatchLines]
+    )
+    private static let subscribedExpression = try? NSRegularExpression(
+        pattern: #"^(?:#|//|;)SUBSCRIBED\b.*$"#,
+        options: [.anchorsMatchLines]
+    )
+    private static let sectionExpression = try? NSRegularExpression(
+        pattern: #"^\[[^\n]+\]$"#,
+        options: [.anchorsMatchLines]
+    )
+    private static let metadataExpression = try? NSRegularExpression(
+        pattern: #"^#![^\n]*"#,
+        options: [.anchorsMatchLines]
+    )
+    private static let urlExpression = try? NSRegularExpression(
+        pattern: #"https?://[^\s,\"]+"#
+    )
+
+    static func compute(in text: String) -> [[NSRange]] {
+        let range = NSRange(location: 0, length: (text as NSString).length)
+        return [commentExpression, subscribedExpression, sectionExpression, metadataExpression, urlExpression].map { expression in
+            guard !Task.isCancelled, let expression else { return [] }
+            var matches: [NSRange] = []
+            expression.enumerateMatches(in: text, options: [.reportProgress], range: range) { match, _, stop in
+                if Task.isCancelled { stop.pointee = true }
+                else if let match { matches.append(match.range) }
+            }
+            return matches
+        }
     }
 }
 
@@ -479,7 +656,7 @@ struct ModuleCodeTextView: NSViewRepresentable {
             height: CGFloat.greatestFiniteMagnitude
         )
         textView.string = text
-        textView.typingAttributes = Coordinator.defaultAttributes
+        if !textView.isPlainTextMode { textView.typingAttributes = Coordinator.defaultAttributes }
         context.coordinator.textView = textView
         controller?.attach(textView)
         controller?.setEditable(isEditable)
@@ -493,11 +670,12 @@ struct ModuleCodeTextView: NSViewRepresentable {
     func updateNSView(_ textView: CodeTextView, context: Context) {
         textView.isEditable = isEditable
         controller?.setEditable(isEditable)
-        if textView.string != text {
+        var currentText = textView.nativeTextSnapshot
+        if currentText != text {
             let selectedRange = textView.selectedRange()
             context.coordinator.isApplyingUpdate = true
             textView.string = text
-            textView.typingAttributes = Coordinator.defaultAttributes
+            if !textView.isPlainTextMode { textView.typingAttributes = Coordinator.defaultAttributes }
             let validLocation = min(selectedRange.location, (text as NSString).length)
             let validLength = min(selectedRange.length, (text as NSString).length - validLocation)
             textView.setSelectedRange(NSRange(location: validLocation, length: validLength))
@@ -505,11 +683,12 @@ struct ModuleCodeTextView: NSViewRepresentable {
             textView.refreshGutter()
             // 外部重新载入的内容与旧撤销栈不再对应，清空后重新计算查找结果。
             controller?.resetForReloadedContent()
+            currentText = textView.nativeTextSnapshot
         }
         // Re-highlighting runs several regex passes over the whole document; only
         // do it when the text or selection actually changed, so unrelated SwiftUI
         // updates (e.g. switching the detail tab) don't trigger a costly re-scan.
-        if context.coordinator.needsHighlight(text: textView.string, selectedModuleID: selectedModuleID) {
+        if context.coordinator.needsHighlight(text: currentText, selectedModuleID: selectedModuleID) {
             context.coordinator.scheduleHighlighting(modules: modules, selectedModuleID: selectedModuleID)
         }
         context.coordinator.scrollToSelectedModule(selectedModuleID, modules: modules)
@@ -537,28 +716,6 @@ struct ModuleCodeTextView: NSViewRepresentable {
             .paragraphStyle: defaultParagraphStyle,
         ]
 
-        // Regex compilation is deterministic, but keep initialization failure local to
-        // the highlighting pass so a malformed future pattern cannot crash the editor.
-        private static let commentExpression = try? NSRegularExpression(
-            pattern: #"^(?:#|//|;).*$"#,
-            options: [.anchorsMatchLines]
-        )
-        private static let subscribedExpression = try? NSRegularExpression(
-            pattern: #"^(?:#|//|;)SUBSCRIBED\b.*$"#,
-            options: [.anchorsMatchLines]
-        )
-        private static let sectionExpression = try? NSRegularExpression(
-            pattern: #"^\[[^\n]+\]$"#,
-            options: [.anchorsMatchLines]
-        )
-        private static let metadataExpression = try? NSRegularExpression(
-            pattern: #"^#![^\n]*"#,
-            options: [.anchorsMatchLines]
-        )
-        private static let urlExpression = try? NSRegularExpression(
-            pattern: #"https?://[^\s,\"]+"#
-        )
-
         @Binding private var text: String
         weak var textView: CodeTextView?
         var isApplyingUpdate = false
@@ -572,7 +729,10 @@ struct ModuleCodeTextView: NSViewRepresentable {
         private var lastSelectedModuleID: UUID?
         private var lastHighlightedText: String?
         private var lastHighlightedSelection: UUID?
-        private var highlightWorkItem: DispatchWorkItem?
+        private var highlightTask: Task<Void, Never>?
+        private var highlightGeneration = 0
+
+        deinit { highlightTask?.cancel() }
 
         init(
             text: Binding<String>,
@@ -592,20 +752,27 @@ struct ModuleCodeTextView: NSViewRepresentable {
         /// Returns true (and records the new state) when the text or selection
         /// changed since the last highlight pass; false when nothing changed.
         func needsHighlight(text: String, selectedModuleID: UUID?) -> Bool {
-            guard lastHighlightedText != text || lastHighlightedSelection != selectedModuleID else {
-                return false
+            return NativeQAPerformanceRecorder.measure("needsHighlight") {
+                guard lastHighlightedText?.utf8.count != text.utf8.count
+                    || lastHighlightedText?.utf16.elementsEqual(text.utf16) != true
+                    || lastHighlightedSelection != selectedModuleID else {
+                    return false
+                }
+                lastHighlightedText = text
+                lastHighlightedSelection = selectedModuleID
+                return true
             }
-            lastHighlightedText = text
-            lastHighlightedSelection = selectedModuleID
-            return true
         }
 
         func textDidChange(_ notification: Notification) {
-            guard !isApplyingUpdate, let textView else { return }
-            text = textView.string
-            publishCursorPosition()
-            textView.refreshGutter()
-            controller?.textDidChange()
+            NativeQAPerformanceRecorder.measure("binding.textDidChange") {
+                guard !isApplyingUpdate, let textView else { return }
+                let changedText = NativeQAPerformanceRecorder.measure("binding.readString") { textView.nativeTextSnapshot }
+                NativeQAPerformanceRecorder.measure("binding.assignString") { text = changedText }
+                publishCursorPosition()
+                textView.refreshGutter()
+                controller?.textDidChange()
+            }
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
@@ -647,58 +814,46 @@ struct ModuleCodeTextView: NSViewRepresentable {
         }
 
         func scheduleHighlighting(modules: [RelayModule], selectedModuleID: UUID?) {
-            highlightWorkItem?.cancel()
-            var workItem: DispatchWorkItem!
-            workItem = DispatchWorkItem { [weak self] in
-                guard let self, self.textView != nil, !workItem.isCancelled else { return }
-                self.applyHighlighting(modules: modules, selectedModuleID: selectedModuleID)
-            }
-            highlightWorkItem = workItem
-            DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(24), execute: workItem)
+            applyHighlighting(modules: modules, selectedModuleID: selectedModuleID)
         }
 
         func applyHighlighting(modules: [RelayModule], selectedModuleID: UUID?) {
-            guard let textView, let textStorage = textView.textStorage else { return }
-            let string = textStorage.string
-            let fullRange = NSRange(location: 0, length: (string as NSString).length)
-
-            textStorage.beginEditing()
-            if fullRange.length > 0 {
-                textStorage.setAttributes([
-                    .font: Self.defaultFont,
-                    .foregroundColor: NSColor.labelColor,
-                    .backgroundColor: NSColor.clear,
-                    .paragraphStyle: Self.defaultParagraphStyle,
-                ], range: fullRange)
+            highlightTask?.cancel()
+            highlightGeneration += 1
+            guard let textView, !textView.isPlainTextMode, let textStorage = textView.textStorage else { return }
+            let source = textStorage.string
+            let generation = highlightGeneration
+            highlightTask = Task { @MainActor [weak self] in
+                do { try await Task.sleep(for: .milliseconds(24)) } catch { return }
+                let worker = Task.detached(priority: .userInitiated) {
+                    ModuleCodeSyntaxRanges.compute(in: source)
+                }
+                let ranges = await withTaskCancellationHandler {
+                    await worker.value
+                } onCancel: { worker.cancel() }
+                guard !Task.isCancelled, let self, self.highlightGeneration == generation,
+                      let textView = self.textView, !textView.isPlainTextMode,
+                      textView.string.utf16.elementsEqual(source.utf16), let storage = textView.textStorage else { return }
+                let attributes: [[NSAttributedString.Key: Any]] = [
+                    [.foregroundColor: NSColor.secondaryLabelColor],
+                    [.foregroundColor: Design.Palette.nsAccent, .font: NSFont.monospacedSystemFont(ofSize: 13, weight: .semibold)],
+                    [.foregroundColor: Design.Palette.nsAccent, .font: NSFont.monospacedSystemFont(ofSize: 13, weight: .semibold)],
+                    [.foregroundColor: Design.Palette.nsAccent],
+                    [.foregroundColor: NSColor.secondaryLabelColor],
+                ]
+                NativeQAPerformanceRecorder.measure("highlight.attributes") {
+                    storage.beginEditing()
+                    storage.setAttributes(Self.defaultAttributes, range: NSRange(location: 0, length: storage.length))
+                    for (index, group) in ranges.enumerated() {
+                        for range in group { storage.addAttributes(attributes[index], range: range) }
+                    }
+                    self.applyModuleColors(modules: modules, selectedModuleID: selectedModuleID, textStorage: storage)
+                    storage.endEditing()
+                    textView.typingAttributes = Self.defaultAttributes
+                }
+                textView.refreshGutter()
+                self.highlightTask = nil
             }
-
-            apply(expression: Self.commentExpression, attributes: [
-                .foregroundColor: NSColor.secondaryLabelColor,
-            ], to: textStorage)
-            apply(expression: Self.subscribedExpression, attributes: [
-                .foregroundColor: Design.Palette.nsAccent,
-                .font: NSFont.monospacedSystemFont(ofSize: 13, weight: .semibold),
-            ], to: textStorage)
-            apply(expression: Self.sectionExpression, attributes: [
-                .foregroundColor: Design.Palette.nsAccent,
-                .font: NSFont.monospacedSystemFont(ofSize: 13, weight: .semibold),
-            ], to: textStorage)
-            apply(expression: Self.metadataExpression, attributes: [
-                .foregroundColor: Design.Palette.nsAccent,
-            ], to: textStorage)
-            apply(expression: Self.urlExpression, attributes: [
-                .foregroundColor: NSColor.secondaryLabelColor,
-            ], to: textStorage)
-
-            applyModuleColors(
-                modules: modules,
-                selectedModuleID: selectedModuleID,
-                textStorage: textStorage
-            )
-            textStorage.endEditing()
-            textView.typingAttributes = Self.defaultAttributes
-            textView.invalidateContentMeasurement()
-            textView.refreshGutter()
         }
 
         func scrollToSelectedModule(_ id: UUID?, modules: [RelayModule]) {
@@ -748,17 +903,5 @@ struct ModuleCodeTextView: NSViewRepresentable {
             }
         }
 
-        private func apply(
-            expression: NSRegularExpression?,
-            attributes: [NSAttributedString.Key: Any],
-            to textStorage: NSTextStorage
-        ) {
-            guard let expression else { return }
-            let string = textStorage.string
-            let range = NSRange(location: 0, length: (string as NSString).length)
-            for match in expression.matches(in: string, range: range) {
-                textStorage.addAttributes(attributes, range: match.range)
-            }
-        }
     }
 }

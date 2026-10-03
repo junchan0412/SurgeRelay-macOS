@@ -205,12 +205,13 @@ enum GitHubPublishPlanner {
         return UpdateHistoryEntry(
             moduleName: "GitHub",
             outcome: .published,
-            duration: 0,
+            duration: report.duration,
             message: historyMessage(commit: report.commitSHA, report: report),
             contentChanged: report.changedFileCount > 0,
             publishedFiles: report.publishedFiles,
             deletedFiles: report.deletedFiles,
-            commitSHA: report.commitSHA
+            commitSHA: report.commitSHA,
+            stageMetrics: report.stageMetrics
         )
     }
 

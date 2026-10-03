@@ -1,0 +1,39 @@
+{
+  "recordedAtUTC": "2026-10-02T12:42:45.816987+00:00",
+  "configuration": "Release",
+  "flags": [
+    "ENABLE_TESTABILITY=YES",
+    "CODE_SIGNING_ALLOWED=NO"
+  ],
+  "gitHead": "386bc2e26409547cd2a1d1d4a47367b4cfc99b56",
+  "coreSourceSHA256": {
+    "SurgeRelay/Services/WebManagementServer.swift": "4d435d954ac6737a9ebf3c170ecfdfad149afc27a6e2cd7a20de97a51eed57b3",
+    "SurgeRelay/Services/WebManagementController.swift": "8e2c542428a86f93de336ac3728d7c8bf8c0c923cabd4ecfaebfb7b4d9b4a919",
+    "SurgeRelay/Services/WebManagementAPI.swift": "d312e1deea26fefcdfd8656f9f5be2098550441946777f418e462f8efb98fba8",
+    "SurgeRelay/Services/WebManagementStateBuilder.swift": "687e24e8c699144a15d4c3b95e4cc65c197e9f196b05f248f713f1074e70ce98",
+    "SurgeRelay/Services/WebManagementModels.swift": "48cd6b6a47274a343eed6f7da5b46673454c581d810785b23a60eed89ab4a396",
+    "SurgeRelay/Services/WebManagementAssets.swift": "0aae4bd14401f5180561a52b318ea1e763633c60b5f6c600a88669e4c6c85d35",
+    "SurgeRelay/Services/ModuleIconStore.swift": "7e707601739fc4ac4cada9f55c21568a4cc41256af4f3102a3ace13a628e0c25",
+    "SurgeRelay/AppModel.swift": "84a4f1b718d0d3891c7e4863122fab5e0e516d2da27b004871833abbf5b416c2",
+    "SurgeRelay/AppModel+ModuleState.swift": "599aff56c5948ca712d57a4cbd8c6301cd5a45a74e5bb75c40231cd8b2d2fae3",
+    "SurgeRelay/AppModel+ModuleOutputFolders.swift": "1e15d38bd372e72f39f57dca8e716397a2179e14256f5573fa8e5c351afa6fe4",
+    "SurgeRelay/AppModel+PreviewAccess.swift": "29181a2a578c4b6f9da89614fe187ba5678b7a1366ae145736c6629f54ea9359",
+    "SurgeRelay/Models/RelayModule.swift": "14e384629213888219c51905511dafb7445eebca4ab8b14d863ce002f20089fb",
+    "SurgeRelay/Models/AppSettings.swift": "e8bfcba2b0154d67b9fea992f6912dbc26ff26b28a851da14d54be5905d24c0d",
+    "SurgeRelay/Models/Workspace.swift": "5f5b2e88e761ff037c7cf6459aab20eeccc0beffa8b94f98e217a04d6c1ad193",
+    "SurgeRelay/Models/WorkActivity.swift": "949ed45fe779cdf1c8f0a894a2178d3a4f4346816ef943add2ab609ab15f46c6",
+    "SurgeRelayTests/WebManagementHTTPTests.swift": "6adae3fcbed6995631e2426f9c4beee994e3e4a03f678b4981c2b8894c13bb67"
+  },
+  "binarySHA256": {
+    "/tmp/surge-relay-web-load-release/Build/Products/Release/Surge Relay.app/Contents/MacOS/Surge Relay": "42a68cd0187fabb666b9b9654e31617e48bbe12789a13d449ef36b2f0a583f80",
+    "/tmp/surge-relay-web-load-release/Build/Products/Release/Surge Relay.app/Contents/PlugIns/Surge RelayTests.xctest/Contents/MacOS/Surge RelayTests": "ab468b3ef1e4ab48cf4fb417366a2c44dc715fec272fd5bd5977b2f9bf8325fb"
+  },
+  "testRunSHA256": "e1b3664c5739fc4330ec735578c0da9cb154ee27e74f9a1df5e15dc84b7c062c",
+  "xcode": "Xcode 27.0\nBuild version 27A266a",
+  "cpu": "Apple M4",
+  "architecture": "arm64",
+  "notes": "Same Release/testability/signing configuration as the Documents-path attempt, with derived products and runtime output under /tmp. No OS permission, injection-path or product-identity changes. Host path is checked by the benchmark before measuring.",
+  "derivedDataPath": "/tmp/surge-relay-web-load-release",
+  "runtimeExpectedHost": "/tmp/surge-relay-web-load-release/Build/Products/Release/Surge Relay.app/Contents/MacOS/Surge Relay",
+  "runtimeOutput": "/tmp/SurgeRelay-web-load-5000-release-tmp-2026-10-02.json"
+}

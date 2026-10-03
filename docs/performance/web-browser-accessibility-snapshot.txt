@@ -1,0 +1,332 @@
+- complementary "模块列表":
+  - heading "Surge Relay" [level=1]
+  - paragraph:
+    - text: Web 管理 ·
+    - status: 已连接
+  - button "添加模块"
+  - button "更新全部"
+  - navigation "工作空间":
+    - button "工作台"
+    - button "活动记录"
+  - search:
+    - searchbox "搜索模块"
+  - status
+  - navigation "模块库":
+    - text: 模块库 100
+    - button "Fixture Module 00000，已是最新":
+      - strong: Fixture Module 00000
+      - text: Quantumult X · Even · Local
+    - button "Fixture Module 00001，已是最新":
+      - strong: Fixture Module 00001
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00002，已是最新":
+      - strong: Fixture Module 00002
+      - text: Quantumult X · Even
+    - button "Fixture Module 00003，已是最新":
+      - strong: Fixture Module 00003
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00004，已是最新":
+      - strong: Fixture Module 00004
+      - text: Quantumult X · Even
+    - button "Fixture Module 00005，已是最新":
+      - strong: Fixture Module 00005
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00006，已是最新":
+      - strong: Fixture Module 00006
+      - text: Quantumult X · Even
+    - button "Fixture Module 00007，已是最新":
+      - strong: Fixture Module 00007
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00008，已是最新":
+      - strong: Fixture Module 00008
+      - text: Quantumult X · Even
+    - button "Fixture Module 00009，已是最新":
+      - strong: Fixture Module 00009
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00010，已是最新":
+      - strong: Fixture Module 00010
+      - text: Quantumult X · Even
+    - button "Fixture Module 00011，已是最新":
+      - strong: Fixture Module 00011
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00012，已是最新":
+      - strong: Fixture Module 00012
+      - text: Quantumult X · Even
+    - button "Fixture Module 00013，已是最新":
+      - strong: Fixture Module 00013
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00014，已是最新":
+      - strong: Fixture Module 00014
+      - text: Quantumult X · Even
+    - button "Fixture Module 00015，已是最新":
+      - strong: Fixture Module 00015
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00016，已是最新":
+      - strong: Fixture Module 00016
+      - text: Quantumult X · Even
+    - button "Fixture Module 00017，已是最新":
+      - strong: Fixture Module 00017
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00018，已是最新":
+      - strong: Fixture Module 00018
+      - text: Quantumult X · Even
+    - button "Fixture Module 00019，已是最新":
+      - strong: Fixture Module 00019
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00020，已是最新":
+      - strong: Fixture Module 00020
+      - text: Quantumult X · Even
+    - button "Fixture Module 00021，已是最新":
+      - strong: Fixture Module 00021
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00022，已是最新":
+      - strong: Fixture Module 00022
+      - text: Quantumult X · Even
+    - button "Fixture Module 00023，已是最新":
+      - strong: Fixture Module 00023
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00024，已是最新":
+      - strong: Fixture Module 00024
+      - text: Quantumult X · Even
+    - button "Fixture Module 00025，已是最新":
+      - strong: Fixture Module 00025
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00026，已是最新":
+      - strong: Fixture Module 00026
+      - text: Quantumult X · Even
+    - button "Fixture Module 00027，已是最新":
+      - strong: Fixture Module 00027
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00028，已是最新":
+      - strong: Fixture Module 00028
+      - text: Quantumult X · Even
+    - button "Fixture Module 00029，已是最新":
+      - strong: Fixture Module 00029
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00030，已是最新":
+      - strong: Fixture Module 00030
+      - text: Quantumult X · Even
+    - button "Fixture Module 00031，已是最新":
+      - strong: Fixture Module 00031
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00032，已是最新":
+      - strong: Fixture Module 00032
+      - text: Quantumult X · Even
+    - button "Fixture Module 00033，已是最新":
+      - strong: Fixture Module 00033
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00034，已是最新":
+      - strong: Fixture Module 00034
+      - text: Quantumult X · Even
+    - button "Fixture Module 00035，已是最新":
+      - strong: Fixture Module 00035
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00036，已是最新":
+      - strong: Fixture Module 00036
+      - text: Quantumult X · Even
+    - button "Fixture Module 00037，已是最新":
+      - strong: Fixture Module 00037
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00038，已是最新":
+      - strong: Fixture Module 00038
+      - text: Quantumult X · Even
+    - button "Fixture Module 00039，已是最新":
+      - strong: Fixture Module 00039
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00040，已是最新":
+      - strong: Fixture Module 00040
+      - text: Quantumult X · Even
+    - button "Fixture Module 00041，已是最新":
+      - strong: Fixture Module 00041
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00042，已是最新":
+      - strong: Fixture Module 00042
+      - text: Quantumult X · Even
+    - button "Fixture Module 00043，已是最新":
+      - strong: Fixture Module 00043
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00044，已是最新":
+      - strong: Fixture Module 00044
+      - text: Quantumult X · Even
+    - button "Fixture Module 00045，已是最新":
+      - strong: Fixture Module 00045
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00046，已是最新":
+      - strong: Fixture Module 00046
+      - text: Quantumult X · Even
+    - button "Fixture Module 00047，已是最新":
+      - strong: Fixture Module 00047
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00048，已是最新":
+      - strong: Fixture Module 00048
+      - text: Quantumult X · Even
+    - button "Fixture Module 00049，已是最新":
+      - strong: Fixture Module 00049
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00050，已是最新":
+      - strong: Fixture Module 00050
+      - text: Quantumult X · Even
+    - button "Fixture Module 00051，已是最新":
+      - strong: Fixture Module 00051
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00052，已是最新":
+      - strong: Fixture Module 00052
+      - text: Quantumult X · Even
+    - button "Fixture Module 00053，已是最新":
+      - strong: Fixture Module 00053
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00054，已是最新":
+      - strong: Fixture Module 00054
+      - text: Quantumult X · Even
+    - button "Fixture Module 00055，已是最新":
+      - strong: Fixture Module 00055
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00056，已是最新":
+      - strong: Fixture Module 00056
+      - text: Quantumult X · Even
+    - button "Fixture Module 00057，已是最新":
+      - strong: Fixture Module 00057
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00058，已是最新":
+      - strong: Fixture Module 00058
+      - text: Quantumult X · Even
+    - button "Fixture Module 00059，已是最新":
+      - strong: Fixture Module 00059
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00060，已是最新":
+      - strong: Fixture Module 00060
+      - text: Quantumult X · Even
+    - button "Fixture Module 00061，已是最新":
+      - strong: Fixture Module 00061
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00062，已是最新":
+      - strong: Fixture Module 00062
+      - text: Quantumult X · Even
+    - button "Fixture Module 00063，已是最新":
+      - strong: Fixture Module 00063
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00064，已是最新":
+      - strong: Fixture Module 00064
+      - text: Quantumult X · Even
+    - button "Fixture Module 00065，已是最新":
+      - strong: Fixture Module 00065
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00066，已是最新":
+      - strong: Fixture Module 00066
+      - text: Quantumult X · Even
+    - button "Fixture Module 00067，已是最新":
+      - strong: Fixture Module 00067
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00068，已是最新":
+      - strong: Fixture Module 00068
+      - text: Quantumult X · Even
+    - button "Fixture Module 00069，已是最新":
+      - strong: Fixture Module 00069
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00070，已是最新":
+      - strong: Fixture Module 00070
+      - text: Quantumult X · Even
+    - button "Fixture Module 00071，已是最新":
+      - strong: Fixture Module 00071
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00072，已是最新":
+      - strong: Fixture Module 00072
+      - text: Quantumult X · Even
+    - button "Fixture Module 00073，已是最新":
+      - strong: Fixture Module 00073
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00074，已是最新":
+      - strong: Fixture Module 00074
+      - text: Quantumult X · Even
+    - button "Fixture Module 00075，已是最新":
+      - strong: Fixture Module 00075
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00076，已是最新":
+      - strong: Fixture Module 00076
+      - text: Quantumult X · Even
+    - button "Fixture Module 00077，已是最新":
+      - strong: Fixture Module 00077
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00078，已是最新":
+      - strong: Fixture Module 00078
+      - text: Quantumult X · Even
+    - button "Fixture Module 00079，已是最新":
+      - strong: Fixture Module 00079
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00080，已是最新":
+      - strong: Fixture Module 00080
+      - text: Quantumult X · Even
+    - button "Fixture Module 00081，已是最新":
+      - strong: Fixture Module 00081
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00082，已是最新":
+      - strong: Fixture Module 00082
+      - text: Quantumult X · Even
+    - button "Fixture Module 00083，已是最新":
+      - strong: Fixture Module 00083
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00084，已是最新":
+      - strong: Fixture Module 00084
+      - text: Quantumult X · Even
+    - button "Fixture Module 00085，已是最新":
+      - strong: Fixture Module 00085
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00086，已是最新":
+      - strong: Fixture Module 00086
+      - text: Quantumult X · Even
+    - button "Fixture Module 00087，已是最新":
+      - strong: Fixture Module 00087
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00088，已是最新":
+      - strong: Fixture Module 00088
+      - text: Quantumult X · Even
+    - button "Fixture Module 00089，已是最新":
+      - strong: Fixture Module 00089
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00090，已是最新":
+      - strong: Fixture Module 00090
+      - text: Quantumult X · Even
+    - button "Fixture Module 00091，已是最新":
+      - strong: Fixture Module 00091
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00092，已是最新":
+      - strong: Fixture Module 00092
+      - text: Quantumult X · Even
+    - button "Fixture Module 00093，已是最新":
+      - strong: Fixture Module 00093
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00094，已是最新":
+      - strong: Fixture Module 00094
+      - text: Quantumult X · Even
+    - button "Fixture Module 00095，已是最新":
+      - strong: Fixture Module 00095
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00096，已是最新":
+      - strong: Fixture Module 00096
+      - text: Quantumult X · Even
+    - button "Fixture Module 00097，已是最新":
+      - strong: Fixture Module 00097
+      - text: Quantumult X · Odd
+    - button "Fixture Module 00098，已是最新":
+      - strong: Fixture Module 00098
+      - text: Quantumult X · Even
+    - button "Fixture Module 00099，已是最新":
+      - strong: Fixture Module 00099
+      - text: Quantumult X · Odd
+  - text: 隔离 fixture
+  - strong: 最新更新时间
+  - text: 尚未更新
+- main:
+  - tablist "显示方式":
+    - tab "详情"
+    - tab "预览" [selected]
+  - button "编辑"
+  - button "删除"
+  - tabpanel "预览":
+    - text: Fixture-0.sgmodule
+    - status: 已保存
+    - button "拷贝全部"
+    - button "恢复"
+    - button "写入" [disabled]
+    - textbox "模块内容": my concurrent edit
+- status: Fixture saved

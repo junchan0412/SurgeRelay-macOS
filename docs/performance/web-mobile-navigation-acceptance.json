@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-10-03T01:00:03.258Z",
+  "browser": "154.0.8037.98",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "fixtureOnly": true,
+  "checks": [
+    "Mobile detail entry selects URL target and visible detail focus; actual ArrowRight/Home keys switch tabs and focus",
+    "Escape closes the real edit dialog and returns focus to its opener",
+    "Mobile back button returns to the list history entry, restores module focus and preserves sidebar scroll",
+    "Browser history back and forward restore list/detail targets with visible focus and retained sidebar scroll",
+    "Command-K from mobile detail keeps focus on search rather than restoring the former module focus"
+  ],
+  "pageErrors": [],
+  "buttonBack": {
+    "moduleID": "module-40",
+    "listScroll": 2105,
+    "url": "http://127.0.0.1:61006/",
+    "history": {
+      "surgeRelay": true,
+      "view": "list",
+      "module": null
+    },
+    "scroll": 2105,
+    "focusID": "module-40",
+    "focusTag": "BUTTON",
+    "focusInert": false
+  },
+  "headless": true
+}

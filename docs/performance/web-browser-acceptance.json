@@ -1,0 +1,80 @@
+{
+  "timestamp": "2026-10-02T02:09:22.346Z",
+  "phase": "acceptance",
+  "environment": {
+    "platform": "darwin",
+    "release": "27.2.0",
+    "cpu": "Apple M4",
+    "cpuCount": 10,
+    "ramBytes": 17179869184,
+    "node": "v26.10.0",
+    "browser": "154.0.8037.93",
+    "headless": true,
+    "macOS": "27.2"
+  },
+  "method": "Current WebResources in installed Chrome; isolated 127.0.0.1 ephemeral HTTP fixture and in-memory API. No real Surge/GitHub backend. Filter timing is synchronous DOM input dispatch through two requestAnimationFrame callbacks (next paint opportunity). Each 30-sample batch includes alternating restrictive and full-list searches. Scroll is scripted real scrollTop over 180 rAF frames. Longtasks observed at browser main thread. JS heap is Chromium performance.memory, not whole-process RSS.",
+  "acceptance": [
+    {
+      "name": "dual destination editor submits both targets",
+      "passed": true,
+      "payload": [
+        "local",
+        "gitHub"
+      ]
+    },
+    {
+      "name": "small textarea input through Playwright fill",
+      "passed": true
+    },
+    {
+      "name": "preview editor geometry",
+      "geometry": {
+        "rect": {
+          "x": 337,
+          "y": 171,
+          "width": 910,
+          "height": 686,
+          "top": 171,
+          "right": 1247,
+          "bottom": 857,
+          "left": 337
+        },
+        "hidden": false,
+        "display": "block",
+        "disabled": false
+      }
+    },
+    {
+      "name": "IndexedDB restores a draft larger than 5 MiB after real page reload",
+      "passed": true,
+      "utf8Bytes": 5700016,
+      "dataEntry": "DOM value assignment + input event; not a large-file typing benchmark"
+    },
+    {
+      "name": "ETag collision preserves draft, exposes server content, confirmed conditional retry saves",
+      "passed": true
+    },
+    {
+      "name": "Reduce Motion suppresses WAAPI and CSS motion in actual Chromium",
+      "passed": true,
+      "open": true,
+      "reducedMedia": true,
+      "running": []
+    },
+    {
+      "name": "rapid accordion and dialog reversal settles at newest requested state",
+      "passed": true
+    },
+    {
+      "name": "390 px mobile viewport has no horizontal overflow",
+      "passed": true
+    }
+  ],
+  "measurements": [],
+  "errors": [],
+  "reducedMotionObservation": {
+    "open": true,
+    "reducedMedia": true,
+    "running": []
+  }
+}

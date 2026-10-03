@@ -15,6 +15,17 @@ struct CodeSearchQuery: Equatable, Sendable {
     var isEmpty: Bool { text.isEmpty }
 }
 
+struct CodeSearchResult: Sendable {
+    var ranges: [NSRange]
+    var isTruncated: Bool
+}
+
+struct CodeSearchRegexObservation: Sendable {
+    var progress: Bool
+    var completed: Bool
+    var internalError: Bool
+}
+
 /// 模块文本查找与替换的纯逻辑。
 ///
 /// 全部按 UTF-16 偏移工作，与 `NSTextView` 的选区一致，因此含中文、Emoji 的
@@ -24,6 +35,26 @@ enum CodeSearchEngine {
     static let maximumMatchCount = 5_000
 
     static func matches(in text: String, query: CodeSearchQuery) -> [NSRange] {
+        search(in: text, query: query).ranges
+    }
+
+    static func search(
+        in text: String,
+        query: CodeSearchQuery,
+        observeRegex: (@Sendable (CodeSearchRegexObservation) -> Void)? = nil
+    ) -> CodeSearchResult {
+        let ranges = collectedMatches(in: text, query: query, observeRegex: observeRegex)
+        return CodeSearchResult(
+            ranges: Array(ranges.prefix(maximumMatchCount)),
+            isTruncated: ranges.count > maximumMatchCount
+        )
+    }
+
+    private static func collectedMatches(
+        in text: String,
+        query: CodeSearchQuery,
+        observeRegex: (@Sendable (CodeSearchRegexObservation) -> Void)?
+    ) -> [NSRange] {
         guard !query.isEmpty, !Task.isCancelled else { return [] }
         let string = text as NSString
         let fullRange = NSRange(location: 0, length: string.length)
@@ -32,14 +63,17 @@ enum CodeSearchEngine {
         if query.usesRegularExpression {
             guard let expression = regularExpression(for: query) else { return [] }
             var results: [NSRange] = []
-            expression.enumerateMatches(in: text, options: [.reportProgress], range: fullRange) { match, _, stop in
+            let options: NSRegularExpression.MatchingOptions = observeRegex == nil ? [.reportProgress] : [.reportProgress, .reportCompletion]
+            expression.enumerateMatches(in: text, options: options, range: fullRange) { match, flags, stop in
+                observeRegex?(CodeSearchRegexObservation(progress: flags.contains(.progress),
+                    completed: flags.contains(.completed), internalError: flags.contains(.internalError)))
                 guard !Task.isCancelled else {
                     stop.pointee = true
                     return
                 }
                 guard let match, match.range.length > 0 else { return }
                 results.append(match.range)
-                if results.count >= maximumMatchCount { stop.pointee = true }
+                if results.count > maximumMatchCount { stop.pointee = true }
             }
             return Task.isCancelled ? [] : results
         }
@@ -53,7 +87,7 @@ enum CodeSearchEngine {
             let found = string.range(of: query.text, options: options, range: searchRange)
             guard found.location != NSNotFound, found.length > 0 else { break }
             results.append(found)
-            if results.count >= maximumMatchCount { break }
+            if results.count > maximumMatchCount { break }
             let nextLocation = NSMaxRange(found)
             searchRange = NSRange(location: nextLocation, length: string.length - nextLocation)
         }

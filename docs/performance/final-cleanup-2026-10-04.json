@@ -1,0 +1,15 @@
+{
+  "date": "2026-10-04",
+  "path": "/tmp/surge-relay-final-qa",
+  "freeBytesBefore": 97746944000,
+  "reason": "All processes stopped, final validation and compact measurements archived; user requires deletion after use",
+  "preserved": [
+    "source and tests",
+    "docs/performance/final-validation-2026-10-04.json",
+    "docs/performance/final-preflight-2026-10-04.log",
+    "final editor matrix data and 100-module callback window"
+  ],
+  "allocatedKiBBefore": 429164,
+  "removed": true,
+  "freeBytesAfter": 98109734912
+}

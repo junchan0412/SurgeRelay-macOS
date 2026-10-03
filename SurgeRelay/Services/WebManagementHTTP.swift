@@ -156,6 +156,7 @@ struct WebHTTPResponse: Sendable {
         case 404: "Not Found"
         case 405: "Method Not Allowed"
         case 409: "Conflict"
+        case 412: "Precondition Failed"
         case 429: "Too Many Requests"
         default: "Internal Server Error"
         }
@@ -169,75 +170,84 @@ enum WebRequestParseResult {
     case invalid(String)
 }
 
+struct WebRequestHead: Sendable {
+    let request: WebHTTPRequest
+    let contentLength: Int
+    let bodyOffset: Int
+
+    func completed(body: Data) -> WebHTTPRequest {
+        WebHTTPRequest(method: request.method, path: request.path, query: request.query,
+            headers: request.headers, body: body, isLoopback: request.isLoopback,
+            clientIdentifier: request.clientIdentifier)
+    }
+}
+
+enum WebRequestHeadResult {
+    case head(WebRequestHead)
+    case incomplete
+    case invalid(String)
+}
+
 enum WebRequestParser {
-    static func parseRequest(
-        _ data: Data,
-        isLoopback: Bool,
-        clientIdentifier: String = "loopback"
-    ) -> WebHTTPRequest? {
-        guard case let .request(request) = parseRequestResult(
-            data,
-            isLoopback: isLoopback,
-            clientIdentifier: clientIdentifier
-        ) else {
-            return nil
-        }
+    static let maximumHeaderSize = 32 * 1024
+    static let maximumPreviewBodySize = 20 * 1024 * 1024
+    static let maximumBodySize = 4 * 1024 * 1024
+
+    static func parseRequest(_ data: Data, isLoopback: Bool, clientIdentifier: String = "loopback") -> WebHTTPRequest? {
+        guard case let .request(request) = parseRequestResult(data, isLoopback: isLoopback,
+            clientIdentifier: clientIdentifier) else { return nil }
         return request
     }
 
-    static func parseRequestResult(
-        _ data: Data,
-        isLoopback: Bool,
-        clientIdentifier: String = "loopback",
-        maximumRequestSize: Int = 4 * 1024 * 1024
-    ) -> WebRequestParseResult {
-        let separator = Data("\r\n\r\n".utf8)
-        guard let headerRange = data.range(of: separator),
-              let headerText = String(data: data[..<headerRange.lowerBound], encoding: .utf8) else {
-            return .incomplete
+    static func parseRequestResult(_ data: Data, isLoopback: Bool, clientIdentifier: String = "loopback",
+                                  maximumRequestSize: Int = maximumBodySize) -> WebRequestParseResult {
+        switch parseHead(data, isLoopback: isLoopback, clientIdentifier: clientIdentifier,
+                         maximumRequestSize: maximumRequestSize) {
+        case .incomplete: return .incomplete
+        case let .invalid(message): return .invalid(message)
+        case let .head(head):
+            guard data.count >= head.bodyOffset + head.contentLength else { return .incomplete }
+            return .request(head.completed(body: data.subdata(in: head.bodyOffset..<(head.bodyOffset + head.contentLength))))
         }
-        let lines = headerText.components(separatedBy: "\r\n")
-        guard let requestLine = lines.first else { return .invalid("无效的 HTTP 请求。") }
-        let requestParts = requestLine.split(separator: " ", omittingEmptySubsequences: true)
-        guard requestParts.count == 3 else { return .invalid("无效的 HTTP 请求。") }
+    }
 
+    static func parseHead(_ data: Data, isLoopback: Bool, clientIdentifier: String,
+                          maximumRequestSize: Int = maximumBodySize) -> WebRequestHeadResult {
+        guard let boundary = data.range(of: Data("\r\n\r\n".utf8)) else {
+            return data.count >= maximumHeaderSize ? .invalid("HTTP 请求头超过 32 KiB 限制。") : .incomplete
+        }
+        guard boundary.upperBound <= maximumHeaderSize else { return .invalid("HTTP 请求头超过 32 KiB 限制。") }
+        guard let text = String(data: data[..<boundary.lowerBound], encoding: .utf8) else { return .invalid("无效的 HTTP 请求头。") }
+        let lines = text.components(separatedBy: "\r\n")
+        let parts = (lines.first ?? "").split(separator: " ", omittingEmptySubsequences: true)
+        guard parts.count == 3, ["HTTP/1.0", "HTTP/1.1"].contains(String(parts[2])),
+              parts[1].hasPrefix("/"), let components = URLComponents(string: String(parts[1])),
+              components.host == nil, components.scheme == nil, components.fragment == nil,
+              let path = components.percentEncodedPath.removingPercentEncoding else { return .invalid("无效的 HTTP 请求。") }
+        let method = String(parts[0]).uppercased()
+        guard ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"].contains(method) else { return .invalid("不支持的 HTTP 方法。") }
         var headers: [String: String] = [:]
         for line in lines.dropFirst() {
-            guard let colon = line.firstIndex(of: ":") else { continue }
+            guard let colon = line.firstIndex(of: ":") else { return .invalid("无效的 HTTP 请求头。") }
             let name = line[..<colon].trimmingCharacters(in: .whitespaces).lowercased()
-            let value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
-            headers[name] = value
+            guard !name.isEmpty, name != "content-length" || headers[name] == nil else { return .invalid("重复或无效的 HTTP 请求头。") }
+            headers[name] = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
         }
-        let contentLengthHeader = headers["content-length", default: "0"]
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let contentLength = Int(contentLengthHeader),
-              (0...maximumRequestSize).contains(contentLength) else {
+        guard headers["transfer-encoding"] == nil else { return .invalid("不支持 Transfer-Encoding，请提供 Content-Length。") }
+        let length = headers["content-length", default: "0"]
+        guard !length.isEmpty, length.utf8.allSatisfy({ (48...57).contains($0) }), let count = Int(length) else {
             return .invalid("Content-Length 无效或超过限制。")
         }
-        let bodyStart = headerRange.upperBound
-        guard bodyStart <= maximumRequestSize,
-              contentLength <= maximumRequestSize - bodyStart else {
-            return .invalid("请求内容过大。")
-        }
-        guard data.count >= bodyStart + contentLength else { return .incomplete }
-        let body = data.subdata(in: bodyStart..<(bodyStart + contentLength))
-
-        let target = String(requestParts[1])
-        let components = URLComponents(string: target)
-        let path = components?.percentEncodedPath.removingPercentEncoding ?? target
-        let query = Dictionary(
-            (components?.queryItems ?? []).compactMap { item in item.value.map { (item.name, $0) } },
-            uniquingKeysWith: { _, latest in latest }
-        )
-        return .request(WebHTTPRequest(
-            method: String(requestParts[0]).uppercased(),
-            path: path.isEmpty ? "/" : path,
-            query: query,
-            headers: headers,
-            body: body,
-            isLoopback: isLoopback,
-            clientIdentifier: clientIdentifier
-        ))
+        let segments = path.split(separator: "/", omittingEmptySubsequences: false)
+        let isPreview = method == "PUT" && segments.count == 5 && segments[0].isEmpty && segments[1] == "api"
+            && segments[2] == "modules" && UUID(uuidString: String(segments[3])) != nil && segments[4] == "preview"
+        let limit = isPreview ? maximumPreviewBodySize : maximumRequestSize
+        guard count <= limit else { return .invalid("Content-Length 超过正文限制（\(limit / 1024 / 1024) MiB）。") }
+        let query = Dictionary((components.queryItems ?? []).compactMap { item in item.value.map { (item.name, $0) } },
+            uniquingKeysWith: { _, latest in latest })
+        let request = WebHTTPRequest(method: method, path: path.isEmpty ? "/" : path, query: query,
+            headers: headers, body: Data(), isLoopback: isLoopback, clientIdentifier: clientIdentifier)
+        return .head(WebRequestHead(request: request, contentLength: count, bodyOffset: boundary.upperBound))
     }
 }
 

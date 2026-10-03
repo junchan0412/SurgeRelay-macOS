@@ -1,8 +1,16 @@
 import Foundation
 
-struct ModulePreviewDraft: Sendable {
+struct ModulePreviewDraft: Codable, Equatable, Sendable {
     var text: String
     var savedText: String
+
+    func hasBaseChanged(comparedTo content: String) -> Bool {
+        !savedText.utf16.elementsEqual(content.utf16)
+    }
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.text.utf16.elementsEqual(rhs.text.utf16) && lhs.savedText.utf16.elementsEqual(rhs.savedText.utf16)
+    }
 }
 
 struct ModuleDraft: Sendable {
@@ -19,6 +27,7 @@ struct ModuleDraft: Sendable {
         set { storageTargets = [newValue] }
     }
     var publishesStandalone = true
+    var refreshIntervalMinutes: Int?
     var isEnabled = false
     var scriptHubOptions = ScriptHubOptions()
     var iconURL = ""
@@ -37,12 +46,14 @@ struct ModuleDraft: Sendable {
         outputFolder = module.outputFolder
         storageTargets = module.storageTargets
         publishesStandalone = module.publishesStandalone
+        refreshIntervalMinutes = module.refreshIntervalMinutes
         isEnabled = module.isEnabled
         scriptHubOptions = module.scriptHubOptions
         iconURL = module.customIconURL ?? ""
     }
 
     var validationMessage: String? {
+        if let refreshIntervalMinutes, !(0...10_080).contains(refreshIntervalMinutes) { return "刷新间隔必须为 0–10080 分钟；0 表示仅手动刷新。" }
         if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "请输入模块名称。" }
         let trimmedIcon = iconURL.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmedIcon.isEmpty {

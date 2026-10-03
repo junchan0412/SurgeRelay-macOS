@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-10-02T06:28:28.501Z",
+  "browser": "154.0.8037.93",
+  "fixtureOnly": true,
+  "checks": [
+    "Live SSE workspace switch flushes old drafts, clears publication tickets/selection, rebuilds identical-ID sidebar and isolates A/B drafts",
+    "Only explicitly marked legacy default imports origin-only drafts during real IndexedDB v1-to-v2 migration",
+    "Writes carry originating workspace header; mismatched workspace request is rejected by isolated fixture without changing data"
+  ],
+  "pageErrors": []
+}

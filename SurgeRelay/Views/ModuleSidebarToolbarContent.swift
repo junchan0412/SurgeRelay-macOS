@@ -49,12 +49,12 @@ struct ModuleSidebarToolbarContent: ToolbarContent {
         Button {
             publishAllAction()
         } label: {
-            Label("发布全部", systemImage: "square.and.arrow.up")
+            Label("发布到 GitHub", systemImage: "square.and.arrow.up")
         }
         .keyboardShortcut("p", modifiers: [.command, .shift])
         .disabled(model.isWorking)
         .help(publishAllHelp)
-        .accessibilityLabel("发布全部模块")
+        .accessibilityLabel("发布到 GitHub")
     }
 
     private var batchSelectionButton: some View {
@@ -65,7 +65,7 @@ struct ModuleSidebarToolbarContent: ToolbarContent {
             Label(isBatchSelecting ? "结束选择" : "多选", systemImage: isBatchSelecting ? "checkmark.circle" : "checklist")
         }
         .disabled(model.isWorking)
-        .help(isBatchSelecting ? "结束多选并清除已勾选模块" : "进入多选模式，勾选需要单独发布的 GitHub 模块")
+        .help(isBatchSelecting ? "结束多选并清除已勾选模块" : "进入多选模式，勾选需要单独发布的模块")
         .accessibilityLabel(isBatchSelecting ? "结束多选" : "进入多选")
     }
 

@@ -15,6 +15,12 @@
         formatAutomaticPublish: format.formatTime
       });
       ui.status.textContent = activity.statusText;
+      if (ui.stages) {
+        const stages = logic.activeStageSummary(state.activity?.isWorking ? state.activity.activeStages : []);
+        if (ui.stages.textContent !== stages.text) ui.stages.textContent = stages.text;
+        ui.stages.title = stages.title;
+        ui.stages.hidden = !stages.text;
+      }
       ui.refresh.disabled = activity.refreshDisabled;
       ui.refresh.title = activity.refreshTitle;
       ui.refresh.setAttribute('aria-label', activity.refreshAriaLabel);

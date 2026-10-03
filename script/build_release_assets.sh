@@ -279,6 +279,10 @@ fi
 while IFS= read -r dylib; do
   codesign "${codesign_nested_args[@]}" "$dylib"
 done < <(find "$APP_PATH/Contents/MacOS" -type f -name '*.dylib' -print)
+WORKER="$APP_PATH/Contents/Helpers/SurgeRelayScriptWorker"
+[[ -x "$WORKER" ]] || fail "Script-Hub helper is missing from the application bundle"
+codesign "${codesign_nested_args[@]}" \
+  --entitlements "$ROOT_DIR/SurgeRelayScriptWorker/SurgeRelayScriptWorker.entitlements" "$WORKER"
 codesign "${codesign_app_args[@]}" "$APP_PATH"
 codesign --verify --deep --strict --verbose=2 "$APP_PATH"
 

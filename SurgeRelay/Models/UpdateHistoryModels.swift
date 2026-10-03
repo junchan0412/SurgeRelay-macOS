@@ -31,6 +31,8 @@ struct UpdateHistoryEntry: Identifiable, Codable, Hashable, Sendable {
     var publishedFiles: [String] = []
     var deletedFiles: [String] = []
     var commitSHA: String?
+    var publishDestination: PublishDestination?
+    var stageMetrics: [StageMetric]?
 
     var publishedChangeCount: Int {
         publishedFiles.count + deletedFiles.count
@@ -48,7 +50,9 @@ struct UpdateHistoryEntry: Identifiable, Codable, Hashable, Sendable {
         contentChanged: Bool = false,
         publishedFiles: [String] = [],
         deletedFiles: [String] = [],
-        commitSHA: String? = nil
+        commitSHA: String? = nil,
+        publishDestination: PublishDestination? = nil,
+        stageMetrics: [StageMetric]? = nil
     ) {
         self.id = id
         self.date = date
@@ -62,11 +66,13 @@ struct UpdateHistoryEntry: Identifiable, Codable, Hashable, Sendable {
         self.publishedFiles = publishedFiles
         self.deletedFiles = deletedFiles
         self.commitSHA = commitSHA
+        self.publishDestination = publishDestination
+        self.stageMetrics = stageMetrics
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, date, moduleID, moduleName, outcome, duration, message, usedCache, contentChanged
-        case publishedFiles, deletedFiles, commitSHA
+        case publishedFiles, deletedFiles, commitSHA, publishDestination, stageMetrics
     }
 
     init(from decoder: Decoder) throws {
@@ -83,6 +89,8 @@ struct UpdateHistoryEntry: Identifiable, Codable, Hashable, Sendable {
         publishedFiles = try container.decodeIfPresent([String].self, forKey: .publishedFiles) ?? []
         deletedFiles = try container.decodeIfPresent([String].self, forKey: .deletedFiles) ?? []
         commitSHA = try container.decodeIfPresent(String.self, forKey: .commitSHA)
+        publishDestination = try container.decodeIfPresent(PublishDestination.self, forKey: .publishDestination)
+        stageMetrics = try container.decodeIfPresent([StageMetric].self, forKey: .stageMetrics)
     }
 }
 
@@ -110,7 +118,7 @@ struct GitHubPublishSnapshot: Codable, Equatable, Sendable {
     static func latest(in history: [UpdateHistoryEntry], settings: GitHubSettings) -> GitHubPublishSnapshot? {
         guard let entry = history.first(where: {
             let hasCommit = !($0.commitSHA ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            return $0.outcome == .published && (
+            return $0.outcome == .published && $0.publishDestination != .local && (
                 hasCommit ||
                     !$0.publishedFiles.isEmpty ||
                     !$0.deletedFiles.isEmpty

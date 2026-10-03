@@ -16,7 +16,7 @@ extension AppModel {
         )
     }
 
-    private func githubPublishTokenAndRefreshRepositoryPrivacy() async throws -> String {
+    func githubPublishTokenAndRefreshRepositoryPrivacy() async throws -> String {
         let token = ensureGitHubTokenLoaded(showStatusMessage: false)
         guard !token.isEmpty else { throw RelayError.githubTokenMissing }
         let isPrivate = try await githubClient.test(settings: settings.github, token: token)
@@ -41,26 +41,43 @@ extension AppModel {
             settings: settings.github,
             token: preparation.token
         )
-        return GitHubPublishPlanner.preview(
-            settings: settings.github,
-            pathPlan: preparation.pathPlan,
-            report: report
-        )
+        var preview = GitHubPublishPlanner.preview(settings: settings.github, pathPlan: preparation.pathPlan, report: report)
+        preview.issues = await Task.detached { ModuleLintPlanner.check(files: preparation.files) }.value
+        return preview
     }
 
-    func publishAllInternal(allowDeleting: Bool = true) async throws -> PublishReport {
-        let preparation = try await prepareGitHubPublish()
+    func publishAllInternal(allowDeleting: Bool = true, reviewed: WebPublishTicket? = nil) async throws -> PublishReport {
+        let preparation: GitHubPublishPreparation
+        if let reviewed, let files = reviewed.files[.gitHub], let pathPlan = reviewed.pathPlan {
+            preparation = GitHubPublishPreparation(token: try await githubPublishTokenAndRefreshRepositoryPrivacy(), files: files, pathPlan: pathPlan)
+        } else {
+            preparation = try await prepareGitHubPublish()
+        }
+        let publishingSettings = reviewed?.settings.github ?? settings.github
+        if let reviewed, settings.github != reviewed.settings.github {
+            throw PreviewContentSaveError.changed
+        }
         let stalePaths = allowDeleting ? preparation.pathPlan.stalePaths : []
         try enterNonCancellableWorkPhase(
             statusMessage: "正在提交 GitHub 发布，已进入不可取消阶段…"
         )
-        let report = try await githubClient.publish(
+        let recorder = StageMetricsContext.current ?? StageMetricsRecorder()
+        let started = ContinuousClock.now
+        var report = try await recorder.measure(.publish, reason: "GitHub", bytes: { report in
+            (nil, Int64(preparation.files.filter { report.publishedFiles.contains($0.name) }.reduce(0) { $0 + $1.data.count }))
+        }) {
+            try await githubClient.publish(
             files: preparation.files,
             deleting: stalePaths,
-            settings: settings.github,
-            token: preparation.token
+            settings: publishingSettings,
+            token: preparation.token,
+            expectedHeadCommitSHA: reviewed?.gitHubHead
         )
-        if GitHubPublishPlanner.shouldPersistPathPlan(preparation.pathPlan, allowDeleting: allowDeleting) {
+        }
+        report.duration = StageMetricsRecorder.elapsed(since: started)
+        report.stageMetrics = recorder.snapshot
+        if PublishCoordinator.repositoryKey(settings.github) == PublishCoordinator.repositoryKey(publishingSettings),
+           GitHubPublishPlanner.shouldPersistPathPlan(preparation.pathPlan, allowDeleting: allowDeleting) {
             settings.githubPublishedRepositoryKey = preparation.pathPlan.repositoryKey
             settings.githubPublishedFilePaths = preparation.pathPlan.currentPaths
             saveSettings()
@@ -90,6 +107,8 @@ extension AppModel {
             knownRepositoryKey: settings.githubPublishedRepositoryKey,
             knownPublishedPaths: settings.githubPublishedFilePaths
         )
+        let issues = await Task.detached { ModuleLintPlanner.check(files: files, ownedModuleIDs: plan.assetModuleIDs) }.value
+        try ModuleLintPlanner.throwIfBlocking(issues)
         return GitHubPublishPreparation(
             token: token,
             files: preparedFiles.files,
@@ -97,7 +116,7 @@ extension AppModel {
         )
     }
 
-    func publishSelectedModulesInternal(moduleIDs: Set<UUID>) async throws -> PublishReport {
+    func publishSelectedModulesInternal(moduleIDs: Set<UUID>, reviewed: WebPublishTicket? = nil) async throws -> PublishReport {
         try checkCurrentWorkCancellation()
         try Task.checkCancellation()
         let plan = PublishCoordinator.selectedPlan(
@@ -108,27 +127,46 @@ extension AppModel {
         )
         try GitHubPublishPlanner.validatePublishableSelection(plan)
         let token = try await githubPublishTokenAndRefreshRepositoryPrivacy()
-        let files = try await selectedPublishedFiles(plan: plan)
+        let publishingSettings = reviewed?.settings.github ?? settings.github
+        if let reviewed, settings.github != reviewed.settings.github {
+            throw PreviewContentSaveError.changed
+        }
+        let files: [PublishFile]
+        if let prepared = reviewed?.files[.gitHub] { files = prepared }
+        else { files = try await selectedPublishedFiles(plan: plan) }
         guard !files.isEmpty else { throw RelayError.noFilesToPublish }
+        let issues = await Task.detached { ModuleLintPlanner.check(files: files, ownedModuleIDs: plan.assetModuleIDs) }.value
+        try ModuleLintPlanner.throwIfBlocking(issues)
         let currentPaths = files.map(\.name)
         try enterNonCancellableWorkPhase(
             statusMessage: "正在提交所选模块，已进入不可取消阶段…"
         )
-        let report = try await githubClient.publish(
+        let recorder = StageMetricsContext.current ?? StageMetricsRecorder()
+        let started = ContinuousClock.now
+        var report = try await recorder.measure(.publish, reason: "GitHub", bytes: { report in
+            (nil, Int64(files.filter { report.publishedFiles.contains($0.name) }.reduce(0) { $0 + $1.data.count }))
+        }) {
+            try await githubClient.publish(
             files: files,
             deleting: [],
-            settings: settings.github,
-            token: token
+            settings: publishingSettings,
+            token: token,
+            expectedHeadCommitSHA: reviewed?.gitHubHead
         )
+        }
+        report.duration = StageMetricsRecorder.elapsed(since: started)
+        report.stageMetrics = recorder.snapshot
         let pathUpdate = GitHubPublishPlanner.selectedPublishPathUpdate(
             currentPaths: currentPaths,
-            settings: settings.github,
+            settings: publishingSettings,
             knownRepositoryKey: settings.githubPublishedRepositoryKey,
             knownPublishedPaths: settings.githubPublishedFilePaths
         )
-        settings.githubPublishedRepositoryKey = pathUpdate.repositoryKey
-        settings.githubPublishedFilePaths = pathUpdate.publishedPaths
-        saveSettings()
+        if PublishCoordinator.repositoryKey(settings.github) == PublishCoordinator.repositoryKey(publishingSettings) {
+            settings.githubPublishedRepositoryKey = pathUpdate.repositoryKey
+            settings.githubPublishedFilePaths = pathUpdate.publishedPaths
+            saveSettings()
+        }
         return report
     }
 

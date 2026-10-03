@@ -1,0 +1,80 @@
+import assert from 'node:assert/strict';
+import { detailHelpers, markup, previewHelpers } from './harness.mjs';
+const module = { id: 'versioned', name: 'Versioned Module', publishesStandalone: true };
+const version = { id: 'historical', createdAt: '2026-10-01T00:00:00Z', reason: 'beforeUpdate', contentHash: 'old-hash', hasOverride: true, byteCount: 90, assets: [{ path: 'scripts/<old>.js', contentHash: 'asset-hash', byteCount: 12 }] };
+let current = 'current cache';
+let etag = '"current"';
+let token = 'version-token-1';
+let stale = false;
+let accepted = true;
+let refreshed = 0;
+const calls = [];
+const confirmations = [];
+const durable = new Map();
+const editor = { value: '', addEventListener(type, callback) { this[type] = callback; } };
+const message = { textContent: '' };
+const api = async (path, options = {}) => {
+  calls.push({ path, options });
+  if (path.endsWith('/preview')) return { body: current, etag };
+  if (path.endsWith('/versions')) return [version];
+  if (path.endsWith('/versions/historical')) return { token, version, changedAssets: ['+ scripts/new.js', '− scripts/<old>.js'], diff: { rows: [{ kind: 'removed', localLine: 1, text: '<old>' }, { kind: 'added', githubLine: 1, text: 'current' }], addedCount: 1, removedCount: 1, hasFinalNewlineDifference: true } };
+  if (path.endsWith('/versions/historical/restore')) {
+    if (stale) throw Object.assign(new Error('stale'), { status: 412 });
+    assert.equal(options.json.token, token);
+    current = 'historical cache'; etag = '"historical"';
+    return { ok: true, message: '缓存已恢复' };
+  }
+  throw new Error(`unexpected ${path}`);
+};
+const preview = previewHelpers.createPreviewController({ api, storage: { getItem: key => durable.get(key) ?? null, setItem: (key, value) => durable.set(key, value), removeItem: key => durable.delete(key) }, document: { querySelector: selector => selector === '#code-editor' ? editor : selector === '#preview-message' ? message : null } });
+await preview.loadPreview('/api/modules/versioned/preview', true);
+editor.value = 'unsaved browser text'; editor.input();
+const ui = { operationDialog: { addEventListener() {} }, operationTitle: {}, operationContent: { innerHTML: '', querySelector: () => null } };
+const controller = detailHelpers.createPublishingController({
+  ui, api, markup, getState: () => ({ modules: [module] }), openDialog() {}, closeDialog() {},
+  askConfirmation: async (...args) => { confirmations.push(args); return accepted; },
+  onVersionRestored: async id => { refreshed += 1; await preview.refreshVersionBaseline(id); }
+});
+const click = (operation, versionId) => controller.handleClick({ target: { closest: () => ({ dataset: { operation, versionId } }) } });
+await controller.openVersions(module);
+assert.match(ui.operationContent.innerHTML, /更新前/);
+assert.match(ui.operationContent.innerHTML, /包含手动编辑/);
+assert.match(ui.operationContent.innerHTML, /data-version-id="historical"/);
+await click('compare-version', 'historical');
+assert.match(ui.operationContent.innerHTML, /历史版本 → 当前缓存/);
+assert.match(ui.operationContent.innerHTML, /历史行/);
+assert.match(ui.operationContent.innerHTML, /当前行/);
+assert.match(ui.operationContent.innerHTML, /恢复将执行反向变化/);
+assert.match(ui.operationContent.innerHTML, /scripts\/&lt;old&gt;\.js/);
+assert.match(ui.operationContent.innerHTML, /文件末尾换行不同/);
+assert.equal(calls.filter(call => call.options.method === 'POST').length, 0);
+accepted = false;
+await click('restore-version');
+assert.equal(calls.filter(call => call.options.method === 'POST').length, 0, 'cancel never restores');
+accepted = true; stale = true;
+await click('restore-version');
+assert.equal(current, 'current cache');
+assert.match(ui.operationContent.innerHTML, /重新比较/);
+assert.doesNotMatch(ui.operationContent.innerHTML, /data-operation="restore-version"/);
+const postCount = calls.filter(call => call.options.method === 'POST').length;
+await click('restore-version');
+assert.equal(calls.filter(call => call.options.method === 'POST').length, postCount, 'expired token cannot be retried without comparison');
+stale = false; token = 'version-token-2';
+await click('refresh-version');
+await click('restore-version');
+assert.equal(current, 'historical cache');
+assert.match(confirmations.at(-1)[1], /本次仅恢复缓存并暂停该模块自动刷新，不立即发布/);
+assert.match(confirmations.at(-1)[1], /后续发布仍按现有发布设置执行/);
+assert.match(confirmations.at(-1)[0], /暂停自动刷新/);
+assert.match(confirmations.at(-1)[1], /未保存的浏览器草稿会保留/);
+assert.equal(confirmations.at(-1)[2], '恢复并暂停自动刷新');
+assert.equal(refreshed, 1);
+assert.equal(preview.text, 'unsaved browser text');
+assert.equal(preview.savedText, 'current cache', 'rollback never replaces the draft original baseline');
+assert.match(message.textContent, /服务器内容已变化/);
+assert.ok(durable.size > 0, 'unsaved text remains durably stored after rollback');
+assert.match(ui.operationContent.innerHTML, /未立即发布/);
+assert.match(ui.operationContent.innerHTML, /该模块已设为仅手动刷新/);
+assert.match(ui.operationContent.innerHTML, /另点“发布此模块”/);
+assert.equal(calls.some(call => call.path.startsWith('/api/publish')), false, 'historical restore does not invoke publication');
+console.log('Version history comparison and cache-only rollback tests passed');

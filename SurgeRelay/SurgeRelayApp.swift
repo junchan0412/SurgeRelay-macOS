@@ -6,17 +6,37 @@ enum SurgeRelayWindow {
 
 @main
 struct SurgeRelayApp: App {
-    @State private var model = AppModel()
+    @NSApplicationDelegateAdaptor(SurgeRelayAppDelegate.self) private var appDelegate
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var workspaces = WorkspaceController()
 
     var body: some Scene {
+        let model = workspaces.activeModel
         Window("Surge Relay", id: SurgeRelayWindow.main) {
             RootView()
+                .id(model.runtimeID)
                 .environment(model)
+                .environment(workspaces)
+                .environment(\.moduleIconCacheDirectory, model.cacheDirectoryURL)
+                .disabled(workspaces.isSwitching)
+                .overlay {
+                    if workspaces.isSwitching {
+                        ProgressView("正在保存并切换工作区…").padding(24).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    }
+                }
                 .task {
+                    appDelegate.workspaces = workspaces
+                    appDelegate.model = model
                     if !AppRuntimeOptions.isUIQAMode {
                         SparkleUpdateController.shared.start()
                     }
                     model.start()
+                }
+                .onDisappear { Task { await workspaces.finishViewRetirement(model) } }
+                .onChange(of: scenePhase) { _, phase in
+                    if phase != .active {
+                        Task { try? await workspaces.flushAllWorkspaces() }
+                    }
                 }
                 .frame(minWidth: 920, minHeight: 600)
         }
@@ -74,6 +94,46 @@ struct SurgeRelayApp: App {
         MenuBarExtra("Surge Relay", systemImage: "repeat") {
             MenuBarContent()
                 .environment(model)
+                .environment(workspaces)
+                .environment(\.moduleIconCacheDirectory, model.cacheDirectoryURL)
+                .disabled(workspaces.isSwitching)
         }
+    }
+}
+
+@MainActor
+final class SurgeRelayAppDelegate: NSObject, NSApplicationDelegate {
+    weak var model: AppModel?
+    weak var workspaces: WorkspaceController?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NativeQAPerformanceRecorder.startAtApplicationLaunch()
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard let model else { return .terminateNow }
+        Task {
+            var workspaceError: String?
+            do {
+                if let workspaces { try await workspaces.flushAllWorkspaces() }
+                else {
+                    await model.configurationMigrationTask?.value
+                    await model.flushPreviewDrafts()
+                    try await model.flushPersistence()
+                }
+            } catch { workspaceError = error.localizedDescription }
+            let errors = [workspaceError, model.previewDraftPersistenceError, model.persistenceError].compactMap { $0 }
+            if !errors.isEmpty {
+                let alert = NSAlert()
+                alert.messageText = "更改尚未保存"
+                alert.informativeText = errors.joined(separator: "\n")
+                alert.addButton(withTitle: "返回应用")
+                alert.addButton(withTitle: "仍然退出")
+                sender.reply(toApplicationShouldTerminate: alert.runModal() == .alertSecondButtonReturn)
+            } else {
+                sender.reply(toApplicationShouldTerminate: true)
+            }
+        }
+        return .terminateLater
     }
 }

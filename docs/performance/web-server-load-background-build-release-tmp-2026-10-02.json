@@ -1,0 +1,39 @@
+{
+  "recordedAtUTC": "2026-10-02T15:18:19.095473+00:00",
+  "configuration": "Release",
+  "flags": [
+    "ENABLE_TESTABILITY=YES",
+    "CODE_SIGNING_ALLOWED=NO"
+  ],
+  "gitHead": "386bc2e26409547cd2a1d1d4a47367b4cfc99b56",
+  "coreSourceSHA256": {
+    "SurgeRelay/Services/WebManagementServer.swift": "3b924f1cce7d64bbd04f2e5766ca8c6110595930ec1276aade3386474c86a006",
+    "SurgeRelay/Services/WebManagementController.swift": "e63313b667039142dab2525bd0b291bb38876b5bf631ac639d365da9f8374c08",
+    "SurgeRelay/Services/WebManagementAPI.swift": "54fab5d42f1e2310d2d0fe2d2f003fe6a4074e57ff0199d2161fd3678214a130",
+    "SurgeRelay/Services/WebManagementStateBuilder.swift": "c9457f266fca503852fa7c4037f970add16a245a2e5910be15e2936f29b4f532",
+    "SurgeRelay/Services/WebManagementModels.swift": "e708fefc94c24509a91ff7a2e6ab96ea3a844ce476b432c11bee5d90f2142811",
+    "SurgeRelay/Services/WebManagementAssets.swift": "0aae4bd14401f5180561a52b318ea1e763633c60b5f6c600a88669e4c6c85d35",
+    "SurgeRelay/Services/ModuleIconStore.swift": "7e707601739fc4ac4cada9f55c21568a4cc41256af4f3102a3ace13a628e0c25",
+    "SurgeRelay/AppModel.swift": "c7d34291c0635a8e3c936a25aa37a477cca40a9a61453c819d9adef210e9fbbc",
+    "SurgeRelay/AppModel+ModuleState.swift": "599aff56c5948ca712d57a4cbd8c6301cd5a45a74e5bb75c40231cd8b2d2fae3",
+    "SurgeRelay/AppModel+ModuleOutputFolders.swift": "1e15d38bd372e72f39f57dca8e716397a2179e14256f5573fa8e5c351afa6fe4",
+    "SurgeRelay/AppModel+PreviewAccess.swift": "29181a2a578c4b6f9da89614fe187ba5678b7a1366ae145736c6629f54ea9359",
+    "SurgeRelay/Models/RelayModule.swift": "14e384629213888219c51905511dafb7445eebca4ab8b14d863ce002f20089fb",
+    "SurgeRelay/Models/AppSettings.swift": "e8bfcba2b0154d67b9fea992f6912dbc26ff26b28a851da14d54be5905d24c0d",
+    "SurgeRelay/Models/Workspace.swift": "5f5b2e88e761ff037c7cf6459aab20eeccc0beffa8b94f98e217a04d6c1ad193",
+    "SurgeRelay/Models/WorkActivity.swift": "949ed45fe779cdf1c8f0a894a2178d3a4f4346816ef943add2ab609ab15f46c6",
+    "SurgeRelayTests/WebManagementHTTPTests.swift": "4f249f4af81d42276fbf153915f229fd55ed8f31e5ce92e61aea107906e5aa5c"
+  },
+  "binarySHA256": {
+    "/tmp/surge-relay-web-load-release/Build/Products/Release/Surge Relay.app/Contents/MacOS/Surge Relay": "a9b32e767881a3691d31a24c7d9c8afac932d60b33cae6e78b3bd6f8a8bafc2c",
+    "/tmp/surge-relay-web-load-release/Build/Products/Release/Surge Relay.app/Contents/PlugIns/Surge RelayTests.xctest/Contents/MacOS/Surge RelayTests": "ac309170b303c94ec69242b9bc34d6a67ce6e2b85ad418096261f2c3eebbacb3"
+  },
+  "testRunSHA256": "97eed0d6f7d3fc498a6ab5925a3fdf0d534ded46d204cd7651a66526f116c7b2",
+  "xcode": "Xcode 27.0\nBuild version 27A266a",
+  "cpu": "Apple M4",
+  "architecture": "arm64",
+  "notes": "Background DTO follow-up. MainActor copies immutable Sendable inputs only. Production actor summary/projection preparation and JSON encoding timed separately by benchmark; both include actor hop/queue time. Same Release host, default SSE limit, 5000 fixture and phases. Source/binary hashes captured before run.",
+  "derivedDataPath": "/tmp/surge-relay-web-load-release",
+  "runtimeExpectedHost": "/tmp/surge-relay-web-load-release/Build/Products/Release/Surge Relay.app/Contents/MacOS/Surge Relay",
+  "runtimeOutput": "/tmp/SurgeRelay-web-load-background-5000-2026-10-02.json"
+}

@@ -305,6 +305,18 @@ final class CodeSearchEngineTests: XCTestCase {
         XCTAssertEqual(result.text, sample)
     }
 
+    func testTruncationRequiresAnAdditionalMatch() {
+        for regex in [false, true] {
+            let query = CodeSearchQuery(text: "match", usesRegularExpression: regex)
+            let exact = CodeSearchEngine.search(in: String(repeating: "match ", count: 5_000), query: query)
+            XCTAssertEqual(exact.ranges.count, 5_000)
+            XCTAssertFalse(exact.isTruncated)
+            let overflow = CodeSearchEngine.search(in: String(repeating: "match ", count: 5_001), query: query)
+            XCTAssertEqual(overflow.ranges.count, 5_000)
+            XCTAssertTrue(overflow.isTruncated)
+        }
+    }
+
     func testMatchSummaryReportsPositionAndTotal() {
         XCTAssertEqual(CodeSearchEngine.matchSummary(matchCount: 0, currentNumber: nil), "无结果")
         XCTAssertEqual(CodeSearchEngine.matchSummary(matchCount: 4, currentNumber: nil), "4 个结果")

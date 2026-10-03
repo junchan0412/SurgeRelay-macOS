@@ -145,7 +145,12 @@
       if (event.key === 'Escape') { event.preventDefault(); ui.search.focus(); ui.search.select(); }
     }
 
+    function resetWorkspace() {
+      visibleIDs = []; renderedRows.clear(); rowElements.clear(); previousSelection = null;
+    }
+
     return {
+      resetWorkspace,
       render,
       patchLive,
       toggleFailuresOnly,

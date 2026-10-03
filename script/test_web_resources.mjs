@@ -6,6 +6,14 @@ import './web-resource-tests/editor-feedback-preview.test.mjs';
 import './web-resource-tests/detail.test.mjs';
 import './web-resource-tests/index-contract.test.mjs';
 import './web-resource-tests/lifecycle.test.mjs';
+import './web-resource-tests/persistent-drafts.test.mjs';
+import './web-resource-tests/conditional-preview.test.mjs';
+import './web-resource-tests/publishing.test.mjs';
+import './web-resource-tests/version-history.test.mjs';
+import './web-resource-tests/refresh-policy.test.mjs';
+import './web-resource-tests/workspace-drafts.test.mjs';
+import './web-resource-tests/stage-metrics.test.mjs';
+import './web-resource-tests/sse-activity.test.mjs';
 import './web-resource-tests/navigation-preview.test.mjs';
 import './web-resource-tests/bundle.test.mjs';
 

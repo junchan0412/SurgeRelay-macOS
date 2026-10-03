@@ -13,6 +13,7 @@ enum ModuleDeletionMode: Sendable {
 @MainActor
 extension AppModel {
     func addModule(from draft: ModuleDraft) throws {
+        guard !isWorking else { throw PreviewContentSaveError.busy }
         let plan = try ModuleDraftPlanner.addPlan(
             from: draft,
             modules: modules,
@@ -32,10 +33,11 @@ extension AppModel {
         statusMessage = AppRuntimeOptions.isUIQAMode
             ? "已添加 \(module.name)；UI QA 模式未启动自动更新"
             : "已添加 \(module.name)，即将自动更新"
-        scheduleAutomaticUpdate()
+        scheduleAutomaticUpdate(moduleID: module.id)
     }
 
     func updateModule(id: UUID, from draft: ModuleDraft) throws {
+        guard !isWorking else { throw PreviewContentSaveError.busy }
         guard let index = modules.firstIndex(where: { $0.id == id }) else { return }
         guard let plan = try ModuleDraftPlanner.updatePlan(
             id: id,
@@ -80,8 +82,9 @@ extension AppModel {
         } else {
             "已保存 \(modules[index].name)，正在刷新输出"
         }
+        if !plan.sourceChanged { restartScheduler() }
         if plan.sourceChanged, shouldUpdateModule(modules[index]) {
-            scheduleAutomaticUpdate()
+            scheduleAutomaticUpdate(moduleID: id)
         } else {
             Task { await rebuildCombinedFromCache() }
         }
@@ -91,6 +94,7 @@ extension AppModel {
     }
 
     func setModuleIncludedInCombined(id: UUID, included: Bool) {
+        guard !isWorking else { statusMessage = PreviewContentSaveError.busy.localizedDescription; return }
         guard let index = modules.firstIndex(where: { $0.id == id }) else { return }
         guard modules[index].isIncludedInCombined != included else { return }
         registerLocalChange()
@@ -103,13 +107,14 @@ extension AppModel {
             statusMessage = included ? "已记录 \(modules[index].name) 将在开启总模块后加入" : "已记录 \(modules[index].name) 不加入总模块"
         }
         if included, shouldUpdateModule(modules[index]) {
-            scheduleAutomaticUpdate()
+            scheduleAutomaticUpdate(moduleID: id)
         } else {
             Task { await rebuildCombinedFromCache() }
         }
     }
 
     func deleteModule(id: UUID, mode: ModuleDeletionMode = .clearOutput) async {
+        guard !isWorking else { statusMessage = PreviewContentSaveError.busy.localizedDescription; return }
         guard let index = modules.firstIndex(where: { $0.id == id }) else { return }
         registerLocalChange()
         let module = modules.remove(at: index)
@@ -141,11 +146,15 @@ extension AppModel {
         refreshLocalSourceWatching()
         selectedModuleID = modules.first?.id
         await rebuildCombinedFromCache()
+        do { try await flushPersistence() }
+        catch { statusMessage = "模块已从内存移除，但删除记录尚未保存到磁盘"; return }
         statusMessage = "已删除 \(module.name)，输出已刷新"
+        restartScheduler()
     }
 
     /// 复制一个模块：保留来源与全部设置，名称与输出文件名按唯一规则生成副本。
     func duplicateModule(id: UUID) throws {
+        guard !isWorking else { throw PreviewContentSaveError.busy }
         guard let index = modules.firstIndex(where: { $0.id == id }) else { return }
         let source = modules[index]
         var draft = ModuleDraft(module: source)
@@ -187,7 +196,7 @@ extension AppModel {
         try persistModules()
         refreshLocalSourceWatching()
         statusMessage = "已复制 \(source.name) 为 \(copy.name)"
-        scheduleAutomaticUpdate()
+        scheduleAutomaticUpdate(moduleID: copy.id)
     }
 
     func refreshModuleMetadataFromCache() async {
@@ -246,10 +255,14 @@ extension AppModel {
                 try? await iconStore.removeIcon(for: plan.module.id)
             }
         }
-        if changed { try? persistModules() }
+        if changed {
+            try? persistModules()
+            try? await flushPersistence()
+        }
     }
 
     func setModuleArgument(moduleID: UUID, key: String, value: String, defaultValue: String) {
+        guard !isWorking else { statusMessage = PreviewContentSaveError.busy.localizedDescription; return }
         guard let index = modules.firstIndex(where: { $0.id == moduleID }) else { return }
         guard let plan = ModuleArgumentPlanner.setOverride(
             module: modules[index],
@@ -265,6 +278,7 @@ extension AppModel {
     }
 
     func resetModuleArguments(moduleID: UUID) {
+        guard !isWorking else { statusMessage = PreviewContentSaveError.busy.localizedDescription; return }
         guard let index = modules.firstIndex(where: { $0.id == moduleID }),
               let plan = ModuleArgumentPlanner.resetOverrides(module: modules[index]) else { return }
         registerLocalChange()
@@ -293,20 +307,20 @@ extension AppModel {
 
     func persistModules() throws {
         if defersModulePersistence { return }
-        try PersistenceStore.saveModules(modules)
+        enqueueConfiguration(modules, fileName: "modules.json")
     }
 
     func persistModulesIfNeeded(force: Bool = false) throws {
         if defersModulePersistence, !force { return }
-        try PersistenceStore.saveModules(modules)
+        enqueueConfiguration(modules, fileName: "modules.json")
     }
 
     func persistModulesIfNeededIgnoringErrors(force: Bool = false) {
         try? persistModulesIfNeeded(force: force)
     }
 
-    private func scheduleAutomaticUpdate() {
-        guard !AppRuntimeOptions.isUIQAMode else { return }
+    private func scheduleAutomaticUpdate(moduleID: UUID) {
+        guard workspaceIsActive, !isWorkspaceTransitioning, !startupRecoveryPending, !startupRecoveryFailed, !AppRuntimeOptions.isUIQAMode else { return }
         automaticUpdateTask?.cancel()
         automaticUpdateTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(2))
@@ -315,7 +329,7 @@ extension AppModel {
                 try? await Task.sleep(for: .milliseconds(250))
             }
             guard !Task.isCancelled else { return }
-            await self.updateAll()
+            await self.updateAll(only: [moduleID])
         }
     }
 

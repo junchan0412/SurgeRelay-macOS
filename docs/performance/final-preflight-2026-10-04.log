@@ -1,0 +1,37 @@
+ok: verified version, Sparkle, and entitlement configuration
+ok: verified documented distribution hardening posture
+ok: verified changelog section for 2.2.1
+ok: DEVELOPMENT_STATUS.md matches the current project state
+ok: verified generated project status
+Conditional preview save tests passed
+Canonical metadata save and draft recovery tests passed
+Conditional conversion restore tests passed
+web-detail behavior tests passed
+Persistent browser draft tests passed
+IndexedDB large draft tests passed
+Publishing and synchronization controller tests passed
+Refresh policy and server cooldown tests passed
+Split SSE activity ordering, reconnect and workspace tests passed
+Live stage counts and folded history metric tests passed
+Version history comparison and cache-only rollback tests passed
+Workspace draft isolation and legacy migration tests passed
+web-detail behavior tests passed
+Refresh policy and server cooldown tests passed
+Version history comparison and cache-only rollback tests passed
+Conditional preview save tests passed
+Canonical metadata save and draft recovery tests passed
+Publishing and synchronization controller tests passed
+Conditional conversion restore tests passed
+Live stage counts and folded history metric tests passed
+Persistent browser draft tests passed
+Split SSE activity ordering, reconnect and workspace tests passed
+IndexedDB large draft tests passed
+Workspace draft isolation and legacy migration tests passed
+Web resource behavior tests passed
+Web DOM resource tests passed
+ok: verified web resource syntax and behavior tests
+ok: verified appcast latest item
+ok: verified release shell scripts
+ok: verified release workflow references
+ok: verified Swift sources are referenced in the Xcode project
+ok: release configuration preflight passed for 2.2.1 (107)

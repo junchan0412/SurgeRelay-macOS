@@ -15,6 +15,12 @@ struct ModulePreviewPane: View {
     @State private var showsComparison = false
     @State private var confirmsRestore = false
     @State private var editor = ModuleCodeEditorController()
+    @State private var recoveredDraft = false
+    @State private var draftBaseHasChanged = false
+    @State private var showsDraftComparison = false
+    @State private var showsVersionHistory = false
+    @State private var confirmsDraftOverwrite = false
+    @State private var pendingOverwriteBase: String?
 
     private var currentModule: RelayModule {
         model.modules.first(where: { $0.id == module.id }) ?? module
@@ -48,11 +54,34 @@ struct ModulePreviewPane: View {
                 .background(Design.Palette.warning.opacity(0.08))
                 Divider()
             }
+            if recoveredDraft || draftBaseHasChanged {
+                HStack {
+                    Text(draftBaseHasChanged ? "草稿的已保存版本发生变化，保存前请比较并确认覆盖。" : "已恢复上次未保存的草稿。")
+                        .font(.caption)
+                    Spacer()
+                    Button("比较…") { showsDraftComparison = true }
+                }
+                .padding(10)
+                .background(Design.Palette.warning.opacity(0.08))
+            }
+            if let message = model.previewDraftPersistenceError {
+                Text("草稿尚未写入磁盘：\(message)")
+                    .font(.caption)
+                    .foregroundStyle(Design.Palette.warning)
+                    .padding(10)
+            }
+            if CodeTextView.usesPlainTextMode(text) {
+                Text("大文件模式：纯文本，不自动折行；查找、替换与撤销仍可用。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+            }
             if editor.isFindBarPresented {
                 ModuleCodeSearchBar(controller: editor)
             }
             ZStack {
-                ScrollView(.vertical) {
+                ScrollView(CodeTextView.usesPlainTextMode(text) ? [.horizontal, .vertical] : .vertical) {
                     ModuleCodeTextView(
                         text: $text,
                         isEditable: !isLoading,
@@ -89,6 +118,7 @@ struct ModulePreviewPane: View {
                 Label("第 \(cursorPosition.line) 行，第 \(cursorPosition.column) 列", systemImage: "text.cursor")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
+                Button("版本…") { showsVersionHistory = true }
                 ModuleCodeEditorToolbar(controller: editor)
                 Button("恢复") { confirmsRestore = true }
                     .disabled(isWriting || isLoading)
@@ -107,10 +137,25 @@ struct ModulePreviewPane: View {
         }
         .task(id: reloadToken) { await load() }
         .onChange(of: text) { _, _ in retainDraft() }
-        .onDisappear { retainDraft() }
+        .onDisappear {
+            retainDraft()
+            Task { await model.flushPreviewDrafts() }
+        }
         .confirmationDialog("恢复转换结果？", isPresented: $confirmsRestore) {
             Button("恢复转换结果", role: .destructive) { restore() }
         } message: { Text("当前模块的手动修改会被丢弃。") }
+        .sheet(isPresented: $showsVersionHistory) {
+            ModuleVersionHistoryView(moduleID: module.id).environment(model)
+        }
+        .sheet(isPresented: $showsDraftComparison) {
+            OverrideComparisonView(module: currentModule, draftText: text).environment(model)
+        }
+        .confirmationDialog("已保存内容已变化，覆盖为草稿？", isPresented: $confirmsDraftOverwrite) {
+            Button("覆盖为草稿", role: .destructive) { write(approvedBase: pendingOverwriteBase) }
+            Button("比较…") { showsDraftComparison = true }
+        } message: {
+            Text("草稿基于较早版本。覆盖会替换当前已保存内容，并按现有发布设置刷新输出。")
+        }
         .alert("无法完成操作", isPresented: Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
@@ -126,10 +171,21 @@ struct ModulePreviewPane: View {
     }
 
     private func load(force: Bool = false) async {
+        guard !isWriting else { return }
         if !force, let draft = model.modulePreviewDrafts[module.id] {
             text = draft.text
             savedText = draft.savedText
+            recoveredDraft = model.restoredPreviewDraftIDs.remove(module.id) != nil || recoveredDraft
             isLoading = false
+            do {
+                let current = try await model.previewContent(for: currentModule)
+                try Task.checkCancellation()
+                guard savedText.utf16.elementsEqual(draft.savedText.utf16) else { return }
+                draftBaseHasChanged = draft.hasBaseChanged(comparedTo: current)
+            } catch {
+                guard !Task.isCancelled else { return }
+                errorMessage = "草稿已保留，但无法核验当前版本：\(error.localizedDescription)"
+            }
             return
         }
         guard force || text == savedText else { return }
@@ -152,15 +208,32 @@ struct ModulePreviewPane: View {
         }
     }
 
-    private func write() {
+    private func write(approvedBase: String? = nil) {
         isWriting = true
         let submittedText = text
+        let base = savedText
         Task {
             defer { isWriting = false }
             do {
-                try await model.savePreviewContent(submittedText, for: currentModule)
-                savedText = submittedText
+                let current = try await model.previewContent(for: currentModule)
+                let draft = ModulePreviewDraft(text: submittedText, savedText: base)
+                if draft.hasBaseChanged(comparedTo: current),
+                   approvedBase?.utf16.elementsEqual(current.utf16) != true {
+                    draftBaseHasChanged = true
+                    pendingOverwriteBase = current
+                    confirmsDraftOverwrite = true
+                    return
+                }
+                let writtenContent = try await model.savePreviewContent(
+                    submittedText, for: currentModule, expectedContentHash: Data(current.utf8).sha256String
+                )
+                if text.utf16.elementsEqual(submittedText.utf16) { text = writtenContent.content }
+                savedText = writtenContent.content
+                recoveredDraft = false
+                draftBaseHasChanged = false
+                pendingOverwriteBase = nil
                 retainDraft()
+                await model.flushPreviewDrafts()
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -169,13 +242,17 @@ struct ModulePreviewPane: View {
 
     private func restore() {
         isWriting = true
+        let submittedText = text
         Task {
             defer { isWriting = false }
             do {
                 let restored = try await model.restorePreviewContent(for: currentModule)
-                text = restored
+                if text.utf16.elementsEqual(submittedText.utf16) { text = restored }
                 savedText = restored
-                model.modulePreviewDrafts.removeValue(forKey: module.id)
+                recoveredDraft = false
+                draftBaseHasChanged = false
+                retainDraft()
+                await model.flushPreviewDrafts()
                 loadErrorMessage = nil
             } catch {
                 errorMessage = error.localizedDescription
@@ -184,8 +261,9 @@ struct ModulePreviewPane: View {
     }
 
     private func retainDraft() {
+        guard model.modules.contains(where: { $0.id == module.id }) else { return }
         guard !isLoading else { return }
-        if text == savedText { model.modulePreviewDrafts.removeValue(forKey: module.id) }
+        if text.utf16.elementsEqual(savedText.utf16) { model.modulePreviewDrafts.removeValue(forKey: module.id) }
         else { model.modulePreviewDrafts[module.id] = ModulePreviewDraft(text: text, savedText: savedText) }
     }
 }
@@ -194,6 +272,7 @@ private struct OverrideComparisonView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     let module: RelayModule
+    var draftText: String? = nil
     @State private var upstream = ""
     @State private var local = ""
     @State private var errorMessage: String?
@@ -201,23 +280,28 @@ private struct OverrideComparisonView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("上游与本地编辑").font(.headline)
+                Text(draftText == nil ? "上游与本地编辑" : "已保存内容与草稿").font(.headline)
                 Spacer()
                 Button("完成") { dismiss() }.keyboardShortcut(.defaultAction)
             }
             .padding()
             Divider()
             HSplitView {
-                comparisonColumn("最新上游", text: upstream)
-                comparisonColumn("当前本地编辑", text: local)
+                comparisonColumn(draftText == nil ? "最新上游" : "当前已保存内容", text: upstream)
+                comparisonColumn(draftText == nil ? "当前本地编辑" : "未保存草稿", text: local)
             }
         }
         .frame(minWidth: 920, minHeight: 560)
         .task {
             do {
-                async let upstreamValue = model.convertedPreviewContent(for: module)
-                async let localValue = model.previewContent(for: module)
-                (upstream, local) = try await (upstreamValue, localValue)
+                if let draftText {
+                    upstream = try await model.previewContent(for: module)
+                    local = draftText
+                } else {
+                    async let upstreamValue = model.convertedPreviewContent(for: module)
+                    async let localValue = model.previewContent(for: module)
+                    (upstream, local) = try await (upstreamValue, localValue)
+                }
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -264,10 +348,17 @@ struct CombinedPreviewPane: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if CodeTextView.usesPlainTextMode(text) {
+                Text("大文件模式：纯文本，不自动折行；仍可查找与拷贝完整内容。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+            }
             if editor.isFindBarPresented {
                 ModuleCodeSearchBar(controller: editor)
             }
-            ScrollView(.vertical) {
+            ScrollView(CodeTextView.usesPlainTextMode(text) ? [.horizontal, .vertical] : .vertical) {
                 ModuleCodeTextView(
                     text: .constant(text),
                     isEditable: false,
@@ -324,6 +415,12 @@ struct ModuleTextEditorView: View {
     @State private var loadErrorMessage: String?
     @State private var cursorPosition = ModuleCodeCursorPosition(line: 1, column: 1)
     @State private var editor = ModuleCodeEditorController()
+    @State private var recoveredDraft = false
+    @State private var draftBaseHasChanged = false
+    @State private var showsDraftComparison = false
+    @State private var showsVersionHistory = false
+    @State private var confirmsDraftOverwrite = false
+    @State private var pendingOverwriteBase: String?
 
     private var currentModule: RelayModule {
         model.modules.first(where: { $0.id == module.id }) ?? module
@@ -348,6 +445,7 @@ struct ModuleTextEditorView: View {
                     .font(.headline)
                     .lineLimit(1)
                 Spacer(minLength: 0)
+                Button("版本…") { showsVersionHistory = true }
                 ModuleCodeEditorToolbar(controller: editor)
                 Button("恢复") { restore() }
                     .disabled(isWriting || isLoading)
@@ -361,11 +459,34 @@ struct ModuleTextEditorView: View {
             }
             .padding(12)
             Divider()
+            if recoveredDraft || draftBaseHasChanged {
+                HStack {
+                    Text(draftBaseHasChanged ? "草稿的已保存版本发生变化，保存前请比较并确认覆盖。" : "已恢复上次未保存的草稿。")
+                        .font(.caption)
+                    Spacer()
+                    Button("比较…") { showsDraftComparison = true }
+                }
+                .padding(10)
+                .background(Design.Palette.warning.opacity(0.08))
+            }
+            if let message = model.previewDraftPersistenceError {
+                Text("草稿尚未写入磁盘：\(message)")
+                    .font(.caption)
+                    .foregroundStyle(Design.Palette.warning)
+                    .padding(10)
+            }
+            if CodeTextView.usesPlainTextMode(text) {
+                Text("大文件模式：纯文本，不自动折行；查找、替换与撤销仍可用。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+            }
             if editor.isFindBarPresented {
                 ModuleCodeSearchBar(controller: editor)
             }
             ZStack {
-                ScrollView(.vertical) {
+                ScrollView(CodeTextView.usesPlainTextMode(text) ? [.horizontal, .vertical] : .vertical) {
                     ModuleCodeTextView(
                         text: $text,
                         isEditable: !isLoading,
@@ -412,6 +533,23 @@ struct ModuleTextEditorView: View {
         }
         .frame(minWidth: 680, minHeight: 480)
         .task(id: reloadToken) { await load() }
+        .onChange(of: text) { _, _ in retainDraft() }
+        .onDisappear {
+            retainDraft()
+            Task { await model.flushPreviewDrafts() }
+        }
+        .sheet(isPresented: $showsVersionHistory) {
+            ModuleVersionHistoryView(moduleID: module.id).environment(model)
+        }
+        .sheet(isPresented: $showsDraftComparison) {
+            OverrideComparisonView(module: currentModule, draftText: text).environment(model)
+        }
+        .confirmationDialog("已保存内容已变化，覆盖为草稿？", isPresented: $confirmsDraftOverwrite) {
+            Button("覆盖为草稿", role: .destructive) { write(approvedBase: pendingOverwriteBase) }
+            Button("比较…") { showsDraftComparison = true }
+        } message: {
+            Text("草稿基于较早版本。覆盖会替换当前已保存内容，并按现有发布设置刷新输出。")
+        }
         .alert("无法完成操作", isPresented: Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
@@ -423,6 +561,23 @@ struct ModuleTextEditorView: View {
     }
 
     private func load(force: Bool = false) async {
+        guard !isWriting else { return }
+        if !force, let draft = model.modulePreviewDrafts[module.id] {
+            text = draft.text
+            savedText = draft.savedText
+            recoveredDraft = model.restoredPreviewDraftIDs.remove(module.id) != nil || recoveredDraft
+            isLoading = false
+            do {
+                let current = try await model.previewContent(for: currentModule)
+                try Task.checkCancellation()
+                guard savedText.utf16.elementsEqual(draft.savedText.utf16) else { return }
+                draftBaseHasChanged = draft.hasBaseChanged(comparedTo: current)
+            } catch {
+                guard !Task.isCancelled else { return }
+                errorMessage = "草稿已保留，但无法核验当前版本：\(error.localizedDescription)"
+            }
+            return
+        }
         guard force || text == savedText else { return }
         isLoading = true
         defer {
@@ -443,13 +598,32 @@ struct ModuleTextEditorView: View {
         }
     }
 
-    private func write() {
+    private func write(approvedBase: String? = nil) {
         isWriting = true
+        let submittedText = text
+        let base = savedText
         Task {
             defer { isWriting = false }
             do {
-                try await model.savePreviewContent(text, for: currentModule)
-                savedText = text
+                let current = try await model.previewContent(for: currentModule)
+                let draft = ModulePreviewDraft(text: submittedText, savedText: base)
+                if draft.hasBaseChanged(comparedTo: current),
+                   approvedBase?.utf16.elementsEqual(current.utf16) != true {
+                    draftBaseHasChanged = true
+                    pendingOverwriteBase = current
+                    confirmsDraftOverwrite = true
+                    return
+                }
+                let writtenContent = try await model.savePreviewContent(
+                    submittedText, for: currentModule, expectedContentHash: Data(current.utf8).sha256String
+                )
+                if text.utf16.elementsEqual(submittedText.utf16) { text = writtenContent.content }
+                savedText = writtenContent.content
+                recoveredDraft = false
+                draftBaseHasChanged = false
+                pendingOverwriteBase = nil
+                retainDraft()
+                await model.flushPreviewDrafts()
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -458,16 +632,28 @@ struct ModuleTextEditorView: View {
 
     private func restore() {
         isWriting = true
+        let submittedText = text
         Task {
             defer { isWriting = false }
             do {
                 let restored = try await model.restorePreviewContent(for: currentModule)
-                text = restored
+                if text.utf16.elementsEqual(submittedText.utf16) { text = restored }
                 savedText = restored
+                recoveredDraft = false
+                draftBaseHasChanged = false
+                retainDraft()
+                await model.flushPreviewDrafts()
                 loadErrorMessage = nil
             } catch {
                 errorMessage = error.localizedDescription
             }
         }
     }
+    private func retainDraft() {
+        guard model.modules.contains(where: { $0.id == module.id }) else { return }
+        guard !isLoading else { return }
+        if text.utf16.elementsEqual(savedText.utf16) { model.modulePreviewDrafts.removeValue(forKey: module.id) }
+        else { model.modulePreviewDrafts[module.id] = ModulePreviewDraft(text: text, savedText: savedText) }
+    }
+
 }

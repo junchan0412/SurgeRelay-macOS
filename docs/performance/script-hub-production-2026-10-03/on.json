@@ -1,0 +1,267 @@
+{
+  "cells" : [
+    {
+      "aggregateRSSSampledPeakBytes" : 15384576,
+      "bodyBytesRead" : 0,
+      "cacheFallbacks" : 0,
+      "cacheScenario" : "hit",
+      "cpuSecondsSelfAndReapedChildren" : 0.10481799999999998,
+      "failures" : 0,
+      "helperExecutions" : 0,
+      "httpRequests" : 120,
+      "measuredRuns" : 5,
+      "medianBatchSeconds" : 0.009194208,
+      "moduleCount" : 24,
+      "moduleP95Seconds" : 0.001762875,
+      "outputBytesWritten" : 6169320,
+      "profile" : "native",
+      "stageP95Seconds" : {
+        "cache" : 2.9e-05,
+        "conversion" : 0,
+        "download" : 0.00156225,
+        "publish" : 0.000170459
+      },
+      "stageSampleCounts" : {
+        "cache" : 120,
+        "conversion" : 120,
+        "download" : 120,
+        "publish" : 120
+      }
+    },
+    {
+      "aggregateRSSSampledPeakBytes" : 19283968,
+      "bodyBytesRead" : 6169320,
+      "cacheFallbacks" : 0,
+      "cacheScenario" : "invalidated",
+      "cpuSecondsSelfAndReapedChildren" : 0.26605500000000004,
+      "failures" : 0,
+      "helperExecutions" : 0,
+      "httpRequests" : 120,
+      "measuredRuns" : 5,
+      "medianBatchSeconds" : 0.01612525,
+      "moduleCount" : 24,
+      "moduleP95Seconds" : 0.003155417,
+      "outputBytesWritten" : 6169560,
+      "profile" : "native",
+      "stageP95Seconds" : {
+        "cache" : 0.000221166,
+        "conversion" : 0.001206833,
+        "download" : 0.00157125,
+        "publish" : 0.00018575
+      },
+      "stageSampleCounts" : {
+        "cache" : 120,
+        "conversion" : 120,
+        "download" : 120,
+        "publish" : 120
+      }
+    },
+    {
+      "aggregateRSSSampledPeakBytes" : 20955136,
+      "bodyBytesRead" : 4884420,
+      "cacheFallbacks" : 15,
+      "cacheScenario" : "partial",
+      "cpuSecondsSelfAndReapedChildren" : 0.23300500000000013,
+      "failures" : 10,
+      "helperExecutions" : 0,
+      "httpRequests" : 120,
+      "measuredRuns" : 5,
+      "medianBatchSeconds" : 0.014897459,
+      "moduleCount" : 24,
+      "moduleP95Seconds" : 0.003213292,
+      "outputBytesWritten" : 4885075,
+      "profile" : "native",
+      "stageP95Seconds" : {
+        "cache" : 0.000209959,
+        "conversion" : 0.00130825,
+        "download" : 0.001643541,
+        "publish" : 0.00015975
+      },
+      "stageSampleCounts" : {
+        "cache" : 120,
+        "conversion" : 95,
+        "download" : 120,
+        "publish" : 110
+      }
+    },
+    {
+      "aggregateRSSSampledPeakBytes" : 22118400,
+      "bodyBytesRead" : 0,
+      "cacheFallbacks" : 0,
+      "cacheScenario" : "hit",
+      "cpuSecondsSelfAndReapedChildren" : 0.10354099999999988,
+      "failures" : 0,
+      "helperExecutions" : 0,
+      "httpRequests" : 120,
+      "measuredRuns" : 5,
+      "medianBatchSeconds" : 0.009412625,
+      "moduleCount" : 24,
+      "moduleP95Seconds" : 0.001836875,
+      "outputBytesWritten" : 6169320,
+      "profile" : "helper",
+      "stageP95Seconds" : {
+        "cache" : 2.9083e-05,
+        "conversion" : 0,
+        "download" : 0.001650708,
+        "publish" : 0.000165708
+      },
+      "stageSampleCounts" : {
+        "cache" : 120,
+        "conversion" : 120,
+        "download" : 120,
+        "publish" : 120
+      }
+    },
+    {
+      "aggregateRSSSampledPeakBytes" : 87752704,
+      "bodyBytesRead" : 10155720,
+      "cacheFallbacks" : 0,
+      "cacheScenario" : "invalidated",
+      "cpuSecondsSelfAndReapedChildren" : 7.013778000000001,
+      "failures" : 0,
+      "helperExecutions" : 120,
+      "httpRequests" : 120,
+      "measuredRuns" : 5,
+      "medianBatchSeconds" : 0.489197459,
+      "moduleCount" : 24,
+      "moduleP95Seconds" : 0.101146917,
+      "outputBytesWritten" : 9980500,
+      "profile" : "helper",
+      "stageP95Seconds" : {
+        "cache" : 0.000304709,
+        "conversion" : 0.094608833,
+        "download" : 0.002332833,
+        "publish" : 0.000198209
+      },
+      "stageSampleCounts" : {
+        "cache" : 120,
+        "conversion" : 120,
+        "download" : 120,
+        "publish" : 120
+      }
+    },
+    {
+      "aggregateRSSSampledPeakBytes" : 88948736,
+      "bodyBytesRead" : 8138890,
+      "cacheFallbacks" : 15,
+      "cacheScenario" : "partial",
+      "cpuSecondsSelfAndReapedChildren" : 5.662224999999998,
+      "failures" : 10,
+      "helperExecutions" : 95,
+      "httpRequests" : 120,
+      "measuredRuns" : 5,
+      "medianBatchSeconds" : 0.43759125,
+      "moduleCount" : 24,
+      "moduleP95Seconds" : 0.10366075,
+      "outputBytesWritten" : 8008080,
+      "profile" : "helper",
+      "stageP95Seconds" : {
+        "cache" : 0.000307167,
+        "conversion" : 0.098339625,
+        "download" : 0.002324625,
+        "publish" : 0.00020125
+      },
+      "stageSampleCounts" : {
+        "cache" : 120,
+        "conversion" : 95,
+        "download" : 120,
+        "publish" : 110
+      }
+    },
+    {
+      "aggregateRSSSampledPeakBytes" : 28147712,
+      "bodyBytesRead" : 0,
+      "cacheFallbacks" : 0,
+      "cacheScenario" : "hit",
+      "cpuSecondsSelfAndReapedChildren" : 0.11097400000000235,
+      "failures" : 0,
+      "helperExecutions" : 0,
+      "httpRequests" : 120,
+      "measuredRuns" : 5,
+      "medianBatchSeconds" : 0.010216208,
+      "moduleCount" : 24,
+      "moduleP95Seconds" : 0.002018667,
+      "outputBytesWritten" : 6169320,
+      "profile" : "mixed",
+      "stageP95Seconds" : {
+        "cache" : 3.5291e-05,
+        "conversion" : 0,
+        "download" : 0.001821167,
+        "publish" : 0.000187125
+      },
+      "stageSampleCounts" : {
+        "cache" : 120,
+        "conversion" : 120,
+        "download" : 120,
+        "publish" : 120
+      }
+    },
+    {
+      "aggregateRSSSampledPeakBytes" : 96026624,
+      "bodyBytesRead" : 8162520,
+      "cacheFallbacks" : 0,
+      "cacheScenario" : "invalidated",
+      "cpuSecondsSelfAndReapedChildren" : 3.7053429999999956,
+      "failures" : 0,
+      "helperExecutions" : 60,
+      "httpRequests" : 120,
+      "measuredRuns" : 5,
+      "medianBatchSeconds" : 0.280865917,
+      "moduleCount" : 24,
+      "moduleP95Seconds" : 0.094097459,
+      "outputBytesWritten" : 8075030,
+      "profile" : "mixed",
+      "stageP95Seconds" : {
+        "cache" : 0.000348667,
+        "conversion" : 0.088879833,
+        "download" : 0.0024195,
+        "publish" : 0.000200917
+      },
+      "stageSampleCounts" : {
+        "cache" : 120,
+        "conversion" : 120,
+        "download" : 120,
+        "publish" : 120
+      }
+    },
+    {
+      "aggregateRSSSampledPeakBytes" : 81035264,
+      "bodyBytesRead" : 6545420,
+      "cacheFallbacks" : 15,
+      "cacheScenario" : "partial",
+      "cpuSecondsSelfAndReapedChildren" : 3.094086000000001,
+      "failures" : 10,
+      "helperExecutions" : 50,
+      "httpRequests" : 120,
+      "measuredRuns" : 5,
+      "medianBatchSeconds" : 0.25176525,
+      "moduleCount" : 24,
+      "moduleP95Seconds" : 0.095903917,
+      "outputBytesWritten" : 6472970,
+      "profile" : "mixed",
+      "stageP95Seconds" : {
+        "cache" : 0.000322709,
+        "conversion" : 0.090813708,
+        "download" : 0.002488916,
+        "publish" : 0.000201625
+      },
+      "stageSampleCounts" : {
+        "cache" : 120,
+        "conversion" : 95,
+        "download" : 120,
+        "publish" : 110
+      }
+    }
+  ],
+  "createdAt" : "2026-10-03T00:23:45Z",
+  "inputBytesByFormat" : {
+    "loon" : 104345,
+    "native" : 51411,
+    "qx" : 64917
+  },
+  "method" : "Nine-cell isolated stage harness: real loopback URLSession HTTP, production SurgeModuleSanitizer, actual isolated JSC helper executing cached production Rewrite-Parser.js and script-converter.js, with alternating QX\/Loon fixtures, atomic cache and local output writes. Four concurrent jobs; one warmup then measured runs. Source bytes are genuinely downloaded from loopback by the driver, then a test-only exact-URL HTTP prelude feeds those bytes to the otherwise unchanged production parser. The production HTTP bridge blocks private hosts and was NOT relaxed. This covers production conversion logic, NOT its HTTP bridge networking, ScriptHubClient asset materialization, or full AppModel end-to-end. No AppModel\/UI\/real GitHub publication or workspace files. RSS is aggregate parent+descendant 100ms sampled peak excluding the ps sampler, not instantaneous peak. CPU includes self and reaped children including sampling overhead. HTTP request count excludes warmup; stage bytes are content bytes, not protocol traffic. Cache hit means HTTP304; partial means HTTP503 on every fifth source, alternating available\/missing cache.",
+  "metricsEnabled" : true,
+  "os" : "Version 27.2 (Build 26B5091g)",
+  "physicalMemoryBytes" : 17179869184,
+  "processorCount" : 10
+}

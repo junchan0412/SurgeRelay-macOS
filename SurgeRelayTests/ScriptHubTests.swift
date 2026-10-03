@@ -221,6 +221,148 @@ final class ScriptHubTests: XCTestCase {
         }
     }
 
+    func testWorkerMetricsReturnKnownConversionWithoutInventingNetworkBytes() async throws {
+        let metrics = StageMetricsRecorder()
+        let output = try await StageMetricsContext.$current.withValue(metrics) {
+            try await EmbeddedScriptHubEngine().convert(script: "$done({body:'measured output'});", requestURL: URL(string: "https://example.com/source")!)
+        }
+        XCTAssertEqual(output, "measured output")
+        let conversion = try XCTUnwrap(metrics.snapshot.first { $0.stage == .conversion })
+        XCTAssertGreaterThan(conversion.duration, 0)
+        XCTAssertEqual(conversion.bytesWritten, Int64(output.utf8.count))
+        XCTAssertFalse(conversion.isPartial)
+        XCTAssertFalse(conversion.includesDownload)
+        XCTAssertNil(metrics.snapshot.first { $0.stage == .download })
+    }
+
+    func testScriptWorkerIsEmbeddedAndConvertsWithoutHostJavaScriptExecution() async throws {
+        XCTAssertTrue(FileManager.default.isExecutableFile(atPath: EmbeddedScriptHubEngine.bundledWorkerURL.path))
+        let engine = EmbeddedScriptHubEngine()
+        let output = try await engine.convert(script: "$done({body: 'worker result'});", requestURL: URL(string: "https://example.com/source")!)
+        XCTAssertEqual(output, "worker result")
+        let nested = try await engine.convert(
+            script: "$httpClient.get('http://script.hub/convert/_start_/example/_end_/x.js', function(error, response, body) { $done({body: body}); });",
+            scriptConverterScript: "$done({body: 'nested result'});",
+            requestURL: URL(string: "https://example.com/source")!
+        )
+        XCTAssertEqual(nested, "nested result")
+    }
+
+    func testScriptWorkerTerminatesInfiniteJavaScriptAndRecovers() async throws {
+        let engine = EmbeddedScriptHubEngine(executionTimeout: .milliseconds(250))
+        let started = ContinuousClock.now
+        do {
+            _ = try await engine.convert(script: "while (true) {}", requestURL: URL(string: "https://example.com/source")!)
+            XCTFail("Infinite JavaScript must time out in the helper")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("总执行时限"))
+        }
+        XCTAssertLessThan(started.duration(to: .now), .seconds(2))
+        let recovered = try await engine.convert(script: "$done({body: 'recovered'});", requestURL: URL(string: "https://example.com/source")!)
+        XCTAssertEqual(recovered, "recovered")
+    }
+
+    func testScriptWorkerCancellationAlsoReleasesQueuedSlots() async throws {
+        let engine = EmbeddedScriptHubEngine(maximumConcurrentWorkers: 1)
+        let first = Task { try await engine.convert(script: "while (true) {}", requestURL: URL(string: "https://example.com/source")!) }
+        try await Task.sleep(for: .milliseconds(100))
+        let queued = Task { try await engine.convert(script: "$done({body: 'queued'});", requestURL: URL(string: "https://example.com/source")!) }
+        try await Task.sleep(for: .milliseconds(50))
+        queued.cancel()
+        do { _ = try await queued.value; XCTFail("Queued work should be cancelled") }
+        catch { XCTAssertTrue(error is CancellationError) }
+        let started = ContinuousClock.now
+        first.cancel()
+        do { _ = try await first.value; XCTFail("Executing work should be cancelled") }
+        catch { XCTAssertTrue(error is CancellationError) }
+        XCTAssertLessThan(started.duration(to: .now), .seconds(2))
+        let recovered = try await engine.convert(script: "$done({body: 'recovered'});", requestURL: URL(string: "https://example.com/source")!)
+        XCTAssertEqual(recovered, "recovered")
+    }
+
+    func testScriptWorkerReportsMissingExecutableAndScriptFailure() async throws {
+        let missing = EmbeddedScriptHubEngine(workerExecutableURL: URL(filePath: "/nonexistent/SurgeRelayScriptWorker"))
+        do {
+            _ = try await missing.convert(script: "$done({body:'unused'});", requestURL: URL(string: "https://example.com/source")!)
+            XCTFail("Missing helper must not silently fall back to host execution")
+        } catch { XCTAssertTrue(error.localizedDescription.contains("helper 缺失")) }
+        do {
+            _ = try await EmbeddedScriptHubEngine().convert(script: "throw new Error('intentional worker failure');", requestURL: URL(string: "https://example.com/source")!)
+            XCTFail("Script errors must reach the caller")
+        } catch { XCTAssertTrue(error.localizedDescription.contains("intentional worker failure")) }
+    }
+
+    func testWorkerResponsePreservesRetryAfterMetadataAcrossProcessBoundary() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let expected = SourceRetryAfterError(statusCode: 503, sourceURL: "https://example.com/source",
+                                             responseURL: "https://cdn.example.com/source", retryAt: Date(timeIntervalSince1970: 2_000_000_000))
+        let response = ScriptHubWorkerResponse(succeeded: false, error: "limited", retryAfter: expected)
+        let json = String(decoding: try JSONEncoder().encode(response), as: UTF8.self)
+        let executable = root.appending(path: "retry-after-helper")
+        try Data("#!/bin/sh\ncat > \"$1/response.json\" <<'RESPONSE'\n\(json)\nRESPONSE\n".utf8).write(to: executable)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+        do {
+            _ = try await EmbeddedScriptHubEngine(workerExecutableURL: executable).convert(script: "", requestURL: URL(string: expected.sourceURL)!)
+            XCTFail("The helper's retry deadline must survive transport")
+        } catch let error as SourceRetryAfterError { XCTAssertEqual(error, expected) }
+    }
+
+    func testScriptWorkerReportsAbnormalProcessExit() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let executable = root.appending(path: "failed-helper")
+        try Data("#!/bin/sh\nexit 7\n".utf8).write(to: executable)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+        do {
+            _ = try await EmbeddedScriptHubEngine(workerExecutableURL: executable).convert(
+                script: "", requestURL: URL(string: "https://example.com/source")!
+            )
+            XCTFail("Abnormal helper exit must be reported")
+        } catch { XCTAssertTrue(error.localizedDescription.contains("异常退出（7）")) }
+    }
+
+    func testScriptWorkerRejectsOversizedOutput() async throws {
+        do {
+            _ = try await EmbeddedScriptHubEngine().convert(
+                script: "$done({body: 'x'.repeat(20 * 1024 * 1024 + 1)});",
+                requestURL: URL(string: "https://example.com/source")!
+            )
+            XCTFail("Oversized output must be rejected before writing its result file")
+        } catch { XCTAssertTrue(error.localizedDescription.contains("输出超过 20 MB")) }
+    }
+
+    func testScriptWorkerKillsHelperThatIgnoresTermination() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let executable = root.appending(path: "unresponsive-helper")
+        let ready = root.appending(path: "ready")
+        try Data("#!/bin/sh\ntrap '' TERM\nprintf ready > '\(ready.path)'\nwhile :; do :; done\n".utf8).write(to: executable)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+        let engine = EmbeddedScriptHubEngine(workerExecutableURL: executable, executionTimeout: .seconds(15))
+        let task = Task { try await engine.convert(script: "", requestURL: URL(string: "https://example.com/source")!) }
+        defer { task.cancel() }
+        let readinessDeadline = ContinuousClock.now.advanced(by: .seconds(10))
+        while !FileManager.default.fileExists(atPath: ready.path), ContinuousClock.now < readinessDeadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        guard FileManager.default.fileExists(atPath: ready.path) else {
+            task.cancel()
+            _ = try? await task.value
+            XCTFail("Fixture did not install its SIGTERM handler; cancellation timing was not measured")
+            return
+        }
+        let started = ContinuousClock.now
+        task.cancel()
+        do { _ = try await task.value; XCTFail("Unresponsive helper must be killed") }
+        catch { XCTAssertTrue(error is CancellationError) }
+        XCTAssertGreaterThanOrEqual(started.duration(to: .now), .milliseconds(400))
+        XCTAssertLessThan(started.duration(to: .now), .seconds(2))
+    }
+
     func testEmbeddedScriptHubEngineBlocksPrivateHTTPBridgeHosts() async throws {
         let script = """
         $httpClient.get("http://127.0.0.1/private", function(error, response, body) {

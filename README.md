@@ -25,10 +25,10 @@ Surge Relay 面向需要长期维护大量 `.sgmodule` / `.module`、从 Loon/Qu
 - 全新工作台集中展示模块状态、发布去向与最近活动；macOS 和 Web 使用一致的信息层级与浅色 / 深色视觉。
 - 活动记录可搜索模块名、结果、提交编号与发布文件名，支持展开文件变更和拷贝完整记录；侧栏直接显示筛选条件并可一键重置。
 - 更新流水线最多同时处理 4 个模块，保持总模块合并顺序；来源检查与原生转换复用下载结果，内容和脚本资源以完整快照提交。
-- macOS 与 Web 内容页支持在切换模块时保留未保存草稿；退出 App 或刷新网页前请保存修改。
+- macOS 与 Web 内容页支持持久草稿与恢复；遇到服务器版本变化时可比较后再保存。
 - 内置 Script-Hub 本地引擎，转换 Quantumult X、Loon、Surge 模块；远程 Surge 模块直接抓取并自动写入 `#SUBSCRIBED` 标记。
 - 模块“存放位置”与“初始来源”分离建模：本地 / GitHub 存放，订阅 / 远程 / 自写来源，避免混淆。
-- 本地与 GitHub 发布可同时开启，每个独立模块只写入自己选择的存放目标。
+- 本地与 GitHub 发布可同时开启，每个独立模块可以选择本地、GitHub 或同时存放于两个目标。
 - 侧边栏多维度筛选（更新状态、来源、存放位置、发布行为、状态）+ 排序，筛选与搜索叠加。
 - 本地模块源文件在磁盘上被修改后自动重新转换并刷新输出，无需等待刷新间隔（可在设置中关闭）。
 - 模块内容编辑器支持撤销/重做、查找与替换（含正则）、跳转到行和切换注释。
@@ -44,7 +44,7 @@ Surge Relay 面向需要长期维护大量 `.sgmodule` / `.module`、从 Loon/Qu
 | 工作台 / 活动记录 | <kbd>⌘</kbd> + <kbd>1</kbd> / <kbd>⌘</kbd> + <kbd>2</kbd> |
 | 添加模块 | <kbd>⌘</kbd> + <kbd>N</kbd> |
 | 更新全部 | <kbd>⌘</kbd> + <kbd>R</kbd> |
-| 发布全部 | <kbd>⌘</kbd> + <kbd>⇧</kbd> + <kbd>P</kbd> |
+| 发布到 GitHub | <kbd>⌘</kbd> + <kbd>⇧</kbd> + <kbd>P</kbd> |
 | 撤销 / 重做（模块内容编辑器） | <kbd>⌘</kbd> + <kbd>Z</kbd> / <kbd>⌘</kbd> + <kbd>⇧</kbd> + <kbd>Z</kbd> |
 | 查找 / 查找并替换 | <kbd>⌘</kbd> + <kbd>F</kbd> / <kbd>⌘</kbd> + <kbd>⌥</kbd> + <kbd>F</kbd> |
 | 查找下一个 / 上一个 | <kbd>⌘</kbd> + <kbd>G</kbd> / <kbd>⌘</kbd> + <kbd>⇧</kbd> + <kbd>G</kbd> |
@@ -61,7 +61,7 @@ Surge Relay 面向需要长期维护大量 `.sgmodule` / `.module`、从 Loon/Qu
 - Script-Hub 上游默认固定到明确 commit；更新时会记录上游 revision 与脚本 SHA-256 hash。
 - 为每个模块配置 Surge `category` 标签、输出文件名、输出文件夹、自定义图标和 Script-Hub 参数。
 - 模块关系明确分为“模块存放位置”和“初始来源”：模块可以存放在本地或 GitHub；初始来源优先由 `#SUBSCRIBED originalURL` 判定，存在该记录时归类为订阅来源，没有该记录但更新地址为 HTTP/HTTPS 时归类为远程来源，只有本地文件且无记录时归类为自写模块。
-- 本地发布和 GitHub 发布可以同时开启；每个独立模块只写入自己选择的存放位置，本地根目录和 GitHub 模块目录共用一套相对输出路径逻辑。
+- 本地发布和 GitHub 发布可以同时开启；每个独立模块按自己选择的一个或两个存放目标发布，本地根目录和 GitHub 模块目录共用一套相对输出路径逻辑。
 - 本地发布根目录可配置，例如 iCloud Surge 目录；输出文件夹菜单会读取根目录下已有文件夹，也可以新建文件夹。
 - GitHub 发布可发布到公开或私有仓库；公开仓库使用 Raw 地址，私有仓库需要配置公共转发地址。
 - 总模块功能默认关闭，可在设置中手动开启；关闭后相关界面和“包含在总模块中”开关会隐藏，独立模块仍可转换和发布。
@@ -109,7 +109,7 @@ xattr -dr com.apple.quarantine "/Applications/Surge Relay.app"
 
 这类“源文件即输出”的自写模块由文件监听保持同步：你在任何编辑器里改动源文件后，App 会在磁盘事件安静下来后比较来源内容 sha256，只重新转换改动过的模块，再刷新缓存与其他发布目标。可以在“设置 → 自动化 → 同步本地模块改动”关闭该行为，或用旁边的“立即检查”手动比对一次。
 
-新生成的本地输出会写入 Surge Relay 管理标记。之后 App 只会自动覆盖或清理带有该标记的文件；遇到同名但没有标记的文件，会停止并报错。旧版本已经记录在发布清单中的输出可以在下一次写入时迁移为带标记文件，但删除旧文件仍需要走发布预览和确认流程。
+本地模块输出使用管理标记，脚本、JSON 和二进制资源保留原始内容并通过受管清单与恢复记录追踪归属。App 只会覆盖或清理已确认受管的文件；遇到未受管同名文件会停止并报错。旧版本已经记录在发布清单中的输出可以在下一次写入时迁移为带标记文件，但删除旧文件仍需要走发布预览和确认流程。
 
 如果你看到清理提示，请先看清楚“将删除的旧文件”列表。App 的目标是清理自己生成过的输出，而不是删除手动维护的原模块、`Surge.conf`、分类文件夹或 `assets` 目录。
 
@@ -119,7 +119,7 @@ xattr -dr com.apple.quarantine "/Applications/Surge Relay.app"
 
 ## 发布目标
 
-在设置的“发布”页可以分别开启“发布到本地”和“发布到 GitHub”。两者可以同时开启，但每个独立模块只进入自己选择的存放目标；总模块仍可同时发布到两个目标。工具栏的“发布全部”只提交 GitHub 模块与总模块；“多选 / 发布所选”会按每个模块的存放位置分别发布到本地或 GitHub，不会删除其他已发布文件。未完成 GitHub 配置时点击“发布全部”会直接打开设置页；模块搜索框位于左侧边栏，和筛选条件一起作用于模块列表。
+在设置的“发布”页可以分别开启“发布到本地”和“发布到 GitHub”。两者可以同时开启，但每个独立模块可以选择一个或两个存放目标；总模块仍可同时发布到两个目标。工具栏的“发布到 GitHub”只提交 GitHub 模块与总模块；“多选 / 发布所选”会按每个模块的存放位置分别发布到本地或 GitHub，不会删除其他已发布文件。所选模块的发布结果按目标分别记录；部分失败时可在侧栏“重试未完成目标”，已成功的目标不会重复执行。重试使用当前模块内容，目录或仓库变化时需重新选择发布。未完成 GitHub 配置时点击“发布到 GitHub”会直接打开设置页；模块搜索框位于左侧边栏，和筛选条件一起作用于模块列表。
 
 开启本地发布后，需要配置本地模块根目录。常见路径类似：
 
@@ -184,7 +184,7 @@ Surge Relay 不再访问系统钥匙串：
 
 - **添加模块后内容为空？** 添加 / 编辑模块后会自动更新（约 2 秒后）；若首次抓取遇到瞬时 404 / 5xx / 网络抖动，App 会自动重试一次。仍为空可点击“更新全部”或模块右键“更新”手动刷新。
 - **本地模块没写入指定目录？** 确认已在“设置 > 发布”开启“发布到本地”并配置根目录；独立模块需开启“发布为独立模块”，本地发布时才会写出对应 `.sgmodule`。远程来源本地模块的 `localStorageRelativePath` 是输出路径，只要发布就会写入。
-- **GitHub 发布没有反应？** 确认“发布到 GitHub”已开启、仓库与 Token 已配置；如果模块详情显示“本地模块”，全局“发布全部”不会上传它，请编辑模块并将“模块存放”改为“GitHub”后再发布。“发布所选”会按模块存放位置分别发布；GitHub 模块根目录无需预先创建，首次提交文件时会自动建立路径。
+- **GitHub 发布没有反应？** 确认“发布到 GitHub”已开启、仓库与 Token 已配置；如果模块详情显示“本地模块”，全局“发布到 GitHub”不会上传它，请编辑模块并在“模块存放”中选择“GitHub”或“本地与 GitHub”后再发布。“发布所选”会按模块存放位置分别发布；GitHub 模块根目录无需预先创建，首次提交文件时会自动建立路径。
 - **首次打开被系统拦截？** 因为当前使用固定自签名证书，未做 Apple Developer ID 公证。执行 `xattr -dr com.apple.quarantine "/Applications/Surge Relay.app"` 一次即可；后续用 App 内“查看更新…”无需再处理。
 - **更新失败提示 404 / 403 / 429？** 检查来源链接是否已改名 / 删除 / 分支变化，或仓库访问权限与触发频率限制；网络恢复后重试。
 
@@ -218,7 +218,7 @@ SURGE_RELAY_RUN_UI_QA=1 ./script/build_and_run.sh --verify
 需要直接调用 Xcode 时使用：
 
 ```bash
-DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
+DEVELOPER_DIR="$(xcode-select -p)" \
 xcodebuild build \
   -project "Surge Relay.xcodeproj" \
   -scheme "Surge Relay" \
@@ -243,7 +243,7 @@ node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs
 ./script/check_release_configuration.sh
 
-DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
+DEVELOPER_DIR="$(xcode-select -p)" \
 xcodebuild build-for-testing \
   -project "Surge Relay.xcodeproj" \
   -scheme "Surge Relay" \
@@ -267,7 +267,7 @@ REQUIRE_SPARKLE_SIGNATURES=1 \
 REQUIRE_STABLE_CODESIGN=1 \
 VERIFY_APPCAST=1 \
 UPDATE_APPCAST=1 \
-DEVELOPER_DIR="/Volumes/TR 5000/macOS/Applications/Xcode-beta.app/Contents/Developer" \
+DEVELOPER_DIR="$(xcode-select -p)" \
 ./script/build_release_assets.sh
 ```
 
@@ -294,6 +294,22 @@ EXPECTED_CODESIGN_AUTHORITY="Surge Relay Self-Signed Code Signing" \
 ```
 
 当前版本、仓库状态、能力、代码规模、优化顺序和发布核对入口见自动生成的 [DEVELOPMENT_STATUS.md](./DEVELOPMENT_STATUS.md)。不要手工编辑该文件；使用 `node script/generate_project_status.mjs` 刷新，或使用 `node script/generate_project_status.mjs --check` 检查是否过期。
+
+## 工作区、模板与恢复
+
+在设置的“工作区”页新建、重命名或切换工作区。每次只运行一个工作区，各自保存模块、GitHub仓库、凭据、草稿、版本历史和缓存。新工作区从空内容开始，Web与发布目标默认关闭；按需配置后开启。切换会等待旧任务取消和落盘，不可取消的提交结束前不能切换。
+
+模块编辑器可保存常用配置为模板；从模板创建时补填名称和来源地址。模板保存转换、分类、相对输出位置及刷新偏好，不携带凭据和正文。
+
+模块详情提供“发布前检查”和“版本历史”。检查结果显示文件与行号：确定错误阻止发布，兼容性与重复项提醒可核对后继续。历史保存正文及配套脚本，支持比较与回退；回退操作只更新缓存、保留未保存草稿并暂停该模块自动刷新；本次不发布，之后的发布仍按现有发布设置执行，也可点击“发布当前模块”。
+
+## 刷新策略与执行明细
+
+每个模块可继承全局刷新周期、指定间隔或设为仅手动。普通失败按1–60分钟退避；手动操作可跳过普通退避，但遵守来源服务器的Retry-After截止时间。详情显示下次重试和连续失败情况。
+
+活动记录的性能明细区分下载、转换、缓存和发布，未知字节数显示未采集。内容字节不等于实际网络或物理磁盘流量，各并行阶段时间不能直接相加当作总耗时。Script-Hub转换在独立helper中执行，支持超时与取消。
+
+Web端支持逐目标发布预览/确认/重试、同步差异比较和历史回退。发布确认绑定预览内容与目标；内容、仓库或工作区变化后需要重新预览。未保存草稿按工作区独立保留，服务器版本变化时先比较再保存。
 
 ## 开源协议
 

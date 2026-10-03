@@ -1,7 +1,19 @@
 import AppKit
 import SwiftUI
 
+private struct ModuleIconCacheDirectoryKey: EnvironmentKey {
+    static let defaultValue: URL? = nil
+}
+
+extension EnvironmentValues {
+    var moduleIconCacheDirectory: URL? {
+        get { self[ModuleIconCacheDirectoryKey.self] }
+        set { self[ModuleIconCacheDirectoryKey.self] = newValue }
+    }
+}
+
 struct ModuleIconView: View {
+    @Environment(\.moduleIconCacheDirectory) private var cacheDirectory
     let module: RelayModule
     var size: CGFloat = 28
     @State private var cachedImage: NSImage?
@@ -37,7 +49,7 @@ struct ModuleIconView: View {
             // do not flash placeholders during background status updates.
             let previousImage = cachedImage
             hasLoadedCachedImage = false
-            let url = ModuleIconStore.cachedURL(for: module.id)
+            let url = ModuleIconStore.cachedURL(for: module.id, cacheDirectory: cacheDirectory)
             let data = await Task.detached(priority: .utility) {
                 try? Data(contentsOf: url, options: .mappedIfSafe)
             }.value
@@ -52,7 +64,7 @@ struct ModuleIconView: View {
     }
 
     private var cacheIdentity: String {
-        "\(module.id.uuidString)|\(module.iconURL ?? "")|\(module.lastUpdatedAt?.timeIntervalSinceReferenceDate ?? 0)"
+        "\(cacheDirectory?.path ?? "")|\(module.id.uuidString)|\(module.iconURL ?? "")|\(module.lastUpdatedAt?.timeIntervalSinceReferenceDate ?? 0)"
     }
 
     private func moduleImage(_ image: Image) -> some View {

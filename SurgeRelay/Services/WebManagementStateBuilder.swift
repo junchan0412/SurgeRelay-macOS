@@ -1,64 +1,47 @@
 import Foundation
 
 enum WebManagementStateBuilder {
-    @MainActor
-    static func payload(model: AppModel) -> WebStatePayload {
-        let summary = model.moduleSummary
+    static func payload(snapshot: WebCoreSnapshot, activity: WebActivityPayload, summary: ModuleCollectionSummary, modules: [WebModulePayload]) -> WebStatePayload {
+        let settings = snapshot.settings
         return WebStatePayload(
-            combined: combinedPayload(
-                summary: summary,
-                settings: model.settings,
-                rawURL: model.combinedRawURL,
-                localFileURL: model.combinedLocalFileURL
-            ),
-            moduleEditor: moduleEditorPayload(
-                settings: model.settings,
-                localOutputFolders: model.moduleOutputFolderOptions(storageLocation: .local),
-                githubOutputFolders: model.moduleOutputFolderOptions(storageLocation: .gitHub)
-            ),
-            modules: moduleProjection(model: model),
-            activity: activityPayload(model: model),
-            workspace: WebWorkspacePayload(
-                localDirectory: model.settings.localModuleDirectory,
-                githubRepository: model.settings.github.isConfigured ? "\(model.settings.github.owner)/\(model.settings.github.repository)" : "",
-                githubBranch: model.settings.github.branch,
-                historyCount: model.updateHistory.count,
-                recentHistory: Array(model.updateHistory.prefix(4))
-            )
-        )
+            combined: combinedPayload(summary: summary, settings: settings,
+                rawURL: PublishedAddressResolver.combinedGitHubURL(settings: settings),
+                localFileURL: PublishedAddressResolver.combinedLocalFileURL(settings: settings)),
+            moduleEditor: moduleEditorPayload(settings: settings,
+                localOutputFolders: ModuleOutputFolderCatalog.options(settings: settings, modules: snapshot.modules,
+                    localFolders: snapshot.localFolders, githubFolders: snapshot.githubFolders, storageLocation: .local),
+                githubOutputFolders: ModuleOutputFolderCatalog.options(settings: settings, modules: snapshot.modules,
+                    localFolders: snapshot.localFolders, githubFolders: snapshot.githubFolders, storageLocation: .gitHub)),
+            modules: modules,
+            activity: activity, runtimeID: snapshot.runtimeID, revision: snapshot.revision,
+            workspace: WebWorkspacePayload(localDirectory: settings.localModuleDirectory,
+                githubRepository: settings.github.isConfigured ? "\(settings.github.owner)/\(settings.github.repository)" : "",
+                githubBranch: settings.github.branch, historyCount: snapshot.historyCount,
+                recentHistory: snapshot.recentHistory, id: snapshot.workspaceID,
+                name: snapshot.workspaceName, isLegacyDefault: snapshot.isLegacyWorkspace))
     }
 
-    @MainActor
-    static func activityPayload(model: AppModel) -> WebActivityPayload {
-        let summary = model.moduleSummary
-        let updateAdmission = model.updateAdmission
-        return activityPayload(
-                isWorking: model.isWorking,
-                workActivity: model.workActivity,
-                statusMessage: model.statusMessage,
-                completedCount: model.synchronizationCompletedCount,
-                totalCount: model.synchronizationTotalCount,
-                currentModuleID: model.synchronizingModuleID,
-                updateAdmission: updateAdmission,
-                summary: summary,
-                automaticPublishScheduledAt: model.automaticPublishScheduledAt,
-                automaticPublishRunsAt: model.automaticPublishRunsAt,
-                latestGitHubPublish: model.latestGitHubPublish,
-                error: model.presentedError,
-                cancellationRequested: model.workCancellationRequested
-        )
+    static func moduleProjection(snapshot: WebCoreSnapshot) throws -> [WebModulePayload] {
+        try snapshot.modules.map { module in
+            try Task.checkCancellation()
+            return modulePayload(module,
+                publishedURL: PublishedAddressResolver.standaloneURL(for: module, settings: snapshot.settings),
+                iconURL: WebManagementAssets.iconURL(for: module, cacheDirectory: snapshot.cacheDirectory))
+        }
     }
 
-    @MainActor
-    private static func moduleProjection(model: AppModel) -> [WebModulePayload] {
-        if let cached = model.cachedWebProjection, cached.revision == model.moduleRevision, cached.settings == model.settings {
-            return cached.modules
-        }
-        let modules = model.modules.map { module in
-            modulePayload(module, publishedURL: model.rawURL(for: module), iconURL: WebManagementAssets.iconURL(for: module))
-        }
-        model.cachedWebProjection = WebModuleProjectionCache(revision: model.moduleRevision, settings: model.settings, modules: modules)
-        return modules
+    static func activityPayload(snapshot: WebActivitySnapshot, core: WebCoreSnapshot, summary: ModuleCollectionSummary) -> WebActivityPayload {
+        let admission = UpdateAdmission.allModules(activity: snapshot.workActivity,
+            updateableModuleCount: summary.updateableCount, statusMessage: snapshot.statusMessage)
+        let currentModuleID = snapshot.synchronizingModuleIDs.isEmpty ? nil
+            : core.modules.first { snapshot.synchronizingModuleIDs.contains($0.id) }?.id
+        return activityPayload(isWorking: snapshot.isWorking, workActivity: snapshot.workActivity,
+            statusMessage: snapshot.statusMessage, completedCount: snapshot.completedCount, totalCount: snapshot.totalCount,
+            currentModuleID: currentModuleID, updateAdmission: admission, summary: summary,
+            automaticPublishScheduledAt: snapshot.automaticPublishScheduledAt,
+            automaticPublishRunsAt: snapshot.automaticPublishRunsAt,
+            latestGitHubPublish: GitHubPublishSnapshot.latest(in: snapshot.history, settings: snapshot.githubSettings),
+            error: snapshot.error, cancellationRequested: snapshot.cancellationRequested)
     }
 
     static func moduleEditorPayload(
@@ -134,6 +117,10 @@ enum WebManagementStateBuilder {
             sourceETag: module.sourceETag,
             sourceLastModified: module.sourceLastModified,
             sourceContentHash: module.sourceContentHash,
+            refreshIntervalMinutes: module.refreshIntervalMinutes,
+            nextRetryAt: module.nextRetryAt,
+            serverRetryAfter: module.serverRetryAfter,
+            consecutiveFailureCount: module.consecutiveFailureCount,
             conversionEngineRevision: module.conversionEngineRevision,
             lastError: module.lastError,
             iconURL: iconURL,
@@ -189,7 +176,8 @@ enum WebManagementStateBuilder {
             automaticPublishScheduledAt: automaticPublishScheduledAt,
             automaticPublishRunsAt: automaticPublishRunsAt,
             latestGitHubPublish: latestGitHubPublish,
-            error: error
+            error: error,
+            activeStages: workActivity.activeStages
         )
     }
 

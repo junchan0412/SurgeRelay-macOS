@@ -55,7 +55,7 @@ extension AppModel {
         } else {
             updateHistory.removeAll()
         }
-        PersistenceStore.saveUpdateHistory(updateHistory)
+        enqueueConfiguration(Array(updateHistory.prefix(200)), fileName: "update-history.json")
     }
 
     func shouldContinueCurrentWork(
@@ -102,8 +102,12 @@ extension AppModel {
         if kind == nil || workActivity.kind == kind {
             let wasCancelling = workCancellationRequested || Task.isCancelled
             let title = workActivity.title
+            stageProgressTask?.cancel()
+            stageProgressTask = nil
+            activeStageProgress.removeAll()
             workActivity = .idle
-            isWorking = false
+            workActivity.activeStages = nil
+            isWorking = isWorkspaceTransitioning
             workCancellationRequested = false
             if wasCancelling {
                 statusMessage = "已取消\(title)"
@@ -114,7 +118,7 @@ extension AppModel {
     func recordHistory(_ entries: [UpdateHistoryEntry]) {
         guard !entries.isEmpty else { return }
         updateHistory = Array((entries.reversed() + updateHistory).prefix(200))
-        PersistenceStore.saveUpdateHistory(updateHistory)
+        enqueueConfiguration(Array(updateHistory.prefix(200)), fileName: "update-history.json")
     }
 
     private func startForegroundWork(_ operation: @escaping @MainActor (AppModel) async -> Void) {

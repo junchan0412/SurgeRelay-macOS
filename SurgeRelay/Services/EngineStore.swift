@@ -1,9 +1,10 @@
 import Foundation
 
 actor EngineStore {
-    private var directory: URL {
-        PersistenceStore.cacheDirectoryURL
-            .appending(path: "ScriptHubEngine", directoryHint: .isDirectory)
+    private let directory: URL
+
+    init(cacheDirectory: URL = PersistenceStore.cacheDirectoryURL) {
+        directory = cacheDirectory.appending(path: "ScriptHubEngine", directoryHint: .isDirectory)
     }
 
     func save(scripts: [String: Data]) throws {

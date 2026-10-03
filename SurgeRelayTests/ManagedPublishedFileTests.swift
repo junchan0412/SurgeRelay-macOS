@@ -34,4 +34,23 @@ final class ManagedPublishedFileTests: XCTestCase {
     func testManagedPublishedFileTreatsPlainContentAsUnmanaged() {
         XCTAssertFalse(ManagedPublishedFile.isManaged(Data("[General]\n".utf8)))
     }
+    func testResourcesKeepExactJavaScriptAndBinaryBytes() {
+        let script = Data("\"use strict\";\r\nfunction main() { return 42; }\r\n".utf8)
+        let binary = Data([0x00, 0xff, 0x89, 0x00, 0xfe])
+        XCTAssertEqual(ManagedPublishedFile.dataWrapping(script, relativePath: "assets/main.js"), script)
+        XCTAssertEqual(ManagedPublishedFile.dataWrapping(binary, relativePath: "assets/payload.bin"), binary)
+        XCTAssertFalse(ManagedPublishedFile.requiresInlineMarker("assets/main.js"))
+        XCTAssertTrue(ManagedPublishedFile.requiresInlineMarker("Demo.MODULE"))
+    }
+
+    func testLegacyResourceOwnershipRequiresMarkerAndMatchingPathIncludingBinary() {
+        let path = "assets/old.bin"
+        var wrapped = Data("# Surge Relay managed output\n# surge-relay-relative-path: \(path)\n".utf8)
+        wrapped.append(contentsOf: [0xff, 0x00, 0xfe])
+        XCTAssertTrue(ManagedPublishedFile.isManaged(wrapped, relativePath: path))
+        XCTAssertFalse(ManagedPublishedFile.isManaged(wrapped, relativePath: "assets/other.bin"))
+        let incidental = Data("# Surge Relay managed output\nconst value = 1;".utf8)
+        XCTAssertFalse(ManagedPublishedFile.isManaged(incidental, relativePath: "assets/user.js"))
+    }
+
 }

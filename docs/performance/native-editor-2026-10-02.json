@@ -1,0 +1,23 @@
+{
+  "date": "2026-10-02",
+  "configuration": "Debug, XCTest, arm64, Xcode 27.0",
+  "device": "Mac mini, macOS 27.2 (26B5091g)",
+  "method": "Single sample per size; standalone NSTextView measuredContentSize and background CodeSearchEngine.search, maximum 5000 matches. Not UI input p95 or FPS.",
+  "samples": [
+    {
+      "bytes": 102388,
+      "measurementSeconds": 0.04370875,
+      "searchSeconds": 0.001758833
+    },
+    {
+      "bytes": 1048554,
+      "measurementSeconds": 0.009105708,
+      "searchSeconds": 0.004357459
+    },
+    {
+      "bytes": 5242874,
+      "measurementSeconds": 0.0535615,
+      "searchSeconds": 0.003971125
+    }
+  ]
+}

@@ -11,6 +11,8 @@
     const toastDelay = dependencies.toastDelay ?? 2600;
     let toastTimer = null;
     let confirmResolver = null;
+    const dialogOpeners = new WeakMap();
+    const pendingCloses = new WeakMap();
 
     ui.confirmDialog?.addEventListener?.('cancel', event => {
       event.preventDefault();
@@ -23,20 +25,36 @@
     });
 
     function openDialog(dialog) {
+      const pending = pendingCloses.get(dialog);
+      if (pending) { clearTimeoutImpl(pending.timer); pending.resolve(); pendingCloses.delete(dialog); }
+      if (dialog && !dialog.open) dialogOpeners.set(dialog, documentRef.activeElement);
       dialog?.classList?.remove('is-closing');
       dialog?.showModal?.();
     }
 
     function closeDialog(dialog) {
-      return new Promise(resolve => {
-        if (!dialog?.open) return resolve();
+      if (!dialog?.open) return Promise.resolve();
+      if (pendingCloses.has(dialog)) return pendingCloses.get(dialog).promise;
+      let finish;
+      const promise = new Promise(resolve => { finish = resolve; });
+      const pending = { promise, resolve: finish, timer: null };
+      pendingCloses.set(dialog, pending);
+      const close = () => {
+        if (pendingCloses.get(dialog) !== pending) return;
+        pendingCloses.delete(dialog);
+        dialog.close?.();
+        dialog.classList?.remove('is-closing');
+        const opener = dialogOpeners.get(dialog);
+        if (opener?.isConnected) opener.focus?.({ preventScroll: true });
+        dialogOpeners.delete(dialog);
+        finish();
+      };
+      if (windowRef.matchMedia?.('(prefers-reduced-motion: reduce)').matches) close();
+      else {
         dialog.classList?.add('is-closing');
-        setTimeoutImpl(() => {
-          dialog.close?.();
-          dialog.classList?.remove('is-closing');
-          resolve();
-        }, closeDelay);
-      });
+        pending.timer = setTimeoutImpl(close, closeDelay);
+      }
+      return promise;
     }
 
     function askConfirmation(title, message, acceptLabel = '确认') {

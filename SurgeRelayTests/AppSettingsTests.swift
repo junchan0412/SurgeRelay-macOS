@@ -2,6 +2,34 @@ import XCTest
 @testable import SurgeRelay
 
 final class AppSettingsTests: XCTestCase {
+    func testExplicitlyDisabledPublishTargetsRemainDisabled() throws {
+        for mode in ["local", "gitHub"] {
+            let json = """
+            {"storageMode":"\(mode)","publishToLocal":false,"publishToGitHub":false,"webServerEnabled":false}
+            """
+            let settings = try JSONDecoder().decode(AppSettings.self, from: Data(json.utf8))
+            XCTAssertFalse(settings.publishToLocal)
+            XCTAssertFalse(settings.publishToGitHub)
+            XCTAssertFalse(settings.webServerEnabled)
+            let restored = try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(settings))
+            XCTAssertFalse(restored.publishToLocal)
+            XCTAssertFalse(restored.publishToGitHub)
+            XCTAssertEqual(restored.storageMode, settings.storageMode)
+        }
+    }
+
+    func testLegacyMissingPublishFlagsStillFollowStorageMode() throws {
+        let local = try JSONDecoder().decode(AppSettings.self, from: Data(#"{"storageMode":"local"}"#.utf8))
+        XCTAssertTrue(local.publishToLocal)
+        XCTAssertFalse(local.publishToGitHub)
+        let github = try JSONDecoder().decode(AppSettings.self, from: Data(#"{"storageMode":"gitHub"}"#.utf8))
+        XCTAssertFalse(github.publishToLocal)
+        XCTAssertTrue(github.publishToGitHub)
+        let defaultSettings = try JSONDecoder().decode(AppSettings.self, from: Data("{}".utf8))
+        XCTAssertFalse(defaultSettings.publishToLocal)
+        XCTAssertTrue(defaultSettings.publishToGitHub)
+    }
+
     func testSettingsDecodeWithoutSyncedTokenOrRepositoryVisibility() throws {
         let data = Data(#"{"github":{"owner":"someone","repository":"relay","branch":"main","directory":"modules"}}"#.utf8)
         let settings = try JSONDecoder().decode(AppSettings.self, from: data)

@@ -4,6 +4,7 @@ struct ConversionResult: Sendable {
     var content: String
     var requestURL: URL
     var assets: [GeneratedAsset] = []
+    var stageMetrics: [StageMetric]? = nil
 }
 
 struct GeneratedAsset: Sendable {

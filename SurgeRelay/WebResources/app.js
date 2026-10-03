@@ -1,5 +1,9 @@
 const ui = {
   body: document.body,
+  operationDialog: document.querySelector('#operation-dialog'),
+  operationTitle: document.querySelector('#operation-title'),
+  operationContent: document.querySelector('#operation-content'),
+  operationClose: document.querySelector('#operation-close'),
   sidebar: document.querySelector('.sidebar'),
   detailPane: document.querySelector('#detail'),
   list: document.querySelector('#module-list'),
@@ -18,7 +22,10 @@ const ui = {
   refresh: document.querySelector('#refresh-button'),
   back: document.querySelector('#mobile-back'),
   mobileTitle: document.querySelector('#mobile-title'),
+  workspaceName: document.querySelector('#workspace-name'),
+  mobileWorkspaceName: document.querySelector('#mobile-workspace-name'),
   status: document.querySelector('#activity-status'),
+  stages: document.querySelector('#activity-stages'),
   percent: document.querySelector('#activity-percent'),
   progressTrack: document.querySelector('#progress-track'),
   progressFill: document.querySelector('#progress-fill'),
@@ -91,10 +98,22 @@ if (!webDetail) throw new Error('web-detail.js must load before app.js');
 
 let state = null;
 let selectedID = null;
+let mobileListScrollY = 0;
 let editingID = null;
 let showFailuresOnly = false;
 let stateRevision = 0;
 let stateRequest = 0;
+let workspaceEpoch = 0;
+let workspaceSwitching = false;
+let currentWorkspace = null;
+let currentRuntimeID = null;
+let latestReceivedRuntimeID = null;
+let receivedStateRevision = -1;
+let appliedActivityRevision = -1;
+const retiredRuntimeIDs = new Set();
+let hasAppliedState = false;
+let workspaceQueue = Promise.resolve();
+let stateApplySequence = 0;
 const mobileLayout = window.matchMedia('(max-width: 700px)');
 const moduleEditor = webEditor.createModuleEditorController({
   ui,
@@ -125,13 +144,23 @@ const {
   copyText,
   showToast
 } = feedback;
-const previewController = webPreview.createPreviewController({
+const previewController = webPreview.createWorkspacePreviewController({
   api: (...args) => api(...args),
   document,
   highlightCode,
   askConfirmation,
   showToast
 });
+const publishingController = webDetail.createPublishingController({
+  ui, api: (...args) => api(...args), markup: webMarkup,
+  openDialog, closeDialog, askConfirmation, showToast,
+  getState: () => state || { modules: [] },
+  onVersionRestored: id => previewController.refreshVersionBaseline(id),
+  refreshState: () => loadState(false, true)
+});
+ui.operationClose.addEventListener('click', publishingController.close);
+ui.operationContent.addEventListener('click', publishingController.handleClick);
+ui.operationContent.addEventListener('change', publishingController.updateSelection);
 const detailController = webDetail.createDetailController({
   ui,
   markup: webMarkup,
@@ -167,7 +196,9 @@ const stateEventController = webState.createStateEventController({
   clearTimeout: window.clearTimeout.bind(window),
   loadState: (...args) => loadState(...args),
   applyState: (...args) => applyState(...args),
-  applyActivity: activity => applyActivity(activity),
+  applyActivity: (activity, context) => applyActivity(activity, context),
+  getWorkspaceID: () => currentWorkspace?.id || null,
+  getRuntimeID: () => currentRuntimeID,
   fetchActivity: () => api('/api/activity'),
   isWorking: () => Boolean(state?.activity?.isWorking),
   establishSession: () => apiClient.establishSession(),
@@ -207,6 +238,7 @@ ui.moduleForm.elements.sourceURL.addEventListener('input', () => {
   moduleEditor.scheduleNameLookup({ api, updateOutputPathPreview });
 });
 ui.moduleForm.elements.sourceFormat.addEventListener('change', moduleEditor.updateNativeModuleState);
+ui.moduleForm.elements.refreshIntervalMinutes?.addEventListener('change', moduleEditor.updateRefreshPolicy);
 ui.moduleForm.elements.name.addEventListener('input', event => {
   moduleEditor.handleNameInput(event.target.value);
   updateOutputPathPreview();
@@ -241,12 +273,12 @@ ui.detail.addEventListener('change', handleDetailChange);
 ui.detail.addEventListener('keydown', detailController.handleTabKeydown);
 window.addEventListener('popstate', handleHistoryNavigation);
 window.addEventListener('keydown', event => {
-  if (event.defaultPrevented || event.isComposing || ui.moduleDialog.open || ui.confirmDialog.open) return;
+  if (event.defaultPrevented || event.isComposing || ui.moduleDialog.open || ui.confirmDialog.open || ui.operationDialog.open) return;
   const command = (event.metaKey || event.ctrlKey) && !event.altKey;
   const editable = event.target?.closest?.('input, textarea, select, [contenteditable="true"]');
   if ((command && event.key.toLowerCase() === 'k') || (!command && !event.altKey && event.key === '/' && !editable)) {
     event.preventDefault();
-    if (mobileLayout.matches && ui.body.classList.contains('has-selection')) showModuleList(true);
+    if (mobileLayout.matches && ui.body.classList.contains('has-selection')) showModuleList(true, false);
     ui.search.focus();
     ui.search.select();
   }
@@ -256,8 +288,10 @@ window.addEventListener('keydown', event => {
   }
 });
 mobileLayout.addEventListener?.('change', syncResponsiveNavigation);
-window.addEventListener('pagehide', () => stateEventController.close());
+document.addEventListener('visibilitychange', () => { if (document.hidden) previewController.flushDrafts(); });
+window.addEventListener('pagehide', () => { previewController.flushDrafts(); stateEventController.close(); });
 window.addEventListener('beforeunload', event => {
+  previewController.flushDrafts();
   if (previewController.hasUnsavedChanges) { event.preventDefault(); event.returnValue = ''; }
 });
 window.addEventListener('pageshow', event => { if (event.persisted) stateEventController.start(); });
@@ -266,8 +300,16 @@ apiClient.establishSession()
   .catch(error => showToast(error.message, true))
   .finally(() => loadState(true, true).finally(startStateEvents));
 
-function api(path, options = {}) {
-  return apiClient.request(path, options);
+async function api(path, options = {}) {
+  const epoch = workspaceEpoch;
+  const id = currentWorkspace?.id;
+  const isWrite = (options.method || 'GET') !== 'GET';
+  if (isWrite && workspaceSwitching) throw new Error('正在切换工作区，请稍后重试。');
+  const scopedOptions = isWrite && id && !['/api/session', '/api/source/name'].includes(path)
+    ? { ...options, headers: { ...options.headers, 'X-Relay-Workspace': id } } : options;
+  const result = await apiClient.request(path, scopedOptions);
+  if (epoch !== workspaceEpoch) throw new Error('已切换工作区，旧请求结果已忽略。');
+  return result;
 }
 
 async function loadState(initial = false, renderCurrentDetail = false) {
@@ -276,12 +318,63 @@ async function loadState(initial = false, renderCurrentDetail = false) {
   try {
     const next = await api('/api/state');
     if (request !== stateRequest || revision !== stateRevision) return;
-    applyState(next, initial, renderCurrentDetail);
+    await applyState(next, initial, renderCurrentDetail);
   } catch (error) { showToast(error.message, true); }
 }
 
 function applyState(next, initial = false, renderCurrentDetail = false) {
-    stateRevision += 1;
+  if (currentWorkspace?.id && !next.workspace?.id) return Promise.resolve(false);
+  const runtimeID = typeof next.runtimeID === 'string' ? next.runtimeID : null;
+  const revision = Number.isSafeInteger(next.revision) ? next.revision : null;
+  if (currentRuntimeID && !runtimeID) return Promise.resolve(false);
+  if (runtimeID) {
+    if (retiredRuntimeIDs.has(runtimeID)) return Promise.resolve(false);
+    if (latestReceivedRuntimeID !== runtimeID) {
+      if (latestReceivedRuntimeID) retiredRuntimeIDs.add(latestReceivedRuntimeID);
+      latestReceivedRuntimeID = runtimeID; receivedStateRevision = -1;
+    }
+    if (revision != null && revision <= receivedStateRevision) return workspaceQueue.then(() => currentRuntimeID === runtimeID && currentWorkspace?.id === next.workspace?.id);
+    if (revision != null) receivedStateRevision = revision;
+  }
+  const sequence = ++stateApplySequence;
+  stateRevision += 1;
+  const incomingID = next.workspace?.id || 'legacy-origin';
+  const previousID = currentWorkspace?.id || 'legacy-origin';
+  const changesWorkspace = hasAppliedState && (incomingID !== previousID || runtimeID !== currentRuntimeID);
+  if (changesWorkspace) {
+    workspaceSwitching = true; workspaceEpoch += 1; mobileListScrollY = 0;
+    detailController.resetWorkspace(); publishingController.resetWorkspace(); sidebarController.resetWorkspace();
+    resolveConfirmation(false);
+    ui.moduleDialog.close?.(); ui.saveModule.disabled = false; moduleEditor.resetNameLookup('', false);
+    selectedID = null; editingID = null; showFailuresOnly = false; ui.search.value = '';
+    state = null; ui.list.innerHTML = ''; ui.detail.innerHTML = '<p role="status">正在切换工作区…旧草稿会保留。</p>';
+    const entry = webState.listHistoryEntry(location);
+    history.replaceState(entry.state, '', entry.url);
+  }
+  workspaceQueue = workspaceQueue.catch(() => {}).then(async () => {
+    if (sequence !== stateApplySequence) return false;
+    const workspaceChangedByID = (next.workspace?.id || 'legacy-origin') !== (currentWorkspace?.id || 'legacy-origin');
+    const switchedFromDisplayed = hasAppliedState && (workspaceChangedByID || runtimeID !== currentRuntimeID);
+    await previewController.switchWorkspace(next.workspace, runtimeID);
+    if (sequence !== stateApplySequence) return false;
+    if (runtimeID === currentRuntimeID && revision != null && revision < appliedActivityRevision && state) {
+      next = { ...next, activity: state.activity };
+    } else {
+      if (runtimeID !== currentRuntimeID) appliedActivityRevision = -1;
+      if (revision != null) appliedActivityRevision = revision;
+    }
+    currentWorkspace = next.workspace || null; currentRuntimeID = runtimeID; workspaceSwitching = false;
+    const workspaceName = String(next.workspace?.name || '').trim() || '默认工作区';
+    for (const label of [ui.workspaceName, ui.mobileWorkspaceName]) {
+      label.textContent = workspaceName; label.title = workspaceName;
+      label.setAttribute('aria-label', `当前工作区：${workspaceName}`);
+    }
+    if (switchedFromDisplayed) {
+      selectedID = null; editingID = null; showFailuresOnly = false; ui.search.value = '';
+      initial = false; renderCurrentDetail = true;
+      showToast(`${workspaceChangedByID ? '已切换工作区' : '已重新连接工作区'}${next.workspace?.name ? `：${next.workspace.name}` : ''}，旧草稿已保留。`);
+    }
+    if (!hasAppliedState) initial = true;
     const previous = state;
     const previousSelectedID = selectedID;
     state = next;
@@ -305,15 +398,26 @@ function applyState(next, initial = false, renderCurrentDetail = false) {
       activityController.render();
     }
     stateEventController.syncActivityPolling?.();
+
+    hasAppliedState = true;
+    return true;
+  }).catch(error => { workspaceSwitching = false; showToast(error.message, true); return false; });
+  return workspaceQueue;
 }
 
-function applyActivity(activity) {
-  if (!state || !activity) return;
+function applyActivity(activity, context = {}) {
+  if (workspaceSwitching || !state || !activity || (context.workspaceID && context.workspaceID !== currentWorkspace?.id)) return;
+  if (context.runtimeID && context.runtimeID !== currentRuntimeID) return;
+  if (context.source === 'sse' && currentRuntimeID && context.runtimeID !== currentRuntimeID) return;
+  if (Number.isSafeInteger(context.revision)) {
+    if (context.revision <= appliedActivityRevision) return;
+    appliedActivityRevision = context.revision;
+  }
   const previousWorking = Boolean(state.activity?.isWorking);
   state = { ...state, activity };
   activityController.render();
   // When a bulk update finishes, refresh module rows/details once.
-  if (previousWorking && !activity.isWorking) {
+  if (previousWorking && !activity.isWorking && context.source !== 'sse') {
     loadState(false, true);
   } else {
     stateEventController.syncActivityPolling?.();
@@ -375,6 +479,11 @@ async function handleDetailClick(event) {
   if (!action) return;
   const module = state.modules.find(item => item.id === selectedID);
   switch (action) {
+  case 'version-history': if (module) await publishingController.openVersions(module); break;
+  case 'publish-selected': publishingController.openSelected(module?.id || null); break;
+  case 'publish-github': await publishingController.openGitHub(); break;
+  case 'publish-results': await publishingController.showLastResult(); break;
+  case 'compare-sync': if (module) await publishingController.openSync(module); break;
   case 'add-module': openEditor(); break;
   case 'update-all': await updateAll(); break;
   case 'show-activity': selectItem('activity'); break;
@@ -389,6 +498,7 @@ async function handleDetailClick(event) {
   }
   case 'update-module':
     if (module) {
+      if (webLogic.serverCooldownRemaining(module) > 0) { showToast(`服务器冷却至 ${formatDate(module.serverRetryAfter)}，手动更新也需等待。`, true); break; }
       try { const result = await api(`/api/modules/${module.id}/update`, { method: 'POST' }); showToast(result.message); await loadState(false, true); }
       catch (error) { showToast(error.message, true); }
     }
@@ -397,9 +507,17 @@ async function handleDetailClick(event) {
   case 'tab-preview': detailController.showTab('preview'); break;
   case 'edit': if (module) openEditor(module); break;
   case 'delete': if (module) await deleteModule(module); break;
+  case 'copy-history': {
+    const text = detailController.historyRecordText(Number(source.dataset.historyIndex));
+    if (text) await copyText(text, source);
+    break;
+  }
   case 'copy': await copyText(source.dataset.value, source); break;
   case 'copy-preview': await copyText(previewController.text, source); break;
   case 'save-preview': if (module) await previewController.savePreview(module); break;
+  case 'compare-preview': previewController.comparePreview(); break;
+  case 'recover-draft': previewController.recoverDraft(); break;
+  case 'discard-draft': await previewController.discardDraft(); break;
   case 'restore-preview': if (module) await previewController.restorePreview(module); break;
   case 'retry-preview': await previewController.retryPreview(); break;
   case 'reset-arguments': if (module) await resetArguments(module); break;
@@ -429,6 +547,7 @@ function selectItem(id, pushHistory = true) {
   if (!['combined', 'overview', 'activity'].includes(id) && !state.modules.some(module => module.id === id)) id = fallbackSelection();
   if (!id) { showModuleList(pushHistory); return; }
   const cameFromList = mobileLayout.matches && !ui.body.classList.contains('has-selection');
+  if (cameFromList) mobileListScrollY = window.scrollY;
   selectedID = id; detailController.setTab('info'); ui.body.classList.add('has-selection');
   syncResponsiveNavigation();
   resetHorizontalScroll();
@@ -459,7 +578,9 @@ function initializeHistoryState() {
   if (transition.push) history.pushState(transition.push.state, '', transition.push.url);
 }
 
-function showModuleList(replaceHistory = false) {
+function showModuleList(replaceHistory = false, restoreFocus = true) {
+  const previousID = selectedID;
+  const epoch = workspaceEpoch;
   selectedID = null;
   detailController.setTab('info');
   ui.body.classList.remove('has-selection');
@@ -471,6 +592,16 @@ function showModuleList(replaceHistory = false) {
   }
   sidebarController.render();
   renderDetail(false);
+  if (mobileLayout.matches) {
+    window.requestAnimationFrame(() => {
+      if (epoch !== workspaceEpoch || ui.body.classList.contains('has-selection')) return;
+      if (restoreFocus) {
+        const row = [...ui.list.querySelectorAll('.module-row')].find(row => row.dataset.id === previousID);
+        (row?.querySelector('.module-open') || ui.search).focus({ preventScroll: true });
+      }
+      if (restoreFocus) window.scrollTo({ top: mobileListScrollY, left: 0, behavior: 'instant' });
+    });
+  }
 }
 
 function navigateBackToList() {
@@ -502,6 +633,7 @@ function openEditor(module = null) {
 
 async function saveModule(event) {
   event.preventDefault();
+  const epoch = workspaceEpoch;
   const form = ui.moduleForm.elements;
   const existingModule = editingID ? state.modules.find(module => module.id === editingID) : null;
   const editorFields = moduleEditor.collectModuleFields();
@@ -524,10 +656,11 @@ async function saveModule(event) {
     showToast(result.message);
     await loadState(false, true);
   } catch (error) {
+    if (epoch !== workspaceEpoch) return;
     ui.moduleDialogMessage.textContent = error.message;
     ui.moduleDialogMessage.hidden = false;
   }
-  finally { ui.saveModule.disabled = false; }
+  finally { if (epoch === workspaceEpoch) ui.saveModule.disabled = false; }
 }
 
 async function updateAll() {
@@ -552,6 +685,7 @@ async function deleteModule(module) {
   if (!accepted) return;
   try {
     const result = await api(`/api/modules/${module.id}`, { method: 'DELETE' });
+    previewController.forgetModule(module.id);
     selectedID = fallbackSelection({ ...state, modules: state.modules.filter(item => item.id !== module.id) });
     showToast(result.message);
     await loadState(false, true);

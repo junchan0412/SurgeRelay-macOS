@@ -1,0 +1,95 @@
+{
+  "date": "2026-10-03",
+  "configuration": "Release, arm64, Swift6 complete concurrency, -O, ENABLE_DEBUG_DYLIB=NO",
+  "bundleID": "com.allenmiao.SurgeRelay.qa.20261003.85ecaa2c",
+  "method": "CUA individual pressKey(x), append at document end, 40 events per document, one AX read after the batch. Recorder measures keyDown/text change -> NSApplication.didUpdate, not GPU/pixel presentation; CUA call durations are not used. No xctrace was active for these input baselines.",
+  "status": "100KiB and 1MiB complete; 5MiB not started and no sample file exists. UI quiet window ended; await instrumented build.",
+  "cases": [
+    {
+      "document": "100KiB",
+      "requestedCorpusBytes": 102400,
+      "sourcePath": "/private/tmp/surge-relay-release-fixture-20261003-c4667f4e/modules-100/Measurements/editor-100KiB-release.jsonl",
+      "archivedPath": "/Users/qidewei/Documents/Surge Relay/docs/performance/native-input-2026-10-03/100KiB.jsonl",
+      "sessions": [
+        {
+          "executablePath": "/private/tmp/surge-relay-release-qa-20261003-85ecaa2c/Surge Relay QA 20261003 85ecaa2c.app/Contents/MacOS/Surge Relay",
+          "processID": 10320,
+          "sessionID": "5E722A20-6D05-4013-95AC-E0525060B00A",
+          "type": "session",
+          "excludes": "No text, key code, characters, document path or selection content is recorded. Non-text key groups and changes without a tracked keyDown are excluded.",
+          "schemaVersion": 1,
+          "eventTimestampBoundary": "NSEvent timestamp -> NSApplication.didUpdateNotification; includes event delivery delay when timestamp is available",
+          "bundleIdentifier": "com.allenmiao.SurgeRelay.qa.20261003.85ecaa2c",
+          "boundary": "keyDown entry / text change -> NSApplication.didUpdateNotification; not GPU presentation or FPS"
+        }
+      ],
+      "textChangingKeyEvents": 40,
+      "updateGroups": 40,
+      "groupedUpdates": 0,
+      "documentUTF16CountRange": [
+        102422,
+        102461
+      ],
+      "milliseconds": {
+        "keyDownToAppKitUpdate": {
+          "p50": 138.28470831504092,
+          "p95": 143.65025001461618,
+          "max": 150.156458345009
+        },
+        "keyDownToTextChangeDerived": {
+          "p50": 4.5534583332482725,
+          "p95": 6.469833315350115,
+          "max": 11.354000016581267
+        },
+        "textChangeToAppKitUpdate": {
+          "p50": 134.15362499654293,
+          "p95": 138.09324998874217,
+          "max": 138.80245832842775
+        }
+      }
+    },
+    {
+      "document": "1MiB",
+      "requestedCorpusBytes": 1048576,
+      "sourcePath": "/private/tmp/surge-relay-release-fixture-20261003-c4667f4e/modules-100/Measurements/editor-1MiB-release.jsonl",
+      "archivedPath": "/Users/qidewei/Documents/Surge Relay/docs/performance/native-input-2026-10-03/1MiB.jsonl",
+      "sessions": [
+        {
+          "excludes": "No text, key code, characters, document path or selection content is recorded. Non-text key groups and changes without a tracked keyDown are excluded.",
+          "schemaVersion": 1,
+          "type": "session",
+          "sessionID": "BCD15711-9378-4132-8028-C58C90091617",
+          "boundary": "keyDown entry / text change -> NSApplication.didUpdateNotification; not GPU presentation or FPS",
+          "eventTimestampBoundary": "NSEvent timestamp -> NSApplication.didUpdateNotification; includes event delivery delay when timestamp is available",
+          "bundleIdentifier": "com.allenmiao.SurgeRelay.qa.20261003.85ecaa2c",
+          "processID": 10835,
+          "executablePath": "/private/tmp/surge-relay-release-qa-20261003-85ecaa2c/Surge Relay QA 20261003 85ecaa2c.app/Contents/MacOS/Surge Relay"
+        }
+      ],
+      "textChangingKeyEvents": 40,
+      "updateGroups": 40,
+      "groupedUpdates": 0,
+      "documentUTF16CountRange": [
+        1048598,
+        1048637
+      ],
+      "milliseconds": {
+        "keyDownToAppKitUpdate": {
+          "p50": 809.0358333138283,
+          "p95": 885.0383333337959,
+          "max": 889.266583340941
+        },
+        "keyDownToTextChangeDerived": {
+          "p50": 1.413041667547077,
+          "p95": 4.767875012475997,
+          "max": 5.905458325287327
+        },
+        "textChangeToAppKitUpdate": {
+          "p50": 807.5738750048913,
+          "p95": 883.896499988623,
+          "max": 888.0099166708533
+        }
+      }
+    }
+  ]
+}

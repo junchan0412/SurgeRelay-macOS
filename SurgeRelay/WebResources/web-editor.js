@@ -15,6 +15,8 @@
     let nameLookupSequence = 0;
     let autoFilledName = '';
     let manualNameEdited = false;
+    let resizeAnimation = null;
+    const groupAnimations = new WeakMap();
 
     if (!logic) throw new Error('web-logic.js must load before web-editor.js');
     if (!markup) throw new Error('web-markup.js must load before web-editor.js');
@@ -37,12 +39,15 @@
 
     async function animateAdvancedResize(expanded) {
       const dialog = ui.moduleDialog;
+      const beforeHeight = dialog?.open ? dialog.getBoundingClientRect().height : 0;
+      resizeAnimation?.cancel();
+      resizeAnimation = null;
+      if (dialog) dialog.style.height = '';
       if (!dialog?.open || !mobileLayout.matches || windowRef.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
         setAdvancedExpanded(expanded);
         return;
       }
 
-      const beforeHeight = dialog.getBoundingClientRect().height;
       const previousTransition = ui.advancedContent.style.transition;
       ui.advancedContent.style.transition = 'none';
       setAdvancedExpanded(expanded);
@@ -56,33 +61,40 @@
         [{ height: `${beforeHeight}px` }, { height: `${afterHeight}px` }],
         { duration: 280, easing: 'cubic-bezier(.2,.8,.2,1)' }
       );
+      resizeAnimation = animation;
       try { await animation.finished; } catch (_) {}
+      if (resizeAnimation !== animation) return;
+      resizeAnimation = null;
       dialog.style.height = '';
     }
 
     async function animateOptionGroup(group) {
-      if (!group || group.dataset.animating === 'true') return;
+      if (!group) return;
       const content = group.querySelector('.option-content');
       if (!content) return;
-      group.dataset.animating = 'true';
-      const opening = !group.open;
-      if (opening) {
-        content.style.height = '0px';
-        content.style.opacity = '0';
-        group.open = true;
-      }
-      const fullHeight = content.scrollHeight;
-      const animation = content.animate(
-        opening
-          ? [{ height: '0px', opacity: 0 }, { height: `${fullHeight}px`, opacity: 1 }]
-          : [{ height: `${fullHeight}px`, opacity: 1 }, { height: '0px', opacity: 0 }],
-        { duration: 220, easing: 'cubic-bezier(.2,.8,.2,1)' }
-      );
-      try { await animation.finished; } catch (_) {}
-      if (!opening) group.open = false;
+      const previous = groupAnimations.get(group);
+      const opening = previous ? !previous.opening : !group.open;
+      const beforeHeight = content.getBoundingClientRect().height;
+      previous?.animation.cancel();
+      groupAnimations.delete(group);
       content.style.height = '';
       content.style.opacity = '';
-      delete group.dataset.animating;
+      if (windowRef.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        group.open = opening;
+        return;
+      }
+      group.open = true;
+      const fullHeight = content.scrollHeight;
+      const animation = content.animate(
+        [{ height: `${beforeHeight}px`, opacity: previous ? 1 : opening ? 0 : 1 },
+          { height: `${opening ? fullHeight : 0}px`, opacity: opening ? 1 : 0 }],
+        { duration: 220, easing: 'cubic-bezier(.2,.8,.2,1)' }
+      );
+      groupAnimations.set(group, { animation, opening });
+      try { await animation.finished; } catch (_) {}
+      if (groupAnimations.get(group)?.animation !== animation) return;
+      groupAnimations.delete(group);
+      group.open = opening;
     }
 
     function updateNativeModuleState() {
@@ -132,6 +144,7 @@
 
     function outputFoldersForStorage(state, storageLocation) {
       const editor = state?.moduleEditor || {};
+      if (storageLocation === 'both') return [...new Set([...(editor.localOutputFolders || []), ...(editor.githubOutputFolders || [])])];
       return storageLocation === 'local'
         ? (editor.localOutputFolders || [])
         : (editor.githubOutputFolders || []);
@@ -143,6 +156,15 @@
       const requested = selected ?? form.outputFolder?.value ?? '';
       const nextSelected = preservingUnknown || folders.includes(requested) ? requested : '';
       populateOutputFolders(nextSelected, folders);
+    }
+
+    function updateRefreshPolicy() {
+      const form = formElements();
+      const custom = form.refreshIntervalMinutes?.value === 'custom';
+      const input = form.customRefreshIntervalMinutes;
+      if (input) { input.disabled = !custom; input.required = custom; }
+      const row = documentRef.querySelector?.('#custom-refresh-row');
+      if (row) row.hidden = !custom;
     }
 
     function populateModuleForm(module = null, context = {}) {
@@ -163,8 +185,20 @@
       if (form.outputFileName) form.outputFileName.value = module?.outputFileName || '';
       if (form.sourceURL) form.sourceURL.value = module?.sourceURL || '';
       if (form.sourceFormat) form.sourceFormat.value = module?.sourceFormat || 'automatic';
+      if (form.refreshIntervalMinutes) {
+        const minutes = module?.refreshIntervalMinutes;
+        const valid = Number.isInteger(minutes) && minutes >= 0 && minutes <= 10080;
+        const presets = [0, 5, 15, 60, 360, 1440];
+        const unknown = minutes != null && !valid;
+        form.refreshIntervalMinutes.innerHTML = '<option value="">继承全局</option>' + presets.map(value => `<option value="${value}">${logic.refreshIntervalTitle(value)}</option>`).join('') + '<option value="custom">自定义分钟</option>' + (unknown ? '<option value="unchanged">保留现有策略（未识别）</option>' : '');
+        form.refreshIntervalMinutes.value = unknown ? 'unchanged' : minutes == null ? '' : presets.includes(minutes) ? String(minutes) : 'custom';
+        if (form.customRefreshIntervalMinutes) form.customRefreshIntervalMinutes.value = valid && minutes > 0 ? String(minutes) : '60';
+        updateRefreshPolicy();
+      }
+
       if (form.storageLocation) {
-        form.storageLocation.value = module?.storageLocation
+        form.storageLocation.value = module?.storageTargets?.includes('local') && module?.storageTargets?.includes('gitHub')
+          ? 'both' : module?.storageTargets?.[0] || module?.storageLocation
           || context.state?.moduleEditor?.defaultStorageLocation
           || 'gitHub';
       }
@@ -185,11 +219,15 @@
 
     function collectModuleFields() {
       const form = formElements();
+      const interval = form.refreshIntervalMinutes?.value;
+      const minutes = Number(interval === 'custom' ? form.customRefreshIntervalMinutes?.value || NaN : interval);
       return {
+        ...(form.refreshIntervalMinutes && form.refreshIntervalMinutes.value !== 'unchanged' ? { refreshIntervalMinutes: interval === '' ? null : interval === 'custom' && minutes < 1 ? NaN : minutes } : {}),
         name: form.name?.value || '',
         sourceURL: form.sourceURL?.value || '',
         sourceFormat: form.sourceFormat?.value || 'automatic',
         storageLocation: form.storageLocation?.value || 'gitHub',
+        storageTargets: form.storageLocation?.value === 'both' ? ['local', 'gitHub'] : [form.storageLocation?.value || 'gitHub'],
         category: form.category?.value || '',
         iconURL: form.iconURL?.value || '',
         outputFolder: form.outputFolder?.value || '',
@@ -307,6 +345,7 @@
       outputFoldersForStorage,
       refreshOutputFolders,
       populateModuleForm,
+      updateRefreshPolicy,
       collectModuleFields,
       updateOutputPathPreview,
       updateIconURLPreview,

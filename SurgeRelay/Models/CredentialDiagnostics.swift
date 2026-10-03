@@ -102,10 +102,11 @@ struct CredentialDiagnosticSnapshot: Codable, Equatable, Sendable {
     static func current(
         githubTokenStatus: CredentialStorageStatus,
         webAccessTokenStatus: CredentialStorageStatus,
-        credentialProbe: LocalCredentialProbeSnapshot = .notChecked
+        credentialProbe: LocalCredentialProbeSnapshot = .notChecked,
+        storageDirectory: URL? = nil
     ) -> CredentialDiagnosticSnapshot {
         CredentialDiagnosticSnapshot(
-            storageLocation: LocalCredentialStore.defaultFileURL.path,
+            storageLocation: (storageDirectory?.appending(path: "credentials.encrypted") ?? LocalCredentialStore.defaultFileURL).path,
             probeState: credentialProbe.state,
             probeStatus: credentialProbe.state.title,
             probeMessage: credentialProbe.message,

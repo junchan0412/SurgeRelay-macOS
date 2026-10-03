@@ -3,6 +3,88 @@ import XCTest
 @testable import SurgeRelay
 
 final class ConfigurationMigrationTests: XCTestCase {
+    @MainActor
+    func testConfigurationWriterEncodesOffMainThreadAndPreservesWriteOrder() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let writer = ConfigurationPersistenceWriter(directory: root)
+        for value in 0..<8 { writer.enqueue(BackgroundEncodedSnapshot(value: value), fileName: "modules.json") }
+        try await writer.flush()
+        let saved = try JSONDecoder().decode([String: Int].self, from: Data(contentsOf: root.appending(path: "modules.json")))
+        XCTAssertEqual(saved["value"], 7)
+        let backups = try FileManager.default.contentsOfDirectory(at: root.appending(path: "Backups/modules.json"), includingPropertiesForKeys: nil)
+        XCTAssertEqual(backups.count, 7)
+    }
+
+    func testConfigurationWriterFlushRetriesFailedSnapshotWithoutLosingIt() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let failure = PersistenceFailureSwitch()
+        let writer = ConfigurationPersistenceWriter(directory: root) { data, url in
+            if failure.shouldFail { throw CocoaError(.fileWriteOutOfSpace) }
+            try data.write(to: url, options: .atomic)
+        }
+        writer.enqueue(["value": 1], fileName: "selected-publish.json")
+        do { try await writer.flush(); XCTFail("Flush must report the failed write") }
+        catch { XCTAssertTrue(error.localizedDescription.contains("selected-publish.json")) }
+        failure.allowWrites()
+        try await writer.flush()
+        let saved = try JSONDecoder().decode([String: Int].self, from: Data(contentsOf: root.appending(path: "selected-publish.json")))
+        XCTAssertEqual(saved["value"], 1)
+        writer.enqueue(["value": 2], fileName: "selected-publish.json")
+        try await writer.flush()
+        let latest = try JSONDecoder().decode([String: Int].self, from: Data(contentsOf: root.appending(path: "selected-publish.json")))
+        XCTAssertEqual(latest["value"], 2)
+    }
+
+    func testConfigurationWriterQueuesEditsDuringMigrationIntoNewDirectory() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appending(path: "source", directoryHint: .isDirectory)
+        let destination = root.appending(path: "destination", directoryHint: .isDirectory)
+        let versions = source.appending(path: "ModuleVersions/module/version", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: versions, withIntermediateDirectories: true)
+        try Data("historical content".utf8).write(to: versions.appending(path: "Content.module"))
+        let writer = ConfigurationPersistenceWriter(directory: source)
+        writer.enqueue(["value": 1], fileName: "modules.json")
+        let enteredCommit = expectation(description: "migration reached directory switch")
+        let releaseCommit = DispatchSemaphore(value: 0)
+        let migration = Task {
+            try await writer.migrate(to: destination) { _ in
+                enteredCommit.fulfill()
+                releaseCommit.wait()
+            }
+        }
+        await fulfillment(of: [enteredCommit], timeout: 3)
+        writer.enqueue(["value": 2], fileName: "modules.json")
+        releaseCommit.signal()
+        _ = try await migration.value
+        try await writer.flush()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: source.appending(path: "modules.json").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: source.appending(path: "ModuleVersions").path))
+        let saved = try JSONDecoder().decode([String: Int].self, from: Data(contentsOf: destination.appending(path: "modules.json")))
+        XCTAssertEqual(saved["value"], 2)
+        XCTAssertEqual(try String(contentsOf: destination.appending(path: "ModuleVersions/module/version/Content.module"), encoding: .utf8), "historical content")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: destination.appending(path: "Backups/modules.json").path))
+    }
+
+    func testConfigurationWriterDoesNotMigrateAfterAnUnrecoverableWriteFailure() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appending(path: "source", directoryHint: .isDirectory)
+        let destination = root.appending(path: "destination", directoryHint: .isDirectory)
+        let writer = ConfigurationPersistenceWriter(directory: source) { _, _ in throw CocoaError(.fileWriteNoPermission) }
+        writer.enqueue(["value": 1], fileName: "modules.json")
+        do {
+            _ = try await writer.migrate(to: destination) { _ in XCTFail("Failed snapshots must prevent directory switching") }
+            XCTFail("Migration must fail when a queued snapshot cannot be saved")
+        } catch {}
+        let current = await writer.currentDirectory()
+        XCTAssertEqual(current, source)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+    }
+
     func testConfigurationMigrationCopiesRegistryHistoryBackupsAndOverrides() throws {
         let root = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
@@ -110,4 +192,21 @@ final class ConfigurationMigrationTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: source.appending(path: "Sgmodule/Original.sgmodule"), encoding: .utf8), "module")
         XCTAssertEqual(try String(contentsOf: source.appending(path: "Surge.conf"), encoding: .utf8), "surge")
     }
+}
+
+private struct BackgroundEncodedSnapshot: Encodable, Sendable {
+    let value: Int
+    func encode(to encoder: any Encoder) throws {
+        XCTAssertFalse(Thread.isMainThread)
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(value, forKey: .value)
+    }
+    private enum CodingKeys: String, CodingKey { case value }
+}
+
+private final class PersistenceFailureSwitch: @unchecked Sendable {
+    private let lock = NSLock()
+    private var fails = true
+    var shouldFail: Bool { lock.withLock { fails } }
+    func allowWrites() { lock.withLock { fails = false } }
 }

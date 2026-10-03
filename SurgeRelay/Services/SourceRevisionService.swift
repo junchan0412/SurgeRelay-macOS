@@ -12,7 +12,15 @@ actor SourceRevisionService {
         try Task.checkCancellation()
         guard let url = URL(string: module.updateSourceURL) else { throw RelayError.invalidSourceURL }
         if url.isFileURL {
-            return revision(for: try Self.readLocalSource(url), module: module, hasCache: hasCache)
+            let started = ContinuousClock.now
+            do {
+                let data = try Self.readLocalSource(url)
+                StageMetricsContext.current?.record(StageMetric(stage: .cache, duration: StageMetricsRecorder.elapsed(since: started), bytesRead: Int64(data.count), reason: "读取本地来源"))
+                return revision(for: data, module: module, hasCache: hasCache)
+            } catch {
+                StageMetricsContext.current?.record(StageMetric(stage: .cache, duration: StageMetricsRecorder.elapsed(since: started), failedAttempts: 1, result: .failed, reason: "本地来源读取失败", isPartial: true))
+                throw error
+            }
         }
         guard ["http", "https"].contains(url.scheme?.lowercased()) else { throw RelayError.invalidSourceURL }
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: 45)
@@ -21,10 +29,11 @@ actor SourceRevisionService {
             if let etag = module.sourceETag { request.setValue(etag, forHTTPHeaderField: "If-None-Match") }
             if let modified = module.sourceLastModified { request.setValue(modified, forHTTPHeaderField: "If-Modified-Since") }
         }
-        let (data, response) = try await httpClient.data(for: request)
+        let (data, response) = try await fetchSource(request)
         guard let http = response as? HTTPURLResponse else {
             throw RelayError.invalidOutput("来源没有返回有效的 HTTP 响应。")
         }
+        if let retryAfter = SourceRetryAfterError.response(http, requestedURL: url) { throw retryAfter }
         if http.statusCode == 304, hasCache, let hash = module.sourceContentHash {
             return .unchanged(SourceRevisionSnapshot(
                 etag: http.value(forHTTPHeaderField: "ETag") ?? module.sourceETag,
@@ -41,6 +50,20 @@ actor SourceRevisionService {
         return revision(for: data, module: module, hasCache: hasCache, response: http)
     }
 
+    private func fetchSource(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        let started = ContinuousClock.now
+        var bytes: Int64?
+        var status: Int?
+        var failure: (any Error)?
+        defer { StageMetricsContext.current?.recordDownload(since: started, bytesRead: bytes, statusCode: status, error: failure) }
+        do {
+            let response = try await httpClient.data(for: request)
+            bytes = Int64(response.0.count)
+            status = (response.1 as? HTTPURLResponse)?.statusCode
+            return response
+        } catch { failure = error; throw error }
+    }
+
     nonisolated static func readLocalSource(_ url: URL) throws -> Data {
         let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
         guard size > 0, size <= maximumSourceSize else {
@@ -54,6 +77,8 @@ actor SourceRevisionService {
     }
 
     private func revision(for data: Data, module: RelayModule, hasCache: Bool, response: HTTPURLResponse? = nil) -> SourceRevisionResult {
+        let started = ContinuousClock.now
+        defer { StageMetricsContext.current?.record(StageMetric(stage: .conversion, duration: StageMetricsRecorder.elapsed(since: started), reason: "来源指纹")) }
         let snapshot = SourceRevisionSnapshot(
             etag: response?.value(forHTTPHeaderField: "ETag"),
             lastModified: response?.value(forHTTPHeaderField: "Last-Modified"),

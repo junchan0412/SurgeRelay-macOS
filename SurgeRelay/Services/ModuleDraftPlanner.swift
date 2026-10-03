@@ -152,6 +152,7 @@ enum ModuleDraftPlanner {
             customIconURL: normalizedDraft.customIconURL,
             detectedSourceFormat: normalizedDraft.detectedSourceFormat
         )
+        module.refreshIntervalMinutes = draft.refreshIntervalMinutes
         if module.scriptHubSubscription == nil {
             module.scriptHubSubscription = ModuleMetadataParser.scriptHubSubscription(
                 from: normalizedDraft.source
@@ -182,7 +183,8 @@ enum ModuleDraftPlanner {
             throw RelayError.duplicateSourceURL
         }
 
-        let hasChanges = current.name != normalizedDraft.name ||
+        let hasChanges = current.refreshIntervalMinutes != draft.refreshIntervalMinutes ||
+            current.name != normalizedDraft.name ||
             current.sourceURL != normalizedDraft.source ||
             current.sourceFormat != draft.sourceFormat ||
             current.outputFileName != normalizedDraft.outputFileName ||
@@ -213,6 +215,7 @@ enum ModuleDraftPlanner {
         let customIconChanged = current.customIconURL != normalizedDraft.customIconURL
         var module = current
         module.name = normalizedDraft.name
+        module.refreshIntervalMinutes = draft.refreshIntervalMinutes
         module.sourceURL = normalizedDraft.source
         module.sourceFormat = draft.sourceFormat
         module.outputFileName = normalizedDraft.outputFileName
@@ -229,11 +232,17 @@ enum ModuleDraftPlanner {
         module.detectedSourceFormat = normalizedDraft.detectedSourceFormat
         if sourceChanged {
             clearSourceRevisionState(&module)
+            module.lastRefreshAttemptAt = nil
+            ModuleRefreshPlanner.clearFailureState(&module)
         }
         if module.scriptHubSubscription == nil {
             module.scriptHubSubscription = ModuleMetadataParser.scriptHubSubscription(
                 from: normalizedDraft.source
             )
+        }
+        if sourceChanged, ModuleSourceIdentity.matches(current.updateSourceURL, module.updateSourceURL) {
+            module.serverRetryAfter = current.serverRetryAfter
+            module.serverRetrySourceURL = current.serverRetrySourceURL
         }
         if sourceChanged || customIconChanged {
             module.iconURL = normalizedDraft.customIconURL

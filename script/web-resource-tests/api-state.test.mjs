@@ -168,7 +168,7 @@ const eventController = stateHelpers.createStateEventController({
   reconnectDelay: 25
 });
 eventController.start();
-assert.equal(eventSource.url, '/api/events');
+assert.equal(eventSource.url, '/api/events?activity=1');
 eventSource.listeners.get('state')({ data: '{"modules":[]}' });
 assert.equal(appliedStates[0][0].modules.length, 0);
 assert.equal(appliedStates[0][1], false);

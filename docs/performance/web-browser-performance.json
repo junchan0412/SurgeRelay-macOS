@@ -1,0 +1,235 @@
+{
+  "timestamp": "2026-10-02T02:03:24.647Z",
+  "phase": "performance",
+  "environment": {
+    "platform": "darwin",
+    "release": "27.2.0",
+    "cpu": "Apple M4",
+    "cpuCount": 10,
+    "ramBytes": 17179869184,
+    "node": "v26.10.0",
+    "browser": "154.0.8037.93",
+    "headless": true,
+    "macOS": "27.2"
+  },
+  "method": "Current WebResources in installed Chrome; isolated 127.0.0.1 ephemeral HTTP fixture and in-memory API. No real Surge/GitHub backend. Filter timing is synchronous DOM input dispatch through two requestAnimationFrame callbacks (next paint opportunity). Each 30-sample batch includes alternating restrictive and full-list searches. Scroll is scripted real scrollTop over 180 rAF frames. Longtasks observed at browser main thread. JS heap is Chromium performance.memory, not whole-process RSS.",
+  "acceptance": [],
+  "measurements": [
+    {
+      "count": 100,
+      "renderedRows": 100,
+      "filterNextPaintMs": {
+        "p50": 33.19999998807907,
+        "p95": 34.80000001192093,
+        "max": 34.80000001192093,
+        "samples": [
+          34.80000001192093,
+          31.69999998807907,
+          32.599999994039536,
+          33.19999998807907,
+          33.79999998211861,
+          34.70000001788139,
+          33,
+          34.400000005960464,
+          32.400000005960464,
+          33.69999998807907,
+          34.80000001192093,
+          32.599999994039536,
+          32.599999994039536,
+          32.29999998211861,
+          32.900000005960464,
+          34.60000002384186,
+          31.599999994039536,
+          33.80000001192093,
+          32.5,
+          33.60000002384186,
+          34.60000002384186,
+          31.400000005960464,
+          34.400000005960464,
+          33.29999998211861,
+          31.599999994039536,
+          34.70000001788139,
+          31.599999994039536,
+          34.29999998211861,
+          32.29999998211861,
+          33.5
+        ]
+      },
+      "filterSynchronousMs": {
+        "p50": 1.199999988079071,
+        "p95": 2.4000000059604645,
+        "max": 2.5
+      },
+      "scrollFrameIntervalsMs": {
+        "p50": 16.699999999999818,
+        "p95": 16.799999999999727,
+        "max": 16.800000000000182,
+        "over33ms": 0,
+        "samples": 180
+      },
+      "longTasks": {
+        "count": 0,
+        "maxMs": 0,
+        "totalMs": 0,
+        "entries": []
+      },
+      "jsHeap": {
+        "used": 2904817,
+        "total": 8718541,
+        "limit": 4395630592
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 900,
+        "devicePixelRatio": 1
+      },
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36"
+    },
+    {
+      "count": 1000,
+      "renderedRows": 1000,
+      "filterNextPaintMs": {
+        "p50": 33.20000001788139,
+        "p95": 34.69999998807907,
+        "max": 34.79999998211861,
+        "samples": [
+          32.5,
+          32.69999998807907,
+          34.79999998211861,
+          32.20000001788139,
+          34,
+          32.599999994039536,
+          33.69999998807907,
+          34.69999998807907,
+          32.70000001788139,
+          33.900000005960464,
+          33.20000001788139,
+          33.79999998211861,
+          33,
+          32.30000001192093,
+          34.599999994039536,
+          33.900000005960464,
+          33.39999997615814,
+          34.69999998807907,
+          32.19999998807907,
+          32.60000002384186,
+          32.19999998807907,
+          32,
+          34.19999998807907,
+          33.30000001192093,
+          32.599999994039536,
+          32.599999994039536,
+          33.69999998807907,
+          34.19999998807907,
+          32.70000001788139,
+          34.099999994039536
+        ]
+      },
+      "filterSynchronousMs": {
+        "p50": 4.699999988079071,
+        "p95": 11.599999994039536,
+        "max": 14
+      },
+      "scrollFrameIntervalsMs": {
+        "p50": 16.699999999999818,
+        "p95": 16.700000000000273,
+        "max": 16.800000000000182,
+        "over33ms": 0,
+        "samples": 180
+      },
+      "longTasks": {
+        "count": 0,
+        "maxMs": 0,
+        "totalMs": 0,
+        "entries": []
+      },
+      "jsHeap": {
+        "used": 3182621,
+        "total": 19871393,
+        "limit": 4395630592
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 900,
+        "devicePixelRatio": 1
+      },
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36"
+    },
+    {
+      "count": 5000,
+      "renderedRows": 5000,
+      "filterNextPaintMs": {
+        "p50": 34.70000001788139,
+        "p95": 51.599999994039536,
+        "max": 51.70000001788139,
+        "samples": [
+          32.5,
+          51,
+          33.80000001192093,
+          50.099999994039536,
+          32.5,
+          50.89999997615814,
+          34.69999998807907,
+          49.5,
+          32.69999998807907,
+          51.599999994039536,
+          32.5,
+          49,
+          33.5,
+          49.79999998211861,
+          33.60000002384186,
+          50.89999997615814,
+          34.70000001788139,
+          50.099999994039536,
+          33.60000002384186,
+          50.099999994039536,
+          32.69999998807907,
+          49.099999994039536,
+          34.400000005960464,
+          49.79999998211861,
+          31.69999998807907,
+          50.900000005960464,
+          34.69999998807907,
+          49,
+          33.5,
+          51.70000001788139
+        ]
+      },
+      "filterSynchronousMs": {
+        "p50": 11.400000005960464,
+        "p95": 26.700000017881393,
+        "max": 26.799999982118607
+      },
+      "scrollFrameIntervalsMs": {
+        "p50": 16.699999999999818,
+        "p95": 16.799999999999727,
+        "max": 16.800000000000182,
+        "over33ms": 0,
+        "samples": 180
+      },
+      "longTasks": {
+        "count": 1,
+        "maxMs": 62,
+        "totalMs": 62,
+        "entries": [
+          {
+            "startTime": 804.7000000178814,
+            "duration": 62
+          }
+        ]
+      },
+      "jsHeap": {
+        "used": 8089125,
+        "total": 72824481,
+        "limit": 4395630592
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 900,
+        "devicePixelRatio": 1
+      },
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36"
+    }
+  ],
+  "errors": []
+}

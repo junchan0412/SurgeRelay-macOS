@@ -20,18 +20,18 @@ const appSource = readFileSync(new URL('SurgeRelay/WebResources/app.js', root), 
 
 const requiredIDs = [
   'module-list', 'summary-row', 'summary-subtitle', 'detail-content', 'search-input', 'clear-search', 'search-status',
-  'filter-row', 'failure-filter', 'add-button', 'refresh-button', 'mobile-back', 'mobile-title', 'activity-status',
-  'activity-percent', 'progress-track', 'progress-fill', 'activity-cancel', 'latest-update',
+  'filter-row', 'failure-filter', 'add-button', 'refresh-button', 'mobile-back', 'mobile-title', 'workspace-name', 'mobile-workspace-name', 'activity-status',
+  'activity-stages', 'activity-percent', 'progress-track', 'progress-fill', 'activity-cancel', 'latest-update',
   'module-dialog', 'module-dialog-message', 'module-form', 'icon-url-preview',
   'output-path-preview', 'output-path-note', 'dialog-title', 'save-module-button',
   'advanced-master', 'advanced-master-content', 'advanced-options', 'native-module-note',
   'confirm-dialog', 'confirm-title', 'confirm-message', 'confirm-cancel', 'confirm-accept',
-  'toast'
+  'operation-dialog', 'operation-title', 'operation-content', 'operation-close', 'custom-refresh-row', 'toast'
 ];
 
 const requiredFormNames = [
   'name', 'category', 'iconURL', 'storageLocation', 'outputFolder', 'outputFileName',
-  'isEnabled', 'publishesStandalone', 'sourceURL', 'sourceFormat'
+  'isEnabled', 'publishesStandalone', 'sourceURL', 'sourceFormat', 'refreshIntervalMinutes', 'customRefreshIntervalMinutes'
 ];
 
 for (const id of requiredIDs) {
@@ -184,6 +184,18 @@ class FakeForm extends FakeElement {
 }
 
 class FakeDocument {
+  listeners = new Map();
+
+  addEventListener(type, callback) {
+    const listeners = this.listeners.get(type) || [];
+    listeners.push(callback);
+    this.listeners.set(type, listeners);
+  }
+
+  removeEventListener(type, callback) {
+    this.listeners.set(type, (this.listeners.get(type) || []).filter(listener => listener !== callback));
+  }
+
   constructor() {
     this.elementsByID = new Map();
     this.switchRows = new Map();
@@ -247,7 +259,7 @@ class FakeDocument {
   }
 }
 
-const selectFieldNames = new Set(['storageLocation', 'outputFolder', 'sourceFormat']);
+const selectFieldNames = new Set(['storageLocation', 'outputFolder', 'sourceFormat', 'refreshIntervalMinutes']);
 const checkboxFieldNames = new Set(['isEnabled', 'publishesStandalone']);
 
 function elementTagName(id) {
@@ -410,6 +422,8 @@ class FakeEventSource {
 
 const document = new FakeDocument();
 const capturedRequests = [];
+const copiedHistory = [];
+let finishWorkspaceRequest;
 const context = vm.createContext({
   console,
   document,
@@ -420,7 +434,7 @@ const context = vm.createContext({
     pushState(state) { this.state = state; },
     back() {}
   },
-  navigator: { clipboard: { writeText: async () => {} } },
+  navigator: { clipboard: { writeText: async text => copiedHistory.push(text) } },
   URL,
   Headers,
   Intl,
@@ -430,6 +444,7 @@ const context = vm.createContext({
   clearInterval: () => {},
   fetch: async (path, options = {}) => {
     capturedRequests.push({ path: String(path), options });
+    if (path === '/api/slow-write') return new Promise(resolve => { finishWorkspaceRequest = () => resolve(fakeJSONResponse({ message: 'old result' })); });
     if (path === '/api/state') return fakeJSONResponse(fakeState());
     if (String(path).endsWith('/arguments')) return fakeJSONResponse({ arguments: [], help: null });
     if (path === '/api/session') return fakeJSONResponse({ message: 'ok' });
@@ -507,6 +522,8 @@ assert.match(list.innerHTML, /Clean Module/, 'clearing search should restore cur
 document.querySelector('#add-button').dispatch('click');
 const form = document.querySelector('#module-form').elements;
 assert.equal(form.storageLocation.value, 'gitHub');
+assert.equal(document.querySelector('#workspace-name').textContent, '默认工作区');
+assert.equal(document.querySelector('#mobile-workspace-name').textContent, '默认工作区');
 assert.match(form.outputFolder.innerHTML, /Ads\/Video/);
 assert.doesNotMatch(form.outputFolder.innerHTML, /Local/);
 form.name.value = 'YouTube Ads';
@@ -541,6 +558,15 @@ const note = document.querySelector('#output-path-note');
 assert.equal(note.hidden, false);
 assert.match(note.textContent, /不会写出这个独立模块文件/);
 
+form.storageLocation.value = 'both';
+form.storageLocation.dispatch('change');
+assert.match(form.outputFolder.innerHTML, /Local/);
+assert.match(form.outputFolder.innerHTML, /Ads\/Video/);
+assert.equal(document.querySelector('#output-path-preview').textContent, 'Local/YouTube Ads.sgmodule');
+form.refreshIntervalMinutes.value = 'custom';
+form.refreshIntervalMinutes.dispatch('change');
+assert.equal(document.querySelector('#custom-refresh-row').hidden, false);
+form.customRefreshIntervalMinutes.value = '37';
 form.category.value = 'Ads';
 form.sourceFormat.value = 'quantumultX';
 form.iconURL.value = 'https://example.com/icon.png';
@@ -551,10 +577,12 @@ await flushAsync();
 const saveRequest = capturedRequests.find(request => request.path === '/api/modules' && request.options.method === 'POST');
 assert.ok(saveRequest, 'submitting the add-module form should post to /api/modules');
 assert.deepEqual(JSON.parse(saveRequest.options.body), {
+  refreshIntervalMinutes: 37,
   name: 'YouTube Ads',
   sourceURL: 'https://example.com/plugin.lpx',
   sourceFormat: 'quantumultX',
   storageLocation: 'local',
+  storageTargets: ['local', 'gitHub'],
   category: 'Ads',
   iconURL: 'https://example.com/icon.png',
   outputFolder: 'Local',
@@ -564,6 +592,114 @@ assert.deepEqual(JSON.parse(saveRequest.options.body), {
   scriptHubOptions: JSON.parse(JSON.stringify(context.SurgeRelayWebOptions.scriptHubDefaults))
 });
 
+const updateCount = () => capturedRequests.filter(request => request.path === '/api/modules/module-1/update').length;
+vm.runInContext("selectedID = 'module-1'; state.modules[0].serverRetryAfter = new Date(Date.now() + 60000).toISOString()", context);
+const beforeCooldownUpdate = updateCount();
+await vm.runInContext("handleDetailClick({target:{closest:()=>({dataset:{action:'update-module'}})}})", context);
+assert.equal(updateCount(), beforeCooldownUpdate, 'manual updates do not send requests during server cooldown');
+vm.runInContext("state.modules[0].serverRetryAfter = null; state.modules[0].nextRetryAt = new Date(Date.now() + 60000).toISOString()", context);
+await vm.runInContext("handleDetailClick({target:{closest:()=>({dataset:{action:'update-module'}})}})", context);
+assert.equal(updateCount(), beforeCooldownUpdate + 1, 'ordinary backoff does not prevent a manual update');
+context.workspaceState = { ...fakeState(), workspace: { id: 'A', name: 'Workspace A', isLegacyDefault: false } };
+await vm.runInContext('applyState(workspaceState, false, true)', context);
+await vm.runInContext('api("/api/modules/module-1/update", {method:"POST"})', context);
+assert.equal(capturedRequests.at(-1).options.headers.get('X-Relay-Workspace'), 'A');
+await vm.runInContext('api("/api/source/name", {method:"POST", json:{url:"https://example.com/source"}})', context);
+assert.equal(capturedRequests.at(-1).options.headers.get('X-Relay-Workspace'), null);
+const oldRequest = vm.runInContext('api("/api/slow-write", {method:"POST"})', context);
+assert.equal(capturedRequests.at(-1).options.headers.get('X-Relay-Workspace'), 'A', 'request header captures its originating workspace');
+context.workspaceState = { ...fakeState(), workspace: { id: 'B', name: 'Workspace B', isLegacyDefault: false } };
+vm.runInContext("selectedID='module-1'; editingID='module-1'; ui.search.value='old filter'; detailController.setTab('preview')", context);
+await vm.runInContext('applyState(workspaceState, false, true)', context);
+finishWorkspaceRequest();
+await assert.rejects(oldRequest, /旧请求结果已忽略/);
+assert.equal(vm.runInContext('selectedID', context), 'overview');
+assert.match(document.querySelector('#module-list').innerHTML, /Block HTTPDNS/, 'same IDs in the new workspace rebuild real sidebar rows after cache reset');
+assert.equal(vm.runInContext('editingID', context), null);
+assert.equal(vm.runInContext('ui.search.value', context), '');
+assert.equal(vm.runInContext('detailController.getTab()', context), 'info');
+assert.match(document.querySelector('#toast').textContent, /已切换工作区：Workspace B/);
+assert.equal(document.querySelector('#workspace-name').textContent, 'Workspace B');
+assert.equal(document.querySelector('#mobile-workspace-name').title, 'Workspace B');
+await vm.runInContext('api("/api/modules/module-1/update", {method:"POST"})', context);
+assert.equal(capturedRequests.at(-1).options.headers.get('X-Relay-Workspace'), 'B');
+context.workspaceState = fakeState();
+await vm.runInContext('applyState(workspaceState, false, true)', context);
+assert.equal(vm.runInContext('state.workspace.id', context), 'B', 'after identity is known, an unscoped state cannot revert to legacy data');
+context.workspaceState = { ...fakeState(), workspace: { id: 'B', name: '很长的工作区 <name> '.repeat(20), isLegacyDefault: false } };
+await vm.runInContext('applyState(workspaceState, false, true)', context);
+assert.equal(document.querySelector('#workspace-name').textContent, context.workspaceState.workspace.name.trim());
+assert.equal(document.querySelector('#workspace-name').title, context.workspaceState.workspace.name.trim());
+assert.equal(document.querySelector('#mobile-workspace-name').textContent, context.workspaceState.workspace.name.trim());
+vm.runInContext("state.workspace.recentHistory=[{moduleName:'Copied metrics',duration:2,stageMetrics:[{stage:'conversion',duration:3,attempts:1,failedAttempts:0,result:'completed',includesDownload:true,isPartial:true}]}]; selectedID='activity'; detailController.resetWorkspace()", context);
+await vm.runInContext("handleDetailClick({target:{closest:()=>({dataset:{action:'copy-history',historyIndex:'0'},innerHTML:'复制记录',classList:{add(){},remove(){}}})}})", context);
+assert.match(copiedHistory.at(-1), /转换\/下载（未拆分）/);
+assert.match(copiedHistory.at(-1), /总耗时（记录）：2.00 秒/);
+assert.match(copiedHistory.at(-1), /读取内容字节：未采集/);
+const fullStateRequestsBeforeActivity = capturedRequests.filter(request => request.path === '/api/state').length;
+const moduleRowsBeforeActivity = document.querySelector('#module-list').innerHTML;
+const moduleReferenceBeforeActivity = vm.runInContext('state.modules', context);
+await vm.runInContext("applyActivity({isWorking:true,kind:'updatingModules',progress:.25,completedCount:1,totalCount:4,activeStages:[{moduleID:'module-1',moduleName:'One',stage:'download'}]}, {source:'sse',workspaceID:'B'})", context);
+assert.equal(document.querySelector('#activity-percent').textContent, '1/4');
+assert.equal(document.querySelector('#activity-stages').textContent, '下载 1');
+await vm.runInContext("applyActivity({isWorking:false,kind:'idle',progress:1}, {source:'sse',workspaceID:'B'})", context);
+await flushAsync();
+assert.equal(capturedRequests.filter(request => request.path === '/api/state').length, fullStateRequestsBeforeActivity, 'SSE completion does not request another full module snapshot');
+assert.equal(document.querySelector('#module-list').innerHTML, moduleRowsBeforeActivity);
+assert.equal(vm.runInContext('state.modules', context), moduleReferenceBeforeActivity, 'activity updates retain the existing module collection');
+await vm.runInContext("applyActivity({isWorking:true,kind:'updatingModules',progress:.99}, {source:'sse',workspaceID:'A'})", context);
+assert.equal(vm.runInContext('state.activity.kind', context), 'idle', 'old workspace activity cannot mutate the active UI');
+context.versionedState = { ...fakeState(), workspace: { id: 'B', name: 'Workspace B', isLegacyDefault: false }, runtimeID: 'runtime-1', revision: 10, activity: { ...fakeState().activity, isWorking: true, progress: .1 } };
+await vm.runInContext('applyState(versionedState, false, true)', context);
+vm.runInContext("applyActivity({isWorking:true,kind:'updatingModules',progress:.3},{source:'sse',workspaceID:'B',runtimeID:'runtime-1',revision:30})", context);
+context.versionedState = { ...context.versionedState, modules: context.versionedState.modules.map((module, index) => index ? module : { ...module, name: 'Core revision 20' }), revision: 20, activity: { ...context.versionedState.activity, progress: .2 } };
+await vm.runInContext('applyState(versionedState, false, false)', context);
+assert.equal(vm.runInContext('state.activity.progress', context), .3, 'late full-state activity cannot replace a newer SSE activity revision');
+assert.equal(vm.runInContext('state.modules[0].name', context), 'Core revision 20', 'newer core data is accepted even when its revision precedes the latest activity');
+assert.equal(await vm.runInContext('applyState(versionedState, false, false)', context), true, 'duplicate cached state on reconnect is accepted without reverting progress');
+context.versionedState = { ...context.versionedState, runtimeID: 'runtime-2', revision: 1, activity: { ...context.versionedState.activity, progress: .01 } };
+await vm.runInContext('applyState(versionedState, false, false)', context);
+vm.runInContext("applyActivity({isWorking:true,progress:.99},{source:'sse',workspaceID:'B',runtimeID:'runtime-1',revision:99})", context);
+assert.equal(vm.runInContext('state.activity.progress', context), .01);
+context.versionedState = { ...context.versionedState, runtimeID: 'runtime-1', revision: 100 };
+assert.equal(await vm.runInContext('applyState(versionedState, false, false)', context), false, 'retired runtime full-state callback is rejected');
+assert.equal(vm.runInContext('state.runtimeID', context), 'runtime-2');
+let finishActivityPoll;
+context.activityPollResponse = new Promise(resolve => { finishActivityPoll = resolve; });
+vm.runInContext(`
+  var savedEventSource = EventSource; EventSource = undefined;
+  var activityPollCallback;
+  var revisionPoller = SurgeRelayWebState.createStateEventController({
+    document: { hidden: false }, getWorkspaceID: () => currentWorkspace.id, getRuntimeID: () => currentRuntimeID,
+    isWorking: () => true, loadState: async () => {}, applyState() {},
+    fetchActivity: () => activityPollResponse, applyActivity: (value, metadata) => applyActivity(value, metadata),
+    setInterval(callback, delay) { if (delay === 1000) activityPollCallback = callback; return delay; }, clearInterval() {}
+  });
+  EventSource = savedEventSource;
+  revisionPoller.start(); activityPollCallback();
+`, context);
+await flushAsync();
+context.versionedState = { ...context.versionedState, runtimeID: 'runtime-2', revision: 40, activity: { ...fakeState().activity, isWorking: true, progress: .4 } };
+await vm.runInContext('applyState(versionedState, false, false)', context);
+finishActivityPoll({ workspaceID: 'B', runtimeID: 'runtime-2', revision: 20, isWorking: true, progress: .2 });
+await flushAsync();
+assert.equal(vm.runInContext('state.activity.progress', context), .4, 'older same-runtime poll cannot overwrite a newer full HTTP snapshot');
+context.activityPollResponse = new Promise(resolve => { finishActivityPoll = resolve; });
+vm.runInContext('activityPollCallback()', context); await flushAsync();
+vm.runInContext("applyActivity({isWorking:true,progress:.6},{source:'sse',workspaceID:'B',runtimeID:'runtime-2',revision:60})", context);
+finishActivityPoll({ workspaceID: 'B', runtimeID: 'runtime-2', revision: 45, isWorking: true, progress: .45 });
+await flushAsync();
+assert.equal(vm.runInContext('state.activity.progress', context), .6, 'older same-runtime poll cannot overwrite newer SSE progress');
+context.activityPollResponse = Promise.resolve({ workspaceID: 'B', runtimeID: 'runtime-2', revision: 61, isWorking: true, progress: .61 });
+vm.runInContext('activityPollCallback()', context); await flushAsync();
+assert.equal(vm.runInContext('state.activity.progress', context), .61);
+context.activityPollResponse = Promise.resolve({ workspaceID: 'B', runtimeID: 'retired-runtime', revision: 99, isWorking: true, progress: .99 });
+vm.runInContext('activityPollCallback()', context); await flushAsync();
+assert.equal(vm.runInContext('state.activity.progress', context), .61, 'poll response metadata must match the captured runtime');
+context.activityPollResponse = Promise.resolve({ isWorking: true, progress: .7 });
+vm.runInContext('activityPollCallback()', context); await flushAsync();
+assert.equal(vm.runInContext('state.activity.progress', context), .7, 'legacy flat activity without metadata still uses request-generation compatibility');
+vm.runInContext('revisionPoller.close()', context);
 console.log('Web DOM resource tests passed');
 
 async function flushAsync() {

@@ -493,3 +493,91 @@ final class PublishPlannerTests: XCTestCase {
     }
 
 }
+
+@MainActor
+final class SelectedPublishRecoveryTests: XCTestCase {
+    func testPartialFailureRetriesOnlyUnfinishedDestination() async {
+        let attempt = SelectedPublishAttempt(moduleIDs: [UUID()], results: [
+            PublishTargetResult(destination: .local, target: "/tmp/output"),
+            PublishTargetResult(destination: .gitHub, target: "owner/repo/main/modules")
+        ])
+        var calls: [PublishDestination] = []
+        let first = await PublishCoordinator.executeSelected(
+            attempt: attempt, destinations: [.local, .gitHub], isCancelled: { false },
+            publish: { destination in
+                calls.append(destination)
+                if destination == .gitHub { throw URLError(.notConnectedToInternet) }
+                return PublishReport(publishedFiles: ["Local.sgmodule"])
+            }, didComplete: { _, _ in }
+        )
+        XCTAssertEqual(first.results.map(\.status), [.succeeded, .failed])
+        XCTAssertEqual(first.retryDestinations, [.gitHub])
+        XCTAssertFalse(first.succeeded)
+        let second = await PublishCoordinator.executeSelected(
+            attempt: first, destinations: first.retryDestinations, isCancelled: { false },
+            publish: { destination in
+                calls.append(destination)
+                return PublishReport(publishedFiles: ["Remote.sgmodule"], commitSHA: "commit")
+            }, didComplete: { _, _ in }
+        )
+        XCTAssertEqual(calls, [.local, .gitHub, .gitHub])
+        XCTAssertTrue(second.succeeded)
+        XCTAssertEqual(second.results[0].publishedFiles, ["Local.sgmodule"])
+    }
+
+    func testLocalFailureStillAttemptsIndependentGitHubTarget() async {
+        let attempt = SelectedPublishAttempt(moduleIDs: [UUID()], results: [
+            PublishTargetResult(destination: .local, target: "/tmp/output"),
+            PublishTargetResult(destination: .gitHub, target: "repo")
+        ])
+        let result = await PublishCoordinator.executeSelected(
+            attempt: attempt, destinations: [.local, .gitHub], isCancelled: { false },
+            publish: { destination in
+                if destination == .local { throw CocoaError(.fileWriteNoPermission) }
+                return PublishReport(publishedFiles: [])
+            }, didComplete: { _, _ in }
+        )
+        XCTAssertEqual(result.results.map(\.status), [.failed, .succeeded])
+        XCTAssertEqual(result.retryDestinations, [.local])
+    }
+
+    func testCancellationPreservesCompletedTargetAndStopsRemainingWork() async throws {
+        let attempt = SelectedPublishAttempt(moduleIDs: [UUID()], results: [
+            PublishTargetResult(destination: .local, target: "local"),
+            PublishTargetResult(destination: .gitHub, target: "remote")
+        ])
+        var cancelled = false
+        var calls = 0
+        let result = await PublishCoordinator.executeSelected(
+            attempt: attempt, destinations: [.local, .gitHub], isCancelled: { cancelled },
+            publish: { _ in
+                calls += 1
+                return PublishReport(publishedFiles: ["Module.sgmodule"])
+            }, didComplete: { _, target in
+                if target.destination == .local { cancelled = true }
+            }
+        )
+        XCTAssertEqual(calls, 1)
+        XCTAssertEqual(result.results.map(\.status), [.succeeded, .cancelled])
+        let decoded = try JSONDecoder().decode(SelectedPublishAttempt.self, from: JSONEncoder().encode(result))
+        XCTAssertEqual(decoded, result)
+        XCTAssertEqual(decoded.retryDestinations, [.gitHub])
+    }
+
+    func testCrashRecoveryKeepsSuccessAndMarksPendingAsInterrupted() {
+        let attempt = SelectedPublishAttempt(moduleIDs: [UUID()], results: [
+            PublishTargetResult(destination: .local, target: "local", status: .succeeded),
+            PublishTargetResult(destination: .gitHub, target: "remote")
+        ]).restored
+        XCTAssertEqual(attempt.results.map(\.status), [.succeeded, .cancelled])
+        XCTAssertEqual(attempt.retryDestinations, [.gitHub])
+    }
+
+    func testLocalHistoryDoesNotBecomeLatestGitHubPublish() {
+        let entries = [UpdateHistoryEntry(
+            moduleName: "Local", outcome: .published, duration: 0, message: "done",
+            publishedFiles: ["Local.sgmodule"], publishDestination: .local
+        )]
+        XCTAssertNil(GitHubPublishSnapshot.latest(in: entries, settings: GitHubSettings()))
+    }
+}

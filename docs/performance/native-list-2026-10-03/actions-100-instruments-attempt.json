@@ -1,0 +1,28 @@
+{
+  "pid": 19407,
+  "count": 100,
+  "actions": [
+    {
+      "action": "start",
+      "epochMilliseconds": 1790991231179,
+      "completed": 0
+    },
+    {
+      "action": "scroll",
+      "epochMilliseconds": 1790991244863,
+      "completed": 45
+    },
+    {
+      "action": "filter",
+      "epochMilliseconds": 1790991245935,
+      "completed": 49,
+      "visible": 11
+    },
+    {
+      "action": "expand",
+      "epochMilliseconds": 1790991248802,
+      "completed": 60
+    }
+  ],
+  "operations": "14 scrolls (7 down/7 up, 1 page), filter 0002, clear, collapse/expand; HTTP-triggered20s trace"
+}

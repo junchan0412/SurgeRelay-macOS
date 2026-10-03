@@ -227,6 +227,10 @@ private struct PublishPreviewSummaryView: View {
         VStack(alignment: .leading, spacing: 10) {
             detail("目标", value: preview.targetDescription)
             detail("结果清单", value: "\(preview.activeFiles.count) 个文件")
+            ForEach(preview.issues) { issue in
+                Label("\(issue.filePath):\(issue.line) · \(issue.message)", systemImage: "exclamationmark.triangle")
+                    .font(.caption).foregroundStyle(Design.Palette.warning)
+            }
             if preview.hasChanges {
                 if !preview.changedFiles.isEmpty {
                     fileList("将上传/写入", files: preview.changedFiles)

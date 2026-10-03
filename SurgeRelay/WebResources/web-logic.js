@@ -5,6 +5,17 @@
     return `${firstLine.slice(0, Math.max(1, maxLength - 1))}…`;
   }
 
+  function refreshIntervalTitle(minutes) {
+    if (minutes == null) return '继承全局';
+    if (!Number.isInteger(minutes) || minutes < 0 || minutes > 10080) return '现有策略（未识别）';
+    return minutes === 0 ? '仅手动刷新' : `每 ${minutes} 分钟`;
+  }
+
+  function serverCooldownRemaining(module, now = Date.now()) {
+    const deadline = module?.serverRetryAfter ? new Date(module.serverRetryAfter).valueOf() : NaN;
+    return Number.isFinite(deadline) ? Math.max(0, deadline - now) : 0;
+  }
+
   function moduleListSignature(module) {
     return JSON.stringify([
       module.id, module.name, module.sourceURL, module.initialSourceURL, module.updateSourceURL,
@@ -15,7 +26,7 @@
       module.iconURL, module.customIconURL, module.isEnabled, module.publishesStandalone,
       module.state, module.stateTitle, module.lastError, module.lastUpdatedAt, module.sourceCheckedAt,
       module.contentHash, module.sourceContentHash, module.sourceETag, module.sourceLastModified,
-      module.conversionEngineRevision
+      module.conversionEngineRevision, module.refreshIntervalMinutes, module.nextRetryAt, module.serverRetryAfter, module.consecutiveFailureCount
     ].map(value => String(value ?? '')));
   }
 
@@ -30,7 +41,7 @@
     if (!previousModule || !nextModule) return false;
     const fields = ['name', 'sourceURL', 'initialSourceURL', 'updateSourceURL', 'outputFileName', 'publishedRelativePath',
       'category', 'outputFolder', 'iconURL', 'customIconURL', 'advancedSummary', 'hasOverrideConflict',
-      'hasSyncConflict', 'syncConflictLocalUpdatedAt', 'syncConflictGitHubUpdatedAt'];
+      'hasSyncConflict', 'syncConflictLocalUpdatedAt', 'syncConflictGitHubUpdatedAt', 'refreshIntervalMinutes', 'nextRetryAt', 'serverRetryAfter', 'consecutiveFailureCount'];
     return fields.some(key => previousModule[key] !== nextModule[key]) ||
       Boolean(previousModule.contentHash) !== Boolean(nextModule.contentHash) ||
       Boolean(previousModule.sourceContentHash) !== Boolean(nextModule.sourceContentHash) ||
@@ -119,6 +130,23 @@
     return options.failuresOnly ? '没有更新失败的模块' : '还没有模块';
   }
 
+  function activeStageSummary(stages = []) {
+    const labels = { download: '下载', conversion: '转换', cache: '缓存', publish: '发布' };
+    const modules = new Map();
+    for (const item of Array.isArray(stages) ? stages : []) {
+      if (!labels[item.stage]) continue;
+      const key = item.moduleID || item.moduleName;
+      if (!modules.has(key) && modules.size >= 4) continue;
+      modules.set(key, item);
+    }
+    const counts = {};
+    for (const item of modules.values()) counts[item.stage] = (counts[item.stage] || 0) + 1;
+    return {
+      text: Object.entries(labels).filter(([stage]) => counts[stage]).map(([stage, label]) => `${label} ${counts[stage]}`).join(' · '),
+      title: [...modules.values()].map(item => `${item.moduleName || '模块'}：${labels[item.stage]}${item.detail ? ` · ${item.detail}` : ''}`).join('\n')
+    };
+  }
+
   function activityPresentation(activity = {}, context = {}) {
     const formatAutomaticPublish = context.formatAutomaticPublish || (value => String(value || ''));
     const autoPublishText = activity.automaticPublishRunsAt
@@ -173,6 +201,12 @@
 
   function outputPathNotice(path, publishesStandalone, context = {}) {
     if (!publishesStandalone) return { message: '未开启独立发布时，不会写出这个独立模块文件。', warning: false };
+    if (context.storageLocation === 'both') {
+      const disabled = [];
+      if (context.publishToLocal === false) disabled.push('本地');
+      if (context.publishToGitHub === false) disabled.push('GitHub');
+      if (disabled.length) return { message: `该模块设为双目标存放，但全局发布到${disabled.join('、')}尚未开启；暂不会向这些目标发布独立文件。`, warning: true };
+    }
     if (context.storageLocation === 'local' && context.publishToLocal === false) {
       return { message: '该模块设为本地存放，但全局“发布到本地”尚未开启；保存后暂不会生成独立文件。', warning: true };
     }
@@ -211,6 +245,9 @@
   }
 
   function validateModuleEditorFields(fields = {}) {
+    if (fields.refreshIntervalMinutes != null && (!Number.isInteger(fields.refreshIntervalMinutes) || fields.refreshIntervalMinutes < 0 || fields.refreshIntervalMinutes > 10080)) {
+      return { field: 'customRefreshIntervalMinutes', message: '刷新间隔必须为 1–10080 的整数分钟；仅手动刷新请选择对应选项。' };
+    }
     const iconURL = String(fields.iconURL || '').trim();
     if (iconURL && !isValidHTTPURL(iconURL)) {
       return {
@@ -225,10 +262,12 @@
     const existingModule = context.existingModule || {};
     const combinedEnabled = Boolean(context.combinedEnabled);
     return {
+      ...(Object.prototype.hasOwnProperty.call(fields, 'refreshIntervalMinutes') ? { refreshIntervalMinutes: fields.refreshIntervalMinutes } : {}),
       name: String(fields.name || '').trim(),
       sourceURL: String(fields.sourceURL || '').trim(),
       sourceFormat: String(fields.sourceFormat || 'automatic'),
-      storageLocation: String(fields.storageLocation || 'gitHub'),
+      storageLocation: fields.storageLocation === 'both' ? 'local' : String(fields.storageLocation || 'gitHub'),
+      storageTargets: fields.storageTargets || (fields.storageLocation === 'both' ? ['local', 'gitHub'] : [String(fields.storageLocation || 'gitHub')]),
       category: String(fields.category || '').trim(),
       iconURL: String(fields.iconURL || '').trim(),
       outputFolder: String(fields.outputFolder || ''),
@@ -244,7 +283,7 @@
     const explicit = String(draft.outputFileName || '').trim();
     const displayName = String(draft.name || '').trim();
     const preferred = explicit || displayName || suggestedNameFromSource(sourceURL);
-    return isFileSource(sourceURL) || draft.storageLocation === 'local'
+    return isFileSource(sourceURL) || (draft.storageLocation === 'local' || draft.storageLocation === 'both' || draft.storageTargets?.includes('local'))
       ? existingSgmoduleName(preferred)
       : sgmoduleName(preferred);
   }
@@ -301,6 +340,7 @@
   }
 
   global.SurgeRelayWebLogic = {
+    refreshIntervalTitle, serverCooldownRemaining,
     failureSummary,
     moduleListSignature,
     sidebarListSignature,
@@ -313,7 +353,7 @@
     sidebarFailureFilterState,
     sidebarModules,
     sidebarEmptyText,
-    activityPresentation,
+    activeStageSummary, activityPresentation,
     folderTitle,
     publishedRelativePathForDraft,
     outputPathNotice,

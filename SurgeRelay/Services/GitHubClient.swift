@@ -88,7 +88,8 @@ actor GitHubClient {
         )
         return PublishReport(
             publishedFiles: diff.changedFiles.map(\.name),
-            deletedFiles: diff.deletedFiles
+            deletedFiles: diff.deletedFiles,
+            baseCommitSHA: diff.snapshot.headCommitSHA
         )
     }
 
@@ -96,7 +97,8 @@ actor GitHubClient {
         files: [PublishFile],
         deleting obsoleteFileNames: [String] = [],
         settings: GitHubSettings,
-        token: String
+        token: String,
+        expectedHeadCommitSHA: String? = nil
     ) async throws -> PublishReport {
         guard settings.isConfigured else { throw RelayError.githubNotConfigured }
         guard !token.isEmpty else { throw RelayError.githubTokenMissing }
@@ -110,12 +112,16 @@ actor GitHubClient {
                     files: files,
                     deleting: obsoleteFileNames,
                     settings: settings,
-                    token: token
+                    token: token,
+                    expectedHeadCommitSHA: expectedHeadCommitSHA
                 )
                 report.retriedAfterConflict = retriedAfterConflict
                 return report
             } catch {
-                guard attempt == 0, isRetryablePublishError(error) else {
+                if expectedHeadCommitSHA != nil, let relayError = error as? RelayError, Self.isReferenceUpdateConflict(relayError) {
+                    throw RelayError.invalidOutput("GitHub 在比较后发生变化，请重新比较后确认。")
+                }
+                guard expectedHeadCommitSHA == nil, attempt == 0, isRetryablePublishError(error) else {
                     if error is PublishAttemptError {
                         throw RelayError.invalidOutput("GitHub 提交后引用校验失败，未确认发布成功。")
                     }
@@ -137,7 +143,8 @@ actor GitHubClient {
         files: [PublishFile],
         deleting obsoleteFileNames: [String],
         settings: GitHubSettings,
-        token: String
+        token: String,
+        expectedHeadCommitSHA: String?
     ) async throws -> PublishReport {
         let diff = try await publishDiff(
             files: files,
@@ -146,6 +153,9 @@ actor GitHubClient {
             token: token
         )
         let snapshot = diff.snapshot
+        if let expectedHeadCommitSHA, snapshot.headCommitSHA != expectedHeadCommitSHA {
+            throw RelayError.invalidOutput("GitHub 在比较后发生变化，请重新比较后确认。")
+        }
         let changedFiles = diff.changedFiles
         let deletedFiles = diff.deletedFiles
         guard !changedFiles.isEmpty || !deletedFiles.isEmpty else {

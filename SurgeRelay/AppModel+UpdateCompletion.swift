@@ -10,34 +10,35 @@ struct ModuleUpdateRunResult {
 
 @MainActor
 extension AppModel {
+    @discardableResult
     func finishModuleUpdateRun(
         _ result: ModuleUpdateRunResult,
         generation: Int,
         rebuildFromCache: Bool = false
-    ) async {
+    ) async -> Bool {
         if let blockage = UpdateFailurePlanner.missingCacheBlockage(
             moduleNames: result.missingCacheModuleNames,
             details: result.missingCacheDetails
         ) {
             statusMessage = blockage.statusMessage
             presentedError = blockage.presentedError
-            return
+            return false
         }
 
         do {
             if rebuildFromCache {
                 // 单模块（过滤）更新：从全部缓存组件重建总模块并发布本地输出，
                 // 避免总模块只包含被更新模块而丢失其他参与者。
-                guard await rebuildCombinedFromCache(schedulesAutomaticPublish: false) else { return }
+                guard await rebuildCombinedFromCache(schedulesAutomaticPublish: false) else { return false }
             } else if settings.combinedModuleEnabled {
-                guard try await writeCombinedModule(result.components, generation: generation) else { return }
+                guard try await writeCombinedModule(result.components, generation: generation) else { return false }
             } else {
                 try await fileStore.removeCombined()
                 try await publishCurrentFiles(combinedData: nil, includeAssets: false)
             }
-            guard shouldContinueCurrentWork(generation: generation) else { return }
+            guard shouldContinueCurrentWork(generation: generation) else { return false }
             await cleanupLegacyOutputFiles()
-            guard shouldContinueCurrentWork(generation: generation) else { return }
+            guard shouldContinueCurrentWork(generation: generation) else { return false }
             let canUseAutomaticGitHubPublish = AutomaticPublishPlanner.canUseAutomaticPublishing(
                 context: automaticPublishContext()
             )
@@ -62,10 +63,12 @@ extension AppModel {
                 clearAutomaticPublishSchedule()
             }
             statusMessage = completionDecision.statusMessage
+            return true
         } catch {
-            if isCurrentWorkCancellation(error) { return }
+            if isCurrentWorkCancellation(error) { return false }
             statusMessage = "输出刷新失败，请查看错误详情"
             presentedError = "刷新模块输出失败：\(error.localizedDescription)"
+            return false
         }
     }
 }

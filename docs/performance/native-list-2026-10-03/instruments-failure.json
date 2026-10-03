@@ -1,0 +1,15 @@
+{
+  "date": "2026-10-03",
+  "firstTrace": "20-second HTTP-triggered Animation Hitches + Activity Monitor",
+  "targetPID": 19407,
+  "recordingPID": 19575,
+  "outcome": "capture reported completed; saving did not complete within 180-second budget; watchdog terminated recorder",
+  "rawPeakObserved": "10 GiB",
+  "status": "excluded from performance values",
+  "priorAttempts": [
+    "3-minute capture raw peak43GiB; final archive1.9GiB; selective exports exhausted available disk while extracting two13GiB temporary trees; all exporters terminated and temporary trees removed",
+    "ActivityMonitor+Hitches+FrameLifetimes3min remained CPU-bound in finalization for over15min; terminated and failed archive removed"
+  ],
+  "diskAfterCleanup": "27GiB available after export temporary cleanup",
+  "nextMethod": "QA-only native main-thread display-link callback cadence and bounded background RSS; no GPU FPS claim"
+}

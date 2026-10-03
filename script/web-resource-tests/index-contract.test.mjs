@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { indexHTML } from './harness.mjs';
 
 const logicScriptIndex = indexHTML.indexOf('/web-logic.js');
@@ -30,3 +31,7 @@ assert.ok(appScriptIndex > detailScriptIndex, 'web-detail.js must load before ap
 assert.match(indexHTML, /name="storageLocation"/);
 assert.match(indexHTML, /name="outputFolder"/);
 assert.match(indexHTML, /id="output-path-preview"/);
+
+assert.match(indexHTML, /<option value="both">本地与 GitHub<\/option>/);
+
+assert.match(readFileSync(new URL('../../SurgeRelay/WebResources/app.css', import.meta.url), 'utf8'), /\*::backdrop \{ animation-duration: \.01ms !important/);

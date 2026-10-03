@@ -14,6 +14,8 @@ enum WorkActivityKind: String, Codable, Equatable, Sendable {
     case savingPreview
     case restoringPreview
     case checkingLocalCredentials
+    case migratingConfiguration
+    case switchingWorkspace
 
     var title: String {
         switch self {
@@ -30,6 +32,8 @@ enum WorkActivityKind: String, Codable, Equatable, Sendable {
         case .savingPreview: "预览内容写入"
         case .restoringPreview: "预览内容恢复"
         case .checkingLocalCredentials: "本地加密存储检查"
+        case .migratingConfiguration: "配置目录迁移"
+        case .switchingWorkspace: "切换工作区"
         }
     }
 
@@ -39,7 +43,7 @@ enum WorkActivityKind: String, Codable, Equatable, Sendable {
             false
         case .updatingModules, .scanningLocalModules, .importingLocalModules, .refreshingScriptHub,
              .testingGitHub, .publishing, .automaticPublishing, .previewingPublish, .confirmingPublish,
-             .savingPreview, .restoringPreview:
+             .savingPreview, .restoringPreview, .migratingConfiguration, .switchingWorkspace:
             true
         }
     }
@@ -49,7 +53,7 @@ enum WorkActivityKind: String, Codable, Equatable, Sendable {
         case .updatingModules, .scanningLocalModules, .importingLocalModules, .refreshingScriptHub,
              .testingGitHub, .publishing, .automaticPublishing, .previewingPublish, .confirmingPublish:
             true
-        case .idle, .savingPreview, .restoringPreview, .checkingLocalCredentials:
+        case .idle, .savingPreview, .restoringPreview, .checkingLocalCredentials, .migratingConfiguration, .switchingWorkspace:
             false
         }
     }
@@ -61,6 +65,7 @@ struct WorkActivity: Codable, Equatable, Sendable {
     var startedAt: Date?
     var blocksUpdates: Bool
     var canCancel: Bool
+    var activeStages: [WorkStageProgress]? = nil
 
     var isActive: Bool {
         kind != .idle

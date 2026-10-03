@@ -5,7 +5,7 @@ enum ManagedPublishedFile {
     private static let pathPrefix = "# surge-relay-relative-path: "
 
     static func dataWrapping(_ data: Data, relativePath: String) -> Data {
-        guard !isManaged(data) else { return data }
+        guard requiresInlineMarker(relativePath), !isManaged(data) else { return data }
         let markerLines = "\(marker)\n\(pathPrefix)\(relativePath)"
         if let content = String(data: data, encoding: .utf8) {
             var lines = content.components(separatedBy: "\n")
@@ -35,14 +35,31 @@ enum ManagedPublishedFile {
             .contains { $0.trimmingCharacters(in: .whitespaces) == marker }
     }
 
+    static func requiresInlineMarker(_ relativePath: String) -> Bool {
+        ["sgmodule", "module"].contains((relativePath as NSString).pathExtension.lowercased())
+    }
+
+    static func isManaged(_ data: Data, relativePath: String) -> Bool {
+        if requiresInlineMarker(relativePath) { return isManaged(data) }
+        let header = String(decoding: data.prefix(16 * 1024), as: UTF8.self)
+            .replacingOccurrences(of: "\r\n", with: "\n")
+        let lines = Array(header.components(separatedBy: "\n").prefix(64))
+        for index in lines.indices.dropLast() where lines[index] == marker {
+            if lines[index + 1] == pathPrefix + relativePath { return true }
+        }
+        return false
+    }
+
     static func validatedConflictVersions(
         at url: URL,
-        allowingKnownManagedPath: Bool
+        allowingKnownManagedPath: Bool,
+        relativePath: String? = nil
     ) throws -> [NSFileVersion] {
         let versions = NSFileVersion.unresolvedConflictVersionsOfItem(at: url) ?? []
         for version in versions {
             let data = try Data(contentsOf: version.url)
-            guard isManaged(data) || allowingKnownManagedPath else {
+            let managed = relativePath.map { isManaged(data, relativePath: $0) } ?? isManaged(data)
+            guard managed || allowingKnownManagedPath else {
                 throw RelayError.invalidOutput("检测到不属于 Surge Relay 的 iCloud 冲突版本，已停止操作。")
             }
         }

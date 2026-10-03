@@ -1,0 +1,31 @@
+{
+  "classification": "test infrastructure / process bootstrap failure, not service-load failure",
+  "benchmarkExecuted": false,
+  "measuredServiceResult": null,
+  "configuration": "Release; ENABLE_TESTABILITY=YES; CODE_SIGNING_ALLOWED=NO",
+  "derivedDataPath": "/Users/qidewei/Documents/Surge Relay/.build/web-load-benchmark",
+  "toolSession": 35042,
+  "exitCode": 65,
+  "pid": 3003,
+  "pidRemainingAfterFailure": false,
+  "xcodeMessage": "The test runner hung before establishing connection.",
+  "actualExecutablePath": "/Users/qidewei/Documents/Surge Relay/.build/web-load-benchmark/Build/Products/Release/Surge Relay.app/Contents/MacOS/Surge Relay",
+  "spindumpEvidence": {
+    "samples": 447,
+    "threads": 1,
+    "footprint": "256 KB",
+    "stack": [
+      "dyld4::prepare",
+      "dyld4::Loader::makeDiskLoader",
+      "dyld4::SyscallDelegate::mapFileReadOnly",
+      "dyld4::open",
+      "Sandbox approval_response_wait",
+      "__WAITING_ON_APPROVAL_FROM_SANDBOXD__"
+    ],
+    "interpretation": "Dependency loading was waiting for OS sandbox approval before Swift/application/test initialization. The specific file being opened was not identified; path sensitivity is a hypothesis, not an established cause."
+  },
+  "additionalObservation": "The original generated xctestrun names a libXCTestBundleInject.dylib path inside the app that is absent on disk; the Developer-platform copy exists. This path was not introduced by editing the xctestrun, and is not proven to be the cause.",
+  "resultBundle": "/tmp/SurgeRelay-web-load-5000-2026-10-02.xcresult",
+  "buildBaseline": "web-server-load-build-baseline-release-documents-2026-10-02.json",
+  "permissionsChanged": false
+}
