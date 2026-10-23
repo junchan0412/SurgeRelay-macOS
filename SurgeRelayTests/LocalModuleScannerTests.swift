@@ -3,6 +3,45 @@ import XCTest
 @testable import SurgeRelay
 
 final class LocalModuleScannerTests: XCTestCase {
+    func testScanSkipsHistoricalAndCopiedPublishedOutputsWithoutManifest() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let original = Data("#!name=Original\n[Rule]\nFINAL,DIRECT\n".utf8)
+        try original.write(to: root.appending(path: "Original.sgmodule"))
+        let published = ManagedPublishedFile.dataWrapping(original, relativePath: "Old-Combined.sgmodule")
+        try published.write(to: root.appending(path: "Old-Combined.sgmodule"))
+        try published.write(to: root.appending(path: "Copied-Output.sgmodule"))
+        try Data("# Surge Relay managed output\n[Rule]\n".utf8)
+            .write(to: root.appending(path: "Damaged-Output.sgmodule"))
+
+        let report = try LocalModuleScanner.report(in: root.path, combinedFileName: "Relay",
+            existingModules: [], publishedFilePaths: [])
+
+        XCTAssertEqual(report.candidates.map(\.relativePath), ["Original.sgmodule"])
+        XCTAssertEqual(report.skippedFiles.count, 3)
+        XCTAssertTrue(report.skippedFiles.allSatisfy { $0.reason == "这是 Surge Relay 发布文件" })
+        XCTAssertEqual(try Data(contentsOf: root.appending(path: "Original.sgmodule")), original)
+    }
+
+    func testImportRejectsFilePublishedAfterScan() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let source = root.appending(path: "Demo.sgmodule")
+        let original = Data("#!name=Demo\n[Rule]\nFINAL,DIRECT\n".utf8)
+        try original.write(to: source)
+        let candidate = try XCTUnwrap(LocalModuleScanner.candidates(in: root.path,
+            combinedFileName: "Relay", existingModules: [], publishedFilePaths: []).first)
+        let published = ManagedPublishedFile.dataWrapping(original, relativePath: "Demo.sgmodule")
+        try published.write(to: source)
+
+        XCTAssertThrowsError(try LocalModuleScanner.snapshotForImport(candidate, rootDirectoryPath: root.path)) {
+            XCTAssertTrue($0.localizedDescription.contains("Surge Relay 发布文件"))
+        }
+        XCTAssertEqual(try Data(contentsOf: source), published)
+    }
+
     func testLocalModuleScannerDiscoversExistingModules() throws {
         let root = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
@@ -78,6 +117,172 @@ final class LocalModuleScannerTests: XCTestCase {
             try LocalModuleFolderScanner.folders(in: root.path),
             ["Ads", "Ads/Video", "Tools"]
         )
+    }
+
+    func testLocalModuleScannerDeduplicatesSubscriptionAndRepeatedScan() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let content = """
+        #!name=Subscribed
+        #SUBSCRIBED http://script.hub/file/_start_/https://example.com/original.sgmodule/_end_/Demo.sgmodule?type=surge-module&target=surge-module
+        [General]
+        """
+        try Data(content.utf8).write(to: root.appending(path: "B.sgmodule"))
+        try Data(content.utf8).write(to: root.appending(path: "A.sgmodule"))
+
+        let report = try LocalModuleScanner.report(
+            in: root.path,
+            combinedFileName: "Relay",
+            existingModules: [],
+            publishedFilePaths: []
+        )
+        XCTAssertEqual(report.candidates.map(\.relativePath), ["A.sgmodule"])
+        XCTAssertEqual(report.candidates.first?.sourceURL, "https://example.com/original.sgmodule")
+        XCTAssertEqual(report.candidates.first?.rootDirectoryPath,
+                       LocalSourcePathResolver.canonicalDirectoryURL(for: root.path)?.path)
+        let plan = LocalModuleImportPlanner.plan(
+            candidates: report.candidates,
+            existingModules: [],
+            combinedModuleFileName: "Relay"
+        )
+        let repeated = try LocalModuleScanner.report(
+            in: root.path,
+            combinedFileName: "Relay",
+            existingModules: plan.entries.map(\.module),
+            publishedFilePaths: []
+        )
+        XCTAssertTrue(repeated.candidates.isEmpty)
+        XCTAssertEqual(repeated.skippedFiles.count, 2)
+    }
+
+    func testScanKeepsRegisteredGitHubModuleSourceReservedAfterSubscriptionAppears() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let source = root.appending(path: "Demo.sgmodule")
+        let content = Data("""
+        #!name=Demo
+        #SUBSCRIBED http://script.hub/file/_start_/https://example.com/demo.conf/_end_/Demo.sgmodule?type=qx-rewrite&target=surge-module
+        [General]
+        """.utf8)
+        try content.write(to: source)
+        let registered = RelayModule(name: "Registered", sourceURL: source.absoluteString,
+            outputFileName: "Published-Elsewhere.sgmodule", storageLocation: .gitHub)
+
+        let report = try LocalModuleScanner.report(in: root.path, combinedFileName: "Relay",
+            existingModules: [registered], publishedFilePaths: [])
+
+        XCTAssertTrue(report.candidates.isEmpty)
+        XCTAssertEqual(report.skippedFiles.map(\.relativePath), ["Demo.sgmodule"])
+        XCTAssertEqual(try Data(contentsOf: source), content)
+    }
+
+    func testLocalModuleScannerResolvesRootAliasAndSkipsEscapingFile() throws {
+        let base = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let root = base.appending(path: "Modules")
+        let alias = base.appending(path: "Alias")
+        defer { try? FileManager.default.removeItem(at: base) }
+        try FileManager.default.createDirectory(at: root.appending(path: "Tools"), withIntermediateDirectories: true)
+        let source = root.appending(path: "Tools/My Module.sgmodule")
+        try Data("#!name=Local\n[General]".utf8).write(to: source)
+        let outside = base.appending(path: "Outside.sgmodule")
+        try Data("#!name=Outside\n[General]".utf8).write(to: outside)
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: root)
+        try FileManager.default.createSymbolicLink(at: root.appending(path: "Escape.sgmodule"), withDestinationURL: outside)
+        try FileManager.default.createSymbolicLink(at: root.appending(path: "Duplicate.sgmodule"), withDestinationURL: source)
+
+        let report = try LocalModuleScanner.report(
+            in: alias.path,
+            combinedFileName: "Relay",
+            existingModules: [],
+            publishedFilePaths: []
+        )
+
+        XCTAssertEqual(report.candidates.map(\.relativePath), ["Tools/My Module.sgmodule"])
+        XCTAssertTrue(report.skippedFiles.contains { $0.reason == "无法解析相对路径" })
+        XCTAssertTrue(report.skippedFiles.contains { $0.reason == "扫描中发现重复路径" })
+        XCTAssertEqual(try LocalModuleFolderScanner.folders(in: alias.path), ["Tools"])
+    }
+
+    func testLocalMetadataReaderRecoversUniqueRenamedSiblingAndSubscription() throws {
+        let base = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let root = base.appending(path: "Modules")
+        let alias = base.appending(path: "Alias")
+        defer { try? FileManager.default.removeItem(at: base) }
+        try FileManager.default.createDirectory(at: root.appending(path: "Tools"), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: root)
+        let content = """
+        #SUBSCRIBED http://script.hub/file/_start_/https://example.com/original.sgmodule/_end_/My-Module.sgmodule?type=surge-module&target=surge-module
+        [General]
+        """
+        try Data(content.utf8).write(to: root.appending(path: "Tools/My Module.sgmodule"))
+        let module = RelayModule(
+            name: "Local",
+            sourceURL: "https://example.com/original.sgmodule",
+            outputFileName: "My-Module.sgmodule",
+            storageTargets: [.local, .gitHub],
+            localStorageRelativePath: "Tools/My-Module.sgmodule"
+        )
+
+        let snapshot = try XCTUnwrap(LocalModuleMetadataReader.snapshot(for: module, rootDirectoryPath: alias.path))
+        XCTAssertEqual(snapshot.localStorageRelativePath, "Tools/My Module.sgmodule")
+        XCTAssertEqual(snapshot.scriptHubSubscription?.originalURL, module.sourceURL)
+        try Data(content.utf8).write(to: root.appending(path: "Tools/My  Module.sgmodule"))
+        XCTAssertNil(LocalModuleMetadataReader.snapshot(for: module, rootDirectoryPath: alias.path))
+    }
+
+    func testLocalImportRejectsSourceSymlinkChangedAfterScan() throws {
+        let base = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let root = base.appending(path: "Modules")
+        defer { try? FileManager.default.removeItem(at: base) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let source = root.appending(path: "Demo.sgmodule")
+        try Data("#!name=Demo\n[General]".utf8).write(to: source)
+        let candidates = try LocalModuleScanner.candidates(
+            in: root.path, combinedFileName: "Relay", existingModules: [], publishedFilePaths: []
+        )
+        let outside = base.appending(path: "Outside.sgmodule")
+        try Data("private content".utf8).write(to: outside)
+        try FileManager.default.removeItem(at: source)
+        try FileManager.default.createSymbolicLink(at: source, withDestinationURL: outside)
+
+        XCTAssertThrowsError(try LocalModuleScanner.snapshotForImport(candidates[0], rootDirectoryPath: root.path))
+
+        let plan = LocalModuleImportPlanner.plan(
+            candidates: candidates,
+            existingModules: [],
+            combinedModuleFileName: "Relay",
+            localModuleDirectory: root.path
+        )
+
+        XCTAssertTrue(plan.entries.isEmpty)
+        XCTAssertEqual(plan.failures, ["Demo.sgmodule：本地来源路径已改变，请重新扫描"])
+    }
+
+    func testImportSnapshotRefreshesSubscriptionFromCurrentPhysicalContent() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let source = root.appending(path: "Demo.sgmodule")
+        try Data("#!name=Demo\n[General]".utf8).write(to: source)
+        let candidates = try LocalModuleScanner.candidates(
+            in: root.path, combinedFileName: "Relay", existingModules: [], publishedFilePaths: []
+        )
+        let current = Data("""
+        #!name=Demo
+        #SUBSCRIBED http://script.hub/file/_start_/https://new.invalid/demo.plugin/_end_/Demo.sgmodule?type=loon-plugin&target=surge-module
+        [Script]
+        Local = type=http-request, pattern=^https://local.example
+        """.utf8)
+        try current.write(to: source)
+
+        let snapshot = try LocalModuleScanner.snapshotForImport(candidates[0], rootDirectoryPath: root.path)
+
+        XCTAssertEqual(snapshot.data, current)
+        XCTAssertEqual(snapshot.candidate.sourceURL, "https://new.invalid/demo.plugin")
+        XCTAssertEqual(snapshot.candidate.sourceFormat, .loon)
+        XCTAssertNil(snapshot.candidate.sourceContentHash)
     }
 
     func testLocalModuleRootDiagnosticsReportsWritableDirectoryContents() throws {

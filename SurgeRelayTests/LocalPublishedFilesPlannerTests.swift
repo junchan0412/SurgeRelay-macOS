@@ -3,6 +3,62 @@ import XCTest
 @testable import SurgeRelay
 
 final class LocalPublishedFilesPlannerTests: XCTestCase {
+    func testCurrentLocalSourcesAreExcludedFromPublishAndConfirmedCleanupOwnership() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appending(path: "Source.sgmodule")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data("personal".utf8).write(to: source)
+        let module = RelayModule(name: "Source", sourceURL: source.absoluteString, outputFileName: "Source.sgmodule",
+            storageLocation: .local, localStorageRelativePath: "Source.sgmodule")
+        let protected = LocalPublishedFilesPlanner.protectedSourcePaths(modules: [module], targetDirectory: root.path)
+        let plan = LocalPublishedFilesPlanner.plan(files: [], targetDirectory: root.path,
+            previousRootDirectory: root.path, previousPublishedPaths: ["SOURCE.sgmodule", "Old.sgmodule"],
+            protectedSourcePaths: protected)
+        XCTAssertEqual(plan.knownManagedPaths, ["Old.sgmodule"])
+        XCTAssertEqual(plan.stalePaths, ["Old.sgmodule"])
+        let oldPreview = PublishPreview(destination: .local, targetDescription: root.path,
+            activeFiles: ["Source.sgmodule"], changedFiles: [], deletedFiles: ["SOURCE.sgmodule", "Old.sgmodule"])
+        let confirmed = LocalPublishedFilesPlanner.confirmedCleanupPlan(preview: oldPreview,
+            previousRootDirectory: root.path, previousPublishedPaths: ["Source.sgmodule", "Old.sgmodule"],
+            protectedSourcePaths: protected)
+        XCTAssertEqual(confirmed.obsoleteRelativePaths, ["Old.sgmodule"])
+        XCTAssertEqual(confirmed.knownManagedRelativePaths, ["Old.sgmodule"])
+        XCTAssertTrue(confirmed.persistedFilePaths.isEmpty)
+        XCTAssertEqual(confirmed.statusMessage, "已清理 1 个本地旧文件")
+    }
+
+    func testProtectedSourcesIncludeRegisteredSelfAuthoredCopiesButNotRemoteOutputs() {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let authored = RelayModule(name: "Authored", sourceURL: root.appending(path: "Original.sgmodule").absoluteString,
+            outputFileName: "Copy.sgmodule", storageLocation: .local, localStorageRelativePath: "Copy.sgmodule")
+        let remote = RelayModule(name: "Remote", sourceURL: "https://example.com/remote.sgmodule", outputFileName: "Remote.sgmodule",
+            storageLocation: .local, localStorageRelativePath: "Remote.sgmodule")
+        XCTAssertEqual(LocalPublishedFilesPlanner.protectedSourcePaths(modules: [authored, remote], targetDirectory: root.path),
+            ["Copy.sgmodule", "Original.sgmodule"])
+    }
+
+    func testRootAliasesAndEquivalentPathsKeepOneManagedIdentity() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let output = root.appending(path: "Output", directoryHint: .isDirectory)
+        let alias = root.appending(path: "Alias", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: output)
+        let plan = LocalPublishedFilesPlanner.plan(
+            files: [PublishFile(name: "Ads/Caf\u{e9}.sgmodule", data: Data())],
+            targetDirectory: alias.path + "/", previousRootDirectory: output.path,
+            previousPublishedPaths: ["ads\\Cafe\u{301}.sgmodule", "Ads/Caf\u{e9}.sgmodule", "Old.sgmodule"]
+        )
+        XCTAssertEqual(plan.targetDirectory, output.resolvingSymlinksInPath().standardizedFileURL.path)
+        XCTAssertEqual(plan.knownManagedPaths.count, 2)
+        XCTAssertEqual(plan.stalePaths, ["Old.sgmodule"])
+        XCTAssertEqual(LocalPublishedFilesPlanner.mergedPaths(plan.knownManagedPaths, adding: plan.currentPaths),
+            ["Ads/Caf\u{e9}.sgmodule", "Old.sgmodule"])
+        XCTAssertEqual(LocalPublishedFilesPlanner.knownManagedPathsForConfirmedCleanup(preview: plan.cleanupPreview(),
+            previousRootDirectory: alias.path, previousPublishedPaths: ["Old.sgmodule"]), ["Old.sgmodule"])
+    }
+
     func testLocalPublishedFilesPlannerTracksStaleFilesOnlyForSameRoot() {
         let files = [
             PublishFile(name: "A.sgmodule", data: Data("a".utf8)),

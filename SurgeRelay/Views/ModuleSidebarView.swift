@@ -21,54 +21,42 @@ struct ModuleSidebarView: View {
     let editModule: (RelayModule) -> Void
     let textEditModule: (RelayModule) -> Void
     let addModule: () -> Void
+    let isScanningLocalModules: Bool
+    let scanLocalModules: () -> Void
 
     var body: some View {
         @Bindable var model = model
 
         VStack(spacing: 0) {
-            Label(model.workspaceName, systemImage: "square.stack.3d.up")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .help("当前工作区：" + model.workspaceName)
-                .accessibilityIdentifier("workspace.current")
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-                .padding(.top, 10)
-            VStack(spacing: 4) {
-                Button { model.selectedModuleID = AppModel.overviewSelectionID } label: {
-                    Label("工作台", systemImage: "square.grid.2x2")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(8)
-                        .contentShape(Rectangle())
-                        .background(model.selectedModuleID == AppModel.overviewSelectionID ? Design.Palette.accent.opacity(0.12) : .clear,
-                                    in: .rect(cornerRadius: 6))
-                }
-                .accessibilityAddTraits(model.selectedModuleID == AppModel.overviewSelectionID ? .isSelected : [])
-                .accessibilityIdentifier("navigation.overview")
-                Button { model.selectedModuleID = AppModel.activitySelectionID } label: {
-                    Label("活动记录", systemImage: "clock.arrow.circlepath")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(8)
-                        .contentShape(Rectangle())
-                        .background(model.selectedModuleID == AppModel.activitySelectionID ? Design.Palette.accent.opacity(0.12) : .clear,
-                                    in: .rect(cornerRadius: 6))
-                }
-                .accessibilityAddTraits(model.selectedModuleID == AppModel.activitySelectionID ? .isSelected : [])
-                .accessibilityIdentifier("navigation.activity")
-            }
-            .font(.system(size: 14, weight: .medium))
-            .buttonStyle(.plain)
-            .padding(.horizontal, 8)
-            .padding(.top, 8)
-
-            ModuleSidebarFilterBar(selection: $sidebarFilter, sortOrder: $sortOrder,
-                                   searchText: $searchText,
-                                   counts: filterCounts, resultCount: resultCount)
+            searchField
                 .padding(.horizontal, 14)
-                .padding(.top, 8)
-
+                .padding(.top, 12)
+            ModuleSidebarToolbarContent(
+                isBatchSelecting: $isBatchSelecting,
+                batchSelectedModuleIDs: $batchSelectedModuleIDs,
+                isScanningLocalModules: isScanningLocalModules,
+                addModule: addModule,
+                scanLocalModules: scanLocalModules
+            )
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            Divider()
             List(selection: $model.selectedModuleID) {
+                workspaceNavigation
+                    .listRowInsets(EdgeInsets(top: 10, leading: 0, bottom: 0, trailing: 0))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                    .selectionDisabled()
+
+                ModuleSidebarFilterBar(selection: $sidebarFilter, sortOrder: $sortOrder,
+                                       searchText: $searchText,
+                                       counts: filterCounts, resultCount: resultCount)
+                    .padding(.horizontal, 6)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 0, trailing: 0))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                    .selectionDisabled()
+
                 if combinedModuleEnabled {
                     Section {
                         CombinedModuleRow()
@@ -93,15 +81,84 @@ struct ModuleSidebarView: View {
             }
             .listStyle(.sidebar)
             .scrollContentBackground(.hidden)
+            .frame(minHeight: 100)
+            .accessibilityIdentifier("modules.list")
             .animation(.snappy(duration: 0.2), value: sections.map(\.id))
             .animation(.snappy(duration: 0.2), value: collapsedSectionIDsRaw)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Design.Palette.canvas)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             ModuleSidebarStatusCard()
                 .background(Design.Palette.canvas)
         }
-        .searchable(text: $searchText, placement: .sidebar, prompt: "搜索模块")
+        .clipped()
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("modules.sidebar")
+    }
+
+    private var workspaceNavigation: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(model.workspaceName, systemImage: "square.stack.3d.up")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .help("当前工作区：" + model.workspaceName)
+                .accessibilityIdentifier("workspace.current")
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 8)
+            VStack(spacing: 4) {
+                Button { model.selectedModuleID = AppModel.overviewSelectionID } label: {
+                    Label("工作台", systemImage: "square.grid.2x2")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(8)
+                        .contentShape(Rectangle())
+                        .background(model.selectedModuleID == AppModel.overviewSelectionID ? Design.Palette.accent.opacity(0.12) : .clear,
+                                    in: .rect(cornerRadius: 6))
+                }
+                .accessibilityAddTraits(model.selectedModuleID == AppModel.overviewSelectionID ? .isSelected : [])
+                .accessibilityIdentifier("navigation.overview")
+                Button { model.selectedModuleID = AppModel.activitySelectionID } label: {
+                    Label("活动记录", systemImage: "clock.arrow.circlepath")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(8)
+                        .contentShape(Rectangle())
+                        .background(model.selectedModuleID == AppModel.activitySelectionID ? Design.Palette.accent.opacity(0.12) : .clear,
+                                    in: .rect(cornerRadius: 6))
+                }
+                .accessibilityAddTraits(model.selectedModuleID == AppModel.activitySelectionID ? .isSelected : [])
+                .accessibilityIdentifier("navigation.activity")
+            }
+            .font(.system(size: 14, weight: .medium))
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            TextField("搜索模块", text: $searchText)
+                .textFieldStyle(.plain)
+                .onExitCommand { searchText = "" }
+                .accessibilityLabel("搜索模块")
+                .accessibilityIdentifier("modules.search")
+            if !searchText.isEmpty {
+                Button { searchText = "" } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("清除模块搜索（Esc）")
+                .accessibilityLabel("清除模块搜索")
+                .accessibilityIdentifier("modules.clear-search")
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .frame(maxWidth: .infinity)
+        .background(Color.primary.opacity(0.05), in: .rect(cornerRadius: 8))
     }
 
     private var emptyStateTitle: String {
@@ -165,6 +222,7 @@ struct ModuleSidebarView: View {
             )
         }
         .tag(module.id)
+        .accessibilityIdentifier("modules.row.\(module.id.uuidString)")
         .contextMenu {
             ModuleSidebarContextMenu(moduleID: module.id, model: model, deleteCandidate: $deleteCandidate,
                                      editModule: editModule, textEditModule: textEditModule)

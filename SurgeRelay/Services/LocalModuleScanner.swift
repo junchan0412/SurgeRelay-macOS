@@ -5,7 +5,7 @@ enum LocalModuleFolderScanner {
         let trimmedPath = rootDirectoryPath.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedPath.isEmpty else { return [] }
 
-        let root = URL(filePath: trimmedPath, directoryHint: .isDirectory).standardizedFileURL
+        guard let root = LocalSourcePathResolver.canonicalDirectoryURL(for: trimmedPath) else { return [] }
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: root.path, isDirectory: &isDirectory),
               isDirectory.boolValue,
@@ -21,17 +21,14 @@ enum LocalModuleFolderScanner {
         for case let url as URL in enumerator {
             let resourceValues = try url.resourceValues(forKeys: [.isDirectoryKey, .isPackageKey])
             guard resourceValues.isDirectory == true, resourceValues.isPackage != true else { continue }
-            guard let relativePath = relativePath(for: url.standardizedFileURL, root: root) else { continue }
+            guard let relativePath = LocalSourcePathResolver.relativePath(
+                forSourceURL: url.absoluteString,
+                rootDirectoryPath: root.path
+            ) else { continue }
             let folder = ModuleOutputFolder.normalized(relativePath)
             if !folder.isEmpty { values.insert(folder) }
         }
         return values.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
-    }
-
-    private static func relativePath(for fileURL: URL, root: URL) -> String? {
-        let rootPath = root.path.hasSuffix("/") ? root.path : root.path + "/"
-        guard fileURL.path.hasPrefix(rootPath) else { return nil }
-        return String(fileURL.path.dropFirst(rootPath.count))
     }
 }
 
@@ -54,24 +51,23 @@ enum LocalModuleMetadataReader {
               let content = String(data: data, encoding: .utf8) else {
             return nil
         }
-        let root = URL(filePath: rootDirectoryPath, directoryHint: .isDirectory).standardizedFileURL
-        let rootPrefix = root.path.hasSuffix("/") ? root.path : root.path + "/"
-        guard fileURL.path.hasPrefix(rootPrefix) else { return nil }
+        guard let realRelativePath = LocalSourcePathResolver.relativePath(
+            forSourceURL: fileURL.absoluteString,
+            rootDirectoryPath: rootDirectoryPath
+        ) else { return nil }
         return LocalModuleMetadataSnapshot(
-            localStorageRelativePath: String(fileURL.path.dropFirst(rootPrefix.count)),
+            localStorageRelativePath: realRelativePath,
             scriptHubSubscription: ModuleMetadataParser.scriptHubSubscription(in: content)
         )
     }
 
     private static func fileURL(relativePath: String, rootDirectoryPath: String) -> URL? {
         let trimmedRoot = rootDirectoryPath.trimmingCharacters(in: .whitespacesAndNewlines)
-        let normalizedRelativePath = ModuleOutputFolder.normalized(relativePath)
-        guard !trimmedRoot.isEmpty, !normalizedRelativePath.isEmpty else { return nil }
-
-        let root = URL(filePath: trimmedRoot, directoryHint: .isDirectory).standardizedFileURL
-        let candidate = root.appending(path: normalizedRelativePath).standardizedFileURL
-        let rootPrefix = root.path.hasSuffix("/") ? root.path : root.path + "/"
-        guard candidate.path.hasPrefix(rootPrefix),
+        guard !trimmedRoot.isEmpty,
+              let candidate = LocalSourcePathResolver.fileURL(
+                relativePath: relativePath,
+                rootDirectoryPath: trimmedRoot
+              ),
               candidate.pathExtension.lowercased() == "sgmodule" else {
             return nil
         }
@@ -91,7 +87,11 @@ enum LocalModuleMetadataReader {
                 && fileNameIdentity(url.lastPathComponent) == expectedIdentity
                 && (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
         }
-        return matches.count == 1 ? matches[0].standardizedFileURL : nil
+        guard matches.count == 1 else { return nil }
+        return LocalSourcePathResolver.relativePath(
+            forSourceURL: matches[0].absoluteString,
+            rootDirectoryPath: trimmedRoot
+        ) != nil ? matches[0].standardizedFileURL.resolvingSymlinksInPath() : nil
     }
 
     private static func fileNameIdentity(_ value: String) -> String {
@@ -115,6 +115,7 @@ struct LocalModuleScanCandidate: Identifiable, Hashable, Sendable {
     var scriptHubOptions: ScriptHubOptions
     var scriptHubSubscription: ScriptHubSubscriptionInfo?
     var sourceContentHash: String?
+    var rootDirectoryPath: String? = nil
 
     var id: String { relativePath }
 
@@ -143,7 +144,53 @@ struct LocalModuleScanReport: Sendable {
     var skippedFiles: [LocalModuleScanSkippedFile]
 }
 
+struct LocalModuleImportSourceSnapshot: Sendable {
+    var candidate: LocalModuleScanCandidate
+    var fileURL: URL
+    var data: Data
+}
+
 enum LocalModuleScanner {
+    static func snapshotForImport(
+        _ candidate: LocalModuleScanCandidate,
+        rootDirectoryPath: String
+    ) throws -> LocalModuleImportSourceSnapshot {
+        if let scannedRoot = candidate.rootDirectoryPath,
+           LocalSourcePathResolver.canonicalDirectoryURL(for: scannedRoot) !=
+            LocalSourcePathResolver.canonicalDirectoryURL(for: rootDirectoryPath) {
+            throw RelayError.invalidOutput("本地模块根目录已改变，请重新扫描")
+        }
+        guard let fileURL = LocalSourcePathResolver.fileURL(
+            relativePath: candidate.localStorageRelativePath,
+            rootDirectoryPath: rootDirectoryPath
+        ), fileURL.pathExtension.lowercased() == "sgmodule",
+              (try? fileURL.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true,
+              let relativePath = LocalSourcePathResolver.relativePath(
+                forSourceURL: fileURL.absoluteString,
+                rootDirectoryPath: rootDirectoryPath
+              ), LocalSourcePathResolver.pathIdentity(relativePath) ==
+                LocalSourcePathResolver.pathIdentity(candidate.localStorageRelativePath) else {
+            throw RelayError.invalidOutput("本地来源路径已改变，请重新扫描")
+        }
+        let data = try SourceRevisionService.readLocalSource(fileURL)
+        guard !ManagedPublishedFile.hasManagementHeader(data) else {
+            throw RelayError.invalidOutput("这是 Surge Relay 发布文件，请重新扫描")
+        }
+        guard let content = String(data: data, encoding: .utf8) else {
+            throw RelayError.invalidOutput("来源不是有效的 UTF-8 模块文本。")
+        }
+        var refreshed = candidate
+        let subscription = ModuleMetadataParser.scriptHubSubscription(in: content)
+        refreshed.relativePath = relativePath
+        refreshed.localStorageRelativePath = relativePath
+        refreshed.sourceURL = subscription?.originalURL ?? fileURL.absoluteString
+        refreshed.sourceFormat = subscription?.sourceFormat ?? .surge
+        refreshed.scriptHubSubscription = subscription
+        refreshed.scriptHubOptions = subscription?.options ?? ScriptHubOptions()
+        refreshed.sourceContentHash = subscription == nil ? data.sha256String : nil
+        return LocalModuleImportSourceSnapshot(candidate: refreshed, fileURL: fileURL, data: data)
+    }
+
     static func candidates(
         in rootDirectoryPath: String,
         combinedFileName: String,
@@ -169,7 +216,9 @@ enum LocalModuleScanner {
             throw RelayError.invalidOutput("请先设置本地模块根目录。")
         }
 
-        let root = URL(filePath: trimmedPath, directoryHint: .isDirectory).standardizedFileURL
+        guard let root = LocalSourcePathResolver.canonicalDirectoryURL(for: trimmedPath) else {
+            throw RelayError.invalidOutput("请先设置本地模块根目录。")
+        }
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: root.path, isDirectory: &isDirectory), isDirectory.boolValue else {
             throw RelayError.invalidOutput("本地模块根目录不存在。")
@@ -178,12 +227,18 @@ enum LocalModuleScanner {
         let combined = ModuleOutputFolder.relativePath(
             fileName: combinedFileName,
             folder: ModuleOutputFolder.root
-        ).lowercased()
-        var existingSources = Set(existingModules.map { ModuleSourceIdentity.canonicalValue(for: $0.updateSourceURL) })
-        var existingPaths = Set(existingModules.map { $0.publishedRelativePath.lowercased() })
-        existingPaths.formUnion(existingModules.compactMap { $0.localStorageRelativePath?.lowercased() })
-        existingPaths.formUnion(publishedFilePaths.map { ModuleOutputFolder.normalized($0).lowercased() })
-        existingPaths.insert(combined)
+        )
+        let combinedKey = LocalSourcePathResolver.pathIdentity(combined)
+        var existingSources = Set(existingModules.flatMap {
+            [$0.updateSourceURL, $0.sourceURL].map(ModuleSourceIdentity.canonicalValue)
+        })
+        var existingPaths = Set(existingModules.map { LocalSourcePathResolver.pathIdentity($0.publishedRelativePath) })
+        existingPaths.formUnion(existingModules.compactMap { $0.localStorageRelativePath }.map(LocalSourcePathResolver.pathIdentity))
+        existingPaths.formUnion(existingModules.compactMap {
+            LocalSourcePathResolver.storageRelativePath(for: $0, rootDirectoryPath: root.path)
+        }.map(LocalSourcePathResolver.pathIdentity))
+        existingPaths.formUnion(publishedFilePaths.map(LocalSourcePathResolver.pathIdentity))
+        existingPaths.insert(combinedKey)
 
         guard let enumerator = FileManager.default.enumerator(
             at: root,
@@ -196,22 +251,28 @@ enum LocalModuleScanner {
         var values: [LocalModuleScanCandidate] = []
         var skipped: [LocalModuleScanSkippedFile] = []
         var seenPaths = Set<String>()
-        for case let fileURL as URL in enumerator {
-            let standardizedURL = fileURL.standardizedFileURL
+        let fileURLs = enumerator.compactMap { $0 as? URL }.sorted {
+            $0.path.localizedStandardCompare($1.path) == .orderedAscending
+        }
+        for fileURL in fileURLs {
+            let standardizedURL = fileURL.standardizedFileURL.resolvingSymlinksInPath().standardizedFileURL
             guard standardizedURL.pathExtension.lowercased() == "sgmodule",
                   (try? standardizedURL.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else {
                 continue
             }
-            guard let relativePath = relativePath(for: standardizedURL, root: root) else {
+            guard let relativePath = LocalSourcePathResolver.relativePath(
+                forSourceURL: standardizedURL.absoluteString,
+                rootDirectoryPath: root.path
+            ) else {
                 skipped.append(LocalModuleScanSkippedFile(
                     relativePath: standardizedURL.lastPathComponent,
                     reason: "无法解析相对路径"
                 ))
                 continue
             }
-            let normalizedRelativePath = normalizeRelativePath(relativePath)
-            let relativeKey = normalizedRelativePath.lowercased()
-            if relativeKey == combined {
+            let normalizedRelativePath = relativePath
+            let relativeKey = LocalSourcePathResolver.pathIdentity(relativePath)
+            if relativeKey == combinedKey {
                 skipped.append(LocalModuleScanSkippedFile(
                     relativePath: normalizedRelativePath,
                     reason: "这是当前总模块文件"
@@ -257,6 +318,13 @@ enum LocalModuleScanner {
                 ))
                 continue
             }
+            if ManagedPublishedFile.hasManagementHeader(data) {
+                skipped.append(LocalModuleScanSkippedFile(
+                    relativePath: normalizedRelativePath,
+                    reason: "这是 Surge Relay 发布文件"
+                ))
+                continue
+            }
             guard let content = String(data: data, encoding: .utf8) else {
                 skipped.append(LocalModuleScanSkippedFile(
                     relativePath: normalizedRelativePath,
@@ -292,7 +360,8 @@ enum LocalModuleScanner {
                 outputFolder: ModuleOutputFolder.normalized(outputFolder),
                 scriptHubOptions: subscription?.options ?? ScriptHubOptions(),
                 scriptHubSubscription: subscription,
-                sourceContentHash: sourceContentHash
+                sourceContentHash: sourceContentHash,
+                rootDirectoryPath: root.path
             ))
         }
 
@@ -304,19 +373,5 @@ enum LocalModuleScanner {
                 lhs.relativePath.localizedStandardCompare(rhs.relativePath) == .orderedAscending
             }
         )
-    }
-
-    private static func relativePath(for fileURL: URL, root: URL) -> String? {
-        let rootPath = root.path.hasSuffix("/") ? root.path : root.path + "/"
-        guard fileURL.path.hasPrefix(rootPath) else { return nil }
-        return String(fileURL.path.dropFirst(rootPath.count))
-    }
-
-    private static func normalizeRelativePath(_ path: String) -> String {
-        path.replacingOccurrences(of: "\\", with: "/")
-            .split(separator: "/")
-            .map(String.init)
-            .filter { !$0.isEmpty && $0 != "." && $0 != ".." }
-            .joined(separator: "/")
     }
 }

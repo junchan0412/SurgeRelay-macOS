@@ -656,19 +656,67 @@ actor ModuleFileStore {
         toRootDirectory rootDirectoryPath: String,
         removingObsoleteRelativePaths obsoleteRelativePaths: [String] = [],
         knownManagedRelativePaths: [String] = [],
-        expectedExistingHashes: [String: String] = [:]
+        expectedExistingHashes: [String: String] = [:],
+        protectedSourcePaths: [String] = []
     ) throws -> [String] {
-        let root = URL(filePath: rootDirectoryPath, directoryHint: .isDirectory)
+        guard let root = LocalSourcePathResolver.canonicalDirectoryURL(for: rootDirectoryPath) else {
+            throw RelayError.invalidOutput("本地发布根目录无效。")
+        }
+        let destinations = try files.map { try exportURL(root: root, relativePath: $0.name) }
+        var destinationPaths = Set<String>()
+        for destination in destinations {
+            let identity = Self.normalizedRelativePath(destination.path)
+            guard destinationPaths.insert(identity).inserted else {
+                throw RelayError.invalidOutput("本地发布列表包含重复路径：\(destination.lastPathComponent)")
+            }
+        }
+        for path in destinationPaths {
+            var parent = (path as NSString).deletingLastPathComponent
+            while !parent.isEmpty, parent != "/" {
+                guard !destinationPaths.contains(parent) else {
+                    throw RelayError.invalidOutput("本地发布文件与目录路径冲突。")
+                }
+                parent = (parent as NSString).deletingLastPathComponent
+            }
+        }
+        let currentPaths = Set(files.map { Self.normalizedRelativePath($0.name) })
+        let protectedPaths = Set(protectedSourcePaths.map(Self.normalizedRelativePath))
+        guard currentPaths.isDisjoint(with: protectedPaths) else {
+            throw RelayError.invalidOutput("发布目标包含已登记的本地来源文件，已停止写入。")
+        }
+        let obsoletePaths = obsoleteRelativePaths.filter {
+            let identity = Self.normalizedRelativePath($0)
+            return !currentPaths.contains(identity) && !protectedPaths.contains(identity)
+        }
+        for path in obsoletePaths + knownManagedRelativePaths { _ = try exportURL(root: root, relativePath: path) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        let currentPaths = Set(files.map(\.name))
+        var expectedSnapshots: [String: PublishedFileSnapshot] = [:]
+        for path in files.map(\.name) + obsoletePaths {
+            expectedSnapshots[Self.normalizedRelativePath(path)] = try publishedFileSnapshot(at: exportURL(root: root, relativePath: path))
+        }
         let recoveredPaths = try recoverPublishedResourcePaths(rootDirectoryPath: rootDirectoryPath)
-        let receiptPaths = try verifiedResourceReceiptPaths(root: canonicalResourceRoot(root), paths: currentPaths.union(obsoleteRelativePaths))
+        let receiptPaths = try verifiedResourceReceiptPaths(root: root, paths: Set(files.map(\.name)).union(obsoletePaths),
+            pendingPaths: Set(recoveredPaths))
         let knownManagedPaths = Set((knownManagedRelativePaths + recoveredPaths + receiptPaths).map(Self.normalizedRelativePath))
+        for file in files {
+            _ = try validatePublishedFile(at: exportURL(root: root, relativePath: file.name),
+                relativePath: file.name,
+                isKnownManagedPath: knownManagedPaths.contains(Self.normalizedRelativePath(file.name)),
+                expectedExistingHash: expectedExistingHashes[file.name],
+                expectedSnapshot: expectedSnapshots[Self.normalizedRelativePath(file.name)], deleting: false)
+        }
+        for path in obsoletePaths {
+            _ = try validatePublishedFile(at: exportURL(root: root, relativePath: path), relativePath: path,
+                isKnownManagedPath: knownManagedPaths.contains(Self.normalizedRelativePath(path)),
+                expectedExistingHash: expectedExistingHashes[path],
+                expectedSnapshot: expectedSnapshots[Self.normalizedRelativePath(path)], deleting: true)
+        }
         var removedPaths: [String] = []
 
         var writtenPaths: [String] = []
         do {
-            for relativePath in obsoleteRelativePaths where !currentPaths.contains(relativePath) {
+            var removedIdentities = Set<String>()
+            for relativePath in obsoletePaths where removedIdentities.insert(Self.normalizedRelativePath(relativePath)).inserted {
                 let destination = try exportURL(root: root, relativePath: relativePath)
                 let existed = FileManager.default.fileExists(atPath: destination.path)
                 if !existed, let expected = expectedExistingHashes[relativePath], expected != "<missing>" {
@@ -676,8 +724,10 @@ actor ModuleFileStore {
                 }
                 if existed {
                     try removeManagedPublishedFile(at: destination, relativePath: relativePath,
+                                                   rootDirectory: root,
                                                    isKnownManagedPath: knownManagedPaths.contains(Self.normalizedRelativePath(relativePath)),
-                                                   expectedExistingHash: expectedExistingHashes[relativePath])
+                                                   expectedExistingHash: expectedExistingHashes[relativePath],
+                                                   expectedSnapshot: expectedSnapshots[Self.normalizedRelativePath(relativePath)])
                     if existed {
                         removedPaths.append(relativePath)
                         try removeEmptyParentDirectories(startingAt: destination.deletingLastPathComponent(), root: root)
@@ -697,7 +747,8 @@ actor ModuleFileStore {
                     relativePath: file.name,
                     rootDirectory: root,
                     isKnownManagedPath: knownManagedPaths.contains(Self.normalizedRelativePath(file.name)),
-                    expectedExistingHash: expectedExistingHashes[file.name]
+                    expectedExistingHash: expectedExistingHashes[file.name],
+                    expectedSnapshot: expectedSnapshots[Self.normalizedRelativePath(file.name)]
                 )
                 writtenPaths.append(file.name)
             }
@@ -791,7 +842,9 @@ actor ModuleFileStore {
         for relativePath in Set(relativePaths).sorted() {
             let destination = try exportURL(root: directory, relativePath: relativePath)
             guard FileManager.default.fileExists(atPath: destination.path) else { continue }
-            try FileManager.default.removeItem(at: destination)
+            let data = try Data(contentsOf: destination)
+            guard ManagedPublishedFile.isManaged(data, relativePath: relativePath) else { continue }
+            try removeManagedPublishedFile(at: destination, relativePath: relativePath, rootDirectory: directory)
             removedPaths.append(relativePath)
             try removeEmptyParentDirectories(startingAt: destination.deletingLastPathComponent(), root: directory)
         }
@@ -831,7 +884,7 @@ actor ModuleFileStore {
         let root = URL(filePath: rootDirectoryPath, directoryHint: .isDirectory)
         let destination = try exportURL(root: root, relativePath: relativePath)
         if FileManager.default.fileExists(atPath: destination.path) {
-            try removeManagedPublishedFile(at: destination, relativePath: relativePath)
+            try removeManagedPublishedFile(at: destination, relativePath: relativePath, rootDirectory: root)
         }
     }
 
@@ -862,33 +915,73 @@ actor ModuleFileStore {
             options: .forDeleting,
             error: &coordinationError
         ) { coordinatedURL in
-            outcome.result = Result { try FileManager.default.removeItem(at: coordinatedURL) }
+            outcome.result = Result {
+                guard try exportURL(root: root, relativePath: relativePath) == coordinatedURL.standardizedFileURL else {
+                    throw RelayError.invalidOutput("本地删除目标在协调期间变化，已停止操作。")
+                }
+                try FileManager.default.removeItem(at: coordinatedURL)
+            }
         }
         if let coordinationError { throw coordinationError }
         try outcome.result?.get()
     }
 
     private func exportURL(root: URL, relativePath: String) throws -> URL {
-        let components = relativePath
-            .replacingOccurrences(of: "\\", with: "/")
-            .split(separator: "/")
-            .map(String.init)
-        guard !components.isEmpty,
-              components.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else {
+        let path = relativePath.replacingOccurrences(of: "\\", with: "/")
+        let components = path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+        guard !path.hasPrefix("/"), !path.contains("\0"), !path.contains(where: \.isNewline),
+              !components.isEmpty, components.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else {
             throw RelayError.invalidOutput("发布路径无效。")
         }
 
-        var url = root
-        for component in components.dropLast() {
-            url = url.appending(path: component, directoryHint: .isDirectory)
+        let canonicalRoot = canonicalResourceRoot(root)
+        var url = canonicalRoot
+        for (index, component) in components.enumerated() {
+            url = url.appending(path: component)
+            var info = stat()
+            let result = url.path.withCString { Darwin.lstat($0, &info) }
+            if result == 0 {
+                let type = info.st_mode & mode_t(S_IFMT)
+                guard type != mode_t(S_IFLNK) else {
+                    throw RelayError.invalidOutput("发布路径包含符号链接，已停止操作：\(relativePath)")
+                }
+                if index < components.count - 1, type != mode_t(S_IFDIR) {
+                    throw RelayError.invalidOutput("发布目录路径被文件占用：\(relativePath)")
+                }
+                if index == components.count - 1, type != mode_t(S_IFREG) {
+                    throw RelayError.invalidOutput("发布目标不是普通文件：\(relativePath)")
+                }
+            } else if errno != ENOENT {
+                throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+            }
         }
-        return url.appending(path: components[components.count - 1])
+        guard url.path.hasPrefix(canonicalRoot.path.hasSuffix("/") ? canonicalRoot.path : canonicalRoot.path + "/") else {
+            throw RelayError.invalidOutput("发布路径位于本地根目录之外。")
+        }
+        return url
     }
 
     private struct ResourceIdentity: Codable, Equatable {
         var device: UInt64
         var inode: UInt64
         var birthTime: TimeInterval
+    }
+
+    private struct PublishedFileSnapshot: Equatable {
+        var identity: ResourceIdentity?
+        var contentHash: String?
+    }
+
+    private func publishedFileSnapshot(at url: URL) throws -> PublishedFileSnapshot {
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            return PublishedFileSnapshot()
+        }
+        let identity = try resourceIdentity(at: url)
+        let data = try Data(contentsOf: url)
+        guard try resourceIdentity(at: url) == identity else {
+            throw RelayError.invalidOutput("本地文件在读取期间变化，请重新预览。")
+        }
+        return PublishedFileSnapshot(identity: identity, contentHash: data.sha256String)
     }
 
     private struct PublishedResourceJournal: Codable {
@@ -921,29 +1014,42 @@ actor ModuleFileStore {
 
     private func resourceReceiptURL(_ journal: PublishedResourceJournal) throws -> URL {
         try resourceReceiptScope(rootPath: journal.rootPath, identity: journal.rootIdentity)
-            .appending(path: Data(journal.relativePath.utf8).sha256String + ".json")
+            .appending(path: Data(Self.normalizedRelativePath(journal.relativePath).utf8).sha256String + ".json")
     }
 
     private func persistResourceReceipt(_ journal: PublishedResourceJournal) throws {
         let url = try resourceReceiptURL(journal)
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try writeRestoreData(JSONEncoder().encode(journal), to: url)
+        let legacyURL = url.deletingLastPathComponent().appending(path: Data(journal.relativePath.utf8).sha256String + ".json")
+        if legacyURL != url, FileManager.default.fileExists(atPath: legacyURL.path) {
+            try FileManager.default.removeItem(at: legacyURL)
+        }
     }
 
-    private func verifiedResourceReceiptPaths(root: URL, paths requestedPaths: Set<String>) throws -> [String] {
+    private func verifiedResourceReceiptPaths(root: URL, paths requestedPaths: Set<String>, pendingPaths: Set<String> = []) throws -> [String] {
         guard FileManager.default.fileExists(atPath: root.path) else { return [] }
         let identity = try resourceIdentity(at: root)
         let directory = try resourceReceiptScope(rootPath: root.path, identity: identity)
         guard FileManager.default.fileExists(atPath: directory.path) else { return [] }
         var paths: [String] = []
-        let candidates = requestedPaths.map { directory.appending(path: Data($0.utf8).sha256String + ".json") }
+        let pendingIdentities = Set(pendingPaths.map(Self.normalizedRelativePath))
+        let candidates = Set(requestedPaths.flatMap {
+            [directory.appending(path: Data($0.utf8).sha256String + ".json"),
+             directory.appending(path: Data(Self.normalizedRelativePath($0).utf8).sha256String + ".json")]
+        })
         for url in candidates where FileManager.default.fileExists(atPath: url.path) {
             let receipt = try JSONDecoder().decode(PublishedResourceJournal.self, from: Data(contentsOf: url))
+            let legacyURL = directory.appending(path: Data(receipt.relativePath.utf8).sha256String + ".json")
             guard receipt.rootPath == root.path, receipt.rootIdentity == identity,
                   !ManagedPublishedFile.requiresInlineMarker(receipt.relativePath),
-                  try resourceReceiptURL(receipt) == url else { throw RelayError.invalidOutput("资源归属凭据无效。") }
+                  try resourceReceiptURL(receipt) == url || legacyURL == url else { throw RelayError.invalidOutput("资源归属凭据无效。") }
             let destination = try exportURL(root: root, relativePath: receipt.relativePath)
-            if matchesResource(destination, journal: receipt) { paths.append(receipt.relativePath) }
+            if matchesResource(destination, journal: receipt) {
+                paths.append(receipt.relativePath)
+            } else if FileManager.default.fileExists(atPath: destination.path), !pendingIdentities.contains(Self.normalizedRelativePath(receipt.relativePath)) {
+                throw RelayError.invalidOutput("资源 \(receipt.relativePath) 已被外部修改，不属于 Surge Relay 管理，已停止操作。")
+            }
         }
         return paths
     }
@@ -1014,17 +1120,18 @@ actor ModuleFileStore {
     func acknowledgePublishedResources(paths: [String], rootDirectoryPath: String) throws {
         let root = canonicalResourceRoot(URL(filePath: rootDirectoryPath, directoryHint: .isDirectory))
         let journals = try resourceJournals(rootDirectory: root)
-        let requested = Set(paths)
+        let requested = Set(paths.map(Self.normalizedRelativePath))
         var current: [String: PublishedResourceJournal] = [:]
-        for journal in journals where requested.contains(journal.relativePath) {
+        for journal in journals where requested.contains(Self.normalizedRelativePath(journal.relativePath)) {
             let destination = try exportURL(root: root, relativePath: journal.relativePath)
-            if matchesResource(destination, journal: journal) { current[journal.relativePath] = journal }
+            if matchesResource(destination, journal: journal) { current[Self.normalizedRelativePath(journal.relativePath)] = journal }
         }
-        let verified = Set(current.keys).union(try verifiedResourceReceiptPaths(root: root, paths: requested)).intersection(requested)
+        let receipts = try verifiedResourceReceiptPaths(root: root, paths: Set(paths), pendingPaths: Set(current.keys))
+        let verified = Set(current.keys).union(receipts.map(Self.normalizedRelativePath)).intersection(requested)
         try resourceCheckpoint(.acknowledging)
         for journal in current.values { try persistResourceReceipt(journal) }
         try resourceCheckpoint(.ownershipPersisted)
-        for journal in journals where verified.contains(journal.relativePath) {
+        for journal in journals where verified.contains(Self.normalizedRelativePath(journal.relativePath)) {
             let destination = try exportURL(root: root, relativePath: journal.relativePath)
             let stage = resourceStageURL(journal, destination: destination)
             if matchesResourceIdentity(stage, journal: journal) { try FileManager.default.removeItem(at: stage) }
@@ -1035,7 +1142,8 @@ actor ModuleFileStore {
     }
 
     private func discardUnpublishedResourceStages(root: URL, relativePath: String) throws {
-        for journal in try resourceJournals(rootDirectory: root) where journal.relativePath == relativePath {
+        for journal in try resourceJournals(rootDirectory: root)
+            where Self.normalizedRelativePath(journal.relativePath) == Self.normalizedRelativePath(relativePath) {
             let destination = try exportURL(root: root, relativePath: relativePath)
             let stage = resourceStageURL(journal, destination: destination)
             if matchesResourceIdentity(stage, journal: journal), !matchesResource(destination, journal: journal) {
@@ -1045,11 +1153,15 @@ actor ModuleFileStore {
         }
     }
 
-    private func writePublishedResource(_ data: Data, at destination: URL, relativePath: String, rootDirectory: URL) throws {
+    private func writePublishedResource(_ data: Data, at destination: URL, relativePath: String, rootDirectory: URL,
+                                        expectedSnapshot: PublishedFileSnapshot?) throws {
         let root = canonicalResourceRoot(rootDirectory)
         try discardUnpublishedResourceStages(root: root, relativePath: relativePath)
         let id = UUID()
-        let initialHash = (try? Data(contentsOf: destination))?.sha256String ?? "<missing>"
+        let initialSnapshot = try publishedFileSnapshot(at: destination)
+        if let expectedSnapshot, initialSnapshot != expectedSnapshot {
+            throw RelayError.invalidOutput("本地文件在发布预检后变化，请重新预览。")
+        }
         let stage = destination.deletingLastPathComponent().appending(path: ".surge-relay-\(id.uuidString.lowercased()).stage")
         let descriptor = stage.path.withCString { Darwin.open($0, O_WRONLY | O_CREAT | O_EXCL, 0o600) }
         guard descriptor >= 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
@@ -1067,13 +1179,18 @@ actor ModuleFileStore {
             try handle.synchronize()
             try resourceCheckpoint(.staged)
             guard matchesResource(stage, journal: journal) else { throw RelayError.invalidOutput("本地资源暂存内容校验失败。") }
-            let currentHash = (try? Data(contentsOf: destination))?.sha256String ?? "<missing>"
-            guard currentHash == initialHash else { throw RelayError.invalidOutput("本地资源在写入准备期间变化，请重新预览。") }
+            guard try publishedFileSnapshot(at: destination) == initialSnapshot else {
+                throw RelayError.invalidOutput("本地资源在写入准备期间变化，请重新预览。")
+            }
             try resourceCheckpoint(.beforeRename)
-            let finalHash = (try? Data(contentsOf: destination))?.sha256String ?? "<missing>"
-            guard finalHash == initialHash else { throw RelayError.invalidOutput("本地资源在提交前变化，请重新预览。") }
+            guard try exportURL(root: root, relativePath: relativePath) == destination.standardizedFileURL else {
+                throw RelayError.invalidOutput("本地资源提交路径发生变化，已停止操作。")
+            }
+            guard try publishedFileSnapshot(at: destination) == initialSnapshot else {
+                throw RelayError.invalidOutput("本地资源在提交前变化，请重新预览。")
+            }
             let code = stage.path.withCString { source in destination.path.withCString { target in
-                initialHash == "<missing>" ? Darwin.renamex_np(source, target, UInt32(RENAME_EXCL)) : Darwin.rename(source, target)
+                initialSnapshot.identity == nil ? Darwin.renamex_np(source, target, UInt32(RENAME_EXCL)) : Darwin.rename(source, target)
             } }
             guard code == 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
             guard matchesResource(destination, journal: journal) else {
@@ -1092,7 +1209,8 @@ actor ModuleFileStore {
         relativePath: String,
         rootDirectory: URL,
         isKnownManagedPath: Bool,
-        expectedExistingHash: String? = nil
+        expectedExistingHash: String? = nil,
+        expectedSnapshot: PublishedFileSnapshot? = nil
     ) throws {
         let managedData = ManagedPublishedFile.dataWrapping(data, relativePath: relativePath)
         let outcome = CoordinationOutcome<Void>()
@@ -1104,24 +1222,14 @@ actor ModuleFileStore {
             error: &coordinationError
         ) { coordinatedURL in
             outcome.result = Result {
-                if let expectedExistingHash {
-                    let actualHash = (try? Data(contentsOf: coordinatedURL))?.sha256String ?? "<missing>"
-                    guard actualHash == expectedExistingHash else {
-                        throw RelayError.invalidOutput("本地文件在比较后发生变化，请重新比较后确认。")
-                    }
+                guard try exportURL(root: rootDirectory, relativePath: relativePath) == coordinatedURL.standardizedFileURL else {
+                    throw RelayError.invalidOutput("本地发布目标在协调期间变化，已停止操作。")
                 }
-                let conflictVersions = try ManagedPublishedFile.validatedConflictVersions(
-                    at: coordinatedURL,
-                    allowingKnownManagedPath: isKnownManagedPath,
-                    relativePath: relativePath
-                )
+                let conflictVersions = try validatePublishedFile(at: coordinatedURL, relativePath: relativePath,
+                    isKnownManagedPath: isKnownManagedPath, expectedExistingHash: expectedExistingHash,
+                    expectedSnapshot: expectedSnapshot, deleting: false)
                 if FileManager.default.fileExists(atPath: coordinatedURL.path) {
                     let existing = try Data(contentsOf: coordinatedURL)
-                    guard ManagedPublishedFile.isManaged(existing, relativePath: relativePath) || isKnownManagedPath else {
-                        throw RelayError.invalidOutput(
-                            "目标文件 \(relativePath) 已存在且不属于 Surge Relay 管理，已停止写入。"
-                        )
-                    }
                     if conflictVersions.isEmpty, existing == managedData {
                         return
                     }
@@ -1129,7 +1237,8 @@ actor ModuleFileStore {
                 if ManagedPublishedFile.requiresInlineMarker(relativePath) {
                     try managedData.write(to: coordinatedURL, options: .atomic)
                 } else {
-                    try writePublishedResource(managedData, at: coordinatedURL, relativePath: relativePath, rootDirectory: rootDirectory)
+                    try writePublishedResource(managedData, at: coordinatedURL, relativePath: relativePath, rootDirectory: rootDirectory,
+                        expectedSnapshot: expectedSnapshot)
                 }
                 try ManagedPublishedFile.resolve(conflictVersions, at: coordinatedURL)
             }
@@ -1141,7 +1250,37 @@ actor ModuleFileStore {
         try result.get()
     }
 
-    private func removeManagedPublishedFile(at url: URL, relativePath: String, isKnownManagedPath: Bool = false, expectedExistingHash: String? = nil) throws {
+    private func validatePublishedFile(at url: URL, relativePath: String, isKnownManagedPath: Bool,
+                                       expectedExistingHash: String?, expectedSnapshot: PublishedFileSnapshot? = nil,
+                                       deleting: Bool) throws -> [NSFileVersion] {
+        let existing = FileManager.default.fileExists(atPath: url.path) ? try Data(contentsOf: url) : nil
+        if let expectedExistingHash, (existing?.sha256String ?? "<missing>") != expectedExistingHash {
+            throw RelayError.invalidOutput(deleting
+                ? "本地文件在清理预览后发生变化，请重新预览。"
+                : "本地文件在比较后发生变化，请重新比较后确认。")
+        }
+        if let expectedSnapshot {
+            let current = PublishedFileSnapshot(identity: existing == nil ? nil : try resourceIdentity(at: url),
+                contentHash: existing?.sha256String)
+            guard current == expectedSnapshot else {
+                throw RelayError.invalidOutput("本地文件在发布预检后变化，请重新预览。")
+            }
+        }
+        guard let existing else { return [] }
+        let permitsLegacyMigration = isKnownManagedPath && !ManagedPublishedFile.hasManagementHeader(existing)
+            && (!deleting || !ManagedPublishedFile.requiresInlineMarker(relativePath))
+        guard ManagedPublishedFile.isManaged(existing, relativePath: relativePath) || permitsLegacyMigration else {
+            throw RelayError.invalidOutput(deleting
+                ? "旧文件 \(relativePath) 不属于 Surge Relay 管理，已停止自动清理。"
+                : "目标文件 \(relativePath) 已存在且不属于 Surge Relay 管理，已停止写入。")
+        }
+        return try ManagedPublishedFile.validatedConflictVersions(at: url,
+            allowingKnownManagedPath: permitsLegacyMigration, relativePath: relativePath)
+    }
+
+    private func removeManagedPublishedFile(at url: URL, relativePath: String, rootDirectory: URL,
+                                           isKnownManagedPath: Bool = false, expectedExistingHash: String? = nil,
+                                           expectedSnapshot: PublishedFileSnapshot? = nil) throws {
         let outcome = CoordinationOutcome<Void>()
         let coordinator = NSFileCoordinator(filePresenter: nil)
         var coordinationError: NSError?
@@ -1151,25 +1290,13 @@ actor ModuleFileStore {
             error: &coordinationError
         ) { coordinatedURL in
             outcome.result = Result {
-                if let expectedExistingHash {
-                    let actualHash = (try? Data(contentsOf: coordinatedURL))?.sha256String ?? "<missing>"
-                    guard actualHash == expectedExistingHash else {
-                        throw RelayError.invalidOutput("本地文件在清理预览后发生变化，请重新预览。")
-                    }
+                guard try exportURL(root: rootDirectory, relativePath: relativePath) == coordinatedURL.standardizedFileURL else {
+                    throw RelayError.invalidOutput("本地清理目标在协调期间变化，已停止操作。")
                 }
+                let conflictVersions = try validatePublishedFile(at: coordinatedURL, relativePath: relativePath,
+                    isKnownManagedPath: isKnownManagedPath, expectedExistingHash: expectedExistingHash,
+                    expectedSnapshot: expectedSnapshot, deleting: true)
                 guard FileManager.default.fileExists(atPath: coordinatedURL.path) else { return }
-                let existing = try Data(contentsOf: coordinatedURL)
-                let manifestOwnsResource = isKnownManagedPath && !ManagedPublishedFile.requiresInlineMarker(relativePath)
-                guard ManagedPublishedFile.isManaged(existing, relativePath: relativePath) || manifestOwnsResource else {
-                    throw RelayError.invalidOutput(
-                        "旧文件 \(relativePath) 不属于 Surge Relay 管理，已停止自动清理。"
-                    )
-                }
-                let conflictVersions = try ManagedPublishedFile.validatedConflictVersions(
-                    at: coordinatedURL,
-                    allowingKnownManagedPath: manifestOwnsResource,
-                    relativePath: relativePath
-                )
                 try ManagedPublishedFile.resolve(conflictVersions, at: coordinatedURL)
                 try FileManager.default.removeItem(at: coordinatedURL)
             }
@@ -1197,12 +1324,7 @@ actor ModuleFileStore {
     }
 
     private nonisolated static func normalizedRelativePath(_ value: String) -> String {
-        value.replacingOccurrences(of: "\\", with: "/")
-            .split(separator: "/")
-            .map(String.init)
-            .filter { !$0.isEmpty && $0 != "." && $0 != ".." }
-            .joined(separator: "/")
-            .lowercased()
+        LocalSourcePathResolver.pathIdentity(value)
     }
 
 }

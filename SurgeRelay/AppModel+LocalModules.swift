@@ -12,7 +12,9 @@ extension AppModel {
         let rootDirectoryPath = settings.localModuleDirectory
         let combinedFileName = settings.combinedModuleFileName
         let existingModules = modules
-        let publishedFilePaths = settings.localPublishedFilePaths
+        let publishedFilePaths = LocalSourcePathResolver.canonicalDirectoryURL(for: settings.localPublishedRootDirectory ?? "") ==
+            LocalSourcePathResolver.canonicalDirectoryURL(for: rootDirectoryPath)
+            ? settings.localPublishedFilePaths : []
         let report = try await Task.detached(priority: .userInitiated) {
             try LocalModuleScanner.report(
                 in: rootDirectoryPath,
@@ -38,23 +40,38 @@ extension AppModel {
         defer { endWork(.importingLocalModules) }
 
         registerLocalChange()
-        let importPlan = LocalModuleImportPlanner.plan(
-            candidates: candidates,
-            existingModules: modules,
-            combinedModuleFileName: settings.combinedModuleFileName
-        )
+        presentedError = nil
+        statusMessage = "正在从本地文件导入模块…"
+        let rootDirectoryPath = settings.localModuleDirectory
         var imported: [RelayModule] = []
-        var failures = importPlan.failures
+        var failures: [String] = []
 
-        for entry in importPlan.entries {
+        for candidate in candidates {
             guard shouldContinueCurrentWork() else { return }
-            let module = entry.module
             do {
-                let result = try await scriptHubClient.convert(
-                    module: module,
-                    github: settings.github.isConfigured ? settings.github : nil
+                let snapshot = try await Task.detached(priority: .userInitiated) {
+                    try LocalModuleScanner.snapshotForImport(candidate, rootDirectoryPath: rootDirectoryPath)
+                }.value
+                guard shouldContinueCurrentWork() else { return }
+                let importPlan = LocalModuleImportPlanner.plan(
+                    candidates: [snapshot.candidate],
+                    existingModules: modules + imported,
+                    combinedModuleFileName: settings.combinedModuleFileName,
+                    localModuleDirectory: rootDirectoryPath
                 )
-                try await fileStore.writeComponent(result.content, id: module.id)
+                failures.append(contentsOf: importPlan.failures)
+                guard let entry = importPlan.entries.first else { continue }
+                let module = entry.module
+                var nativeModule = module
+                nativeModule.sourceURL = snapshot.fileURL.absoluteString
+                nativeModule.sourceFormat = .surge
+                nativeModule.scriptHubSubscription = nil
+                let result = try await scriptHubClient.convert(
+                    module: nativeModule,
+                    sourceData: snapshot.data
+                )
+                guard shouldContinueCurrentWork() else { return }
+                try await fileStore.commitConversion(result, id: module.id)
                 let fingerprint = await processingWorker.contentFingerprint(
                     of: result.content,
                     assets: result.assets
@@ -66,7 +83,7 @@ extension AppModel {
                 ))
             } catch {
                 guard shouldContinueCurrentWork() else { return }
-                failures.append("\(entry.candidate.relativePath)：\(error.localizedDescription)")
+                failures.append("\(candidate.relativePath)：\(error.localizedDescription)")
             }
         }
 
@@ -91,7 +108,7 @@ extension AppModel {
             return
         }
         refreshLocalSourceWatching()
-        await rebuildCombinedFromCache()
+        guard await rebuildCombinedFromCache(schedulesAutomaticPublish: false, exportsLocalOutput: false) else { return }
         statusMessage = LocalModuleImportPlanner.importStatus(
             importedCount: imported.count,
             failureCount: failures.count

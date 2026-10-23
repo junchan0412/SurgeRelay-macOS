@@ -27,6 +27,9 @@ open_app() {
   local arguments=(-n -F)
   if [[ "${SURGE_RELAY_RUN_UI_QA:-0}" == "1" ]]; then
     arguments+=(--env SURGE_RELAY_UI_QA=1)
+    if [[ -n "${SURGE_RELAY_UI_QA_ROOT:-}" ]]; then
+      arguments+=(--env "SURGE_RELAY_UI_QA_ROOT=$SURGE_RELAY_UI_QA_ROOT")
+    fi
     if [[ -n "${SURGE_RELAY_UI_QA_APPEARANCE:-}" ]]; then
       arguments+=(--env "SURGE_RELAY_UI_QA_APPEARANCE=$SURGE_RELAY_UI_QA_APPEARANCE")
     fi

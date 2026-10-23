@@ -57,16 +57,16 @@ enum ModuleNamingPlanner {
         let combined = ModuleOutputFolder.relativePath(
             fileName: combinedModuleFileName,
             folder: ModuleOutputFolder.root
-        ).lowercased()
-        let unavailable = Set(modules.compactMap { module -> String? in
-            module.id == excludedID ? nil : module.publishedRelativePath.lowercased()
-        } + [combined])
+        )
+        let unavailable = Set(modules.filter { $0.id != excludedID }.flatMap { module in
+            [module.publishedRelativePath] + [module.localStorageRelativePath].compactMap { $0 }
+        }.map(LocalSourcePathResolver.pathIdentity) + [LocalSourcePathResolver.pathIdentity(combined)])
         let relativePath = ModuleOutputFolder.relativePath(
             fileName: normalized,
             folder: folder,
             preservesExistingFileName: draft.storageLocation == .local || preservesExistingFileName
         )
-        guard unavailable.contains(relativePath.lowercased()) else { return normalized }
+        guard unavailable.contains(LocalSourcePathResolver.pathIdentity(relativePath)) else { return normalized }
 
         return uniqueOutputFileName(
             preferredFileName: normalized,
@@ -82,6 +82,7 @@ enum ModuleNamingPlanner {
         unavailable: Set<String>,
         preservesExistingFileName: Bool = false
     ) -> String {
+        let unavailable = Set(unavailable.map(LocalSourcePathResolver.pathIdentity))
         let normalized = preservesExistingFileName
             ? FilenameSanitizer.existingSgmoduleName(from: preferredFileName)
             : FilenameSanitizer.sgmoduleName(from: preferredFileName)
@@ -90,7 +91,7 @@ enum ModuleNamingPlanner {
             folder: folder,
             preservesExistingFileName: preservesExistingFileName
         )
-        guard unavailable.contains(relativePath.lowercased()) else { return normalized }
+        guard unavailable.contains(LocalSourcePathResolver.pathIdentity(relativePath)) else { return normalized }
 
         let base = preservesExistingFileName
             ? FilenameSanitizer.existingFileBaseName(from: normalized)
@@ -102,7 +103,7 @@ enum ModuleNamingPlanner {
                 folder: folder,
                 preservesExistingFileName: preservesExistingFileName
             )
-            if unavailable.contains(relativePath.lowercased()) {
+            if unavailable.contains(LocalSourcePathResolver.pathIdentity(relativePath)) {
                 suffix += 1
             } else {
                 break
@@ -116,15 +117,11 @@ enum ModuleNamingPlanner {
         combinedFileName: String,
         localModuleDirectory: String
     ) -> [RelayModule] {
-        var used = Set<String>()
-        let combined = ModuleOutputFolder.relativePath(
-            fileName: combinedFileName,
-            folder: ModuleOutputFolder.root
-        ).lowercased()
-        return modules.map { value in
+        let normalizedModules = modules.map { value in
             var module = value
             module.outputFolder = ModuleOutputFolder.normalized(module.outputFolder)
             if module.hasLocalStorageTarget {
+                let hadLocalPath = module.localStorageRelativePath != nil
                 if module.localStorageRelativePath == nil {
                     module.localStorageRelativePath = LocalSourcePathResolver.relativePath(
                         forSourceURL: module.sourceURL,
@@ -132,39 +129,50 @@ enum ModuleNamingPlanner {
                     ) ?? module.publishedRelativePath
                 }
                 module.preservesOutputFileName = true
+                let currentOutputPath = module.publishedRelativePath
+                let localSourcePath = LocalSourcePathResolver.relativePath(
+                    forSourceURL: module.sourceURL,
+                    rootDirectoryPath: localModuleDirectory
+                )
+                let localPath = module.localStorageRelativePath
+                let shouldRestorePhysicalPath = localPath.map {
+                    !hadLocalPath || localSourcePath == nil ||
+                        LocalSourcePathResolver.pathIdentity(currentOutputPath) == LocalSourcePathResolver.pathIdentity($0)
+                } ?? false
+                if shouldRestorePhysicalPath,
+                   let components = localPath?.split(separator: "/"),
+                   let fileName = components.last {
+                    module.outputFileName = FilenameSanitizer.existingSgmoduleName(from: String(fileName))
+                    module.outputFolder = components.dropLast().joined(separator: "/")
+                }
             }
-            let localSourceFileName = LocalSourcePathResolver.fileName(
-                forSourceURL: module.sourceURL,
-                rootDirectoryPath: localModuleDirectory
-            )
+            return module
+        }
+        var used = Set(normalizedModules.filter(\.hasLocalStorageTarget).flatMap {
+            [$0.publishedRelativePath] + [$0.localStorageRelativePath].compactMap { $0 }
+        }.map(LocalSourcePathResolver.pathIdentity))
+        let combined = ModuleOutputFolder.relativePath(
+            fileName: combinedFileName,
+            folder: ModuleOutputFolder.root
+        )
+        used.insert(LocalSourcePathResolver.pathIdentity(combined))
+        return normalizedModules.map { value in
+            var module = value
+            guard !module.hasLocalStorageTarget else { return module }
             let preservesExistingFileName = module.preservesOutputFileName ||
                 URL(string: module.sourceURL)?.isFileURL == true
-            let preferredValue = localSourceFileName
-                ?? (module.outputFileName.isEmpty ? module.name : module.outputFileName)
+            let preferredValue = module.outputFileName.isEmpty ? module.name : module.outputFileName
             let preferred = preservesExistingFileName
                 ? FilenameSanitizer.existingSgmoduleName(from: preferredValue)
                 : FilenameSanitizer.sgmoduleName(from: preferredValue)
-            let base = preservesExistingFileName
-                ? FilenameSanitizer.existingFileBaseName(from: preferred)
-                : FilenameSanitizer.baseName(from: preferred)
-            var candidate = preferred
-            var suffix = 2
-            var relative = ModuleOutputFolder.relativePath(
-                fileName: candidate,
+            let candidate = uniqueOutputFileName(
+                preferredFileName: preferred,
                 folder: module.outputFolder,
+                unavailable: used,
                 preservesExistingFileName: preservesExistingFileName
             )
-            while used.contains(relative.lowercased()) || relative.lowercased() == combined {
-                candidate = "\(base)-\(suffix).sgmodule"
-                relative = ModuleOutputFolder.relativePath(
-                    fileName: candidate,
-                    folder: module.outputFolder,
-                    preservesExistingFileName: preservesExistingFileName
-                )
-                suffix += 1
-            }
-            used.insert(relative.lowercased())
             module.outputFileName = candidate
+            used.insert(LocalSourcePathResolver.pathIdentity(module.publishedRelativePath))
             return module
         }
     }

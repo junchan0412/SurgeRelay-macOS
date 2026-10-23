@@ -165,6 +165,26 @@ final class RelayRuntimeTests: XCTestCase {
         XCTAssertEqual(model.settings.localPublishedRootDirectory, root.path)
     }
 
+    func testCurrentAndSelectedPublishDoNotReplaceManifestAfterRootChangesDuringExport() async throws {
+        for selected in [false, true] {
+            try await assertLocalPublishRejectsContextChange(.root, selected: selected)
+        }
+    }
+
+    func testCurrentAndSelectedPublishRetainJournalAfterGenerationOrWorkspaceChangesDuringExport() async throws {
+        for selected in [false, true] {
+            for change in [LocalPublishContextChange.generation, .transition, .retirement] {
+                try await assertLocalPublishRejectsContextChange(change, selected: selected)
+            }
+        }
+    }
+
+    func testPartialLocalPublishDoesNotReplaceManifestAfterRootChangesDuringExport() async throws {
+        for selected in [false, true] {
+            try await assertLocalPublishRejectsContextChange(.root, selected: selected, failsAfterWrite: true)
+        }
+    }
+
     func testFailedRestorePreservesManualOverride() async throws {
         guard AppRuntimeOptions.isUIQAMode else { throw XCTSkip("Requires isolated QA configuration") }
         let model = isolatedModel()
@@ -343,8 +363,292 @@ final class RelayRuntimeTests: XCTestCase {
         XCTAssertNil(model.persistenceError)
     }
 
+    func testDuplicateLocalModuleKeepsDistinctOutputAfterReload() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let context = WorkspaceContext(
+            id: UUID(), name: "Duplicate regression",
+            configurationDirectory: root.appending(path: "Configuration"),
+            cacheDirectory: root.appending(path: "Cache"), allowsLegacyFallback: false
+        )
+        let model = AppModel(context: context, persistsOnInit: false)
+        model.workspaceIsActive = false
+        model.settings.publishToLocal = false
+        model.settings.publishToGitHub = false
+        model.settings.localModuleDirectory = root.appending(path: "Modules").path
+        let source = RelayModule(
+            name: "Local",
+            sourceURL: root.appending(path: "Modules/My Module.sgmodule").absoluteString,
+            outputFileName: "My Module.sgmodule",
+            storageLocation: .local,
+            localStorageRelativePath: "My Module.sgmodule"
+        )
+        model.modules = [source]
+
+        try model.duplicateModule(id: source.id)
+        try await model.flushPersistence()
+        let copy = try XCTUnwrap(model.modules.last)
+        XCTAssertEqual(copy.outputFileName, "My Module-2.sgmodule")
+        XCTAssertEqual(copy.localStorageRelativePath, "My Module-2.sgmodule")
+        XCTAssertNotEqual(copy.publishedRelativePath, source.publishedRelativePath)
+        let restored = ModuleNamingPlanner.normalizedModuleNaming(
+            model.modules,
+            combinedFileName: model.settings.combinedModuleFileName,
+            localModuleDirectory: model.settings.localModuleDirectory
+        )
+        XCTAssertEqual(restored, model.modules)
+        model.persistenceFeedbackTask?.cancel()
+    }
+
+    func testFullLocalRebuildPublishesAndRetainsCurrentAssets() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let context = WorkspaceContext(id: UUID(), name: "Local asset regression",
+            configurationDirectory: root.appending(path: "Configuration"), cacheDirectory: root.appending(path: "Cache"),
+            allowsLegacyFallback: false)
+        let model = AppModel(context: context, persistsOnInit: false)
+        let directory = root.appending(path: "Modules")
+        model.settings.localModuleDirectory = directory.path
+        model.settings.publishToLocal = true
+        model.settings.publishToGitHub = false
+        model.settings.combinedModuleEnabled = false
+        model.settings.watchesLocalModuleChanges = false
+        model.settings.automaticallyPublish = false
+        let module = RelayModule(name: "With assets", sourceURL: "https://test.invalid/assets.sgmodule", sourceFormat: .surge,
+            outputFileName: "With-assets.sgmodule", storageLocation: .local, isEnabled: true)
+        model.modules = [module]
+        let assetPath = "assets/\(module.id.uuidString.lowercased())/demo.js"
+        let content = "#!name=With assets\n[Script]\nDemo = type=http-request, pattern=^https://example.org, script-path=\(assetPath)\n"
+        let firstAsset = Data("const version = 1;".utf8)
+        try await model.fileStore.commitConversion(ConversionResult(content: content,
+            requestURL: try XCTUnwrap(URL(string: module.sourceURL)), assets: [GeneratedAsset(relativePath: assetPath, data: firstAsset)]), id: module.id)
+        let selected = try await model.selectedLocalPublishedFiles(moduleIDs: [module.id])
+        try await model.publishSelectedLocalFiles(selected)
+        XCTAssertEqual(try Data(contentsOf: directory.appending(path: assetPath)), firstAsset)
+
+        for includesCombined in [false, true] {
+            model.settings.combinedModuleEnabled = includesCombined
+            let currentAsset = Data("const combined = \(includesCombined);".utf8)
+            try await model.fileStore.replaceAssets([GeneratedAsset(relativePath: assetPath, data: currentAsset)], id: module.id)
+            let succeeded = await model.rebuildCombinedFromCache(schedulesAutomaticPublish: false)
+            XCTAssertTrue(succeeded, model.presentedError ?? "Local rebuild failed")
+            XCTAssertNil(model.pendingPublishPreview, "Current assets must never appear in obsolete-file cleanup")
+            XCTAssertTrue(model.settings.localPublishedFilePaths.contains(assetPath))
+            XCTAssertEqual(try Data(contentsOf: directory.appending(path: assetPath)), currentAsset)
+        }
+        model.persistenceFeedbackTask?.cancel()
+    }
+
+    func testLocalSelfExportSourceIsNeverProposedOrDeletedByCleanup() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let context = WorkspaceContext(id: UUID(), name: "Source cleanup regression",
+            configurationDirectory: root.appending(path: "Configuration"), cacheDirectory: root.appending(path: "Cache"),
+            allowsLegacyFallback: false)
+        let model = AppModel(context: context, persistsOnInit: false)
+        let directory = root.appending(path: "Modules")
+        model.settings.localModuleDirectory = directory.path
+        model.settings.publishToLocal = true
+        model.settings.publishToGitHub = false
+        model.settings.combinedModuleEnabled = false
+        model.settings.watchesLocalModuleChanges = false
+        model.settings.automaticallyPublish = false
+        let sourcePath = "Source.sgmodule"
+        _ = try await model.fileStore.exportPublishedFiles([
+            PublishFile(name: sourcePath, data: Data("#!name=Source\n[General]\n".utf8)),
+            PublishFile(name: "Old.sgmodule", data: Data("#!name=Old\n[General]\n".utf8))
+        ], toRootDirectory: directory.path)
+        let source = directory.appending(path: sourcePath)
+        let original = try Data(contentsOf: source)
+        model.settings.localPublishedRootDirectory = directory.path
+        model.settings.localPublishedFilePaths = [sourcePath, "Old.sgmodule"]
+        model.modules = [RelayModule(name: "Source", sourceURL: source.absoluteString, sourceFormat: .surge,
+            outputFileName: sourcePath, storageLocation: .local, localStorageRelativePath: sourcePath)]
+
+        try await model.publishCurrentFiles(combinedData: nil)
+        XCTAssertEqual(model.pendingPublishPreview?.deletedFiles, ["Old.sgmodule"])
+        XCTAssertEqual(model.settings.localPublishedFilePaths, ["Old.sgmodule"])
+        await model.confirmPendingPublish()
+        XCTAssertEqual(try Data(contentsOf: source), original)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appending(path: "Old.sgmodule").path))
+        XCTAssertNil(model.pendingPublishPreview)
+
+        model.pendingPublishPreview = PublishPreview(destination: .local, targetDescription: directory.path,
+            activeFiles: [], changedFiles: [], deletedFiles: [sourcePath], localExpectedHashes: [sourcePath: original.sha256String],
+            localReviewFingerprint: model.localCleanupReviewFingerprint())
+        await model.confirmPendingPublish()
+        XCTAssertEqual(try Data(contentsOf: source), original)
+        XCTAssertNotNil(model.presentedError)
+        model.persistenceFeedbackTask?.cancel()
+    }
+
+    func testLocalImportIsIdempotentAndNeverChangesSourceFiles() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let directory = root.appending(path: "Modules")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let original = Data("#!name=Local\n[General]\n".utf8)
+        let source = directory.appending(path: "My Module.sgmodule")
+        try original.write(to: source)
+        let context = WorkspaceContext(
+            id: UUID(), name: "Import regression",
+            configurationDirectory: root.appending(path: "Configuration"),
+            cacheDirectory: root.appending(path: "Cache"), allowsLegacyFallback: false
+        )
+        let model = AppModel(context: context, persistsOnInit: false)
+        model.settings.localModuleDirectory = directory.path
+        model.settings.watchesLocalModuleChanges = false
+        model.settings.combinedModuleEnabled = false
+        model.settings.publishToLocal = true
+        model.settings.publishToGitHub = false
+        model.settings.automaticallyPublish = false
+        model.settings.localPublishedRootDirectory = root.appending(path: "Previous").path
+        model.settings.localPublishedFilePaths = ["My Module.sgmodule"]
+
+        let report = try await model.scanExistingLocalModules()
+        XCTAssertEqual(report.candidates.count, 1)
+        await model.importLocalModules(report.candidates)
+        XCTAssertEqual(model.modules.count, 1)
+        XCTAssertEqual(model.statusMessage, "已导入 1 个本地模块")
+        let imported = try XCTUnwrap(model.modules.first)
+        let content = try await model.fileStore.readConvertedComponent(id: imported.id)
+        XCTAssertTrue(content.contains("#!name=Local"))
+        await model.importLocalModules(report.candidates)
+        XCTAssertEqual(model.modules.count, 1)
+        XCTAssertEqual(try Data(contentsOf: source), original)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.path), ["My Module.sgmodule"])
+        model.persistenceFeedbackTask?.cancel()
+    }
+
+    func testClearOutputPreservesRegisteredSourceWithManagedMarker() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let directory = root.appending(path: "Modules")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let source = directory.appending(path: "Source.sgmodule")
+        let original = ManagedPublishedFile.dataWrapping(Data("#!name=Source\n[Rule]\nFINAL,DIRECT\n".utf8),
+            relativePath: "Source.sgmodule")
+        try original.write(to: source)
+        let context = WorkspaceContext(id: UUID(), name: "Delete regression",
+            configurationDirectory: root.appending(path: "Configuration"),
+            cacheDirectory: root.appending(path: "Cache"), allowsLegacyFallback: false)
+        let model = AppModel(context: context, persistsOnInit: false)
+        model.settings.localModuleDirectory = directory.path
+        model.settings.combinedModuleEnabled = false
+        model.settings.publishToLocal = false
+        model.settings.publishToGitHub = false
+        model.settings.watchesLocalModuleChanges = false
+        let module = RelayModule(name: "Source", sourceURL: source.absoluteString,
+            outputFileName: "Source.sgmodule", storageLocation: .local,
+            localStorageRelativePath: "Source.sgmodule")
+        model.modules = [module]
+
+        model.settings.publishToLocal = true
+        model.settings.localPublishedRootDirectory = directory.path
+        model.settings.localPublishedFilePaths = ["Source.sgmodule"]
+
+        await model.deleteModule(id: module.id, mode: .clearOutput)
+
+        XCTAssertTrue(model.modules.isEmpty)
+        XCTAssertEqual(try Data(contentsOf: source), original)
+        XCTAssertFalse(model.pendingPublishPreview?.deletedFiles.contains("Source.sgmodule") == true)
+        XCTAssertFalse(model.settings.localPublishedFilePaths.contains("Source.sgmodule"))
+        XCTAssertFalse(model.isWorking)
+        model.persistenceFeedbackTask?.cancel()
+    }
+
+    func testFailedOutputDeletionRetainsModuleAndCachedContent() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let directory = root.appending(path: "Modules")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let source = directory.appending(path: "Source.sgmodule")
+        let personal = Data("personal module".utf8)
+        try personal.write(to: source)
+        try FileManager.default.createSymbolicLink(at: directory.appending(path: "Output.sgmodule"),
+            withDestinationURL: source)
+        let context = WorkspaceContext(id: UUID(), name: "Failed delete regression",
+            configurationDirectory: root.appending(path: "Configuration"),
+            cacheDirectory: root.appending(path: "Cache"), allowsLegacyFallback: false)
+        let model = AppModel(context: context, persistsOnInit: false)
+        model.settings.localModuleDirectory = directory.path
+        model.settings.watchesLocalModuleChanges = false
+        let module = RelayModule(name: "Output", sourceURL: "https://test.invalid/output.sgmodule",
+            outputFileName: "Output.sgmodule", storageLocation: .local,
+            localStorageRelativePath: "Output.sgmodule")
+        model.modules = [module]
+        try await model.fileStore.writeComponent("[Rule]\nFINAL,DIRECT", id: module.id)
+        let cached = try await model.fileStore.readComponent(id: module.id)
+
+        await model.deleteModule(id: module.id, mode: .clearOutput)
+
+        XCTAssertEqual(model.modules, [module])
+        XCTAssertTrue(model.presentedError?.contains("符号链接") == true)
+        let retained = try await model.fileStore.readComponent(id: module.id)
+        XCTAssertEqual(retained, cached)
+        XCTAssertEqual(try Data(contentsOf: source), personal)
+        XCTAssertFalse(model.isWorking)
+        model.persistenceFeedbackTask?.cancel()
+    }
+
+    func testSubscribedLocalImportUsesPhysicalBytesAndOnlyRebuildsCache() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let directory = root.appending(path: "Modules")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: directory.appending(path: "assets"), withIntermediateDirectories: true)
+        let source = directory.appending(path: "Subscribed.sgmodule")
+        let original = Data("""
+        #!name=Subscribed Local
+        #SUBSCRIBED http://script.hub/file/_start_/https://upstream.invalid/Loon/demo.plugin/_end_/Subscribed.sgmodule?type=loon-plugin&target=surge-module
+        # Keep this local explanation
+        [Script]
+        Local = type=http-request, pattern=^https://local.example, script-path=assets/local.js
+        """.utf8)
+        let resource = Data("const retained = true;".utf8)
+        try original.write(to: source)
+        try resource.write(to: directory.appending(path: "assets/local.js"))
+        let context = WorkspaceContext(
+            id: UUID(), name: "Subscribed import regression",
+            configurationDirectory: root.appending(path: "Configuration"),
+            cacheDirectory: root.appending(path: "Cache"), allowsLegacyFallback: false
+        )
+        let model = AppModel(context: context, persistsOnInit: false)
+        model.settings.localModuleDirectory = directory.path
+        model.settings.watchesLocalModuleChanges = false
+        model.settings.combinedModuleEnabled = true
+        model.settings.publishToLocal = true
+        model.settings.publishToGitHub = true
+        model.settings.automaticallyPublish = true
+        let contributor = RelayModule(name: "Combined contributor", sourceURL: "https://test.invalid/existing.sgmodule",
+                                      outputFileName: "Existing", isEnabled: true)
+        model.modules = [contributor]
+        try await model.fileStore.writeComponent("[Rule]\nDOMAIN,existing.example,DIRECT", id: contributor.id)
+
+        let report = try await model.scanExistingLocalModules()
+        await model.importLocalModules(report.candidates)
+
+        XCTAssertEqual(model.modules.count, 2)
+        XCTAssertEqual(model.statusMessage, "已导入 1 个本地模块")
+        XCTAssertNil(model.presentedError)
+        XCTAssertNil(model.automaticPublishRunsAt)
+        let imported = try XCTUnwrap(model.modules.last)
+        XCTAssertEqual(imported.sourceFormat, .loon)
+        XCTAssertEqual(imported.updateSourceURL, "https://upstream.invalid/Loon/demo.plugin")
+        XCTAssertEqual(imported.initialSource, .subscribed(.loon))
+        let cached = try await model.fileStore.readConvertedComponent(id: imported.id)
+        XCTAssertTrue(cached.contains("# Keep this local explanation"))
+        XCTAssertTrue(cached.contains("script-path=assets/local.js"))
+        let combined = try await model.fileStore.readCombined()
+        XCTAssertTrue(String(decoding: combined, as: UTF8.self).contains("existing.example"))
+        await model.importLocalModules(report.candidates)
+        XCTAssertEqual(model.modules.count, 2)
+        XCTAssertEqual(try Data(contentsOf: source), original)
+        XCTAssertEqual(try Data(contentsOf: directory.appending(path: "assets/local.js")), resource)
+        XCTAssertEqual(Set(try FileManager.default.contentsOfDirectory(atPath: directory.path)), ["Subscribed.sgmodule", "assets"])
+        model.persistenceFeedbackTask?.cancel()
+    }
+
     func testScheduledRefreshUpdatesOnlyDueModulesAndPreservesCombinedCache() async throws {
-        guard AppRuntimeOptions.isUIQAMode else { throw XCTSkip("Requires isolated QA configuration") }
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -357,7 +661,18 @@ final class RelayRuntimeTests: XCTestCase {
         let slow = RelayModule(name: "Slow", sourceURL: root.appending(path: "Missing-but-not-due.sgmodule").absoluteString,
                                outputFileName: "Slow", isEnabled: true, lastUpdatedAt: now,
                                refreshIntervalMinutes: 60, lastRefreshAttemptAt: now)
-        let model = isolatedModel()
+        let context = WorkspaceContext(
+            id: UUID(), name: "Scheduled refresh regression",
+            configurationDirectory: root.appending(path: "Configuration"),
+            cacheDirectory: root.appending(path: "Cache"), allowsLegacyFallback: false
+        )
+        let model = AppModel(context: context, persistsOnInit: false)
+        model.settings.publishToLocal = false
+        model.settings.publishToGitHub = false
+        model.settings.automaticallyUpdateScriptHub = false
+        model.settings.automaticallyPublish = false
+        model.settings.watchesLocalModuleChanges = false
+        model.settings.localModuleDirectory = root.path
         model.settings.combinedModuleEnabled = true
         model.modules = [fast, slow]
         try await model.fileStore.writeComponent("#!name=Fast\n[Rule]\nDOMAIN,fast-old.example,DIRECT", id: fast.id)
@@ -371,6 +686,7 @@ final class RelayRuntimeTests: XCTestCase {
         try await model.fileStore.removeComponent(id: fast.id)
         try await model.fileStore.removeComponent(id: slow.id)
         try await model.fileStore.removeCombined()
+        model.persistenceFeedbackTask?.cancel()
     }
 
     func testManualRefreshBypassesOrdinaryBackoffButWaitsForServer() async throws {
@@ -397,6 +713,93 @@ final class RelayRuntimeTests: XCTestCase {
         XCTAssertEqual(model.modules.first?.lastRefreshAttemptAt, module.lastRefreshAttemptAt)
         XCTAssertTrue(model.statusMessage.contains("Retry-After"))
         try await model.fileStore.removeComponent(id: module.id)
+    }
+
+    private enum LocalPublishContextChange {
+        case root, generation, transition, retirement
+    }
+
+    private func assertLocalPublishRejectsContextChange(
+        _ change: LocalPublishContextChange,
+        selected: Bool,
+        failsAfterWrite: Bool = false
+    ) async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let context = WorkspaceContext(id: UUID(), name: "Local publish context regression",
+            configurationDirectory: root.appending(path: "Configuration"), cacheDirectory: root.appending(path: "Cache"),
+            allowsLegacyFallback: false)
+        let oldDirectory = root.appending(path: "OldModules")
+        let newDirectory = root.appending(path: "NewModules")
+        let checkpoint = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        let resume = DispatchSemaphore(value: 0)
+        defer { resume.signal() }
+        let store = ModuleFileStore(cacheDirectory: context.cacheDirectory, configurationDirectory: context.configurationDirectory,
+            allowsLegacyFallback: false, resourceInterruption: { phase in
+                guard phase == .renamed else { return }
+                checkpoint.continuation.yield(())
+                guard resume.wait(timeout: .now() + 10) == .success else {
+                    throw RelayError.invalidOutput("Timed out waiting for the context change")
+                }
+                if failsAfterWrite { throw RelayError.invalidOutput("Injected post-write failure") }
+            })
+        let model = AppModel(context: context, fileStore: store, persistsOnInit: false)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        model.settings.localModuleDirectory = oldDirectory.path
+        model.settings.localPublishedRootDirectory = oldDirectory.path
+        model.settings.localPublishedFilePaths = ["Existing.sgmodule"]
+        model.settings.publishToLocal = true
+        model.settings.publishToGitHub = false
+        model.settings.combinedModuleEnabled = false
+        model.settings.automaticallyPublish = false
+        model.settings.watchesLocalModuleChanges = false
+        let module = RelayModule(name: "Context", sourceURL: "https://test.invalid/context.sgmodule", sourceFormat: .surge,
+            outputFileName: "Context.sgmodule", storageLocation: .local)
+        model.modules = [module]
+        let assetPath = "assets/\(module.id.uuidString.lowercased())/context.js"
+        let assetData = Data("const context = 1;".utf8)
+        let content = "#!name=Context\n[Script]\nContext = type=http-request, pattern=^https://example.org, script-path=\(assetPath)\n"
+        try await store.commitConversion(ConversionResult(content: content,
+            requestURL: try XCTUnwrap(URL(string: module.sourceURL)),
+            assets: [GeneratedAsset(relativePath: assetPath, data: assetData)]), id: module.id)
+        let files = [PublishFile(name: module.publishedRelativePath, data: Data(content.utf8)),
+                     PublishFile(name: assetPath, data: assetData)]
+        let publish = Task { @MainActor in
+            defer { checkpoint.continuation.finish() }
+            if selected { try await model.publishSelectedLocalFiles(files) }
+            else { try await model.publishCurrentFiles(combinedData: nil) }
+        }
+        var events = checkpoint.stream.makeAsyncIterator()
+        let reachedCheckpoint = await events.next()
+        XCTAssertNotNil(reachedCheckpoint)
+        switch change {
+        case .root:
+            model.settings.localModuleDirectory = newDirectory.path
+            model.settings.localPublishedRootDirectory = newDirectory.path
+            model.settings.localPublishedFilePaths = ["New.sgmodule"]
+        case .generation:
+            model.registerLocalChange()
+        case .transition:
+            model.isWorkspaceTransitioning = true
+        case .retirement:
+            model.workspaceIsActive = false
+        }
+        let expectedRoot = model.settings.localPublishedRootDirectory
+        let expectedPaths = model.settings.localPublishedFilePaths
+        resume.signal()
+        do {
+            try await publish.value
+            XCTFail("A stale publish must not commit the previous context's manifest")
+        } catch {
+            XCTAssertTrue(error is CancellationError, error.localizedDescription)
+        }
+        XCTAssertEqual(model.settings.localPublishedRootDirectory, expectedRoot)
+        XCTAssertEqual(model.settings.localPublishedFilePaths, expectedPaths)
+        XCTAssertNil(model.pendingPublishPreview)
+        XCTAssertEqual(try Data(contentsOf: oldDirectory.appending(path: assetPath)), assetData)
+        let recovered = try await store.recoverPublishedResourcePaths(rootDirectoryPath: oldDirectory.path)
+        XCTAssertEqual(recovered, [assetPath])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: newDirectory.path))
     }
 
     private func isolatedModel() -> AppModel {

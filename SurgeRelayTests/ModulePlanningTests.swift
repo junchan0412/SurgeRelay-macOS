@@ -378,6 +378,118 @@ final class ModulePlanningTests: XCTestCase {
         XCTAssertEqual(normalized[1].outputFileName, "Surge-Relay-2.sgmodule")
     }
 
+    func testLoadedNamingReservesPhysicalLocalPathBeforeRemoteModule() {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let remote = RelayModule(
+            name: "Remote collision",
+            sourceURL: "https://example.com/remote.sgmodule",
+            outputFileName: "My Module.sgmodule",
+            outputFolder: "Tools",
+            storageLocation: .gitHub,
+            preservesOutputFileName: true
+        )
+        let local = RelayModule(
+            name: "Local",
+            sourceURL: root.appending(path: "Tools/My Module.sgmodule").absoluteString,
+            outputFileName: "My Module.sgmodule",
+            outputFolder: "Tools",
+            storageLocation: .local,
+            localStorageRelativePath: "Tools/My Module.sgmodule"
+        )
+
+        let normalized = ModuleNamingPlanner.normalizedModuleNaming(
+            [remote, local],
+            combinedFileName: "Relay",
+            localModuleDirectory: root.path
+        )
+
+        XCTAssertEqual(normalized[0].publishedRelativePath, "Tools/My Module-2.sgmodule")
+        XCTAssertEqual(normalized[1].publishedRelativePath, "Tools/My Module.sgmodule")
+        XCTAssertEqual(normalized[1].localStorageRelativePath, "Tools/My Module.sgmodule")
+        XCTAssertEqual(ModuleNamingPlanner.normalizedModuleNaming(
+            normalized,
+            combinedFileName: "Relay",
+            localModuleDirectory: root.path
+        ), normalized)
+    }
+
+    func testModuleNamingPlannerReservesLocalPathsAndUnicodeAliases() {
+        let existing = RelayModule(
+            name: "Local",
+            sourceURL: "https://example.com/existing.sgmodule",
+            outputFileName: "Different.sgmodule",
+            storageLocation: .local,
+            localStorageRelativePath: "Tools/Café.sgmodule"
+        )
+        var draft = ModuleDraft(defaultStorageLocation: .local)
+        draft.name = "New"
+        draft.sourceURL = "https://example.com/new.sgmodule"
+        draft.outputFileName = "Cafe\u{301}.sgmodule"
+        draft.outputFolder = "Tools"
+
+        XCTAssertEqual(ModuleNamingPlanner.uniqueOutputFileName(
+            for: draft,
+            source: draft.sourceURL,
+            modules: [existing],
+            combinedModuleFileName: "Relay"
+        ), "Cafe\u{301}-2.sgmodule")
+    }
+
+    func testLoadedNamingPreservesExplicitLocalSourceOutputFolder() {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let module = RelayModule(
+            name: "Local export",
+            sourceURL: root.appending(path: "Sources/My Module.sgmodule").absoluteString,
+            outputFileName: "My Module.sgmodule",
+            outputFolder: "Exports",
+            storageLocation: .local,
+            localStorageRelativePath: "Sources/My Module.sgmodule"
+        )
+
+        let restored = ModuleNamingPlanner.normalizedModuleNaming(
+            [module], combinedFileName: "Relay", localModuleDirectory: root.path
+        )
+
+        XCTAssertEqual(restored, [module])
+        XCTAssertEqual(restored[0].publishedRelativePath, "Exports/My Module.sgmodule")
+        XCTAssertEqual(restored[0].localStorageRelativePath, "Sources/My Module.sgmodule")
+    }
+
+    func testLocalSourcePathResolverUsesPhysicalRootAndSourceIdentity() throws {
+        let base = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let root = base.appending(path: "Modules")
+        let alias = base.appending(path: "Alias")
+        let outside = base.appending(path: "Outside.sgmodule")
+        defer { try? FileManager.default.removeItem(at: base) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let source = root.appending(path: "My Module.sgmodule")
+        try Data("[General]".utf8).write(to: source)
+        try Data("[General]".utf8).write(to: outside)
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: root)
+        let sourceAlias = alias.appending(path: "My Module.sgmodule")
+
+        XCTAssertTrue(ModuleSourceIdentity.matches(source.absoluteString, sourceAlias.absoluteString))
+        XCTAssertEqual(LocalSourcePathResolver.relativePath(
+            forSourceURL: source.absoluteString,
+            rootDirectoryPath: alias.path
+        ), "My Module.sgmodule")
+        let stale = RelayModule(
+            name: "Stale",
+            sourceURL: outside.absoluteString,
+            outputFileName: "My Module.sgmodule",
+            storageLocation: .local,
+            localStorageRelativePath: "My Module.sgmodule"
+        )
+        XCTAssertNil(LocalSourcePathResolver.storageRelativePath(for: stale, rootDirectoryPath: root.path))
+        XCTAssertFalse(PublishCoordinator.shouldSkipStandaloneLocalExport(
+            stale,
+            isLocalExport: true,
+            localModuleDirectory: root.path
+        ))
+        XCTAssertNil(LocalSourcePathResolver.fileURL(relativePath: "../Outside.sgmodule", rootDirectoryPath: root.path))
+        XCTAssertNil(LocalSourcePathResolver.fileURL(relativePath: outside.path, rootDirectoryPath: root.path))
+    }
+
     func testModuleArgumentPlannerStoresOverridesAndClearsDefaults() throws {
         var module = RelayModule(
             name: "Arguments",

@@ -55,14 +55,10 @@ extension AppModel {
         registerLocalChange()
         modules[index] = plan.module
         if let adoptedPath = plan.adoptedLocalPublishedPath {
-            if settings.localPublishedRootDirectory == settings.localModuleDirectory {
-                settings.localPublishedFilePaths = Array(
-                    Set(settings.localPublishedFilePaths).union([adoptedPath])
-                ).sorted()
-            } else {
-                settings.localPublishedRootDirectory = settings.localModuleDirectory
-                settings.localPublishedFilePaths = [adoptedPath]
-            }
+            let localPlan = LocalPublishedFilesPlanner.plan(files: [], targetDirectory: settings.localModuleDirectory,
+                previousRootDirectory: settings.localPublishedRootDirectory, previousPublishedPaths: settings.localPublishedFilePaths)
+            settings.localPublishedRootDirectory = localPlan.targetDirectory
+            settings.localPublishedFilePaths = LocalPublishedFilesPlanner.mergedPaths(localPlan.knownManagedPaths, adding: [adoptedPath])
             saveSettings()
         }
         invalidateModuleSummaryCache()
@@ -116,39 +112,54 @@ extension AppModel {
     func deleteModule(id: UUID, mode: ModuleDeletionMode = .clearOutput) async {
         guard !isWorking else { statusMessage = PreviewContentSaveError.busy.localizedDescription; return }
         guard let index = modules.firstIndex(where: { $0.id == id }) else { return }
+        let module = modules[index]
+        beginWork(.savingPreview)
+        workActivity.title = "删除模块"
+        defer { endWork(.savingPreview) }
+        let protectedPaths = Set(localProtectedSourcePaths(targetDirectory: settings.localModuleDirectory)
+            .map(LocalSourcePathResolver.pathIdentity))
+        do {
+            if module.hasLocalStorageTarget {
+                switch mode {
+                case .removeFromList:
+                    break
+                case .clearOutput:
+                    if !protectedPaths.contains(LocalSourcePathResolver.pathIdentity(module.publishedRelativePath)) {
+                        try await fileStore.removePublishedFile(relativePath: module.publishedRelativePath,
+                            rootDirectoryPath: settings.localModuleDirectory)
+                    }
+                case .deleteAll:
+                    try await fileStore.removePublishedFileForcing(relativePath: module.publishedRelativePath,
+                        rootDirectoryPath: settings.localModuleDirectory)
+                }
+            }
+        } catch {
+            presentedError = "删除模块文件失败：\(error.localizedDescription)"
+            statusMessage = "删除未完成，模块仍保留在管理列表"
+            return
+        }
         registerLocalChange()
-        let module = modules.remove(at: index)
+        let localPlan = LocalPublishedFilesPlanner.plan(files: [], targetDirectory: settings.localModuleDirectory,
+            previousRootDirectory: settings.localPublishedRootDirectory,
+            previousPublishedPaths: settings.localPublishedFilePaths,
+            protectedSourcePaths: Array(protectedPaths))
+        if settings.localPublishedFilePaths != localPlan.knownManagedPaths {
+            settings.localPublishedFilePaths = localPlan.knownManagedPaths
+            saveSettings()
+        }
+        modules.removeAll { $0.id == id }
         modulePreviewDrafts.removeValue(forKey: id)
         invalidateModuleSummaryCache()
         try? await fileStore.removeComponent(id: id)
         try? await fileStore.removeAssets(id: id)
         try? await iconStore.removeIcon(for: id)
-        // 本地模块按删除模式处理磁盘上的输出文件。
-        if module.hasLocalStorageTarget {
-            switch mode {
-            case .removeFromList:
-                break
-            case .clearOutput:
-                if module.publishesStandalone {
-                    try? await fileStore.removePublishedFile(
-                        relativePath: module.publishedRelativePath,
-                        rootDirectoryPath: settings.localModuleDirectory
-                    )
-                }
-            case .deleteAll:
-                try? await fileStore.removePublishedFileForcing(
-                    relativePath: module.publishedRelativePath,
-                    rootDirectoryPath: settings.localModuleDirectory
-                )
-            }
-        }
         try? persistModules()
         refreshLocalSourceWatching()
         selectedModuleID = modules.first?.id
-        await rebuildCombinedFromCache()
+        let rebuiltOutput = await rebuildCombinedFromCache()
         do { try await flushPersistence() }
         catch { statusMessage = "模块已从内存移除，但删除记录尚未保存到磁盘"; return }
-        statusMessage = "已删除 \(module.name)，输出已刷新"
+        if rebuiltOutput { statusMessage = "已删除 \(module.name)，输出已刷新" }
         restartScheduler()
     }
 
@@ -163,8 +174,7 @@ extension AppModel {
             for: draft,
             source: draft.sourceURL,
             modules: modules,
-            combinedModuleFileName: settings.combinedModuleFileName,
-            excluding: source.id
+            combinedModuleFileName: settings.combinedModuleFileName
         )
         var copy = source
         copy.id = UUID()
@@ -180,13 +190,7 @@ extension AppModel {
         copy.state = .never
         copy.lastError = nil
         if copy.hasLocalStorageTarget {
-            copy.localStorageRelativePath = try ModuleNamingPlanner.localStorageRelativePath(
-                storageLocation: .local,
-                source: copy.sourceURL,
-                outputFileName: outputFileName,
-                outputFolder: ModuleOutputFolder.normalized(copy.outputFolder),
-                localModuleDirectory: settings.localModuleDirectory
-            )
+            copy.localStorageRelativePath = copy.publishedRelativePath
             copy.preservesOutputFileName = true
         }
         registerLocalChange()
@@ -212,9 +216,19 @@ extension AppModel {
             var moduleForPlanning = moduleValue
             if let localMetadata,
                moduleForPlanning.localStorageRelativePath != localMetadata.localStorageRelativePath {
+                let previousLocalPath = moduleForPlanning.localStorageRelativePath
+                let followsLocalPath = previousLocalPath.map {
+                    LocalSourcePathResolver.pathIdentity($0) ==
+                        LocalSourcePathResolver.pathIdentity(moduleForPlanning.publishedRelativePath)
+                } ?? true
                 moduleForPlanning.localStorageRelativePath = localMetadata.localStorageRelativePath
-                moduleForPlanning.storageLocation = .local
+                moduleForPlanning.storageTargets.insert(.local)
                 moduleForPlanning.preservesOutputFileName = true
+                if followsLocalPath {
+                    let components = localMetadata.localStorageRelativePath.split(separator: "/")
+                    moduleForPlanning.outputFolder = components.dropLast().joined(separator: "/")
+                    if let fileName = components.last { moduleForPlanning.outputFileName = String(fileName) }
+                }
                 changed = true
             }
             guard let content = try? await fileStore.readComponent(id: moduleValue.id) else {

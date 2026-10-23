@@ -82,6 +82,7 @@
 		D80D80D80D80D80D80D80D80 /* UpdateFailurePlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80E80E80E80E80E80E80E80 /* UpdateFailurePlanner.swift */; };
 		D81D81D81D81D81D81D81D81 /* UpdateFailureFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E81E81E81E81E81E81E81E81 /* UpdateFailureFormatter.swift */; };
 		D90D90D90D90D90D90D90D90 /* GitHubPublishPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90E90E90E90E90E90E90E90 /* GitHubPublishPlanner.swift */; };
+		D54A88485CA57B13F7B4F156 /* LocalSourcePathResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = E54A88485CA57B13F7B4F156 /* LocalSourcePathResolver.swift */; };
 		D93D93D93D93D93D93D93D93 /* PublishCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E93E93E93E93E93E93E93E93 /* PublishCoordinator.swift */; };
 		D9BDD9BDD9BDD9BDD9BDD9BD /* GitHubRESTClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9BEE9BEE9BEE9BEE9BEE9BE /* GitHubRESTClient.swift */; };
 		D91D91D91D91D91D91D91D91 /* ModuleRefreshPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E91E91E91E91E91E91E91E91 /* ModuleRefreshPlanner.swift */; };
@@ -441,6 +442,7 @@
 		E80E80E80E80E80E80E80E80 /* UpdateFailurePlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateFailurePlanner.swift; sourceTree = "<group>"; };
 		E81E81E81E81E81E81E81E81 /* UpdateFailureFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateFailureFormatter.swift; sourceTree = "<group>"; };
 		E90E90E90E90E90E90E90E90 /* GitHubPublishPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubPublishPlanner.swift; sourceTree = "<group>"; };
+		E54A88485CA57B13F7B4F156 /* LocalSourcePathResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalSourcePathResolver.swift; sourceTree = "<group>"; };
 		E93E93E93E93E93E93E93E93 /* PublishCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishCoordinator.swift; sourceTree = "<group>"; };
 		E9BEE9BEE9BEE9BEE9BEE9BE /* GitHubRESTClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubRESTClient.swift; sourceTree = "<group>"; };
 		E91E91E91E91E91E91E91E91 /* ModuleRefreshPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleRefreshPlanner.swift; sourceTree = "<group>"; };
@@ -666,6 +668,7 @@
 				DA24D7A4AEF1770EAB7A055B /* ModuleMerger.swift */,
 				D905BBAE1F590AB7B3F224FE /* PersistenceStore.swift */,
 				E40E40E40E40E40E40E40E40 /* PublishedAddressResolver.swift */,
+				E54A88485CA57B13F7B4F156 /* LocalSourcePathResolver.swift */,
 				E93E93E93E93E93E93E93E93 /* PublishCoordinator.swift */,
 				B33B33B33B33B33B33B33B33 /* PublishFileAssembler.swift */,
 				254A83429BCA625706A87254 /* ScriptHubClient.swift */,
@@ -1201,6 +1204,7 @@
 				D596D087CB06F13BD28D7510 /* SurgeRelayApp.swift in Sources */,
 				A12A12A12A12A12A12A12A12 /* WorkActivity.swift in Sources */,
 				D90D90D90D90D90D90D90D90 /* GitHubPublishPlanner.swift in Sources */,
+				D54A88485CA57B13F7B4F156 /* LocalSourcePathResolver.swift in Sources */,
 				D93D93D93D93D93D93D93D93 /* PublishCoordinator.swift in Sources */,
 				D98D98D98D98D98D98D98D98 /* UpdateCoordinator.swift in Sources */,
 				D81D81D81D81D81D81D81D81 /* UpdateFailureFormatter.swift in Sources */,
@@ -1249,6 +1253,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_ENTITLEMENTS = SurgeRelayUITests/SurgeRelayUITests.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1267,6 +1272,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_ENTITLEMENTS = SurgeRelayUITests/SurgeRelayUITests.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1316,7 +1322,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-			CURRENT_PROJECT_VERSION = 108;
+			CURRENT_PROJECT_VERSION = 109;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1330,7 +1336,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-			MARKETING_VERSION = 2.3.0;
+			MARKETING_VERSION = 2.3.1;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1414,7 +1420,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-			CURRENT_PROJECT_VERSION = 108;
+			CURRENT_PROJECT_VERSION = 109;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -1434,7 +1440,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-			MARKETING_VERSION = 2.3.0;
+			MARKETING_VERSION = 2.3.1;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

@@ -41,7 +41,8 @@ struct SurgeRelayApp: App {
                 .frame(minWidth: 920, minHeight: 600)
         }
         .windowStyle(.automatic)
-        .windowToolbarStyle(.unified(showsTitle: false))
+        .defaultLaunchBehavior(.presented)
+        .windowToolbarStyle(.unified)
         .windowResizability(.contentMinSize)
         .defaultSize(width: 1240, height: 760)
         .commands {

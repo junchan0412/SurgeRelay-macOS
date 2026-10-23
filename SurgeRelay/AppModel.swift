@@ -139,7 +139,8 @@ final class AppModel {
     /// and high-frequency status text churn that would force full-tree observation.
     @ObservationIgnored var defersModulePersistence = false
 
-    init(context: WorkspaceContext? = nil, githubClient: GitHubClient? = nil, persistsOnInit: Bool = true) {
+    init(context: WorkspaceContext? = nil, githubClient: GitHubClient? = nil,
+         fileStore: ModuleFileStore? = nil, persistsOnInit: Bool = true) {
         let contextValue = context ?? WorkspaceContext.legacyDefault
         workspaceID = contextValue.id
         workspaceName = contextValue.name
@@ -154,8 +155,8 @@ final class AppModel {
         scriptHubClient = ScriptHubClient(engineStore: engine, session: session)
         sourceRevisionService = SourceRevisionService(session: session)
         upstreamService = ScriptHubUpstreamService(session: session)
-        fileStore = ModuleFileStore(cacheDirectory: contextValue.cacheDirectory, configurationDirectory: contextValue.configurationDirectory,
-                                    allowsLegacyFallback: contextValue.allowsLegacyFallback)
+        self.fileStore = fileStore ?? ModuleFileStore(cacheDirectory: contextValue.cacheDirectory, configurationDirectory: contextValue.configurationDirectory,
+                                                    allowsLegacyFallback: contextValue.allowsLegacyFallback)
         iconStore = ModuleIconStore(cacheDirectory: contextValue.cacheDirectory, session: session)
         var loadedSettings = PersistenceStore.loadSettings(in: contextValue.configurationDirectory, allowLegacyFallback: contextValue.allowsLegacyFallback)
         if AppRuntimeOptions.isUIQAMode, context == nil || (contextValue.id == WorkspaceContext.legacyID && contextValue.configurationDirectory == PersistenceStore.configurationDirectoryURL) {

@@ -261,7 +261,15 @@ struct ModuleDetailView: View {
                         Spacer(minLength: 0)
                         TextCopyButton(text: error, title: "复制错误")
                     }
-                    Text(error).textSelection(.enabled)
+                    ScrollView {
+                        Text(error)
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(maxHeight: 220)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("module-detail.error")
                     Text(failureCacheNote)
                         .font(.caption)
                         .foregroundStyle(.secondary)

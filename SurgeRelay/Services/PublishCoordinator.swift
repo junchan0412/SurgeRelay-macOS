@@ -162,7 +162,8 @@ enum PublishCoordinator {
               ) else {
             return false
         }
-        return sourceRelativePath.lowercased() == module.publishedRelativePath.lowercased()
+        return LocalSourcePathResolver.pathIdentity(sourceRelativePath)
+            == LocalSourcePathResolver.pathIdentity(module.publishedRelativePath)
     }
 }
 
@@ -172,37 +173,5 @@ private extension ModuleStorageLocation {
         case (.local, .local), (.gitHub, .gitHub): true
         default: false
         }
-    }
-}
-
-enum LocalSourcePathResolver {
-    static func storageRelativePath(
-        for module: RelayModule,
-        rootDirectoryPath: String
-    ) -> String? {
-        // 只有“转换前来源”是本地文件、且该文件位于本地根目录之下的模块，
-        // 才存在需要避免自覆盖的来源文件。远程来源本地模块的
-        // localStorageRelativePath 只是发布输出路径，不是来源，不能当作来源。
-        guard URL(string: module.sourceURL)?.isFileURL == true else { return nil }
-        if module.hasLocalStorageTarget, let relativePath = module.localStorageRelativePath {
-            return ModuleOutputFolder.normalized(relativePath)
-        }
-        return relativePath(forSourceURL: module.sourceURL, rootDirectoryPath: rootDirectoryPath)
-    }
-
-    static func fileName(forSourceURL sourceURL: String, rootDirectoryPath: String) -> String? {
-        guard let relativePath = relativePath(forSourceURL: sourceURL, rootDirectoryPath: rootDirectoryPath) else {
-            return nil
-        }
-        return relativePath.split(separator: "/").last.map(String.init)
-    }
-
-    static func relativePath(forSourceURL sourceURL: String, rootDirectoryPath: String) -> String? {
-        guard let url = URL(string: sourceURL), url.isFileURL else { return nil }
-        let root = URL(filePath: rootDirectoryPath, directoryHint: .isDirectory).standardizedFileURL
-        let source = url.standardizedFileURL
-        let rootPath = root.path.hasSuffix("/") ? root.path : root.path + "/"
-        guard source.path.hasPrefix(rootPath) else { return nil }
-        return ModuleOutputFolder.normalized(String(source.path.dropFirst(rootPath.count)))
     }
 }

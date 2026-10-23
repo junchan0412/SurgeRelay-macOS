@@ -21,7 +21,7 @@ enum ModuleSourceIdentity {
     static func canonicalValue(for source: String) -> String {
         let trimmed = source.trimmingCharacters(in: .whitespacesAndNewlines)
         if let url = URL(string: trimmed), url.isFileURL {
-            return url.standardizedFileURL.absoluteString
+            return url.standardizedFileURL.resolvingSymlinksInPath().standardizedFileURL.absoluteString
         }
         guard var components = URLComponents(string: trimmed) else { return trimmed }
 

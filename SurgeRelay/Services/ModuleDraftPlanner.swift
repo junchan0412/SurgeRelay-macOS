@@ -128,9 +128,8 @@ enum ModuleDraftPlanner {
             combinedModuleFileName: combinedModuleFileName,
             localModuleDirectory: localModuleDirectory
         )
-        guard !modules.contains(where: {
-            ModuleSourceIdentity.matches($0.updateSourceURL, normalizedDraft.source)
-        }) else {
+        guard !hasRegisteredSource(normalizedDraft.source, modules: modules,
+                                   localModuleDirectory: localModuleDirectory) else {
             throw RelayError.duplicateSourceURL
         }
         var module = RelayModule(
@@ -177,9 +176,8 @@ enum ModuleDraftPlanner {
             localModuleDirectory: localModuleDirectory,
             excluding: id
         )
-        guard !modules.contains(where: {
-            $0.id != id && ModuleSourceIdentity.matches($0.updateSourceURL, normalizedDraft.source)
-        }) else {
+        guard !hasRegisteredSource(normalizedDraft.source, modules: modules.filter { $0.id != id },
+                                   localModuleDirectory: localModuleDirectory) else {
             throw RelayError.duplicateSourceURL
         }
 
@@ -248,12 +246,17 @@ enum ModuleDraftPlanner {
             module.iconURL = normalizedDraft.customIconURL
         }
         let adoptedLocalPublishedPath: String? = if current.sourceURL != normalizedDraft.source,
-                                                   URL(string: current.sourceURL)?.isFileURL == true,
+                                                   let currentSourcePath = LocalSourcePathResolver.storageRelativePath(
+                                                    for: current, rootDirectoryPath: localModuleDirectory),
                                                    let newSourceURL = URL(string: normalizedDraft.source),
                                                    ["http", "https"].contains(newSourceURL.scheme?.lowercased()),
                                                    module.hasLocalStorageTarget,
                                                    module.localStorageRelativePath != nil,
-                                                   module.publishesStandalone {
+                                                   module.publishesStandalone,
+                                                   let currentSourceURL = LocalSourcePathResolver.fileURL(relativePath: currentSourcePath,
+                                                    rootDirectoryPath: localModuleDirectory),
+                                                   currentSourceURL == LocalSourcePathResolver.fileURL(relativePath: module.publishedRelativePath,
+                                                    rootDirectoryPath: localModuleDirectory) {
             module.publishedRelativePath
         } else {
             nil
@@ -265,6 +268,35 @@ enum ModuleDraftPlanner {
             customIconChanged: customIconChanged,
             adoptedLocalPublishedPath: adoptedLocalPublishedPath
         )
+    }
+
+    private static func hasRegisteredSource(
+        _ source: String,
+        modules: [RelayModule],
+        localModuleDirectory: String
+    ) -> Bool {
+        let sourceIdentities = Set([
+            source,
+            ModuleMetadataParser.scriptHubSubscription(from: source)?.originalURL
+        ].compactMap { $0 }.map(ModuleSourceIdentity.canonicalValue))
+        let sourcePath = LocalSourcePathResolver.relativePath(
+            forSourceURL: source, rootDirectoryPath: localModuleDirectory
+        ).map(LocalSourcePathResolver.pathIdentity)
+        return modules.contains { module in
+            if [module.sourceURL, module.updateSourceURL].contains(where: {
+                sourceIdentities.contains(ModuleSourceIdentity.canonicalValue(for: $0))
+            }) {
+                return true
+            }
+            guard module.hasLocalStorageTarget, let sourcePath else { return false }
+            return [module.publishedRelativePath, module.localStorageRelativePath].compactMap { $0 }.contains {
+                guard let url = LocalSourcePathResolver.fileURL(relativePath: $0,
+                        rootDirectoryPath: localModuleDirectory),
+                      let path = LocalSourcePathResolver.relativePath(forSourceURL: url.absoluteString,
+                        rootDirectoryPath: localModuleDirectory) else { return false }
+                return LocalSourcePathResolver.pathIdentity(path) == sourcePath
+            }
+        }
     }
 
     private struct NormalizedDraftValues {

@@ -46,6 +46,9 @@ struct LocalModuleImportPreviewView: View {
                 Text("发现 \(candidates.count) 个可导入文件，跳过 \(skippedFiles.count) 个文件。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Text("导入会从当前本地文件建立缓存；已有文件位置保持不变。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(24)
@@ -91,7 +94,8 @@ struct LocalModuleImportPreviewView: View {
                     .font(.caption)
                     .foregroundStyle(hasInvalidSelection ? Design.Palette.error : .secondary)
                 Button("取消", role: .cancel) { dismiss() }
-                Button("导入") {
+                    .disabled(isImporting)
+                Button(isImporting ? "正在导入…" : "导入") {
                     Task { await importSelectedCandidates() }
                 }
                 .buttonStyle(.borderedProminent)
@@ -217,14 +221,12 @@ struct LocalModuleImportPreviewView: View {
                             .textFieldStyle(.roundedBorder)
                     }
                     GridRow {
-                        Text("文件夹")
+                        Text("位置")
                             .foregroundStyle(.secondary)
-                        Picker("", selection: outputFolderBinding(index: index)) {
-                            ForEach(outputFolderOptions(preserving: candidate.outputFolder), id: \.self) { folder in
-                                Text(ModuleOutputFolder.displayTitle(for: folder)).tag(folder)
-                            }
-                        }
-                        .labelsHidden()
+                        Text(candidate.localStorageRelativePath)
+                            .font(.caption.monospaced())
+                            .lineLimit(2)
+                            .textSelection(.enabled)
                     }
                 }
                 .font(.callout)
@@ -298,23 +300,6 @@ struct LocalModuleImportPreviewView: View {
         Binding(
             get: { candidates[index][keyPath: keyPath] },
             set: { candidates[index][keyPath: keyPath] = $0 }
-        )
-    }
-
-    private func outputFolderBinding(index: Int) -> Binding<String> {
-        Binding(
-            get: { ModuleOutputFolder.normalized(candidates[index].outputFolder) },
-            set: { candidates[index].outputFolder = $0 }
-        )
-    }
-
-    private func outputFolderOptions(preserving selected: String) -> [String] {
-        ModuleOutputFolder.options(
-            from: model.moduleOutputFolderOptions(
-                storageLocation: .local,
-                preserving: selected
-            ) + candidates.map(\.outputFolder),
-            preserving: selected
         )
     }
 

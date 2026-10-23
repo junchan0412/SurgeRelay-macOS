@@ -179,9 +179,9 @@ extension AppModel {
         beginWork(.confirmingPublish)
         defer { endWork(.confirmingPublish) }
         do {
-            let currentRoot = URL(filePath: settings.localModuleDirectory).standardizedFileURL.path
-            guard settings.publishToLocal,
-                  currentRoot == URL(filePath: preview.targetDescription).standardizedFileURL.path,
+            guard let currentRoot = LocalSourcePathResolver.canonicalDirectoryURL(for: settings.localModuleDirectory)?.path,
+                  settings.publishToLocal,
+                  currentRoot == LocalSourcePathResolver.canonicalDirectoryURL(for: preview.targetDescription)?.path,
                   let expected = preview.localExpectedHashes,
                   preview.localReviewFingerprint == localCleanupReviewFingerprint(),
                   Set(expected.keys) == Set(preview.deletedFiles) else { throw PreviewContentSaveError.changed }
@@ -191,11 +191,14 @@ extension AppModel {
             }
             let plan = LocalPublishedFilesPlanner.confirmedCleanupPlan(preview: preview,
                 previousRootDirectory: settings.localPublishedRootDirectory,
-                previousPublishedPaths: settings.localPublishedFilePaths)
+                previousPublishedPaths: settings.localPublishedFilePaths,
+                protectedSourcePaths: localProtectedSourcePaths(targetDirectory: currentRoot))
+            guard Set(plan.obsoleteRelativePaths) == Set(preview.deletedFiles) else { throw PreviewContentSaveError.changed }
             try enterNonCancellableWorkPhase(statusMessage: "正在清理确认过的本地旧文件…")
             _ = try await fileStore.exportPublishedFiles([], toRootDirectory: plan.targetDirectory,
                 removingObsoleteRelativePaths: plan.obsoleteRelativePaths,
-                knownManagedRelativePaths: plan.knownManagedRelativePaths, expectedExistingHashes: expected)
+                knownManagedRelativePaths: plan.knownManagedRelativePaths, expectedExistingHashes: expected,
+                protectedSourcePaths: localProtectedSourcePaths(targetDirectory: currentRoot))
             settings.localPublishedRootDirectory = plan.persistedRootDirectory
             settings.localPublishedFilePaths = plan.persistedFilePaths
             pendingPublishPreview = nil

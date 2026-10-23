@@ -3,8 +3,55 @@ import SwiftUI
 @MainActor
 struct ModuleSidebarStatusCard: View {
     @Environment(AppModel.self) private var model
+    @State private var showsErrorDetails = false
 
     var body: some View {
+        ViewThatFits(in: .vertical) {
+            statusContent.fixedSize(horizontal: false, vertical: true)
+            ScrollView {
+                statusContent
+            }
+        }
+        .frame(maxHeight: 190)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Design.Separator.color.opacity(Design.Separator.opacity))
+                .frame(height: Design.Separator.hairline)
+        }
+        .animation(.snappy(duration: 0.22), value: model.workActivity.kind)
+        .animation(.snappy(duration: 0.22), value: model.workActivity.isActive)
+        .animation(.snappy(duration: 0.22), value: model.automaticPublishRunsAt)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("work.status")
+        .sheet(isPresented: $showsErrorDetails) {
+            if let error = model.presentedError {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("错误详情").font(.headline)
+                        Spacer()
+                        TextCopyButton(text: error, title: "复制错误")
+                        Button("关闭") { showsErrorDetails = false }
+                            .keyboardShortcut(.cancelAction)
+                            .accessibilityIdentifier("work.close-error-details")
+                    }
+                    ScrollView {
+                        Text(error)
+                            .font(.callout)
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(maxHeight: 300)
+                }
+                .padding(16)
+                .frame(width: 520, height: 360)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("work.error-detail-content")
+            }
+        }
+    }
+
+    private var statusContent: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let error = model.presentedError {
                 HStack(alignment: .top, spacing: 8) {
@@ -14,8 +61,10 @@ struct ModuleSidebarStatusCard: View {
                     Text(error)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .textSelection(.enabled)
+                        .lineLimit(2)
+                        .truncationMode(.tail)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .help(error)
                     Spacer(minLength: 4)
                     Button {
                         model.presentedError = nil
@@ -26,8 +75,13 @@ struct ModuleSidebarStatusCard: View {
                     .buttonStyle(.plain)
                     .help("关闭错误提示")
                     .accessibilityLabel("关闭错误提示")
+                    .accessibilityIdentifier("work.dismiss-error")
                 }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                Button("查看完整错误…") { showsErrorDetails = true }
+                    .buttonStyle(.borderless)
+                    .controlSize(.small)
+                    .accessibilityIdentifier("work.error-details")
+                .transition(.opacity)
                 Divider()
             }
 
@@ -43,8 +97,9 @@ struct ModuleSidebarStatusCard: View {
                     Text(model.statusMessage)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .textSelection(.enabled)
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .help(model.statusMessage)
                 }
                 Divider()
             }
@@ -56,6 +111,8 @@ struct ModuleSidebarStatusCard: View {
                         Text("\(result.destination.title)：\(result.message)")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .help(result.message)
                     }
                     Button("重试未完成目标") {
                         Task { await model.retrySelectedPublish() }
@@ -76,6 +133,7 @@ struct ModuleSidebarStatusCard: View {
                         HStack(spacing: 8) {
                             Text(name)
                                 .lineLimit(1)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentTransition(.identity)
                             Spacer(minLength: 4)
                             Text("\(model.synchronizationCompletedCount)/\(model.synchronizationTotalCount)")
@@ -112,6 +170,7 @@ struct ModuleSidebarStatusCard: View {
                         let elapsed = stages.map { max(0, Int(context.date.timeIntervalSince($0.startedAt))) }.max() ?? 0
                         Text("\(counts) · \(elapsed) 秒")
                             .font(.caption2).monospacedDigit().foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
                     .help(stages.map { "\($0.moduleName)：\($0.detail ?? $0.stage.title)" }.joined(separator: "\n"))
                     .accessibilityIdentifier("work.stages")
@@ -138,7 +197,7 @@ struct ModuleSidebarStatusCard: View {
                     Text(automaticPublishText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(2)
                 }
                 .transition(.opacity)
                 Divider()
@@ -157,16 +216,6 @@ struct ModuleSidebarStatusCard: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(Design.Separator.color.opacity(Design.Separator.opacity))
-                .frame(height: Design.Separator.hairline)
-        }
-        .animation(.snappy(duration: 0.22), value: model.workActivity.kind)
-        .animation(.snappy(duration: 0.22), value: model.workActivity.isActive)
-        .animation(.snappy(duration: 0.22), value: model.presentedError != nil)
-        .animation(.snappy(duration: 0.22), value: model.automaticPublishRunsAt)
-        .accessibilityIdentifier("work.status")
     }
 
     private var latestUpdateText: String {

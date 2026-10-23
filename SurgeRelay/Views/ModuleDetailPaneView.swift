@@ -63,10 +63,10 @@ struct ModuleDetailPaneView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
         .toolbar {
-            ToolbarSpacer(.flexible)
             if selectionKind != nil {
-                ToolbarItem {
+                ToolbarItem(placement: .primaryAction) {
                     Picker("视图", selection: selectedTabBinding) {
                         Label("概览", systemImage: "info.circle")
                             .accessibilityLabel("详情")
@@ -82,7 +82,7 @@ struct ModuleDetailPaneView: View {
                     .frame(width: 160)
                 }
             }
-            ToolbarItem {
+            ToolbarItem(placement: .primaryAction) {
                 Button {
                     model.presentsSettings = true
                 } label: {

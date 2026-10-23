@@ -193,11 +193,11 @@ final class WebActionTests: XCTestCase {
     func testAutomaticLocalExportRejectsInvalidContentAndPreservesOutput() async throws {
         let (model, module, root) = try await model()
         defer { try? FileManager.default.removeItem(at: root) }
-        try await model.publishCurrentFiles(combinedData: nil, includeAssets: false)
+        try await model.publishCurrentFiles(combinedData: nil)
         let output = root.appending(path: module.publishedRelativePath)
         let valid = try Data(contentsOf: output)
         try await model.fileStore.writeComponent("[Rule\nDOMAIN,broken.example,DIRECT", id: module.id)
-        do { try await model.publishCurrentFiles(combinedData: nil, includeAssets: false); XCTFail("Automatic exports must lint before changing files") }
+        do { try await model.publishCurrentFiles(combinedData: nil); XCTFail("Automatic exports must lint before changing files") }
         catch { XCTAssertTrue(error.localizedDescription.contains("发布前检查")) }
         XCTAssertEqual(try Data(contentsOf: output), valid)
     }
@@ -250,7 +250,7 @@ final class WebActionTests: XCTestCase {
         _ = try await model.fileStore.exportPublishedFiles([PublishFile(name: oldPath, data: Data("[Rule]\nFINAL,DIRECT".utf8))], toRootDirectory: root.path)
         model.settings.localPublishedRootDirectory = root.path
         model.settings.localPublishedFilePaths = [oldPath]
-        try await model.publishCurrentFiles(combinedData: nil, includeAssets: false)
+        try await model.publishCurrentFiles(combinedData: nil)
         XCTAssertEqual(model.pendingPublishPreview?.deletedFiles, [oldPath])
         _ = try await model.fileStore.exportPublishedFiles([PublishFile(name: oldPath, data: Data("[Rule]\nFINAL,REJECT".utf8))],
             toRootDirectory: root.path, knownManagedRelativePaths: [oldPath])

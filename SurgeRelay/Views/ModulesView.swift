@@ -117,21 +117,11 @@ struct ModulesView: View {
                 deleteCandidate: $deleteCandidate,
                 editModule: presentEditor,
                 textEditModule: { textEditModule = $0 },
-                addModule: { editorRoute = ModuleEditorRoute(module: nil) }
+                addModule: { editorRoute = ModuleEditorRoute(module: nil) },
+                isScanningLocalModules: isScanningLocalModules,
+                scanLocalModules: scanLocalModulesForPreview
             )
             .navigationSplitViewColumnWidth(min: 260, ideal: 292, max: 360)
-            .navigationTitle("Surge Relay")
-            .toolbar {
-                if columnVisibility != .detailOnly {
-                    ModuleSidebarToolbarContent(
-                        isBatchSelecting: $isBatchSelecting,
-                        batchSelectedModuleIDs: $batchSelectedModuleIDs,
-                        isScanningLocalModules: isScanningLocalModules,
-                        addModule: { editorRoute = ModuleEditorRoute(module: nil) },
-                        scanLocalModules: scanLocalModulesForPreview
-                    )
-                }
-            }
         } detail: {
             ModuleDetailPaneView(
                 editModule: presentEditor,
@@ -140,6 +130,7 @@ struct ModulesView: View {
                 filterModules: showModules
             )
         }
+        .navigationTitle("Surge Relay")
         .task(id: contentIndexToken) { await rebuildContentIndex() }
         .task(id: sidebarRefreshToken) { await rebuildSidebarPresentation() }
         .sheet(item: $editorRoute) { route in

@@ -322,7 +322,8 @@ launch_smoke_test() {
   local new_pid=""
 
   pgrep -x "$APP_NAME" > "$existing_pids" 2>/dev/null || true
-  open -n --env SURGE_RELAY_UI_QA=1 "$app_path"
+  open -n --env SURGE_RELAY_UI_QA=1 \
+    --env "SURGE_RELAY_UI_QA_ROOT=$TMP_DIR/launch-smoke-data-$safe_label" "$app_path"
   for _ in {1..10}; do
     pgrep -x "$APP_NAME" > "$current_pids" 2>/dev/null || true
     grep -Fvx -f "$existing_pids" "$current_pids" > "$new_pids" 2>/dev/null || true
@@ -341,6 +342,9 @@ launch_smoke_test() {
     print_launch_smoke_diagnostics "$label" "$app_path" "$existing_pids" "$current_pids" "$new_pids"
     fail "$label launch smoke test started $APP_NAME pid $new_pid, but it exited early"
   fi
+  local running_binary="$(ps -p "$new_pid" -o comm=)"
+  [[ "$running_binary" -ef "$app_path/Contents/MacOS/$APP_NAME" ]] \
+    || fail "$label launched an unexpected executable: $running_binary"
   kill "$new_pid" 2>/dev/null || true
   ok "verified $label launch smoke test"
 }

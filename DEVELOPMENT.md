@@ -32,10 +32,10 @@ The 2.0 refactor and reproducible validation are described in `docs/RELAY_2_0.md
 
 ## View Boundaries
 
-Keep `ModulesView.swift` focused on the split-view shell, search/index coordination, toolbar mounting, editor presentation, and sheet routing.
+Keep `ModulesView.swift` focused on the split-view shell, search/index coordination, toolbar mounting, editor presentation, and sheet routing. The main window uses a unified toolbar; sidebar search and module actions stay in the content safe area, and split panes clip content at their own bounds. Keep the system sidebar toggle and detail controls in the window toolbar. Workspace navigation and filters scroll with the module list so batch selection and error status do not force the sidebar beyond a compact window's height.
 
 - `ModuleSidebarSectionPlanner` owns the sidebar grouping rules for attention, local, GitHub, and uncategorized modules. `ModuleSidebarView.swift` owns the sidebar list rendering, module rows, batch-selection checkboxes, context menu entry points, empty/sidebar states, and the bottom status card. `ModuleSidebarFilterBar.swift` owns quick filters, the full filter menu, result counts, clearing, and sort selection.
-- `ModuleSidebarToolbarContent.swift` owns the sidebar toolbar buttons and their enable/help rules for add, update, publish, batch publish, and local-module scanning.
+- `ModuleSidebarToolbarContent.swift` owns the fixed sidebar action bar and overflow menu buttons and their enable/help rules for add, update, publish, batch publish, and local-module scanning.
 - `ModuleDetailPaneView.swift` owns main-window detail selection, the detail/preview tab picker, detail toolbar settings entry, and detail-pane search binding.
 - `ModuleDetailSummaryHeader.swift` owns the module detail title, icon, metadata pills, and summary metrics. `ModuleDetailView.swift` owns the detail page composition, management relation rows, sync status, module arguments, and publishing/local file sections.
 - `CombinedModuleViews.swift` owns the combined-module sidebar row, combined-module detail page, and publish-preview summary UI.
@@ -61,7 +61,7 @@ Keep these two axes separate:
 - `RelayModule.storageTargets`: the nonempty set of standalone destinations (`local`, `gitHub`, or both). `storageLocation` is the legacy single-target projection; assigning it replaces the entire target set. Web editors must submit the complete `storageTargets`.
 - `RelayModule.initialSource`: whether converted content contains a valid Script-Hub `#SUBSCRIBED originalURL` (subscribed), whether the module is updated from an HTTP/HTTPS remote address without that marker (remote), or whether a local file has no subscription metadata (self-authored).
 
-Resolve `#SUBSCRIBED` metadata from converted content, never from a user override. When it is present and valid, classify the module as subscribed and use `originalURL` for updates. When it is absent, classify an HTTP/HTTPS source as a remote source and only classify a local file as self-authored; do not label a remote update address as self-authored. A local file can restore a remote `originalURL` while still being managed as a local module. For local modules, preserve `localStorageRelativePath` whenever it is known.
+Resolve `#SUBSCRIBED` metadata from converted content, never from a user override. When it is present and valid, classify the module as subscribed and use `originalURL` for updates. When it is absent, classify an HTTP/HTTPS source as a remote source and only classify a local file as self-authored; do not label a remote update address as self-authored. A local file can restore a remote `originalURL` while still being managed as a local module. For local modules, preserve `localStorageRelativePath` whenever it is known. For a `file://` source, this is the source location and may differ from an explicitly chosen output path; preserve that choice across restarts. For a remote/subscribed local module it is the physical output location.
 
 Treat local physical module metadata as authoritative for initial-source discovery and repair. Once a valid `#SUBSCRIBED originalURL` has been discovered, a later upstream/cache payload without that marker must not erase it: native upstream modules commonly omit the Script-Hub wrapper comment. Clear persisted subscription metadata only when the user changes the registered source. When `localStorageRelativePath` conflicts with a persisted GitHub storage value, the local path wins; when the exact path is missing, metadata recovery may uniquely match a sibling `.sgmodule` after normalizing spaces and hyphens, then persist the real relative path.
 
@@ -82,7 +82,11 @@ Local publish self-overwrite checks also belong in `PublishCoordinator` with pat
 
 Published file assembly belongs in `PublishFileAssembler`: it owns adding the combined module data, materializing standalone modules with argument overrides, applying Surge metadata, appending generated assets, and consulting the local self-overwrite check. `AppModel+PublishedOutput.swift` owns the shared call into the assembler plus combined-output rebuild, local export, and legacy cleanup orchestration. Keep `AppModel+Publishing.swift` focused on GitHub previews, commits, and persisted publish manifests.
 
-Local published-file manifest planning belongs in `LocalPublishedFilesPlanner`. Keep the "same root only" managed-path reuse, stale local-file detection, cleanup preview construction, post-export persistence/cleanup decisions, and confirmed-cleanup managed path/settings/status planning there. When the configured local module root changes, do not carry stale paths or overwrite privileges from the previous root into the new root.
+Local published-file manifest planning belongs in `LocalPublishedFilesPlanner`. Keep the "same root only" managed-path reuse, stale local-file detection, cleanup preview construction, post-export persistence/cleanup decisions, and confirmed-cleanup managed path/settings/status planning there. When the configured local module root changes, do not carry stale paths or overwrite privileges from the previous root into the new root. Resolve root aliases consistently. Exclude registered local sources from managed/stale cleanup paths and recheck the protection at confirmation and deletion. Publish batches preflight all destinations, reject symlinks and duplicate/path-parent collisions, and revalidate paths inside file coordination. Inline ownership must match the relative path; damaged/mismatched declarations and invalid resource receipts never receive legacy manifest fallback.
+
+Local source/root canonicalization and relative-path identity belong in `LocalSourcePathResolver`. Local import re-reads the physical file and subscription metadata, deduplicates against the current registry and batch, commits a native snapshot from those bytes, and rebuilds cache only. It must not download upstream or publish as a side effect of registration.
+
+Full local output refresh always includes generated assets. Revalidate the root, module generation, and workspace activity after asynchronous publishing work before updating manifests or cleanup previews. If the context changes, preserve resource journals for recovery in the original root. File ownership snapshots include identity and hash and are rechecked inside coordination and before resource rename.
 
 Local published-file markers and iCloud conflict safety checks belong in `ManagedPublishedFile`. Keep marker insertion after Surge `#!` metadata, managed-file detection, conflict-version validation, and conflict resolution there; `ModuleFileStore` should coordinate file writes/deletes and call this service instead of owning marker parsing inline.
 
@@ -216,7 +220,7 @@ Module editor presentation primitives live in `Views/ModuleEditorComponents.swif
 SURGE_RELAY_RUN_UI_QA=1 ./script/build_and_run.sh --verify
 ```
 
-UI QA 模式使用临时配置与本地模块目录，并暂停启动期和编辑后的自动更新。
+UI QA 模式使用临时配置与本地模块目录，并暂停启动期和编辑后的自动更新。UI tests 使用 `/private/tmp/SurgeRelayUIQA/` 下的独立目录，runner 的测试专用 entitlement 仅允许写入这个目录，避免被测应用无法读取 runner 私有容器内的数据。测试按 runner 同级路径启动新构建产物并核对实际 bundle 路径。
 
 原生设置、模块编辑与详情 smoke test 使用独立 scheme，避免系统 UI automation 权限影响日常单元测试：
 

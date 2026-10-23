@@ -34,7 +34,7 @@ extension AppModel {
                 guard try await writeCombinedModule(result.components, generation: generation) else { return false }
             } else {
                 try await fileStore.removeCombined()
-                try await publishCurrentFiles(combinedData: nil, includeAssets: false)
+                try await publishCurrentFiles(combinedData: nil)
             }
             guard shouldContinueCurrentWork(generation: generation) else { return false }
             await cleanupLegacyOutputFiles()

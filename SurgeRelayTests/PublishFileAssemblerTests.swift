@@ -3,6 +3,29 @@ import XCTest
 @testable import SurgeRelay
 
 final class PublishFileAssemblerTests: XCTestCase {
+    func testMissingStandaloneCacheStopsAssemblyBeforeProducingCleanupCandidates() async throws {
+        let ready = RelayModule(name: "Ready", sourceURL: "https://example.com/ready.sgmodule", outputFileName: "Ready")
+        let missing = RelayModule(name: "Missing", sourceURL: "https://example.com/missing.sgmodule", outputFileName: "Missing")
+        var requestedAssets = false
+        do {
+            _ = try await PublishFileAssembler.files(
+                request: PublishFileAssemblyRequest(plan: PublishPlan(standaloneModules: [ready, missing], combinedModuleIDs: []),
+                    combinedData: nil, combinedFileName: "Combined", includeAssets: true, destination: .local,
+                    localModuleDirectory: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path),
+                readComponent: { id in id == ready.id ? "[Rule]\nFINAL,DIRECT" : nil },
+                generatedAssetFiles: { _ in requestedAssets = true; return [] },
+                materialize: { content, _ in content },
+                applyingModuleMetadata: { _, _, _, _, content in content },
+                cancellationCheckpoint: {}
+            )
+            XCTFail("Missing current content must not silently drop an enabled standalone output")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("Missing"))
+            XCTAssertTrue(error.localizedDescription.contains("缺少转换缓存"))
+        }
+        XCTAssertFalse(requestedAssets)
+    }
+
     func testPublishFileAssemblerBuildsCombinedStandaloneAndAssets() async throws {
         let standaloneID = UUID()
         let combinedID = UUID()

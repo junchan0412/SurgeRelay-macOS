@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct ModuleSidebarToolbarContent: ToolbarContent {
+struct ModuleSidebarToolbarContent: View {
     @Environment(AppModel.self) private var model
     @Binding var isBatchSelecting: Bool
     @Binding var batchSelectedModuleIDs: Set<UUID>
@@ -8,19 +8,49 @@ struct ModuleSidebarToolbarContent: ToolbarContent {
     let addModule: () -> Void
     let scanLocalModules: () -> Void
 
-    var body: some ToolbarContent {
-        ToolbarItemGroup(placement: .primaryAction) {
-            addModuleButton
-            updateAllButton
-            publishAllButton
-            batchSelectionButton
-            if isBatchSelecting {
-                selectAllButton
-                clearSelectionButton
-                publishSelectedButton
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 12) {
+                addModuleButton
+                updateAllButton
+                publishAllButton
+                Spacer(minLength: 0)
+                Menu {
+                    Group {
+                        batchSelectionButton
+                        if isBatchSelecting {
+                            selectAllButton
+                            clearSelectionButton
+                        }
+                        Divider()
+                        scanLocalModulesButton
+                    }
+                    .labelStyle(.titleAndIcon)
+                } label: {
+                    Label("更多模块操作", systemImage: "ellipsis.circle")
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .accessibilityIdentifier("modules.more-actions")
             }
-            scanLocalModulesButton
+            .labelStyle(.iconOnly)
+            .buttonStyle(.borderless)
+            if isBatchSelecting {
+                HStack(spacing: 8) {
+                    Text("已选 \(batchSelectedModuleIDs.count) 个")
+                        .font(.caption).monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("modules.selected-count")
+                    Spacer(minLength: 0)
+                    publishSelectedButton
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                }
+            }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("modules.actions")
     }
 
     private var addModuleButton: some View {
@@ -43,6 +73,7 @@ struct ModuleSidebarToolbarContent: ToolbarContent {
         .keyboardShortcut("r", modifiers: .command)
         .disabled(!model.updateAdmission.isAccepted)
         .help(model.updateAdmission.isAccepted ? "更新全部模块（⌘R）" : model.updateAdmission.message)
+        .accessibilityIdentifier("modules.update-all")
     }
 
     private var publishAllButton: some View {
@@ -55,6 +86,7 @@ struct ModuleSidebarToolbarContent: ToolbarContent {
         .disabled(model.isWorking)
         .help(publishAllHelp)
         .accessibilityLabel("发布到 GitHub")
+        .accessibilityIdentifier("modules.publish-all")
     }
 
     private var batchSelectionButton: some View {
@@ -67,6 +99,7 @@ struct ModuleSidebarToolbarContent: ToolbarContent {
         .disabled(model.isWorking)
         .help(isBatchSelecting ? "结束多选并清除已勾选模块" : "进入多选模式，勾选需要单独发布的模块")
         .accessibilityLabel(isBatchSelecting ? "结束多选" : "进入多选")
+        .accessibilityIdentifier("modules.toggle-batch-selection")
     }
 
     private var publishSelectedButton: some View {
@@ -87,6 +120,7 @@ struct ModuleSidebarToolbarContent: ToolbarContent {
             !canPublishSelected
         )
         .help(publishSelectedHelp)
+        .accessibilityIdentifier("modules.publish-selected")
     }
 
     private var canPublishSelected: Bool {
@@ -102,6 +136,7 @@ struct ModuleSidebarToolbarContent: ToolbarContent {
         }
         .disabled(model.isWorking || model.modules.isEmpty)
         .help("勾选全部模块")
+        .accessibilityIdentifier("modules.select-all")
     }
 
     private var clearSelectionButton: some View {

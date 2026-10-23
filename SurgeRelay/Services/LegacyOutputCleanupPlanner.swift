@@ -6,14 +6,12 @@ enum LegacyOutputCleanupPlanner {
         configurationDirectory: String,
         localModuleDirectory: String
     ) -> [String] {
-        let localRoot = URL(filePath: localModuleDirectory, directoryHint: .isDirectory)
-            .standardizedFileURL
-            .path
+        let localRoot = LocalSourcePathResolver.canonicalDirectoryURL(for: localModuleDirectory)?.path
         var seen = Set<String>()
         return [outputDirectory, configurationDirectory].compactMap { path in
             let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return nil }
-            let standardized = URL(filePath: trimmed, directoryHint: .isDirectory).standardizedFileURL.path
+            guard let standardized = LocalSourcePathResolver.canonicalDirectoryURL(for: trimmed)?.path else { return nil }
             guard standardized != localRoot, seen.insert(standardized).inserted else { return nil }
             return standardized
         }

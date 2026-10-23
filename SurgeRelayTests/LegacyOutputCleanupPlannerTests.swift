@@ -3,6 +3,19 @@ import XCTest
 @testable import SurgeRelay
 
 final class LegacyOutputCleanupPlannerTests: XCTestCase {
+    func testLegacyCleanupSkipsSymlinkAliasOfActiveModuleRoot() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let modules = root.appending(path: "Modules", directoryHint: .isDirectory)
+        let alias = root.appending(path: "OldOutput", directoryHint: .isDirectory)
+        let configuration = root.appending(path: "Configuration", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: modules, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: modules)
+        let paths = LegacyOutputCleanupPlanner.cleanupDirectories(outputDirectory: alias.path,
+            configurationDirectory: configuration.path, localModuleDirectory: modules.path)
+        XCTAssertEqual(paths, [configuration.resolvingSymlinksInPath().standardizedFileURL.path])
+    }
+
     func testLegacyOutputCleanupDirectoriesSkipActiveLocalModuleRoot() throws {
         let root = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
@@ -16,7 +29,7 @@ final class LegacyOutputCleanupPlannerTests: XCTestCase {
             localModuleDirectory: localRoot.path
         )
 
-        XCTAssertEqual(directories, [configuration.standardizedFileURL.path])
+        XCTAssertEqual(directories, [configuration.resolvingSymlinksInPath().standardizedFileURL.path])
     }
 
     func testLegacyOutputCleanupPlannerBuildsKnownPublishedPaths() {

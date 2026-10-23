@@ -42,7 +42,9 @@ enum PublishFileAssembler {
             ) {
                 continue
             }
-            guard let content = await readComponent(module.id) else { continue }
+            guard let content = await readComponent(module.id) else {
+                throw RelayError.invalidOutput("“\(module.name)”缺少转换缓存，请先更新该模块。现有发布输出已保留。")
+            }
             let materialized = await materialize(content, module.argumentOverrides)
             let namedContent = await applyingModuleMetadata(
                 module.name,

@@ -20,16 +20,28 @@ enum LocalModuleImportPlanner {
         candidates: [LocalModuleScanCandidate],
         existingModules: [RelayModule],
         combinedModuleFileName: String,
+        localModuleDirectory: String? = nil,
         plannedAt: Date = .now
     ) -> LocalModuleImportPlan {
         var entries: [LocalModuleImportEntry] = []
         var failures: [String] = []
-        var unavailablePaths = Set(existingModules.map { $0.publishedRelativePath.lowercased() })
+        var unavailablePaths = Set(existingModules.flatMap {
+            [$0.publishedRelativePath] + [$0.localStorageRelativePath].compactMap { $0 }
+        }.map(LocalSourcePathResolver.pathIdentity))
+        if let localModuleDirectory {
+            unavailablePaths.formUnion(existingModules.compactMap {
+                LocalSourcePathResolver.storageRelativePath(for: $0, rootDirectoryPath: localModuleDirectory)
+            }.map(LocalSourcePathResolver.pathIdentity))
+        }
+        var unavailableSources = Set(existingModules.flatMap {
+            [$0.updateSourceURL, $0.sourceURL].map(ModuleSourceIdentity.canonicalValue)
+        })
         let combinedPath = ModuleOutputFolder.relativePath(
             fileName: combinedModuleFileName,
             folder: ModuleOutputFolder.root
-        ).lowercased()
-        unavailablePaths.insert(combinedPath)
+        )
+        let combinedKey = LocalSourcePathResolver.pathIdentity(combinedPath)
+        unavailablePaths.insert(combinedKey)
 
         for candidate in candidates {
             let name = candidate.name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -38,30 +50,71 @@ enum LocalModuleImportPlanner {
                 continue
             }
 
-            let outputFolder = ModuleOutputFolder.normalized(candidate.outputFolder)
-            let outputFileName = ModuleNamingPlanner.uniqueOutputFileName(
-                preferredFileName: candidate.outputFileName,
+            if let scannedRoot = candidate.rootDirectoryPath,
+               let localModuleDirectory,
+               LocalSourcePathResolver.canonicalDirectoryURL(for: scannedRoot) !=
+                LocalSourcePathResolver.canonicalDirectoryURL(for: localModuleDirectory) {
+                failures.append("\(candidate.relativePath)：本地模块根目录已改变，请重新扫描")
+                continue
+            }
+            let components = candidate.localStorageRelativePath
+                .replacingOccurrences(of: "\\", with: "/")
+                .split(separator: "/", omittingEmptySubsequences: false)
+            guard !components.isEmpty,
+                  components.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }),
+                  let fileName = components.last,
+                  fileName.lowercased().hasSuffix(".sgmodule") else {
+                failures.append("\(candidate.relativePath)：本地模块路径无效")
+                continue
+            }
+            let outputFolder = components.dropLast().joined(separator: "/")
+            let outputFileName = String(fileName)
+            let outputPath = ModuleOutputFolder.relativePath(
+                fileName: outputFileName,
                 folder: outputFolder,
-                unavailable: unavailablePaths,
                 preservesExistingFileName: true
             )
-            unavailablePaths.insert(
-                ModuleOutputFolder.relativePath(
-                    fileName: outputFileName,
-                    folder: outputFolder,
-                    preservesExistingFileName: true
-                ).lowercased()
-            )
+            let pathKey = LocalSourcePathResolver.pathIdentity(candidate.localStorageRelativePath)
+            guard LocalSourcePathResolver.pathIdentity(outputPath) == pathKey else {
+                failures.append("\(candidate.relativePath)：文件名无法保留，请先调整本地文件名后重新扫描")
+                continue
+            }
+            let source = candidate.scriptHubSubscription?.originalURL ?? candidate.sourceURL
+            guard let sourceURL = URL(string: source),
+                  sourceURL.isFileURL || (["http", "https"].contains(sourceURL.scheme?.lowercased()) && sourceURL.host?.isEmpty == false) else {
+                failures.append("\(candidate.relativePath)：来源地址无效")
+                continue
+            }
+            if sourceURL.isFileURL, let localModuleDirectory {
+                guard let sourcePath = LocalSourcePathResolver.relativePath(
+                    forSourceURL: source,
+                    rootDirectoryPath: localModuleDirectory
+                ), LocalSourcePathResolver.pathIdentity(sourcePath) == pathKey else {
+                    failures.append("\(candidate.relativePath)：本地来源路径已改变，请重新扫描")
+                    continue
+                }
+            }
+            guard !unavailablePaths.contains(pathKey) else {
+                failures.append("\(candidate.relativePath)：本地模块路径已纳入管理或与总模块冲突，请重新扫描")
+                continue
+            }
+            let sourceKey = ModuleSourceIdentity.canonicalValue(for: source)
+            guard !unavailableSources.contains(sourceKey) else {
+                failures.append("\(candidate.relativePath)：来源文件已纳入管理，请重新扫描")
+                continue
+            }
+            unavailablePaths.insert(pathKey)
+            unavailableSources.insert(sourceKey)
 
             let module = RelayModule(
                 name: name,
-                sourceURL: candidate.sourceURL,
+                sourceURL: source,
                 sourceFormat: candidate.sourceFormat,
                 outputFileName: outputFileName,
                 category: candidate.category,
                 outputFolder: outputFolder,
                 storageLocation: .local,
-                localStorageRelativePath: candidate.localStorageRelativePath,
+                localStorageRelativePath: outputPath,
                 preservesOutputFileName: true,
                 isEnabled: false,
                 scriptHubOptions: candidate.scriptHubOptions,
