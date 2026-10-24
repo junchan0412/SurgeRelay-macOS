@@ -53,15 +53,55 @@ final class ModulePlanningTests: XCTestCase {
         XCTAssertEqual(name, "private module")
     }
 
-    func testModuleEditorSourceNameLookupSkipsNonRemoteSources() async {
-        let localURL = URL(filePath: "/tmp/Local Module.sgmodule").absoluteString
+    func testModuleEditorSourceNameLookupReadsLocalMetadataWithoutNetwork() async throws {
+        let folder = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let local = folder.appending(path: "file-name.sgmodule")
+        try Data("#!name = 内容中的默认名称\n[Rule]\nFINAL,DIRECT".utf8).write(to: local)
+        let localURL = local.absoluteString
         let name = await ModuleEditorSourceNameLookup.autofillName(from: localURL) { _ in
             XCTFail("Local file URLs should not be fetched for name lookup.")
             return Data()
         }
 
-        XCTAssertNil(name)
+        XCTAssertEqual(name, "内容中的默认名称")
         XCTAssertNil(ModuleEditorSourceNameLookup.remoteURL(from: "ftp://example.com/demo.sgmodule"))
+    }
+
+    func testSourceNameLookupUsesOriginalContentForSubscribedURL() async throws {
+        let subscription = "http://script.hub/file/_start_/https://example.com/wrong-filename.plugin/_end_/Wrong.sgmodule?type=loon-plugin&target=surge-module"
+        let name = try await ModuleEditorSourceNameLookup.resolvedName(from: subscription) { request in
+            XCTAssertEqual(request.url?.absoluteString, "https://example.com/wrong-filename.plugin")
+            return Data("#!name = \"来源声明名称\"\n[Script]\n".utf8)
+        }
+        XCTAssertEqual(name, "来源声明名称")
+    }
+
+    func testLocalSourceNameFallsBackToFilenameOnlyWithoutNameMetadata() async throws {
+        let folder = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let local = folder.appending(path: "Fallback-Name.sgmodule")
+        try Data("[Rule]\nFINAL,DIRECT".utf8).write(to: local)
+        let name = await ModuleEditorSourceNameLookup.autofillName(from: local.absoluteString)
+        XCTAssertEqual(name, "Fallback Name")
+    }
+
+    func testRemoteSubscriptionNameLookupCannotReadEmbeddedLocalFile() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let local = root.appending(path: "Private.sgmodule")
+        try Data("#!name=Private local metadata\n[Rule]\nFINAL,DIRECT".utf8).write(to: local)
+        let wrapped = "https://example.com/file/_start_/\(local.absoluteString)/_end_/Demo.sgmodule?type=surge-module&target=surge-module"
+        do {
+            _ = try await ModuleEditorSourceNameLookup.resolvedName(from: wrapped) { _ in
+                XCTFail("An embedded local source must not become a remote lookup")
+                return Data()
+            }
+            XCTFail("Remote subscription URLs may not select local files")
+        } catch { XCTAssertEqual(error as? BoundedRemoteFetchError, .invalidSourceURL) }
     }
 
     func testBoundedRemoteDataFetcherRejectsPrivateNetworkTargets() async throws {

@@ -1,5 +1,11 @@
 import Foundation
 
+struct LocalOutputRetirement: Codable, Hashable, Sendable {
+    var rootDirectory: String
+    var relativePath: String
+    var contentHash: String?
+}
+
 struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     var id: UUID
     var name: String
@@ -53,6 +59,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     var state: ModuleUpdateState
     var lastError: String?
     var localOutputError: String?
+    var pendingLocalOutputRetirements: [LocalOutputRetirement] = []
 
     init(
         id: UUID = UUID(),
@@ -154,6 +161,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         case createdAt, lastUpdatedAt, contentHash, sourceETag, sourceLastModified, sourceContentHash, sourceCheckedAt
         case refreshIntervalMinutes, lastRefreshAttemptAt, consecutiveFailureCount, nextRetryAt, serverRetryAfter, serverRetrySourceURL
         case conversionEngineRevision, overrideBaseHash, hasOverrideConflict, syncBaseHash, syncBaseScope, syncConflict, state, lastError, localOutputError
+        case pendingLocalOutputRetirements
     }
 
     func encode(to encoder: Encoder) throws {
@@ -198,6 +206,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         try container.encode(state, forKey: .state)
         try container.encodeIfPresent(localOutputError, forKey: .localOutputError)
         try container.encodeIfPresent(lastError, forKey: .lastError)
+        try container.encode(pendingLocalOutputRetirements, forKey: .pendingLocalOutputRetirements)
     }
 
     init(from decoder: Decoder) throws {
@@ -260,6 +269,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         syncConflict = try container.decodeIfPresent(ModuleSyncConflictMetadata.self, forKey: .syncConflict)
         state = try container.decodeIfPresent(ModuleUpdateState.self, forKey: .state) ?? .never
         localOutputError = try container.decodeIfPresent(String.self, forKey: .localOutputError)
+        pendingLocalOutputRetirements = try container.decodeIfPresent([LocalOutputRetirement].self, forKey: .pendingLocalOutputRetirements) ?? []
         lastError = try container.decodeIfPresent(String.self, forKey: .lastError)
     }
 

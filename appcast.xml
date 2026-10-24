@@ -3,6 +3,23 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>2.4.3</title>
+            <pubDate>Sun, 25 Oct 2026 04:46:09 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v2.4.3</link>
+            <sparkle:version>114</sparkle:version>
+            <sparkle:shortVersionString>2.4.3</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 2.4.3
+
+
+- 移动清理：修改模块存放文件夹或输出名时，记录该模块原来的路径与文件 hash；新文件成功写入后自动清理对应旧受管输出并更新发布清单，避免在原标签目录留下重复模块。移动记录按工作区持久保存，目标写入失败或重启后可继续处理；旧版本已登记的残留副本在文件名、管理标记和订阅来源一致时也会清理。
+- 文件保护：仅清理本次移动的旧模块文件，不影响其他模块、脚本资源或已登记的自写来源；原文件被外部修改、当前仍被其他模块使用或根目录变化时保留并要求核对。
+- 默认名称：新增模块优先读取来源内容的 `#!name`，支持本地文件和订阅链接原始地址；自动填充名称随来源地址变化重新读取，快速提交时会等待名称解析，用户手动填写的名称保留。没有名称声明或读取失败时才回退文件名。
+- 验证：592 项 Release 测试通过、2 项可选性能测试跳过；覆盖移动后清理、写入失败保留、重启恢复、外部修改保护、连续移动和根目录隔离，以及本地/远程/订阅来源名称读取。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v2.4.3/Surge-Relay-2.4.3.app.zip" length="12851000" type="application/zip" sparkle:edSignature="PdKGawIbxoh6ocJ3wToOnJelTR4c8ygYRBv4jHjHvOJCduDoAlVaqTBbM9R04TkW9pWO2RRwqCDoorNS3iQsDA=="/>
+        </item>
+        <item>
             <title>2.4.2</title>
             <pubDate>Sun, 25 Oct 2026 02:19:30 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v2.4.2</link>

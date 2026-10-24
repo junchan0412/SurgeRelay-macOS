@@ -9,6 +9,7 @@ struct ModuleEditorView: View {
     @State private var isSubmitting = false
     @State private var isAdvancedExpanded: Bool
     @State private var nameLookup: Task<Void, Never>?
+    @State private var autofilledName: String?
     @State private var showsNewFolderDialog = false
     @State private var newFolderName = ""
 
@@ -88,6 +89,7 @@ struct ModuleEditorView: View {
             .onChange(of: draft.sourceURL) { _, newValue in
                 autofillName(from: newValue)
             }
+            .task { if module == nil { autofillName(from: draft.sourceURL) } }
 
             SheetActionFooter {
                 Button("取消", role: .cancel) { dismiss() }
@@ -265,29 +267,32 @@ struct ModuleEditorView: View {
 
     private func autofillName(from urlString: String) {
         nameLookup?.cancel()
-        guard draft.name.isEmpty else { return }
-        guard ModuleEditorSourceNameLookup.remoteURL(from: urlString) != nil else { return }
+        guard draft.name.isEmpty || draft.name == autofilledName else { return }
+        let requestedName = draft.name
         nameLookup = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(500))
-            guard !Task.isCancelled, draft.name.isEmpty else { return }
+            do { try await Task.sleep(for: .milliseconds(500)) } catch { return }
+            guard !Task.isCancelled, draft.name == requestedName else { return }
             guard let resolved = await ModuleEditorSourceNameLookup.autofillName(from: urlString) else { return }
-            guard !Task.isCancelled, draft.name.isEmpty else { return }
+            guard !Task.isCancelled, draft.name == requestedName, draft.sourceURL == urlString else { return }
             draft.name = resolved
+            autofilledName = resolved
         }
     }
 
     private func save() {
         guard !isSubmitting else { return }
         isSubmitting = true
-        let snapshot = draft
+        nameLookup?.cancel()
         Task { @MainActor in
-            defer { isSubmitting = false }
-            do {
-                try await model.enqueueModuleSave(moduleID: module?.id, draft: snapshot)
-                dismiss()
-            } catch {
-                localError = error.localizedDescription
+            var snapshot = draft
+            if module == nil, snapshot.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || snapshot.name == autofilledName,
+               let resolved = await ModuleEditorSourceNameLookup.autofillName(from: snapshot.sourceURL) {
+                snapshot.name = resolved
+                draft.name = resolved
             }
+            defer { isSubmitting = false }
+            do { try await model.enqueueModuleSave(moduleID: module?.id, draft: snapshot); dismiss() }
+            catch { localError = error.localizedDescription }
         }
     }
 

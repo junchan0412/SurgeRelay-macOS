@@ -106,6 +106,8 @@ Preview content reads belong in `ModulePreviewContentProvider`. Keep cache looku
 
 Native module-editor submissions use the workspace-owned pending-module-saves.json queue. Freeze the draft at submission, persist before dismissing the editor, and drain serially after active work and startup finish. Retain failures for retry, preserve stable IDs for replayed additions, and keep direct/Web mutation admission checks intact. Workspace retirement stops the worker and preserves pending intents in the old workspace.
 
+Module moves persist root-scoped old-path/hash retirements on the owning module. Write the new module and its assets first, then delete only unchanged, correctly marked retired files. Never use the full selected-publish stale list as a move cleanup list. Keep failed retirements for retry and protect registered source paths and other module owners. Default editor names come from source metadata, including local sources and unwrapped subscriptions; preserve manual edits and await lookup on immediate submission.
+
 Module output naming belongs in `ModuleNamingPlanner`. Keep output-file uniqueness checks, detected source-format inference, local storage relative-path derivation, and loaded-module naming normalization there. AppModel should pass the current modules and settings into the planner instead of reimplementing path rules inline.
 
 Surge module sanitizing belongs in `SurgeModuleSanitizer.swift`: keep line-ending normalization, empty Body Rewrite removal, converted Loon Map Local script extraction, and generated Script section insertion there. `ModuleProcessingWorker.swift` provides background parameter materialization, metadata application, and per-module content fingerprints. No module merge is performed.

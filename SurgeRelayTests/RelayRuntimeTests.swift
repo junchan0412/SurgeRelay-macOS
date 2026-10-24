@@ -4,6 +4,167 @@ import XCTest
 
 @MainActor
 final class RelayRuntimeTests: XCTestCase {
+    func testMovingModuleWritesNewOutputThenRemovesOnlyItsPreviousFile() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = pendingSaveModel(root: root)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        model.settings.localModuleDirectory = root.appending(path: "Modules").path
+        model.settings.publishToLocal = true
+        let module = RelayModule(name: "Move", sourceURL: "https://example.com/move.sgmodule", outputFileName: "Move.sgmodule",
+            outputFolder: "Old", storageLocation: .local, localStorageRelativePath: "Old/Move.sgmodule")
+        let other = RelayModule(name: "Other", sourceURL: "https://example.com/other.sgmodule", outputFileName: "Other.sgmodule", storageLocation: .local)
+        model.modules = [module, other]
+        for item in model.modules { try await model.fileStore.writeComponent("#!name=\(item.name)\n[Rule]\nFINAL,DIRECT", id: item.id) }
+        let initial = await model.refreshModuleOutputs(schedulesAutomaticPublish: false)
+        XCTAssertTrue(initial)
+        let otherURL = URL(filePath: model.settings.localModuleDirectory).appending(path: "Other.sgmodule")
+        let otherData = try Data(contentsOf: otherURL)
+        var draft = ModuleDraft(module: module)
+        draft.outputFolder = "New"
+        draft.category = "New label"
+        try await model.enqueueModuleSave(moduleID: module.id, draft: draft)
+        await model.pendingModuleSaveTask?.value
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appending(path: "Modules/Old/Move.sgmodule").path))
+        let output = try String(contentsOf: root.appending(path: "Modules/New/Move.sgmodule"), encoding: .utf8)
+        XCTAssertTrue(output.contains("#!category=New label"))
+        XCTAssertTrue(output.contains("# surge-relay-relative-path: New/Move.sgmodule"))
+        XCTAssertEqual(try Data(contentsOf: otherURL), otherData)
+        XCTAssertEqual(Set(model.settings.localPublishedFilePaths), ["New/Move.sgmodule", "Other.sgmodule"])
+        XCTAssertTrue(model.modules[0].pendingLocalOutputRetirements.isEmpty)
+        let again = await model.refreshModuleOutputs(moduleIDs: [module.id], schedulesAutomaticPublish: false)
+        XCTAssertTrue(again)
+    }
+
+    func testMoveKeepsOldFileIfNewOutputFailsAndResumesCleanupAfterRestart() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = pendingSaveModel(root: root)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        model.settings.localModuleDirectory = root.appending(path: "Modules").path
+        model.settings.publishToLocal = true
+        let module = RelayModule(name: "Move", sourceURL: "https://example.com/move.sgmodule", outputFileName: "Move.sgmodule",
+            outputFolder: "Old", storageLocation: .local)
+        model.modules = [module]
+        try await model.fileStore.writeComponent("#!name=Move\n[Rule]\nFINAL,DIRECT", id: module.id)
+        _ = await model.refreshModuleOutputs(schedulesAutomaticPublish: false)
+        let oldURL = root.appending(path: "Modules/Old/Move.sgmodule")
+        let oldData = try Data(contentsOf: oldURL)
+        let newURL = root.appending(path: "Modules/New/Move.sgmodule")
+        try FileManager.default.createDirectory(at: newURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let unrelated = Data("#!name=Personal\n[Rule]\nFINAL,REJECT".utf8)
+        try unrelated.write(to: newURL)
+        var draft = ModuleDraft(module: module)
+        draft.outputFolder = "New"
+        try await model.enqueueModuleSave(moduleID: module.id, draft: draft)
+        await model.pendingModuleSaveTask?.value
+        XCTAssertEqual(try Data(contentsOf: oldURL), oldData)
+        XCTAssertEqual(try Data(contentsOf: newURL), unrelated)
+        XCTAssertEqual(model.modules[0].pendingLocalOutputRetirements.count, 1)
+        XCTAssertNotNil(model.modules[0].localOutputError)
+        try await model.flushPersistence()
+        try FileManager.default.removeItem(at: newURL)
+        let reopened = pendingSaveModel(root: root)
+        defer { reopened.persistenceFeedbackTask?.cancel() }
+        reopened.settings.localModuleDirectory = model.settings.localModuleDirectory
+        reopened.settings.publishToLocal = true
+        let retried = await reopened.refreshModuleOutputs(schedulesAutomaticPublish: false)
+        XCTAssertTrue(retried)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: newURL.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: oldURL.path))
+        XCTAssertTrue(reopened.modules[0].pendingLocalOutputRetirements.isEmpty)
+    }
+
+    func testMoveDoesNotDeleteOldFileChangedAfterMoveWasRequested() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = pendingSaveModel(root: root)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        model.settings.localModuleDirectory = root.appending(path: "Modules").path
+        model.settings.publishToLocal = true
+        let module = RelayModule(name: "Move", sourceURL: "https://example.com/move.sgmodule", outputFileName: "Move.sgmodule", outputFolder: "Old", storageLocation: .local)
+        model.modules = [module]
+        try await model.fileStore.writeComponent("[Rule]\nFINAL,DIRECT", id: module.id)
+        _ = await model.refreshModuleOutputs(schedulesAutomaticPublish: false)
+        let oldURL = root.appending(path: "Modules/Old/Move.sgmodule")
+        var draft = ModuleDraft(module: module)
+        draft.outputFolder = "New"
+        try model.updateModule(id: module.id, from: draft)
+        let edited = Data("#!name=External\n[Rule]\nFINAL,REJECT".utf8)
+        try edited.write(to: oldURL)
+        let result = await model.refreshModuleOutputs(schedulesAutomaticPublish: false)
+        XCTAssertFalse(result)
+        XCTAssertEqual(try Data(contentsOf: oldURL), edited)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appending(path: "Modules/New/Move.sgmodule").path))
+        XCTAssertTrue(model.modules[0].localOutputError?.contains("已保留") == true)
+    }
+
+    func testRepeatedMovesAndLabelOnlyEditsKeepOneOutputAndStayWithinRoot() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = pendingSaveModel(root: root)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        let modulesRoot = root.appending(path: "Modules")
+        model.settings.localModuleDirectory = modulesRoot.path
+        model.settings.publishToLocal = true
+        let module = RelayModule(name: "Move", sourceURL: "https://example.com/move.sgmodule", outputFileName: "Move.sgmodule", outputFolder: "A", storageLocation: .local)
+        model.modules = [module]
+        try await model.fileStore.writeComponent("#!name=Move\n[Rule]\nFINAL,DIRECT", id: module.id)
+        _ = await model.refreshModuleOutputs(schedulesAutomaticPublish: false)
+        var draft = ModuleDraft(module: module)
+        draft.category = "Changed label"
+        try await model.enqueueModuleSave(moduleID: module.id, draft: draft)
+        await model.pendingModuleSaveTask?.value
+        XCTAssertTrue(model.modules[0].pendingLocalOutputRetirements.isEmpty)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: modulesRoot.appending(path: "A/Move.sgmodule").path))
+        for folder in ["B", "C"] {
+            var move = ModuleDraft(module: model.modules[0])
+            move.outputFolder = folder
+            try await model.enqueueModuleSave(moduleID: module.id, draft: move)
+            await model.pendingModuleSaveTask?.value
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: modulesRoot.appending(path: "A/Move.sgmodule").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: modulesRoot.appending(path: "B/Move.sgmodule").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: modulesRoot.appending(path: "C/Move.sgmodule").path))
+        XCTAssertEqual(model.settings.localPublishedFilePaths, ["C/Move.sgmodule"])
+        model.modules[0].pendingLocalOutputRetirements = [LocalOutputRetirement(rootDirectory: modulesRoot.path,
+            relativePath: "C/Move.sgmodule", contentHash: nil)]
+        model.settings.localModuleDirectory = root.appending(path: "OtherRoot").path
+        var newRootDraft = ModuleDraft(module: model.modules[0])
+        newRootDraft.outputFolder = "New"
+        try await model.enqueueModuleSave(moduleID: module.id, draft: newRootDraft)
+        await model.pendingModuleSaveTask?.value
+        XCTAssertTrue(FileManager.default.fileExists(atPath: modulesRoot.appending(path: "C/Move.sgmodule").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appending(path: "OtherRoot/New/Move.sgmodule").path))
+    }
+
+    func testUpdateCleansLegacyDuplicateOnlyWhenSubscriptionAndFilenameMatch() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = pendingSaveModel(root: root)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        model.settings.localModuleDirectory = root.appending(path: "Modules").path
+        model.settings.publishToLocal = true
+        let module = RelayModule(name: "Move", sourceURL: "https://example.com/move.sgmodule", outputFileName: "Move.sgmodule", outputFolder: "New", storageLocation: .local)
+        model.modules = [module]
+        let subscribed = "#!name=Move\n#SUBSCRIBED http://script.hub/file/_start_/https://example.com/move.sgmodule/_end_/Move.sgmodule?type=surge-module&target=surge-module\n[Rule]\nFINAL,DIRECT\n"
+        let otherSource = subscribed.replacingOccurrences(of: "example.com/move.sgmodule", with: "example.com/other.sgmodule")
+        let oldPath = "Old/Move.sgmodule"
+        let unrelatedPath = "Unrelated/Move.sgmodule"
+        _ = try await model.fileStore.exportPublishedFiles([PublishFile(name: oldPath, data: Data(subscribed.utf8)),
+            PublishFile(name: unrelatedPath, data: Data(otherSource.utf8))], toRootDirectory: model.settings.localModuleDirectory)
+        model.settings.localPublishedRootDirectory = model.settings.localModuleDirectory
+        model.settings.localPublishedFilePaths = [oldPath, unrelatedPath]
+        try await model.fileStore.writeComponent(subscribed, id: module.id)
+        XCTAssertTrue(model.modules[0].pendingLocalOutputRetirements.isEmpty)
+        let success = await model.refreshModuleOutputs(schedulesAutomaticPublish: false)
+        XCTAssertTrue(success)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appending(path: "Modules/Old/Move.sgmodule").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appending(path: "Modules/New/Move.sgmodule").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appending(path: "Modules/Unrelated/Move.sgmodule").path))
+        XCTAssertEqual(Set(model.settings.localPublishedFilePaths), ["New/Move.sgmodule", unrelatedPath])
+    }
+
     func testModuleParametersRemainConfigurableThroughPreviewEditingPublishResetAndUpdate() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

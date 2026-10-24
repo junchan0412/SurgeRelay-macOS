@@ -62,8 +62,24 @@ extension AppModel {
             statusMessage = "没有需要保存的更改"
             return plan
         }
+        let previous = modules[index]
+        var updated = plan.module
+        if previous.hasLocalStorageTarget, updated.hasLocalStorageTarget,
+           LocalSourcePathResolver.pathIdentity(previous.publishedRelativePath) != LocalSourcePathResolver.pathIdentity(updated.publishedRelativePath),
+           let root = LocalSourcePathResolver.canonicalDirectoryURL(for: settings.localModuleDirectory),
+           let fileURL = LocalSourcePathResolver.fileURL(relativePath: previous.publishedRelativePath, rootDirectoryPath: root.path) {
+            let data = try? Data(contentsOf: fileURL)
+            let retirement = LocalOutputRetirement(rootDirectory: root.path, relativePath: previous.publishedRelativePath,
+                contentHash: data?.sha256String)
+            if !updated.pendingLocalOutputRetirements.contains(where: {
+                $0.rootDirectory == retirement.rootDirectory &&
+                    LocalSourcePathResolver.pathIdentity($0.relativePath) == LocalSourcePathResolver.pathIdentity(retirement.relativePath)
+            }) {
+                updated.pendingLocalOutputRetirements.append(retirement)
+            }
+        }
         registerLocalChange()
-        modules[index] = plan.module
+        modules[index] = updated
         if let adoptedPath = plan.adoptedLocalPublishedPath {
             let localPlan = LocalPublishedFilesPlanner.plan(files: [], targetDirectory: settings.localModuleDirectory,
                 previousRootDirectory: settings.localPublishedRootDirectory, previousPublishedPaths: settings.localPublishedFilePaths)
@@ -294,6 +310,7 @@ extension AppModel {
         copy.state = .never
         copy.lastError = nil
         copy.localOutputError = nil
+        copy.pendingLocalOutputRetirements = []
         if copy.hasLocalStorageTarget {
             copy.localStorageRelativePath = copy.publishedRelativePath
             copy.preservesOutputFileName = true

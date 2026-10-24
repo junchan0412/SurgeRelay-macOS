@@ -215,13 +215,73 @@ extension AppModel {
 
         }
         try checkLocalPublishContext(target: target, generation: generation)
+        let retiredPaths = try await retireMovedLocalOutputs(files: files, knownPaths: plan.knownManagedPaths,
+            target: target, generation: generation)
+        let retired = Set(retiredPaths.map(LocalSourcePathResolver.pathIdentity))
         let mergedPaths = LocalPublishedFilesPlanner.mergedPaths(plan.knownManagedPaths, adding: plan.currentPaths)
+            .filter { !retired.contains(LocalSourcePathResolver.pathIdentity($0)) }
         settings.localPublishedRootDirectory = plan.targetDirectory
         settings.localPublishedFilePaths = mergedPaths
         saveSettings()
         try await flushPersistence()
         try checkLocalPublishContext(target: target, generation: generation)
         try await fileStore.acknowledgePublishedResources(paths: plan.currentPaths, rootDirectoryPath: target)
+    }
+
+    private func retireMovedLocalOutputs(files: [PublishFile], knownPaths: [String], target: String, generation: Int) async throws -> [String] {
+        guard let root = LocalSourcePathResolver.canonicalDirectoryURL(for: target) else { return [] }
+        let published = Set(files.map { LocalSourcePathResolver.pathIdentity($0.name) })
+        let protected = localProtectedSourcePaths(targetDirectory: target)
+        var retired: [String] = []
+        var completed: [UUID: Set<LocalOutputRetirement>] = [:]
+        for module in modules where module.hasLocalStorageTarget && published.contains(LocalSourcePathResolver.pathIdentity(module.publishedRelativePath)) {
+            var retirements = module.pendingLocalOutputRetirements.filter { $0.rootDirectory == root.path }
+            if module.hasRemoteUpdateSource {
+                for oldPath in knownPaths where !published.contains(LocalSourcePathResolver.pathIdentity(oldPath)) &&
+                    (oldPath as NSString).lastPathComponent == (module.publishedRelativePath as NSString).lastPathComponent {
+                    guard !retirements.contains(where: { LocalSourcePathResolver.pathIdentity($0.relativePath) == LocalSourcePathResolver.pathIdentity(oldPath) }),
+                          let data = try await fileStore.readPublishedFile(relativePath: oldPath, rootDirectoryPath: target),
+                          ManagedPublishedFile.isManaged(data, relativePath: oldPath),
+                          let text = String(data: data, encoding: .utf8),
+                          let subscription = ModuleMetadataParser.scriptHubSubscription(in: text),
+                          ModuleSourceIdentity.matches(subscription.originalURL, module.updateSourceURL) else { continue }
+                    retirements.append(LocalOutputRetirement(rootDirectory: root.path, relativePath: oldPath, contentHash: data.sha256String))
+                }
+            }
+            for item in retirements {
+                let identity = LocalSourcePathResolver.pathIdentity(item.relativePath)
+                if identity == LocalSourcePathResolver.pathIdentity(module.publishedRelativePath) {
+                    completed[module.id, default: []].insert(item)
+                    continue
+                }
+                guard !published.contains(identity), !protected.map(LocalSourcePathResolver.pathIdentity).contains(identity),
+                      !modules.contains(where: { other in
+                          other.id != module.id && other.hasLocalStorageTarget &&
+                            [other.publishedRelativePath, other.localStorageRelativePath].compactMap { $0 }
+                                .contains { LocalSourcePathResolver.pathIdentity($0) == identity }
+                      }) else { continue }
+                try checkLocalPublishContext(target: target, generation: generation)
+                let existing = try await fileStore.readPublishedFile(relativePath: item.relativePath, rootDirectoryPath: target)
+                if let existing {
+                    guard let hash = item.contentHash, existing.sha256String == hash,
+                          ManagedPublishedFile.isManaged(existing, relativePath: item.relativePath) else {
+                        throw RelayError.invalidOutput("新位置已写入；旧文件 \(item.relativePath) 在移动后变化或不属于本模块受管输出，已保留，请核对后清理。")
+                    }
+                    _ = try await fileStore.exportPublishedFiles([], toRootDirectory: target,
+                        removingObsoleteRelativePaths: [item.relativePath], expectedExistingHashes: [item.relativePath: hash],
+                        protectedSourcePaths: protected)
+                }
+                try checkLocalPublishContext(target: target, generation: generation)
+                retired.append(item.relativePath)
+                completed[module.id, default: []].insert(item)
+            }
+        }
+        for index in modules.indices {
+            guard let items = completed[modules[index].id] else { continue }
+            modules[index].pendingLocalOutputRetirements.removeAll { items.contains($0) }
+        }
+        try persistModules()
+        return retired
     }
 
     private func repairRelocatedLocalOutputs(files: [PublishFile], knownPaths: [String], target: String, generation: Int) async throws {
