@@ -14,6 +14,7 @@ enum PersistenceStore {
         "selected-publish.json",
         "preview-drafts.json",
         "module-templates.json",
+        "pending-module-saves.json",
         "credentials.encrypted",
         "credentials.key"
     ]
@@ -134,6 +135,10 @@ enum PersistenceStore {
 
     static func loadModuleTemplates(in directory: URL? = nil) -> [ModuleTemplate] {
         decodeFile(at: (directory ?? configurationDirectoryURL).appending(path: "module-templates.json")) ?? []
+    }
+
+    static func loadPendingModuleSaves(in directory: URL) -> [PendingModuleSave] {
+        decodeFile(at: directory.appending(path: "pending-module-saves.json")) ?? []
     }
 
     static func loadSelectedPublishAttempt(in directory: URL? = nil) -> SelectedPublishAttempt? {

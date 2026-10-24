@@ -14,13 +14,18 @@ enum ModuleDeletionMode: Sendable {
 extension AppModel {
     func addModule(from draft: ModuleDraft) throws {
         guard !isWorking else { throw PreviewContentSaveError.busy }
+        _ = try applyModuleAddition(from: draft, id: UUID(), schedulesRefresh: true)
+    }
+
+    private func applyModuleAddition(from draft: ModuleDraft, id: UUID, schedulesRefresh: Bool) throws -> UUID {
         let plan = try ModuleDraftPlanner.addPlan(
             from: draft,
             modules: modules,
 
             localModuleDirectory: settings.localModuleDirectory
         )
-        let module = plan.module
+        var module = plan.module
+        module.id = id
         registerLocalChange()
         modules.append(module)
         invalidateModuleSummaryCache()
@@ -33,12 +38,17 @@ extension AppModel {
         statusMessage = AppRuntimeOptions.isUIQAMode
             ? "已添加 \(module.name)；UI QA 模式未启动自动更新"
             : "已添加 \(module.name)，即将自动更新"
-        scheduleAutomaticUpdate(moduleID: module.id)
+        if schedulesRefresh { scheduleAutomaticUpdate(moduleID: module.id) }
+        return module.id
     }
 
     func updateModule(id: UUID, from draft: ModuleDraft) throws {
         guard !isWorking else { throw PreviewContentSaveError.busy }
-        guard let index = modules.firstIndex(where: { $0.id == id }) else { return }
+        _ = try applyModuleUpdate(id: id, from: draft, schedulesRefresh: true)
+    }
+
+    private func applyModuleUpdate(id: UUID, from draft: ModuleDraft, schedulesRefresh: Bool) throws -> ModuleDraftUpdatePlan? {
+        guard let index = modules.firstIndex(where: { $0.id == id }) else { return nil }
         guard let plan = try ModuleDraftPlanner.updatePlan(
             id: id,
             from: draft,
@@ -46,11 +56,11 @@ extension AppModel {
 
             localModuleDirectory: settings.localModuleDirectory
         ) else {
-            return
+            return nil
         }
         guard plan.hasChanges else {
             statusMessage = "没有需要保存的更改"
-            return
+            return plan
         }
         registerLocalChange()
         modules[index] = plan.module
@@ -78,6 +88,7 @@ extension AppModel {
         } else {
             "已保存 \(modules[index].name)，正在刷新输出"
         }
+        guard schedulesRefresh else { return plan }
         if !plan.sourceChanged { restartScheduler() }
         if plan.sourceChanged, shouldUpdateModule(modules[index]) {
             scheduleAutomaticUpdate(moduleID: id)
@@ -86,6 +97,120 @@ extension AppModel {
         }
         if plan.customIconChanged, plan.customIconURL == nil, !plan.sourceChanged {
             Task { await refreshModuleMetadataFromCache() }
+        }
+        return plan
+    }
+
+    func enqueueModuleSave(moduleID: UUID?, draft: ModuleDraft) async throws {
+        guard workspaceIsActive, !isWorkspaceTransitioning else { throw PreviewContentSaveError.busy }
+        let refreshSource: Bool
+        if let moduleID {
+            guard modules.contains(where: { $0.id == moduleID }) else { throw RelayError.moduleMissing }
+            refreshSource = try ModuleDraftPlanner.updatePlan(id: moduleID, from: draft, modules: modules,
+                localModuleDirectory: settings.localModuleDirectory)?.sourceChanged ?? false
+        } else {
+            _ = try ModuleDraftPlanner.addPlan(from: draft, modules: modules, localModuleDirectory: settings.localModuleDirectory)
+            refreshSource = true
+        }
+        pendingModuleSaves.append(PendingModuleSave(moduleID: moduleID, draft: draft, refreshSource: refreshSource))
+        try await persistPendingModuleSaves()
+        statusMessage = "已加入待处理保存队列（\(pendingModuleSaves.count) 项），当前任务完成后自动保存"
+        schedulePendingModuleSaves()
+    }
+
+    func cancelPendingModuleSave(id: UUID) async throws {
+        guard activePendingModuleSaveID != id else { throw PreviewContentSaveError.busy }
+        pendingModuleSaves.removeAll { $0.id == id }
+        try await persistPendingModuleSaves()
+        if !workActivity.isActive { statusMessage = "已取消排队保存" }
+    }
+
+    func retryPendingModuleSave(id: UUID) async throws {
+        guard let index = pendingModuleSaves.firstIndex(where: { $0.id == id }),
+              activePendingModuleSaveID != id else { return }
+        pendingModuleSaves[index].errorMessage = nil
+        try await persistPendingModuleSaves()
+        schedulePendingModuleSaves()
+    }
+
+    private func persistPendingModuleSaves() async throws {
+        enqueueConfiguration(pendingModuleSaves, fileName: "pending-module-saves.json")
+        try await flushPersistence()
+    }
+
+    func schedulePendingModuleSaves() {
+        guard pendingModuleSaveTask == nil, !isWorking, !workActivity.isActive,
+              workspaceIsActive, !isWorkspaceTransitioning, startupTask == nil,
+              !startupRecoveryPending, !startupRecoveryFailed,
+              pendingModuleSaves.contains(where: { $0.errorMessage == nil }) else { return }
+        pendingModuleSaveTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            guard !isWorking, !workActivity.isActive, workspaceIsActive, !isWorkspaceTransitioning else {
+                pendingModuleSaveTask = nil
+                return
+            }
+            beginWork(.savingModule)
+            var refreshMetadata = false
+            defer {
+                activePendingModuleSaveID = nil
+                pendingModuleSaveTask = nil
+                endWork(.savingModule)
+                if workspaceIsActive, !isWorkspaceTransitioning { restartScheduler() }
+                if refreshMetadata, workspaceIsActive, !isWorkspaceTransitioning {
+                    Task { await refreshModuleMetadataFromCache() }
+                }
+            }
+            while var item = pendingModuleSaves.first(where: { $0.errorMessage == nil }) {
+                guard !Task.isCancelled, workspaceIsActive, !isWorkspaceTransitioning else { return }
+                activePendingModuleSaveID = item.id
+                workActivity.title = "保存 \(item.draft.name)"
+                do {
+                    try await flushPersistence()
+                    try Task.checkCancellation()
+                    guard workspaceIsActive, !isWorkspaceTransitioning else { return }
+                    let moduleID: UUID
+                    let sourceChanged: Bool
+                    if let id = item.moduleID {
+                        guard modules.contains(where: { $0.id == id }) else {
+                            throw RelayError.moduleMissing
+                        }
+                        moduleID = id
+                        let plan = try applyModuleUpdate(id: id, from: item.draft, schedulesRefresh: false)
+                        sourceChanged = plan?.sourceChanged ?? false
+                        if let plan, plan.customIconChanged, plan.customIconURL == nil, !plan.sourceChanged {
+                            refreshMetadata = true
+                        }
+                    } else {
+                        moduleID = item.id
+                        if !modules.contains(where: { $0.id == moduleID }) {
+                            _ = try applyModuleAddition(from: item.draft, id: moduleID, schedulesRefresh: false)
+                        }
+                        sourceChanged = true
+                    }
+                    item.refreshSource = item.refreshSource || sourceChanged
+                    if let index = pendingModuleSaves.firstIndex(where: { $0.id == item.id }) {
+                        pendingModuleSaves[index] = item
+                    }
+                    try persistModules()
+                    try await persistPendingModuleSaves()
+                    if item.refreshSource { scheduleAutomaticUpdate(moduleID: moduleID) }
+                    else { _ = await refreshModuleOutputs(moduleIDs: [moduleID]) }
+                    pendingModuleSaves.removeAll { $0.id == item.id }
+                    try await persistPendingModuleSaves()
+                    statusMessage = "已保存 \(item.draft.name)"
+                } catch {
+                    if error is CancellationError { return }
+                    if let index = pendingModuleSaves.firstIndex(where: { $0.id == item.id }) {
+                        pendingModuleSaves[index].errorMessage = error.localizedDescription
+                    } else {
+                        item.errorMessage = error.localizedDescription
+                        pendingModuleSaves.insert(item, at: 0)
+                    }
+                    statusMessage = "排队保存失败，可在待处理队列中重试或取消"
+                    do { try await persistPendingModuleSaves() } catch { return }
+                }
+                activePendingModuleSaveID = nil
+            }
         }
     }
 
@@ -315,6 +440,7 @@ extension AppModel {
 
     private func scheduleAutomaticUpdate(moduleID: UUID) {
         guard workspaceIsActive, !isWorkspaceTransitioning, !startupRecoveryPending, !startupRecoveryFailed, !AppRuntimeOptions.isUIQAMode else { return }
+        pendingAutomaticUpdateModuleIDs.insert(moduleID)
         automaticUpdateTask?.cancel()
         automaticUpdateTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(2))
@@ -323,7 +449,9 @@ extension AppModel {
                 try? await Task.sleep(for: .milliseconds(250))
             }
             guard !Task.isCancelled else { return }
-            await self.updateAll(only: [moduleID])
+            let ids = self.pendingAutomaticUpdateModuleIDs
+            self.pendingAutomaticUpdateModuleIDs.removeAll()
+            await self.updateAll(only: ids)
         }
     }
 

@@ -112,6 +112,7 @@ extension AppModel {
             if wasCancelling {
                 statusMessage = "已取消\(title)"
             }
+            schedulePendingModuleSaves()
         }
     }
 

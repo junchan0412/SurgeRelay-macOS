@@ -631,15 +631,16 @@ actor ModuleFileStore {
         let original = try Data(contentsOf: destination)
         guard original.sha256String == expectedExistingHash else { throw PreviewContentSaveError.changed }
         guard original.count <= 20 * 1024 * 1024, String(data: original, encoding: .utf8) != nil,
-              !ManagedPublishedFile.hasManagementHeader(original) else {
-            throw RelayError.invalidOutput("该文件不是可接管的未受管 UTF-8 模块，请重新检查文件内容与归属。")
+              ManagedPublishedFile.canAdopt(original, relativePath: relativePath) else {
+            throw RelayError.invalidOutput("该文件已受管或管理标记损坏，请重新检查文件内容与归属。")
         }
         let backup = storageConfigurationDirectory
             .appending(path: "Backups/LocalOutputAdoption/\(moduleID.uuidString)/\(UUID().uuidString)", directoryHint: .isDirectory)
             .appending(path: destination.lastPathComponent)
         try PersistenceStore.writeProtectedData(original, to: backup, configurationDirectory: storageConfigurationDirectory)
         try writeManagedPublishedFile(original, to: destination, relativePath: relativePath, rootDirectory: root,
-            isKnownManagedPath: true, expectedExistingHash: expectedExistingHash, expectedSnapshot: snapshot)
+            isKnownManagedPath: true, expectedExistingHash: expectedExistingHash, expectedSnapshot: snapshot,
+            confirmedPreviousPath: ManagedPublishedFile.managedRelativePath(in: original))
         return backup
     }
 
@@ -1192,7 +1193,8 @@ actor ModuleFileStore {
         rootDirectory: URL,
         isKnownManagedPath: Bool,
         expectedExistingHash: String? = nil,
-        expectedSnapshot: PublishedFileSnapshot? = nil
+        expectedSnapshot: PublishedFileSnapshot? = nil,
+        confirmedPreviousPath: String? = nil
     ) throws {
         let managedData = ManagedPublishedFile.dataWrapping(data, relativePath: relativePath)
         let outcome = CoordinationOutcome<Void>()
@@ -1209,7 +1211,7 @@ actor ModuleFileStore {
                 }
                 let conflictVersions = try validatePublishedFile(at: coordinatedURL, relativePath: relativePath,
                     isKnownManagedPath: isKnownManagedPath, expectedExistingHash: expectedExistingHash,
-                    expectedSnapshot: expectedSnapshot, deleting: false)
+                    expectedSnapshot: expectedSnapshot, deleting: false, confirmedPreviousPath: confirmedPreviousPath)
                 if FileManager.default.fileExists(atPath: coordinatedURL.path) {
                     let existing = try Data(contentsOf: coordinatedURL)
                     if conflictVersions.isEmpty, existing == managedData {
@@ -1234,7 +1236,7 @@ actor ModuleFileStore {
 
     private func validatePublishedFile(at url: URL, relativePath: String, isKnownManagedPath: Bool,
                                        expectedExistingHash: String?, expectedSnapshot: PublishedFileSnapshot? = nil,
-                                       deleting: Bool) throws -> [NSFileVersion] {
+                                       deleting: Bool, confirmedPreviousPath: String? = nil) throws -> [NSFileVersion] {
         let existing = FileManager.default.fileExists(atPath: url.path) ? try Data(contentsOf: url) : nil
         if let expectedExistingHash, (existing?.sha256String ?? "<missing>") != expectedExistingHash {
             throw RelayError.invalidOutput(deleting
@@ -1251,14 +1253,20 @@ actor ModuleFileStore {
         guard let existing else { return [] }
         let permitsLegacyMigration = isKnownManagedPath && !ManagedPublishedFile.hasManagementHeader(existing)
             && (!deleting || !ManagedPublishedFile.requiresInlineMarker(relativePath))
-        guard ManagedPublishedFile.isManaged(existing, relativePath: relativePath) || permitsLegacyMigration else {
+        let permitsConfirmedRelocation = !deleting && expectedExistingHash != nil && expectedSnapshot != nil
+            && confirmedPreviousPath.map { ManagedPublishedFile.isManaged(existing, relativePath: $0) } == true
+        guard ManagedPublishedFile.isManaged(existing, relativePath: relativePath) || permitsLegacyMigration || permitsConfirmedRelocation else {
             if deleting {
                 throw RelayError.invalidOutput("旧文件 \(relativePath) 不属于 Surge Relay 管理，已停止自动清理。")
             }
             throw RelayError.localOutputConflict(relativePath)
         }
-        return try ManagedPublishedFile.validatedConflictVersions(at: url,
-            allowingKnownManagedPath: permitsLegacyMigration, relativePath: relativePath)
+        let versions = try ManagedPublishedFile.validatedConflictVersions(at: url,
+            allowingKnownManagedPath: permitsLegacyMigration, relativePath: confirmedPreviousPath ?? relativePath)
+        if permitsConfirmedRelocation, !versions.isEmpty {
+            throw RelayError.invalidOutput("该文件存在 iCloud 冲突版本，请先解决冲突后再修复路径。")
+        }
+        return versions
     }
 
     private func removeManagedPublishedFile(at url: URL, relativePath: String, rootDirectory: URL,

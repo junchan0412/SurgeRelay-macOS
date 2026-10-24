@@ -108,6 +108,10 @@ final class AppModel {
     @ObservationIgnored var foregroundWorkIdentifier = UUID()
     @ObservationIgnored var schedulerTask: Task<Void, Never>?
     @ObservationIgnored var automaticUpdateTask: Task<Void, Never>?
+    @ObservationIgnored var pendingAutomaticUpdateModuleIDs = Set<UUID>()
+    @ObservationIgnored var pendingModuleSaveTask: Task<Void, Never>?
+    var pendingModuleSaves: [PendingModuleSave]
+    var activePendingModuleSaveID: UUID?
     @ObservationIgnored var automaticPublishTask: Task<Void, Never>?
     @ObservationIgnored var localSourceWatcherTask: Task<Void, Never>?
     @ObservationIgnored var localSourceSyncTask: Task<Void, Never>?
@@ -186,6 +190,7 @@ final class AppModel {
         upstreamState = loadedUpstreamState
         updateHistory = PersistenceStore.loadUpdateHistory(in: contextValue.configurationDirectory)
         moduleTemplates = PersistenceStore.loadModuleTemplates(in: contextValue.configurationDirectory)
+        pendingModuleSaves = PersistenceStore.loadPendingModuleSaves(in: contextValue.configurationDirectory)
         selectedPublishAttempt = PersistenceStore.loadSelectedPublishAttempt(in: contextValue.configurationDirectory)
         let drafts = PersistenceStore.loadPreviewDrafts(in: contextValue.configurationDirectory).filter { id, _ in loadedModules.contains { $0.id == id } }
         modulePreviewDrafts = drafts
@@ -226,6 +231,7 @@ final class AppModel {
                 NSApp.appearance = NSAppearance(named: appearance == "light" ? .aqua : .darkAqua)
             }
             statusMessage = "UI QA 模式：自动任务已暂停"
+            schedulePendingModuleSaves()
             return
         }
         applyAppearancePreference()
@@ -234,6 +240,10 @@ final class AppModel {
         workActivity.title = "检查恢复记录"
         startupTask = Task { [weak self] in
             guard let self else { return }
+            defer {
+                startupTask = nil
+                schedulePendingModuleSaves()
+            }
             do {
                 try await recoverPersistedVersionState()
                 try await reconcileRecoveredLocalResources()

@@ -3,6 +3,52 @@ import XCTest
 @testable import SurgeRelay
 
 final class LocalPublishedExportTests: XCTestCase {
+    func testExplicitAdoptionRepairsMovedMarkerAndPreservesOriginalBackup() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let old = "Sgmodule(#1苹果服务)/Reddit-去广告.sgmodule"
+        let path = "Sgmodule(#3广告模块)/Reddit-去广告.sgmodule"
+        let destination = root.appending(path: path)
+        try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let original = ManagedPublishedFile.dataWrapping(Data("#!name=Reddit\n[Rule]\nDOMAIN,reddit.example,DIRECT\n".utf8), relativePath: old)
+        try original.write(to: destination)
+        let snapshot = LocalModuleOutputSnapshot.read(relativePath: path, rootDirectoryPath: root.path)
+        XCTAssertTrue(snapshot.hasManagementHeader)
+        XCTAssertTrue(snapshot.canAdopt)
+        XCTAssertEqual(snapshot.managementPath, old)
+        XCTAssertTrue(snapshot.message.contains("旧位置"))
+        let store = ModuleFileStore(cacheDirectory: root.appending(path: "Cache"), configurationDirectory: root.appending(path: "Config"))
+        let backup = try await store.adoptLocalPublishedFile(relativePath: path, rootDirectoryPath: root.path,
+            moduleID: UUID(), expectedExistingHash: original.sha256String, protectedSourcePaths: [])
+        XCTAssertEqual(try Data(contentsOf: backup), original)
+        XCTAssertTrue(ManagedPublishedFile.isManaged(try Data(contentsOf: destination), relativePath: path))
+        XCTAssertFalse(LocalModuleOutputSnapshot.read(relativePath: path, rootDirectoryPath: root.path).canAdopt)
+        let output = PublishFile(name: path, data: Data("#!name=Updated\n[Rule]\nDOMAIN,reddit.example,REJECT\n".utf8))
+        _ = try await store.exportPublishedFiles([output], toRootDirectory: root.path)
+        XCTAssertEqual(ModuleSyncPlanner.normalizedPublishedData(try Data(contentsOf: destination)), output.data)
+    }
+
+    func testMovedMarkerAdoptionRejectsChangedAndMalformedDeclarations() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let path = "Moved.sgmodule"
+        let destination = root.appending(path: path)
+        let original = ManagedPublishedFile.dataWrapping(Data("#!name=Moved\n[Rule]\nFINAL,DIRECT".utf8), relativePath: "Old/Moved.sgmodule")
+        let store = ModuleFileStore(cacheDirectory: root.appending(path: "Cache"), configurationDirectory: root.appending(path: "Config"))
+        let malformed = Data("# Surge Relay managed output\n# surge-relay-relative-path: ../Escape.sgmodule\n[Rule]\nFINAL,DIRECT".utf8)
+        for (data, hash, protected) in [(original, "stale", [String]()), (original, original.sha256String, [path]), (malformed, malformed.sha256String, [])] {
+            try data.write(to: destination)
+            do {
+                _ = try await store.adoptLocalPublishedFile(relativePath: path, rootDirectoryPath: root.path,
+                    moduleID: UUID(), expectedExistingHash: hash, protectedSourcePaths: protected)
+                XCTFail("Changed, protected, and malformed files must not be adopted")
+            } catch {}
+            XCTAssertEqual(try Data(contentsOf: destination), data)
+        }
+        XCTAssertFalse(ManagedPublishedFile.canAdopt(malformed, relativePath: path))
+    }
+
     func testExplicitLocalAdoptionBacksUpOriginalAndAllowsSubsequentExport() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

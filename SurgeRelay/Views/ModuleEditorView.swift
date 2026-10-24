@@ -6,6 +6,7 @@ struct ModuleEditorView: View {
     let module: RelayModule?
     @State private var draft: ModuleDraft
     @State private var localError: String?
+    @State private var isSubmitting = false
     @State private var isAdvancedExpanded: Bool
     @State private var nameLookup: Task<Void, Never>?
     @State private var showsNewFolderDialog = false
@@ -91,7 +92,7 @@ struct ModuleEditorView: View {
             SheetActionFooter {
                 Button("取消", role: .cancel) { dismiss() }
                 Spacer()
-                Button(module == nil ? "添加" : "保存") { save() }
+                Button(model.isWorking ? "加入待处理队列" : module == nil ? "添加" : "保存") { save() }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
                     .accessibilityIdentifier("module-editor.save")
@@ -99,6 +100,8 @@ struct ModuleEditorView: View {
         }
         .frame(width: 680, height: 720)
         .background(Design.Palette.canvas)
+        .disabled(isSubmitting)
+        .interactiveDismissDisabled(isSubmitting)
         .onDisappear { nameLookup?.cancel() }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("module-editor.root")
@@ -274,15 +277,17 @@ struct ModuleEditorView: View {
     }
 
     private func save() {
-        do {
-            if let module {
-                try model.updateModule(id: module.id, from: draft)
-            } else {
-                try model.addModule(from: draft)
+        guard !isSubmitting else { return }
+        isSubmitting = true
+        let snapshot = draft
+        Task { @MainActor in
+            defer { isSubmitting = false }
+            do {
+                try await model.enqueueModuleSave(moduleID: module?.id, draft: snapshot)
+                dismiss()
+            } catch {
+                localError = error.localizedDescription
             }
-            dismiss()
-        } catch {
-            localError = error.localizedDescription
         }
     }
 

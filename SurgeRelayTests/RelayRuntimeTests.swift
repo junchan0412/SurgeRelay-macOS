@@ -4,6 +4,263 @@ import XCTest
 
 @MainActor
 final class RelayRuntimeTests: XCTestCase {
+    private func pendingSaveModel(root: URL) -> AppModel {
+        let context = WorkspaceContext(id: UUID(), name: "Pending saves",
+            configurationDirectory: root.appending(path: "Config"), cacheDirectory: root.appending(path: "Cache"),
+            allowsLegacyFallback: false)
+        let model = AppModel(context: context, persistsOnInit: false)
+        model.settings.publishToLocal = false
+        model.settings.publishToGitHub = false
+        model.settings.automaticallyPublish = false
+        model.settings.watchesLocalModuleChanges = false
+        model.settings.refreshIntervalMinutes = 0
+        return model
+    }
+
+    func testManagedOutputRelocationRepairsStaleMarkerAfterPathChange() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let context = WorkspaceContext(id: UUID(), name: "Relocated output", configurationDirectory: root.appending(path: "Config"), cacheDirectory: root.appending(path: "Cache"), allowsLegacyFallback: false)
+        let model = AppModel(context: context, persistsOnInit: false)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        model.settings.localModuleDirectory = root.path
+        model.settings.publishToLocal = true
+        model.settings.publishToGitHub = false
+        let old = "Sgmodule(#1苹果服务)/Reddit-去广告.sgmodule"
+        let current = "Sgmodule(#3广告模块)/Reddit-去广告.sgmodule"
+        let module = RelayModule(name: "Reddit 去广告", sourceURL: "https://example.com/reddit.sgmodule", outputFileName: "Reddit-去广告.sgmodule", outputFolder: "Sgmodule(#3广告模块)", storageLocation: .local, localStorageRelativePath: current)
+        model.modules = [module]
+        let destination = root.appending(path: current)
+        try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let oldManaged = ManagedPublishedFile.dataWrapping(Data("#!name=Reddit 去广告\n#SUBSCRIBED http://script.hub/file/_start_/https://example.com/reddit.sgmodule/_end_/Reddit-去广告.sgmodule?type=surge-module&target=surge-module&del=true&jqEnabled=true&noNtf=true\n[Rule]\nDOMAIN,reddit.example,DIRECT\n".utf8), relativePath: old)
+        try oldManaged.write(to: destination)
+        model.settings.localPublishedRootDirectory = root.path
+        model.settings.localPublishedFilePaths = [old]
+        let knownPlan = LocalPublishedFilesPlanner.plan(files: [PublishFile(name: current, data: Data())], targetDirectory: root.path,
+            previousRootDirectory: root.path, previousPublishedPaths: [old])
+        XCTAssertEqual(knownPlan.knownManagedPaths, [old])
+        try await model.fileStore.writeComponent("#!name=Reddit 去广告\n[Rule]\nDOMAIN,reddit.example,REJECT\n", id: module.id)
+        let succeeded = await model.refreshModuleOutputs(moduleIDs: [module.id], schedulesAutomaticPublish: false)
+        XCTAssertTrue(succeeded, model.modules[0].localOutputError ?? model.statusMessage)
+        XCTAssertNil(model.modules[0].localOutputError, model.modules[0].localOutputError ?? "")
+        let content = try Data(contentsOf: destination)
+        XCTAssertTrue(ManagedPublishedFile.isManaged(content, relativePath: current), String(decoding: content, as: UTF8.self))
+        XCTAssertFalse(ManagedPublishedFile.isManaged(content, relativePath: old), String(decoding: content, as: UTF8.self))
+        let backups = try XCTUnwrap(FileManager.default.enumerator(at: context.configurationDirectory.appending(path: "Backups/LocalOutputAdoption"), includingPropertiesForKeys: nil)).allObjects.compactMap { $0 as? URL }.filter { $0.pathExtension == "sgmodule" }
+        XCTAssertEqual(backups.count, 1)
+        XCTAssertTrue(String(decoding: try Data(contentsOf: XCTUnwrap(backups.first)), as: UTF8.self).contains("reddit.example,DIRECT"))
+    }
+
+    func testRelocationDoesNotAutomaticallyClaimAnotherSourceAndCanBeConfirmed() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = pendingSaveModel(root: root)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        model.settings.localModuleDirectory = root.appending(path: "Modules").path
+        model.settings.publishToLocal = true
+        let old = "Old/Reddit.sgmodule"
+        let path = "Correct/Reddit.sgmodule"
+        let module = RelayModule(name: "Reddit", sourceURL: "https://example.com/reddit.sgmodule", outputFileName: "Reddit.sgmodule", outputFolder: "Correct", storageLocation: .local, localStorageRelativePath: path)
+        model.modules = [module]
+        let rootURL = URL(filePath: model.settings.localModuleDirectory)
+        let destination = rootURL.appending(path: path)
+        try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let original = ManagedPublishedFile.dataWrapping(Data("#!name=Unrelated\n#SUBSCRIBED http://script.hub/file/_start_/https://example.com/other.sgmodule/_end_/Reddit.sgmodule?type=surge-module&target=surge-module\n[Rule]\nFINAL,DIRECT\n".utf8), relativePath: old)
+        try original.write(to: destination)
+        model.settings.localPublishedRootDirectory = rootURL.path
+        model.settings.localPublishedFilePaths = [old]
+        try await model.fileStore.writeComponent("#!name=Reddit\n[Rule]\nDOMAIN,reddit.example,REJECT\n", id: module.id)
+        let succeeded = await model.refreshModuleOutputs(moduleIDs: [module.id], schedulesAutomaticPublish: false)
+        XCTAssertFalse(succeeded)
+        XCTAssertEqual(try Data(contentsOf: destination), original)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appending(path: "Config/Backups/LocalOutputAdoption").path))
+        let review = try await model.prepareLocalOutputAdoption(moduleID: module.id)
+        try await model.confirmLocalOutputAdoption(review)
+        XCTAssertTrue(ManagedPublishedFile.isManaged(try Data(contentsOf: destination), relativePath: path))
+        XCTAssertNil(model.modules[0].localOutputError)
+    }
+
+    func testDeletedOldOutputIsNotRecreatedAfterChangingFolder() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = pendingSaveModel(root: root)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        model.settings.localModuleDirectory = root.appending(path: "Modules").path
+        model.settings.publishToLocal = true
+        let old = "Sgmodule(#1苹果服务)/Reddit.sgmodule"
+        let current = "Sgmodule(#3广告模块)/Reddit.sgmodule"
+        let module = RelayModule(name: "Reddit", sourceURL: "https://example.com/reddit.sgmodule", outputFileName: "Reddit.sgmodule", outputFolder: "Sgmodule(#1苹果服务)", storageLocation: .local, localStorageRelativePath: old)
+        model.modules = [module]
+        try await model.fileStore.writeComponent("#!name=Reddit\n[Rule]\nDOMAIN,reddit.example,REJECT\n", id: module.id)
+        let initial = await model.refreshModuleOutputs(moduleIDs: [module.id], schedulesAutomaticPublish: false)
+        XCTAssertTrue(initial)
+        let oldURL = URL(filePath: model.settings.localModuleDirectory).appending(path: old)
+        try FileManager.default.removeItem(at: oldURL)
+        var draft = ModuleDraft(module: module)
+        draft.outputFolder = "Sgmodule(#3广告模块)"
+        try await model.enqueueModuleSave(moduleID: module.id, draft: draft)
+        await model.pendingModuleSaveTask?.value
+        let updated = await model.refreshModuleOutputs(moduleIDs: [module.id], schedulesAutomaticPublish: false)
+        XCTAssertTrue(updated)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: oldURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: URL(filePath: model.settings.localModuleDirectory).appending(path: current).path))
+        let reloaded = ModuleNamingPlanner.normalizedModuleNaming(PersistenceStore.loadModules(in: root.appending(path: "Config"), allowLegacyFallback: false), localModuleDirectory: model.settings.localModuleDirectory)
+        XCTAssertEqual(reloaded.first?.publishedRelativePath, current)
+    }
+
+    func testBusyModuleSavesKeepSnapshotsAndRunInSubmissionOrderAfterCancellation() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = pendingSaveModel(root: root)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        let module = RelayModule(name: "Original", sourceURL: "https://test.invalid/original.sgmodule", outputFileName: "Original")
+        model.modules = [module]
+        model.beginWork(.updatingModules)
+        let generation = model.localChangeGeneration
+        var draft = ModuleDraft(module: module)
+        draft.name = "First click"
+        try await model.enqueueModuleSave(moduleID: module.id, draft: draft)
+        draft.name = "Second click"
+        try await model.enqueueModuleSave(moduleID: module.id, draft: draft)
+        draft.name = "Not submitted"
+        XCTAssertEqual(model.modules[0].name, "Original")
+        XCTAssertEqual(model.localChangeGeneration, generation)
+        XCTAssertEqual(model.workActivity.kind, .updatingModules)
+        XCTAssertEqual(model.pendingModuleSaves.map(\.draft.name), ["First click", "Second click"])
+        XCTAssertNil(model.pendingModuleSaveTask)
+        XCTAssertEqual(PersistenceStore.loadPendingModuleSaves(in: root.appending(path: "Config")).count, 2)
+
+        XCTAssertTrue(model.cancelCurrentWork())
+        model.endWork(.updatingModules)
+        let processing = try XCTUnwrap(model.pendingModuleSaveTask)
+        await processing.value
+
+        XCTAssertEqual(model.modules[0].name, "Second click")
+        XCTAssertEqual(model.localChangeGeneration, generation + 2)
+        XCTAssertTrue(model.pendingModuleSaves.isEmpty)
+        XCTAssertFalse(model.isWorking)
+        XCTAssertEqual(PersistenceStore.loadModules(in: root.appending(path: "Config"), allowLegacyFallback: false)[0].name, "Second click")
+        XCTAssertTrue(PersistenceStore.loadPendingModuleSaves(in: root.appending(path: "Config")).isEmpty)
+    }
+
+    func testPendingAdditionsRecoverAfterRestartWithoutDuplicatingAcknowledgedModules() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = pendingSaveModel(root: root)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        model.beginWork(.publishing)
+        for name in ["First", "Second"] {
+            var draft = ModuleDraft(defaultStorageLocation: .gitHub)
+            draft.name = name
+            draft.sourceURL = "https://test.invalid/\(name).sgmodule"
+            try await model.enqueueModuleSave(moduleID: nil, draft: draft)
+        }
+        let intents = model.pendingModuleSaves
+        let restarted = pendingSaveModel(root: root)
+        defer { restarted.persistenceFeedbackTask?.cancel() }
+        XCTAssertEqual(restarted.pendingModuleSaves.map(\.id), intents.map(\.id))
+        restarted.schedulePendingModuleSaves()
+        await restarted.pendingModuleSaveTask?.value
+        XCTAssertEqual(restarted.modules.map(\.name), ["First", "Second"])
+        XCTAssertEqual(restarted.modules.map(\.id), intents.map(\.id))
+        restarted.enqueueConfiguration([intents[0]], fileName: "pending-module-saves.json")
+        try await restarted.flushPersistence()
+        let replayed = pendingSaveModel(root: root)
+        defer { replayed.persistenceFeedbackTask?.cancel() }
+        replayed.schedulePendingModuleSaves()
+        await replayed.pendingModuleSaveTask?.value
+        XCTAssertEqual(replayed.modules.map(\.id), intents.map(\.id))
+        XCTAssertTrue(replayed.pendingModuleSaves.isEmpty)
+    }
+
+    func testFailedSaveStaysInQueueWithoutBlockingLaterItemsAndCanRetry() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = pendingSaveModel(root: root)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        let original = RelayModule(name: "Removed while busy", sourceURL: "https://test.invalid/removed.sgmodule", outputFileName: "Removed")
+        model.modules = [original]
+        model.beginWork(.publishing)
+        var edit = ModuleDraft(module: original)
+        edit.name = "Saved after retry"
+        try await model.enqueueModuleSave(moduleID: original.id, draft: edit)
+        let failedID = try XCTUnwrap(model.pendingModuleSaves.first?.id)
+        var add = ModuleDraft(defaultStorageLocation: .gitHub)
+        add.name = "Independent addition"
+        add.sourceURL = "https://test.invalid/addition.sgmodule"
+        try await model.enqueueModuleSave(moduleID: nil, draft: add)
+        model.modules = []
+        model.endWork(.publishing)
+        await model.pendingModuleSaveTask?.value
+        XCTAssertEqual(model.modules.map(\.name), ["Independent addition"])
+        XCTAssertEqual(model.pendingModuleSaves.map(\.id), [failedID])
+        XCTAssertNotNil(model.pendingModuleSaves[0].errorMessage)
+        XCTAssertFalse(model.pendingModuleSaves[0].errorMessage?.contains("转换结果") == true)
+        XCTAssertNotNil(PersistenceStore.loadPendingModuleSaves(in: root.appending(path: "Config"))[0].errorMessage)
+
+        model.modules.append(original)
+        try await model.retryPendingModuleSave(id: failedID)
+        await model.pendingModuleSaveTask?.value
+        XCTAssertTrue(model.pendingModuleSaves.isEmpty)
+        XCTAssertEqual(model.modules.last?.name, "Saved after retry")
+    }
+
+    func testPendingSaveCancellationAndWorkspaceRetirementPreserveIntentBoundaries() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = pendingSaveModel(root: root)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        model.beginWork(.updatingModules)
+        var draft = ModuleDraft(defaultStorageLocation: .gitHub)
+        draft.name = "Cancelled"
+        draft.sourceURL = "https://test.invalid/cancelled.sgmodule"
+        try await model.enqueueModuleSave(moduleID: nil, draft: draft)
+        try await model.cancelPendingModuleSave(id: XCTUnwrap(model.pendingModuleSaves.first?.id))
+        XCTAssertTrue(PersistenceStore.loadPendingModuleSaves(in: root.appending(path: "Config")).isEmpty)
+        draft.name = "Old workspace only"
+        try await model.enqueueModuleSave(moduleID: nil, draft: draft)
+        model.isWorkspaceTransitioning = true
+        model.endWork(.updatingModules)
+        model.finishWorkspaceRetirement()
+        model.schedulePendingModuleSaves()
+        XCTAssertNil(model.pendingModuleSaveTask)
+        XCTAssertTrue(model.modules.isEmpty)
+        let other = pendingSaveModel(root: root.appending(path: "Other"))
+        XCTAssertTrue(other.pendingModuleSaves.isEmpty)
+        let reopened = pendingSaveModel(root: root)
+        defer { reopened.persistenceFeedbackTask?.cancel() }
+        reopened.schedulePendingModuleSaves()
+        await reopened.pendingModuleSaveTask?.value
+        XCTAssertEqual(reopened.modules.map(\.name), ["Old workspace only"])
+    }
+
+    func testQueuedSaveDoesNotInheritCancellationFromTheFinishingTask() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = pendingSaveModel(root: root)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        let ready = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        let waiting = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        let operation = Task { @MainActor in
+            model.beginWork(.updatingModules)
+            defer { model.endWork(.updatingModules) }
+            var draft = ModuleDraft(defaultStorageLocation: .gitHub)
+            draft.name = "Survives cancellation"
+            draft.sourceURL = "https://test.invalid/cancel-parent.sgmodule"
+            try await model.enqueueModuleSave(moduleID: nil, draft: draft)
+            ready.continuation.yield(())
+            for await _ in waiting.stream {}
+        }
+        var events = ready.stream.makeAsyncIterator()
+        _ = await events.next()
+        operation.cancel()
+        try await operation.value
+        await model.pendingModuleSaveTask?.value
+        XCTAssertEqual(model.modules.map(\.name), ["Survives cancellation"])
+        XCTAssertTrue(model.pendingModuleSaves.isEmpty)
+        XCTAssertFalse(model.isWorking)
+    }
+
     func testUnmanagedBaiduOutputDoesNotBlockOtherModulesAndCanBeAdopted() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

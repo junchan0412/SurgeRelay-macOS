@@ -6,7 +6,7 @@
 
 | 项目 | 当前值 |
 | --- | --- |
-| 版本 | 2.4.0 (111) |
+| 版本 | 2.4.1 (112) |
 | macOS deployment target | 26.0 |
 | Swift | 6.0，strict concurrency complete |
 
@@ -42,11 +42,11 @@
 | --- | --- |
 | 应用 Swift 文件 | 167 |
 | Swift 测试文件（unit / UI） | 52 / 1 |
-| 源码中的 XCTest 方法 | 576 |
+| 源码中的 XCTest 方法 | 586 |
 | Services / Models / Views / Utilities / App-Core | 71 / 26 / 38 / 3 / 29 |
-| 应用 Swift 行数 | 28,508 |
-| 测试 Swift 行数 | 14,825 |
-| CHANGELOG release 段落 | 111 |
+| 应用 Swift 行数 | 28,813 |
+| 测试 Swift 行数 | 15,128 |
+| CHANGELOG release 段落 | 112 |
 
 ## 主要维护热点
 
@@ -54,16 +54,16 @@
 
 | 文件 | 行数 |
 | --- | --- |
-| SurgeRelay/Services/ModuleFileStore.swift | 1313 |
+| SurgeRelay/Services/ModuleFileStore.swift | 1321 |
 | SurgeRelay/Views/ModuleCodeTextView.swift | 858 |
 | SurgeRelay/Views/ModuleDetailView.swift | 700 |
 | SurgeRelay/Views/ModulePreviewViews.swift | 583 |
 | SurgeRelay/Utilities/ModuleMetadataParser.swift | 517 |
 | SurgeRelay/Views/NativeQAPerformanceRecorder.swift | 482 |
-| SurgeRelay/Services/PersistenceStore.swift | 476 |
+| SurgeRelay/Services/PersistenceStore.swift | 481 |
 | SurgeRelay/Views/ModuleCodeEditorController.swift | 472 |
+| SurgeRelay/AppModel+Modules.swift | 465 |
 | SurgeRelay/Services/WebManagementServer.swift | 465 |
-| SurgeRelay/Models/RelayModule.swift | 462 |
 
 ## 当前优化顺序
 
@@ -83,7 +83,7 @@ git diff --check
 node script/generate_project_status.mjs --check
 node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs
-VERSION=2.4.0 BUILD=111 ./script/check_release_configuration.sh
+VERSION=2.4.1 BUILD=112 ./script/check_release_configuration.sh
 
 DEVELOPER_DIR="$(xcode-select -p)" \
 xcodebuild test \

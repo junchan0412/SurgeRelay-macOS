@@ -118,7 +118,7 @@ extension AppModel {
         guard let original = try await fileStore.readPublishedFile(relativePath: path, rootDirectoryPath: target),
               original.count <= 20 * 1024 * 1024,
               let originalText = String(data: original, encoding: .utf8),
-              !ManagedPublishedFile.hasManagementHeader(original) else {
+              ManagedPublishedFile.canAdopt(original, relativePath: path) else {
             throw RelayError.invalidOutput("文件已不存在、已受管或不适合接管，请重新检查。")
         }
         let files = try await selectedLocalPublishedFiles(moduleIDs: [moduleID])
@@ -194,6 +194,10 @@ extension AppModel {
             previousPublishedPaths: settings.localPublishedFilePaths,
             protectedSourcePaths: localProtectedSourcePaths(targetDirectory: target)
         )
+        if expectedExistingHashes.isEmpty {
+            try await repairRelocatedLocalOutputs(files: files, knownPaths: plan.knownManagedPaths,
+                target: target, generation: generation)
+        }
         do {
             let recorder = StageMetricsContext.current ?? StageMetricsRecorder()
             _ = try await recorder.measure(.publish, reason: "本地", bytes: { paths in
@@ -208,6 +212,7 @@ extension AppModel {
             try await retainPartialLocalPublish(failure.writtenPaths, target: target,
                 generation: generation, knownPaths: plan.knownManagedPaths)
             throw failure
+
         }
         try checkLocalPublishContext(target: target, generation: generation)
         let mergedPaths = LocalPublishedFilesPlanner.mergedPaths(plan.knownManagedPaths, adding: plan.currentPaths)
@@ -217,6 +222,36 @@ extension AppModel {
         try await flushPersistence()
         try checkLocalPublishContext(target: target, generation: generation)
         try await fileStore.acknowledgePublishedResources(paths: plan.currentPaths, rootDirectoryPath: target)
+    }
+
+    private func repairRelocatedLocalOutputs(files: [PublishFile], knownPaths: [String], target: String, generation: Int) async throws {
+        let publishedPaths = Set(files.map { LocalSourcePathResolver.pathIdentity($0.name) })
+        let known = Set(knownPaths.map(LocalSourcePathResolver.pathIdentity))
+        let protected = localProtectedSourcePaths(targetDirectory: target)
+        for module in modules where module.hasLocalStorageTarget && module.hasRemoteUpdateSource {
+            let path = module.publishedRelativePath
+            guard publishedPaths.contains(LocalSourcePathResolver.pathIdentity(path)),
+                  let original = try await fileStore.readPublishedFile(relativePath: path, rootDirectoryPath: target),
+                  let oldPath = ManagedPublishedFile.managedRelativePath(in: original),
+                  !ManagedPublishedFile.isManaged(original, relativePath: path),
+                  known.contains(LocalSourcePathResolver.pathIdentity(oldPath)),
+                  LocalSourcePathResolver.pathIdentity((oldPath as NSString).lastPathComponent)
+                    == LocalSourcePathResolver.pathIdentity((path as NSString).lastPathComponent),
+                  !modules.contains(where: { other in
+                      other.id != module.id && other.hasLocalStorageTarget &&
+                        [other.publishedRelativePath, other.localStorageRelativePath].compactMap { $0 }.contains {
+                            LocalSourcePathResolver.pathIdentity($0) == LocalSourcePathResolver.pathIdentity(oldPath)
+                        }
+                  }),
+                  !protected.map(LocalSourcePathResolver.pathIdentity).contains(LocalSourcePathResolver.pathIdentity(oldPath)),
+                  let text = String(data: original, encoding: .utf8),
+                  let subscription = ModuleMetadataParser.scriptHubSubscription(in: text),
+                  ModuleSourceIdentity.matches(subscription.originalURL, module.updateSourceURL) else { continue }
+            try checkLocalPublishContext(target: target, generation: generation)
+            _ = try await fileStore.adoptLocalPublishedFile(relativePath: path, rootDirectoryPath: target,
+                moduleID: module.id, expectedExistingHash: original.sha256String, protectedSourcePaths: protected)
+            try checkLocalPublishContext(target: target, generation: generation)
+        }
     }
 
     private func retainPartialLocalPublish(_ paths: [String], target: String, generation: Int, knownPaths: [String]) async throws {

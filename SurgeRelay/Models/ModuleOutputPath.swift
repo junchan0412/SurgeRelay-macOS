@@ -68,10 +68,12 @@ struct LocalModuleOutputSnapshot: Equatable, Sendable {
     var path: String
     var state: State
     var hasManagementHeader = false
+    var canAdopt = false
+    var managementPath: String?
 
     var message: String {
         switch state {
-        case .present: "本地文件存在"
+        case .present: canAdopt && hasManagementHeader ? "管理标记仍指向旧位置，可修复路径" : "本地文件存在"
         case .missing: "尚未写入本地文件"
         case .unavailable(let message): message
         }
@@ -103,7 +105,9 @@ struct LocalModuleOutputSnapshot: Equatable, Sendable {
             defer { try? handle.close() }
             let header = try handle.read(upToCount: 16 * 1024) ?? Data()
             return Self(path: path, state: .present,
-                        hasManagementHeader: ManagedPublishedFile.hasManagementHeader(header))
+                        hasManagementHeader: ManagedPublishedFile.hasManagementHeader(header),
+                        canAdopt: ManagedPublishedFile.canAdopt(header, relativePath: relativePath),
+                        managementPath: ManagedPublishedFile.managedRelativePath(in: header))
         } catch {
             let error = error as NSError
             if error.domain == NSCocoaErrorDomain,

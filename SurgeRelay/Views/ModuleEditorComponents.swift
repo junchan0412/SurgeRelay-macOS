@@ -119,12 +119,22 @@ struct ModuleEditorTextFieldRow: View {
     @Binding var text: String
     let prompt: String
     var accessibilityIdentifier: String? = nil
+    @FocusState private var isFocused: Bool
 
     var body: some View {
         ModuleEditorControlRow(title, icon: icon) {
             TextField(title, text: $text, prompt: Text(prompt))
                 .labelsHidden()
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.plain)
+                .focused($isFocused)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 6)
+                        .strokeBorder(isFocused ? Color.accentColor : Color(nsColor: .separatorColor),
+                                      lineWidth: isFocused ? 2 : 0.5)
+                }
                 .accessibilityIdentifier(accessibilityIdentifier ?? "module-editor.field.\(title)")
         }
     }

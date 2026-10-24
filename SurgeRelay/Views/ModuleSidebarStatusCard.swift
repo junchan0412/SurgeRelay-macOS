@@ -4,6 +4,7 @@ import SwiftUI
 struct ModuleSidebarStatusCard: View {
     @Environment(AppModel.self) private var model
     @State private var showsErrorDetails = false
+    @State private var showsPendingSaves = false
 
     var body: some View {
         ViewThatFits(in: .vertical) {
@@ -23,6 +24,9 @@ struct ModuleSidebarStatusCard: View {
         .animation(.snappy(duration: 0.22), value: model.automaticPublishRunsAt)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("work.status")
+        .sheet(isPresented: $showsPendingSaves) {
+            PendingModuleSavesView().environment(model)
+        }
         .sheet(isPresented: $showsErrorDetails) {
             if let error = model.presentedError {
                 VStack(alignment: .leading, spacing: 12) {
@@ -53,6 +57,17 @@ struct ModuleSidebarStatusCard: View {
 
     private var statusContent: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if !model.pendingModuleSaves.isEmpty {
+                Button {
+                    showsPendingSaves = true
+                } label: {
+                    Label(pendingSaveTitle, systemImage: "list.bullet.rectangle")
+                        .font(.caption)
+                }
+                .buttonStyle(.borderless)
+                .accessibilityIdentifier("work.pending-saves")
+                Divider()
+            }
             if let error = model.presentedError {
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -223,6 +238,11 @@ struct ModuleSidebarStatusCard: View {
         return date.formatted(date: .abbreviated, time: .shortened)
     }
 
+    private var pendingSaveTitle: String {
+        let failed = model.pendingModuleSaves.filter { $0.errorMessage != nil }.count
+        return failed == 0 ? "待处理保存队列（\(model.pendingModuleSaves.count)）" : "保存队列：\(failed) 项失败，点击处理"
+    }
+
     private var automaticPublishText: String? {
         guard let runsAt = model.automaticPublishRunsAt else { return nil }
         return "自动发布已排队，预计 \(runsAt.formatted(date: .omitted, time: .shortened)) 执行"
@@ -249,4 +269,61 @@ struct ModuleSidebarStatusCard: View {
         )
     }
 
+}
+
+private struct PendingModuleSavesView: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    @State private var errorMessage: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("待处理保存队列").font(.title2.bold())
+                Spacer()
+                Button("关闭") { dismiss() }.keyboardShortcut(.cancelAction)
+            }
+            Text("按提交顺序保存；当前任务结束后自动处理。失败项目会保留，可重试或取消。")
+                .font(.callout).foregroundStyle(.secondary)
+            if let errorMessage {
+                Text(errorMessage).font(.caption).foregroundStyle(Design.Palette.error).textSelection(.enabled)
+            }
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 12) {
+                    ForEach(model.pendingModuleSaves) { item in
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text(item.draft.name).font(.headline)
+                                Spacer()
+                                if item.errorMessage != nil {
+                                    Button("重试") { perform { try await model.retryPendingModuleSave(id: item.id) } }
+                                }
+                                Button("取消") { perform { try await model.cancelPendingModuleSave(id: item.id) } }
+                                    .disabled(model.activePendingModuleSaveID == item.id)
+                            }
+                            Text(item.errorMessage ?? (model.activePendingModuleSaveID == item.id ? "正在保存…" : "等待当前任务完成"))
+                                .font(.caption)
+                                .foregroundStyle(item.errorMessage == nil ? Color.secondary : Design.Palette.error)
+                                .textSelection(.enabled)
+                            Divider()
+                        }
+                    }
+                    if model.pendingModuleSaves.isEmpty {
+                        Text("所有排队保存已处理完成").foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .padding(24)
+        .frame(width: 560, height: 380)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("work.pending-saves-panel")
+    }
+
+    private func perform(_ action: @escaping @MainActor () async throws -> Void) {
+        Task { @MainActor in
+            do { try await action(); errorMessage = nil }
+            catch { errorMessage = error.localizedDescription }
+        }
+    }
 }

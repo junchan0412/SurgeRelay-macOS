@@ -13,7 +13,15 @@ struct ModulePreviewDraft: Codable, Equatable, Sendable {
     }
 }
 
-struct ModuleDraft: Sendable {
+struct PendingModuleSave: Identifiable, Codable, Sendable {
+    var id = UUID()
+    var moduleID: UUID?
+    var draft: ModuleDraft
+    var refreshSource = false
+    var errorMessage: String?
+}
+
+struct ModuleDraft: Codable, Sendable {
     var name = ""
     var sourceURL = ""
     var sourceFormat: ModuleSourceFormat = .automatic

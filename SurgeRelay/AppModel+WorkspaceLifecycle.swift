@@ -17,12 +17,14 @@ extension AppModel {
         let pendingScheduler = schedulerTask
         let pendingWatcher = localSourceWatcherTask
         let pendingLocalSync = localSourceSyncTask
+        let pendingSaves = pendingModuleSaveTask
         isWorkspaceTransitioning = true
         if workActivity.isActive { _ = cancelCurrentWork() }
         isWorking = true
         workCancellationRequested = true
         schedulerTask?.cancel()
         automaticUpdateTask?.cancel()
+        pendingModuleSaveTask?.cancel()
         cancelAutomaticPublishSchedule()
         automaticPublishTask?.cancel()
         startupTask?.cancel()
@@ -47,6 +49,7 @@ extension AppModel {
             await pendingScheduler?.value
             await pendingWatcher?.value
             await pendingLocalSync?.value
+            await pendingSaves?.value
             completion.finished = true
         }
         defer { observer.cancel() }
@@ -64,6 +67,7 @@ extension AppModel {
         enqueueConfiguration(upstreamState, fileName: "script-hub-state.json")
         enqueueConfiguration(Array(updateHistory.prefix(200)), fileName: "update-history.json")
         if let selectedPublishAttempt { enqueueConfiguration(selectedPublishAttempt, fileName: "selected-publish.json") }
+        enqueueConfiguration(pendingModuleSaves, fileName: "pending-module-saves.json")
         await flushPreviewDrafts()
         if let previewDraftPersistenceError { throw RelayError.invalidOutput(previewDraftPersistenceError) }
         try await flushPersistence()
@@ -72,6 +76,7 @@ extension AppModel {
 
     func finishWorkspaceRetirement() {
         workspaceIsActive = false
+        pendingModuleSaveTask?.cancel()
         networkPathMonitor.cancel()
         persistenceFeedbackTask?.cancel()
         stageProgressTask?.cancel()
@@ -86,6 +91,7 @@ extension AppModel {
         isWorkspaceTransitioning = false
         if workActivity.kind == .switchingWorkspace { endWork(.switchingWorkspace) }
         else if !workActivity.isActive { isWorking = false; workCancellationRequested = false }
+        schedulePendingModuleSaves()
         guard hasStarted, !AppRuntimeOptions.isUIQAMode else { return }
         applyWebServerSettings(persist: false)
         startNetworkRecoveryMonitor()

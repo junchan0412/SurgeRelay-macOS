@@ -3,6 +3,24 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>2.4.1</title>
+            <pubDate>Sun, 25 Oct 2026 01:22:54 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v2.4.1</link>
+            <sparkle:version>112</sparkle:version>
+            <sparkle:shortVersionString>2.4.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 2.4.1
+
+
+- 路径修复：模块改存放位置后，新位置文件若保留旧管理标记，会在旧发布清单、文件名与订阅来源一致且不占用其他模块/源文件时，先备份再修正标记；仅删除旧输出再改目录时，只生成新位置文件。
+- 冲突恢复：详情页区分“带有管理标记”和“标记匹配当前路径”，为旧路径标记文件显示“修复路径并更新本地文件…”；确认前比较内容并复核文件 hash 与身份，损坏标记、符号链接及 iCloud 冲突继续阻止写入。
+- 输入框：模块编辑输入框增加文字与光标的边缘留白，修复长 URL 滚到末尾时右侧字母显示不完整。
+- 保存队列：后台任务忙碌时可提交编辑，冻结提交内容并按工作区持久保存，任务结束后依次执行；侧栏支持查看、重试和取消，重启恢复未完成保存，多个来源变更不再相互取消自动更新。
+- 验证：580 项 Release 测试通过、2 项可选性能测试跳过；覆盖路径迁移、原文件备份、来源不符时的确认保护、保存顺序/恢复/工作区隔离，保留文件归属与发布保护回归。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v2.4.1/Surge-Relay-2.4.1.app.zip" length="12759507" type="application/zip" sparkle:edSignature="pDfXpzzvnZcxizBxAmUx1aPtw+nvGLGV1NEWRIpoHuU1Wm0f/3WAGwMSAuXvAqOZjp6ewqTop4B7L82wdQbLBw=="/>
+        </item>
+        <item>
             <title>2.4.0</title>
             <pubDate>Sat, 24 Oct 2026 20:52:46 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v2.4.0</link>

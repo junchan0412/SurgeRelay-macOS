@@ -268,8 +268,8 @@ struct ModuleDetailView: View {
                     .accessibilityIdentifier("module-detail.write-local-file")
                 }
                 if let output = currentLocalOutput, output.state == .present,
-                   !output.hasManagementHeader, module.hasRemoteUpdateSource {
-                    Button(isPreparingLocalAdoption ? "正在比较本地文件…" : "接管并更新本地文件…",
+                   output.canAdopt, module.hasRemoteUpdateSource {
+                    Button(isPreparingLocalAdoption ? "正在比较本地文件…" : output.hasManagementHeader ? "修复路径并更新本地文件…" : "接管并更新本地文件…",
                            systemImage: "doc.badge.arrow.up") {
                         Task { await prepareLocalOutputAdoption() }
                     }

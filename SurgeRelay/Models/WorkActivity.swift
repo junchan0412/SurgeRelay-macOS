@@ -12,6 +12,7 @@ enum WorkActivityKind: String, Codable, Equatable, Sendable {
     case previewingPublish
     case confirmingPublish
     case savingPreview
+    case savingModule
     case restoringPreview
     case checkingLocalCredentials
     case migratingConfiguration
@@ -30,6 +31,7 @@ enum WorkActivityKind: String, Codable, Equatable, Sendable {
         case .previewingPublish: "发布预览"
         case .confirmingPublish: "确认发布"
         case .savingPreview: "预览内容写入"
+        case .savingModule: "模块保存"
         case .restoringPreview: "预览内容恢复"
         case .checkingLocalCredentials: "本地加密存储检查"
         case .migratingConfiguration: "配置目录迁移"
@@ -43,7 +45,7 @@ enum WorkActivityKind: String, Codable, Equatable, Sendable {
             false
         case .updatingModules, .scanningLocalModules, .importingLocalModules, .refreshingScriptHub,
              .testingGitHub, .publishing, .automaticPublishing, .previewingPublish, .confirmingPublish,
-             .savingPreview, .restoringPreview, .migratingConfiguration, .switchingWorkspace:
+             .savingPreview, .savingModule, .restoringPreview, .migratingConfiguration, .switchingWorkspace:
             true
         }
     }
@@ -53,7 +55,7 @@ enum WorkActivityKind: String, Codable, Equatable, Sendable {
         case .updatingModules, .scanningLocalModules, .importingLocalModules, .refreshingScriptHub,
              .testingGitHub, .publishing, .automaticPublishing, .previewingPublish, .confirmingPublish:
             true
-        case .idle, .savingPreview, .restoringPreview, .checkingLocalCredentials, .migratingConfiguration, .switchingWorkspace:
+        case .idle, .savingPreview, .savingModule, .restoringPreview, .checkingLocalCredentials, .migratingConfiguration, .switchingWorkspace:
             false
         }
     }

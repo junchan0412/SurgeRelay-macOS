@@ -54,7 +54,11 @@ enum ManagedPublishedFile {
         return LocalSourcePathResolver.pathIdentity(managedPath) == LocalSourcePathResolver.pathIdentity(relativePath)
     }
 
-    private static func managedRelativePath(in data: Data) -> String? {
+    static func canAdopt(_ data: Data, relativePath: String) -> Bool {
+        !hasManagementHeader(data) || (managedRelativePath(in: data) != nil && !isManaged(data, relativePath: relativePath))
+    }
+
+    static func managedRelativePath(in data: Data) -> String? {
         let header = String(decoding: data.prefix(16 * 1024), as: UTF8.self)
             .replacingOccurrences(of: "\r\n", with: "\n")
         let lines = Array(header.components(separatedBy: "\n").prefix(64))
