@@ -7,38 +7,12 @@ enum ModuleRefreshTrigger: Equatable, Sendable {
 }
 
 enum ModuleRefreshPlanner {
-    static func contributesToCombined(
-        _ module: RelayModule,
-        combinedModuleEnabled: Bool
-    ) -> Bool {
-        combinedModuleEnabled && module.isIncludedInCombined
+    static func isUpdateable(_ module: RelayModule) -> Bool {
+        module.hasValidUpdateSource
     }
 
-    static func combinedContributorModules(
-        in modules: [RelayModule],
-        combinedModuleEnabled: Bool
-    ) -> [RelayModule] {
-        modules.filter {
-            contributesToCombined($0, combinedModuleEnabled: combinedModuleEnabled)
-        }
-    }
-
-    static func isUpdateable(
-        _ module: RelayModule,
-        combinedModuleEnabled: Bool
-    ) -> Bool {
-        module.hasRemoteUpdateSource ||
-            contributesToCombined(module, combinedModuleEnabled: combinedModuleEnabled) ||
-            module.publishesStandalone
-    }
-
-    static func updateableModules(
-        in modules: [RelayModule],
-        combinedModuleEnabled: Bool
-    ) -> [RelayModule] {
-        modules.filter {
-            isUpdateable($0, combinedModuleEnabled: combinedModuleEnabled)
-        }
+    static func updateableModules(in modules: [RelayModule]) -> [RelayModule] {
+        modules.filter { isUpdateable($0) }
     }
 
     static func serverDeadline(for module: RelayModule, among modules: [RelayModule]) -> Date? {
@@ -100,13 +74,12 @@ enum ModuleRefreshPlanner {
 
     static func shouldUpdateOnLaunch(
         modules: [RelayModule],
-        combinedModuleEnabled: Bool,
         refreshIntervalMinutes: Int,
         now: Date = .now,
         componentExists: @Sendable (UUID) async -> Bool
     ) async -> Bool {
         let cooldowns = modules.filter { $0.serverRetryAfter.map { $0 > now } ?? false }
-        for module in updateableModules(in: modules, combinedModuleEnabled: combinedModuleEnabled) {
+        for module in updateableModules(in: modules) {
             let hasCache = await componentExists(module.id)
             if shouldRefresh(module, among: cooldowns, trigger: .launch, globalIntervalMinutes: refreshIntervalMinutes,
                              hasCache: hasCache, now: now) { return true }

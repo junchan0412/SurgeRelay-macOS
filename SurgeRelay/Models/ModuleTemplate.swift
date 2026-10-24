@@ -8,8 +8,6 @@ struct ModuleTemplate: Identifiable, Codable, Equatable, Sendable {
     var moduleDescription: String
     var outputFolder: String
     var storageTargets: Set<ModuleStorageLocation>
-    var publishesStandalone: Bool
-    var isIncludedInCombined: Bool
     var refreshIntervalMinutes: Int?
     var scriptHubOptions: ScriptHubOptions
 }

@@ -48,7 +48,7 @@ final class ModulePreviewEditPlannerTests: XCTestCase {
         XCTAssertEqual(plan.overrideContent, "new content")
         XCTAssertEqual(plan.module.overrideBaseHash, Data("fresh converted".utf8).sha256String)
         XCTAssertFalse(plan.module.hasOverrideConflict)
-        XCTAssertEqual(plan.statusMessage, "已写入 Edited，等待合并发布")
+        XCTAssertEqual(plan.statusMessage, "已写入 Edited，等待发布")
     }
 
     func testSavePlanKeepsExistingConflictStateWhenConvertedContentIsUnavailable() {
@@ -90,7 +90,7 @@ final class ModulePreviewEditPlannerTests: XCTestCase {
 
         XCTAssertNil(plan.module.overrideBaseHash)
         XCTAssertFalse(plan.module.hasOverrideConflict)
-        XCTAssertEqual(plan.statusMessage, "已恢复 Restored 的转换结果，等待合并发布")
+        XCTAssertEqual(plan.statusMessage, "已恢复 Restored 的转换结果，等待发布")
     }
 
     func testAcceptConflictPlanRefreshesBaseHashAndClearsConflict() {

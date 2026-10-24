@@ -42,7 +42,7 @@ extension AppModel {
         try await fileStore.writeComponentOverride(plan.overrideContent, id: module.id)
         try checkPreviewMutationContext(module, generation: generation)
         replace(plan.module)
-        let refreshedOutput = await rebuildCombinedFromCache()
+        let refreshedOutput = await refreshModuleOutputs(moduleIDs: [module.id])
         try checkPreviewMutationContext(plan.module, generation: generation)
         try persistModules()
         try await flushPersistence()
@@ -75,7 +75,7 @@ extension AppModel {
         replace(plan.module)
         try persistModules()
         try await flushPersistence()
-        let refreshedOutput = await rebuildCombinedFromCache()
+        let refreshedOutput = await refreshModuleOutputs(moduleIDs: [module.id])
         try checkPreviewMutationContext(plan.module, generation: generation)
         statusMessage = refreshedOutput ? plan.statusMessage : "已恢复转换结果，输出刷新未完成"
         let preview = try await modulePreviewProvider.previewContent(for: plan.module)
@@ -104,7 +104,11 @@ extension AppModel {
 
     private func checkPreviewMutationContext(_ module: RelayModule, generation: Int) throws {
         guard localChangeGeneration == generation,
-              let current = modules.first(where: { $0.id == module.id }), current == module else {
+              var current = modules.first(where: { $0.id == module.id }) else {
+            throw PreviewContentSaveError.changed
+        }
+        current.localOutputError = module.localOutputError
+        guard current == module else {
             throw PreviewContentSaveError.changed
         }
     }

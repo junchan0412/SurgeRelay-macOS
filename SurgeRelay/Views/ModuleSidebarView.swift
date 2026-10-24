@@ -8,7 +8,6 @@ struct ModuleSidebarView: View {
     let sections: [ModuleSidebarSection]
     let filteredModulesAreEmpty: Bool
     let allModulesAreEmpty: Bool
-    let combinedModuleEnabled: Bool
     let filterCounts: [ModuleFilter: Int]
     let resultCount: Int
     let hasSearchQuery: Bool
@@ -56,13 +55,6 @@ struct ModuleSidebarView: View {
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
                     .selectionDisabled()
-
-                if combinedModuleEnabled {
-                    Section {
-                        CombinedModuleRow()
-                            .tag(AppModel.combinedModuleSelectionID)
-                    }
-                }
 
                 ForEach(sections) { section in
                     moduleSection(section)
@@ -214,11 +206,7 @@ struct ModuleSidebarView: View {
             }
             ModuleRow(
                 module: module,
-                isSelected: model.selectedModuleID == module.id,
-                combinedModuleEnabled: combinedModuleEnabled,
-                onIncludedChange: { @MainActor @Sendable included in
-                    model.setModuleIncludedInCombined(id: module.id, included: included)
-                }
+                isSelected: model.selectedModuleID == module.id
             )
         }
         .tag(module.id)
@@ -367,8 +355,6 @@ private struct ModuleSidebarSectionHeader: View {
 private struct ModuleRow: View {
     let module: RelayModule
     let isSelected: Bool
-    let combinedModuleEnabled: Bool
-    let onIncludedChange: @MainActor @Sendable (Bool) -> Void
 
     var body: some View {
         HStack(spacing: 10) {
@@ -392,7 +378,7 @@ private struct ModuleRow: View {
                         .controlSize(.small)
                         .transition(.opacity.combined(with: .scale(scale: 0.85)))
                 } else {
-                    Image(systemName: module.state.systemImage)
+                    Image(systemName: module.localOutputError == nil ? module.state.systemImage : "exclamationmark.triangle")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(isSelected ? Color.primary : statusColor)
                         .frame(width: 14, height: 14)
@@ -403,24 +389,13 @@ private struct ModuleRow: View {
             .frame(width: 14, height: 14)
             .accessibilityElement()
             .accessibilityLabel("状态：\(statusHelp)")
-            if combinedModuleEnabled {
-                Toggle("包含", isOn: Binding(
-                    get: { module.isIncludedInCombined },
-                    set: onIncludedChange
-                ))
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .controlSize(.mini)
-                .help("将 \(module.name) 包含在总模块中")
-                .accessibilityLabel("\(module.name) 参与总模块")
-            }
         }
         .padding(.vertical, 7)
         .animation(.snappy(duration: 0.18), value: module.state)
-        .animation(.snappy(duration: 0.18), value: module.isIncludedInCombined)
     }
 
     private var subtitle: String {
+        if module.localOutputError != nil { return "本地输出需要处理 · " + module.publishedRelativePath }
         if module.state == .failed, let failureSummary {
             return "更新失败：\(failureSummary)"
         }
@@ -438,12 +413,13 @@ private struct ModuleRow: View {
     }
 
     private var statusHelp: String {
+        if let error = module.localOutputError { return "本地输出失败：" + error }
         guard module.state == .failed, let failureSummary else { return module.state.title }
         return "\(module.state.title)：\(failureSummary)"
     }
 
     private var statusColor: Color {
-        module.state.tintColor
+        module.localOutputError == nil ? module.state.tintColor : Design.Palette.error
     }
 }
 

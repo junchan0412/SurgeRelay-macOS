@@ -118,22 +118,10 @@ struct LocalModuleOutputSnapshot: Equatable, Sendable {
 enum ModuleOutputPathInspector {
     static func notice(
         for relativePath: String,
-        publishesStandalone: Bool,
         modules: [RelayModule],
-        editingModuleID: UUID?,
-        combinedFileName: String
+        editingModuleID: UUID?
     ) -> ModuleOutputPathNotice? {
-        if !publishesStandalone {
-            return ModuleOutputPathNotice(message: "未开启独立发布时，不会写出这个独立模块文件。", isWarning: false)
-        }
         let normalizedPath = relativePath.lowercased()
-        let combinedPath = ModuleOutputFolder.relativePath(
-            fileName: combinedFileName,
-            folder: ModuleOutputFolder.root
-        ).lowercased()
-        if normalizedPath == combinedPath {
-            return ModuleOutputPathNotice(message: "该路径与总模块文件冲突，保存时会自动加编号避免覆盖。", isWarning: true)
-        }
         if let owner = modules.first(where: { module in
             module.id != editingModuleID && module.publishedRelativePath.lowercased() == normalizedPath
         }) {

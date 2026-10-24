@@ -12,15 +12,11 @@ extension AppModel {
     private func updateMeasuredModule(_ moduleValue: RelayModule, generation updateGeneration: Int, metrics: StageMetricsRecorder) async -> ModuleUpdateOutcome? {
         let measuredStart = ContinuousClock.now
         defer { setWorkStage(nil, moduleID: moduleValue.id, moduleName: moduleValue.name) }
-        var components: [(RelayModule, String)] = []
         var failures = 0
-        var missingCache: [String] = []
-        var missingCacheDetails: [String] = []
         var contentChanged = false
         var newHistory: [UpdateHistoryEntry] = []
         func outcome() -> ModuleUpdateOutcome {
-            ModuleUpdateOutcome(components: components, failures: failures, missingCache: missingCache,
-                                missingCacheDetails: missingCacheDetails, contentChanged: contentChanged, history: newHistory.map {
+            ModuleUpdateOutcome(moduleID: moduleValue.id, failures: failures, contentChanged: contentChanged, history: newHistory.map {
                                     var entry = $0
                                     entry.duration = StageMetricsRecorder.elapsed(since: measuredStart)
                                     entry.stageMetrics = metrics.snapshot
@@ -77,11 +73,9 @@ extension AppModel {
                         revisionSnapshot = snapshot
                         if !engineChanged {
                             setWorkStage(.cache, moduleID: module.id, moduleName: module.name)
-                            let cached = try await metrics.measure(.cache, reason: snapshot.data == nil ? "HTTP 304，沿用缓存" : "来源内容未变，沿用缓存", bytes: { (Int64($0.utf8.count), nil) }) {
+                            _ = try await metrics.measure(.cache, reason: snapshot.data == nil ? "HTTP 304，沿用缓存" : "来源内容未变，沿用缓存", bytes: { (Int64($0.utf8.count), nil) }) {
                                 try await fileStore.readComponent(id: module.id)
                             }
-                            let materialized = shouldContributeToCombined(module)
-                                ? await metrics.measure(.conversion, reason: "缓存参数展开") { await processingWorker.materialize(cached, overrides: module.argumentOverrides) } : nil
                             guard shouldContinueCurrentWork(generation: updateGeneration) else { return nil }
                             let metadataPlan = ModuleMetadataRefreshPlanner.unchangedCachedContentPlan(
                                 module: module,
@@ -90,9 +84,6 @@ extension AppModel {
                             module = metadataPlan.module
                             ModuleRefreshPlanner.clearFailureState(&module)
                             replace(module)
-                            if let materialized {
-                                components.append((module, materialized))
-                            }
                             newHistory.append(UpdateHistoryEntry(
                                 moduleID: module.id,
                                 moduleName: module.name,
@@ -188,12 +179,6 @@ extension AppModel {
                 message: metadataPlan.historyMessage,
                 contentChanged: metadataPlan.contentChanged
             ))
-            if shouldContributeToCombined(module) {
-                let materialized = await metrics.measure(.conversion, reason: "展开汇总参数") {
-                    await processingWorker.materialize(effectiveContent, overrides: module.argumentOverrides)
-                }
-                components.append((module, materialized))
-            }
         } catch {
             guard shouldContinueCurrentWork(generation: updateGeneration) else { return nil }
             failures += 1
@@ -219,38 +204,22 @@ extension AppModel {
                 module = failed
             }
             setWorkStage(.cache, moduleID: module.id, moduleName: module.name, detail: "检查可用回退")
-            if let cached = try? await metrics.measure(.cache, reason: sourceFailure == nil ? "转换失败，检查回退缓存" : "来源失败，检查回退缓存", bytes: { (Int64($0.utf8.count), nil) }, operation: {
+            if let _ = try? await metrics.measure(.cache, reason: sourceFailure == nil ? "转换失败，检查回退缓存" : "来源失败，检查回退缓存", bytes: { (Int64($0.utf8.count), nil) }, operation: {
                 try await fileStore.readComponent(id: module.id)
             }) {
-                let current = modules.first(where: { $0.id == module.id }) ?? module
-                let materialized = await processingWorker.materialize(
-                    cached,
-                    overrides: current.argumentOverrides
-                )
                 let failurePlan = UpdateFailurePlanner.cachedFailureOutcome(
                     module: module,
                     failureMessage: failureMessage,
-                    duration: Date.now.timeIntervalSince(startedAt),
-                    contributesToCombined: shouldContributeToCombined(current)
+                    duration: Date.now.timeIntervalSince(startedAt)
                 )
-                if failurePlan.shouldUseCachedContentInCombined {
-                    components.append((current, materialized))
-                }
                 newHistory.append(failurePlan.historyEntry)
             } else {
                 metrics.record(StageMetric(stage: .cache, duration: 0, attempts: 0, result: .failed, reason: "没有可用缓存，无法回退"))
                 let failurePlan = UpdateFailurePlanner.missingCacheFailureOutcome(
                     module: module,
                     failureMessage: failureMessage,
-                    duration: Date.now.timeIntervalSince(startedAt),
-                    contributesToCombined: shouldContributeToCombined(module)
+                    duration: Date.now.timeIntervalSince(startedAt)
                 )
-                if let moduleName = failurePlan.missingCacheModuleName {
-                    missingCache.append(moduleName)
-                }
-                if let detail = failurePlan.missingCacheDetail {
-                    missingCacheDetails.append(detail)
-                }
                 newHistory.append(failurePlan.historyEntry)
             }
         }
@@ -263,7 +232,7 @@ extension AppModel {
     }
 
     private func moduleSyncConflict(for module: inout RelayModule) async throws -> ModuleSyncConflictMetadata? {
-        guard module.publishesStandalone, module.hasLocalStorageTarget, module.hasGitHubStorageTarget,
+        guard module.hasLocalStorageTarget, module.hasGitHubStorageTarget,
               settings.publishToGitHub, settings.github.isConfigured, !githubToken.isEmpty else { return nil }
         guard let snapshot = try await readModuleSyncComparison(for: module, includesDiff: false, allowsMissing: true) else { return nil }
         if snapshot.metadata.comparisonState == .same {
@@ -312,7 +281,7 @@ extension AppModel {
         includesDiff: Bool,
         allowsMissing: Bool = false
     ) async throws -> ModuleSyncComparison? {
-        guard module.publishesStandalone, module.hasLocalStorageTarget, module.hasGitHubStorageTarget,
+        guard module.hasLocalStorageTarget, module.hasGitHubStorageTarget,
               settings.publishToLocal, settings.publishToGitHub, settings.github.isConfigured, !githubToken.isEmpty else {
             if allowsMissing { return nil }
             throw RelayError.invalidOutput("请先开启并配置模块的本地与 GitHub 双目标。")
@@ -410,11 +379,6 @@ extension AppModel {
             replace(updated)
             try persistModules()
             try await flushPersistence()
-            let refreshed = await rebuildCombinedFromCache(schedulesAutomaticPublish: false, exportsLocalOutput: false)
-            guard refreshed else {
-                statusMessage = "两端同步已完成，但总模块缓存刷新失败，请检查错误后重新合并"
-                return false
-            }
             statusMessage = resolution == .localWins ? "已用本地版本覆盖 GitHub，并记录共同基线" : "已用 GitHub 版本覆盖本地，并记录共同基线"
             return true
         } catch {

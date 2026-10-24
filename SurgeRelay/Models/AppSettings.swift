@@ -122,8 +122,7 @@ struct AppSettings: Codable, Equatable, Sendable {
     // Kept only to find and remove files created by early development builds.
     var outputDirectory: String = AppSettings.defaultOutputDirectory
     var scriptHubModuleURL = AppSettings.defaultScriptHubModuleURL
-    var combinedModuleEnabled = false
-    var combinedModuleFileName = "Surge-Relay.sgmodule"
+    var legacyCombinedModuleFileName = "Surge-Relay.sgmodule"
     // Retained so existing settings decode cleanly during migration.
     var scriptHubBaseURL = "http://script.hub"
     var managedEngineFileName = "Script-Hub-Relay.sgmodule"
@@ -158,8 +157,9 @@ struct AppSettings: Codable, Equatable, Sendable {
         scriptHubModuleURL = Self.normalizedScriptHubModuleURL(
             try container.decodeIfPresent(String.self, forKey: .scriptHubModuleURL)
         )
-        combinedModuleEnabled = try container.decodeIfPresent(Bool.self, forKey: .combinedModuleEnabled) ?? false
-        combinedModuleFileName = try container.decodeIfPresent(String.self, forKey: .combinedModuleFileName) ?? "Surge-Relay.sgmodule"
+        let legacy = try decoder.container(keyedBy: LegacyKeys.self)
+        legacyCombinedModuleFileName = try container.decodeIfPresent(String.self, forKey: .legacyCombinedModuleFileName)
+            ?? legacy.decodeIfPresent(String.self, forKey: .combinedModuleFileName) ?? "Surge-Relay.sgmodule"
         scriptHubBaseURL = try container.decodeIfPresent(String.self, forKey: .scriptHubBaseURL) ?? "http://script.hub"
         managedEngineFileName = try container.decodeIfPresent(String.self, forKey: .managedEngineFileName) ?? "Script-Hub-Relay.sgmodule"
         automaticallyUpdateScriptHub = try container.decodeIfPresent(Bool.self, forKey: .automaticallyUpdateScriptHub) ?? true
@@ -184,6 +184,8 @@ struct AppSettings: Codable, Equatable, Sendable {
         webServerAllowRemoteAccess = try container.decodeIfPresent(Bool.self, forKey: .webServerAllowRemoteAccess) ?? false
         appearancePreference = try container.decodeIfPresent(AppearancePreference.self, forKey: .appearancePreference) ?? .system
     }
+
+    private enum LegacyKeys: String, CodingKey { case combinedModuleFileName }
 
     static var defaultOutputDirectory: String {
         defaultConfigurationDirectory

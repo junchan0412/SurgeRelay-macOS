@@ -5,7 +5,6 @@ struct ModulePreviewContentProvider {
     typealias ComponentExists = (UUID) async -> Bool
     typealias ComponentReader = (UUID) async throws -> String
     typealias ComponentWriter = (String, UUID) async throws -> Void
-    typealias CombinedReader = () async throws -> Data
     typealias Materializer = (String, [String: String]) async -> String
     typealias ArgumentInfoReader = (String) async -> ModuleArgumentInfo
     typealias MetadataApplier = (String, String, String, String?, String) async -> String
@@ -14,7 +13,6 @@ struct ModulePreviewContentProvider {
     let readComponent: ComponentReader
     let readConvertedComponent: ComponentReader
     let writeComponent: ComponentWriter
-    let readCombined: CombinedReader
     let materialize: Materializer
     let argumentInfo: ArgumentInfoReader
     let applyingModuleMetadata: MetadataApplier
@@ -38,17 +36,6 @@ struct ModulePreviewContentProvider {
             return ModuleArgumentInfo()
         }
         return await argumentInfo(content)
-    }
-
-    func combinedPreviewContent(combinedModuleEnabled: Bool) async throws -> String {
-        guard combinedModuleEnabled else {
-            throw RelayError.invalidOutput("总模块功能已关闭。")
-        }
-        let data = try await readCombined()
-        guard let content = String(data: data, encoding: .utf8) else {
-            throw RelayError.invalidOutput("最终模块缓存不是有效的 UTF-8 文本。")
-        }
-        return await materialize(content, [:])
     }
 
     func convertedPreviewContent(for module: RelayModule) async throws -> String {

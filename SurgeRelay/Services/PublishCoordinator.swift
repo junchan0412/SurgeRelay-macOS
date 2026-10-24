@@ -2,30 +2,10 @@ import Foundation
 
 struct PublishPlan: Equatable, Sendable {
     var standaloneModules: [RelayModule]
-    var combinedModuleIDs: Set<UUID>
 
-    var includesCombined: Bool {
-        !combinedModuleIDs.isEmpty
-    }
-
-    var assetModuleIDs: Set<UUID> {
-        Set(standaloneModules.map(\.id)).union(combinedModuleIDs)
-    }
-
-    var hasPublishableModuleSelection: Bool {
-        !standaloneModules.isEmpty || includesCombined
-    }
-
-    var hasStandaloneModuleSelection: Bool {
-        !standaloneModules.isEmpty
-    }
-
-    var scopeTitle: String {
-        if includesCombined {
-            return standaloneModules.isEmpty ? "总模块" : "总模块与独立模块"
-        }
-        return "独立模块"
-    }
+    var assetModuleIDs: Set<UUID> { Set(standaloneModules.map(\.id)) }
+    var hasPublishableModuleSelection: Bool { !standaloneModules.isEmpty }
+    var scopeTitle: String { "模块" }
 }
 
 enum PublishCoordinator {
@@ -86,68 +66,16 @@ enum PublishCoordinator {
         report.retriedAfterConflict ? "远端分支已更新并重新同步；" : ""
     }
 
-    static func plan(
-        modules: [RelayModule],
-        combinedModuleEnabled: Bool,
-        destination: PublishDestination
-    ) -> PublishPlan {
-        PublishPlan(
-            standaloneModules: modules.filter {
-                shouldPublishStandalone(
-                    $0,
-                    destination: destination,
-                    combinedModuleEnabled: combinedModuleEnabled
-                )
-            },
-            combinedModuleIDs: Set(ModuleRefreshPlanner.combinedContributorModules(
-                in: modules,
-                combinedModuleEnabled: combinedModuleEnabled
-            ).map(\.id))
-        )
+    static func plan(modules: [RelayModule], destination: PublishDestination) -> PublishPlan {
+        PublishPlan(standaloneModules: modules.filter { shouldPublishStandalone($0, destination: destination) })
     }
 
-    /// Whether a module's standalone file should be written for `destination`.
-    ///
-    /// A local module's own `.sgmodule` file is its only on-disk materialization
-    /// when it is not carried by an enabled combined module, so it must be written
-    /// even if `publishesStandalone` is off — otherwise updating a cache-only local
-    /// module (e.g. with the combined module disabled) leaves its source file
-    /// untouched on disk. Self-authored local sources are still protected from
-    /// self-overwrite by `shouldSkipStandaloneLocalExport`.
-    static func shouldPublishStandalone(
-        _ module: RelayModule,
-        destination: PublishDestination,
-        combinedModuleEnabled: Bool
-    ) -> Bool {
-        let hasTarget = destination == .local
-            ? module.hasLocalStorageTarget
-            : module.hasGitHubStorageTarget
-        guard hasTarget else { return false }
-        if module.publishesStandalone { return true }
-        return destination == .local
-            && !ModuleRefreshPlanner.contributesToCombined(
-                module,
-                combinedModuleEnabled: combinedModuleEnabled
-            )
+    static func shouldPublishStandalone(_ module: RelayModule, destination: PublishDestination) -> Bool {
+        destination == .local ? module.hasLocalStorageTarget : module.hasGitHubStorageTarget
     }
 
-    static func selectedPlan(
-        modules: [RelayModule],
-        moduleIDs: Set<UUID>,
-        combinedModuleEnabled: Bool,
-        destination: PublishDestination
-    ) -> PublishPlan {
-        PublishPlan(
-            standaloneModules: modules.filter {
-                moduleIDs.contains($0.id) &&
-                    shouldPublishStandalone(
-                        $0,
-                        destination: destination,
-                        combinedModuleEnabled: combinedModuleEnabled
-                    )
-            },
-            combinedModuleIDs: []
-        )
+    static func selectedPlan(modules: [RelayModule], moduleIDs: Set<UUID>, destination: PublishDestination) -> PublishPlan {
+        plan(modules: modules.filter { moduleIDs.contains($0.id) }, destination: destination)
     }
 
     static func shouldSkipStandaloneLocalExport(
@@ -164,14 +92,5 @@ enum PublishCoordinator {
         }
         return LocalSourcePathResolver.pathIdentity(sourceRelativePath)
             == LocalSourcePathResolver.pathIdentity(module.publishedRelativePath)
-    }
-}
-
-private extension ModuleStorageLocation {
-    func matches(_ destination: PublishDestination) -> Bool {
-        switch (self, destination) {
-        case (.local, .local), (.gitHub, .gitHub): true
-        default: false
-        }
     }
 }

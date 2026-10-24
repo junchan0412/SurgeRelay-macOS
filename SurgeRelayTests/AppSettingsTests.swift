@@ -83,36 +83,21 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(settings.githubToken, "ghp_legacy")
     }
 
-    func testStorageModeSelectsOnlyItsOwnCombinedOutput() throws {
-        var settings = AppSettings()
-        settings.combinedModuleEnabled = true
-        settings.combinedModuleFileName = "My Relay"
-        settings.localModuleDirectory = "/tmp/Surge Relay"
-        settings.github.repositoryIsPrivate = false
 
-        settings.publishToLocal = true
-        settings.publishToGitHub = false
-        XCTAssertNil(PublishedAddressResolver.githubURL(for: "My-Relay.sgmodule", settings: settings))
-        XCTAssertEqual(
-            try XCTUnwrap(PublishedAddressResolver.combinedLocalFileURL(settings: settings)).path,
-            "/tmp/Surge Relay/My-Relay.sgmodule"
-        )
 
-        settings.publishToGitHub = true
-        XCTAssertEqual(
-            try XCTUnwrap(PublishedAddressResolver.combinedLocalFileURL(settings: settings)).path,
-            "/tmp/Surge Relay/My-Relay.sgmodule"
-        )
-        XCTAssertEqual(
-            try XCTUnwrap(PublishedAddressResolver.githubURL(for: "My-Relay.sgmodule", settings: settings)).host,
-            "raw.githubusercontent.com"
-        )
-    }
-
-    func testAppSettingsDefaultDisablesCombinedModule() throws {
-        let settings = try JSONDecoder().decode(AppSettings.self, from: Data("{}".utf8))
-        XCTAssertFalse(settings.combinedModuleEnabled)
-        XCTAssertNil(PublishedAddressResolver.combinedLocalFileURL(settings: settings))
+    func testLegacyAggregateSettingsAreIgnoredAndNotEncoded() throws {
+        let data = Data(#"{"combinedModuleEnabled":true,"combinedModuleFileName":"Old Collection"}"#.utf8)
+        let settings = try JSONDecoder().decode(AppSettings.self, from: data)
+        XCTAssertEqual(settings.legacyCombinedModuleFileName, "Old Collection")
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(settings)) as? [String: Any])
+        XCTAssertNil(json["combinedModuleEnabled"])
+        XCTAssertNil(json["combinedModuleFileName"])
+        let moduleData = Data(#"{"id":"11111111-1111-1111-1111-111111111111","name":"Old","sourceURL":"https://test.invalid/source","outputFileName":"Old","publishesStandalone":false,"isEnabled":true}"#.utf8)
+        let module = try JSONDecoder().decode(RelayModule.self, from: moduleData)
+        XCTAssertTrue(PublishCoordinator.shouldPublishStandalone(module, destination: .gitHub))
+        let encoded = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(module)) as? [String: Any])
+        XCTAssertNil(encoded["isEnabled"])
+        XCTAssertNil(encoded["publishesStandalone"])
     }
 
     func testAppSettingsDefaultEnablesLaunchUpdate() throws {
@@ -131,9 +116,9 @@ final class AppSettingsTests: XCTestCase {
             sourceURL: "https://example.com/test.sgmodule",
             outputFileName: "Demo"
         )
-        XCTAssertEqual(ModuleFilter.all.matches(module, combinedModuleEnabled: true), true)
-        XCTAssertEqual(ModuleFilter.updatable.matches(module, combinedModuleEnabled: true), true)
-        XCTAssertEqual(ModuleFilter.nonUpdatable.matches(module, combinedModuleEnabled: true), false)
+        XCTAssertEqual(ModuleFilter.all.matches(module), true)
+        XCTAssertEqual(ModuleFilter.updatable.matches(module), true)
+        XCTAssertEqual(ModuleFilter.nonUpdatable.matches(module), false)
 
         module = RelayModule(
             name: "Local Demo",
@@ -141,42 +126,31 @@ final class AppSettingsTests: XCTestCase {
             outputFileName: "Demo.sgmodule",
             storageLocation: .local
         )
-        XCTAssertEqual(ModuleFilter.updatable.matches(module, combinedModuleEnabled: true), true)
-        XCTAssertEqual(ModuleFilter.nonUpdatable.matches(module, combinedModuleEnabled: true), false)
-        XCTAssertEqual(ModuleFilter.local.matches(module, combinedModuleEnabled: true), true)
-        XCTAssertEqual(ModuleFilter.github.matches(module, combinedModuleEnabled: true), false)
+        XCTAssertEqual(ModuleFilter.updatable.matches(module), true)
+        XCTAssertEqual(ModuleFilter.nonUpdatable.matches(module), false)
+        XCTAssertEqual(ModuleFilter.local.matches(module), true)
+        XCTAssertEqual(ModuleFilter.github.matches(module), false)
 
         module = RelayModule(
             name: "Enabled",
             sourceURL: "https://example.com/test.sgmodule",
-            outputFileName: "Demo",
-            isEnabled: true
+            outputFileName: "Demo"
         )
-        XCTAssertEqual(ModuleFilter.includedInCombined.matches(module, combinedModuleEnabled: true), true)
-        XCTAssertEqual(ModuleFilter.excludedFromCombined.matches(module, combinedModuleEnabled: true), false)
 
-        XCTAssertEqual(ModuleFilter.includedInCombined.matches(module, combinedModuleEnabled: false), false)
-        XCTAssertEqual(ModuleFilter.excludedFromCombined.matches(module, combinedModuleEnabled: false), true)
 
         let counts = ModuleFilter.counts(
-            for: [module],
-            combinedModuleEnabled: true
+            for: [module]
         )
-        XCTAssertEqual(counts[.includedInCombined], 1)
-        XCTAssertEqual(counts[.excludedFromCombined], 0)
     }
 
     func testModuleExtendedFilterMatching() {
         let remote = RelayModule(
             name: "Remote",
             sourceURL: "https://example.com/a.sgmodule",
-            outputFileName: "A",
-            publishesStandalone: true
+            outputFileName: "A"
         )
-        XCTAssertTrue(ModuleFilter.remoteSource.matches(remote, combinedModuleEnabled: true))
-        XCTAssertTrue(ModuleFilter.standalone.matches(remote, combinedModuleEnabled: true))
-        XCTAssertFalse(ModuleFilter.cachedOnly.matches(remote, combinedModuleEnabled: true))
-        XCTAssertFalse(ModuleFilter.selfAuthored.matches(remote, combinedModuleEnabled: true))
+        XCTAssertTrue(ModuleFilter.remoteSource.matches(remote))
+        XCTAssertFalse(ModuleFilter.selfAuthored.matches(remote))
 
         let subscribed = RelayModule(
             name: "Sub",
@@ -188,8 +162,8 @@ final class AppSettingsTests: XCTestCase {
                 options: ScriptHubOptions()
             )
         )
-        XCTAssertTrue(ModuleFilter.subscribed.matches(subscribed, combinedModuleEnabled: true))
-        XCTAssertFalse(ModuleFilter.selfAuthored.matches(subscribed, combinedModuleEnabled: true))
+        XCTAssertTrue(ModuleFilter.subscribed.matches(subscribed))
+        XCTAssertFalse(ModuleFilter.selfAuthored.matches(subscribed))
 
         let selfAuthored = RelayModule(
             name: "Self",
@@ -197,7 +171,7 @@ final class AppSettingsTests: XCTestCase {
             outputFileName: "Self.sgmodule",
             storageLocation: .local
         )
-        XCTAssertTrue(ModuleFilter.selfAuthored.matches(selfAuthored, combinedModuleEnabled: true))
+        XCTAssertTrue(ModuleFilter.selfAuthored.matches(selfAuthored))
 
         let failed = RelayModule(
             name: "Fail",
@@ -205,8 +179,8 @@ final class AppSettingsTests: XCTestCase {
             outputFileName: "F",
             state: .failed
         )
-        XCTAssertTrue(ModuleFilter.failed.matches(failed, combinedModuleEnabled: true))
-        XCTAssertTrue(ModuleFilter.attention.matches(failed, combinedModuleEnabled: true))
+        XCTAssertTrue(ModuleFilter.failed.matches(failed))
+        XCTAssertTrue(ModuleFilter.attention.matches(failed))
 
         let never = RelayModule(
             name: "Never",
@@ -214,7 +188,7 @@ final class AppSettingsTests: XCTestCase {
             outputFileName: "N",
             state: .never
         )
-        XCTAssertTrue(ModuleFilter.neverUpdated.matches(never, combinedModuleEnabled: true))
+        XCTAssertTrue(ModuleFilter.neverUpdated.matches(never))
 
         let conflict = RelayModule(
             name: "Conflict",
@@ -222,17 +196,15 @@ final class AppSettingsTests: XCTestCase {
             outputFileName: "C",
             hasOverrideConflict: true
         )
-        XCTAssertTrue(ModuleFilter.overrideConflict.matches(conflict, combinedModuleEnabled: true))
-        XCTAssertTrue(ModuleFilter.attention.matches(conflict, combinedModuleEnabled: true))
+        XCTAssertTrue(ModuleFilter.overrideConflict.matches(conflict))
+        XCTAssertTrue(ModuleFilter.attention.matches(conflict))
 
         let cached = RelayModule(
             name: "Cached",
             sourceURL: "https://example.com/x.sgmodule",
-            outputFileName: "X",
-            publishesStandalone: false
+            outputFileName: "X"
         )
-        XCTAssertTrue(ModuleFilter.cachedOnly.matches(cached, combinedModuleEnabled: true))
-        XCTAssertFalse(ModuleFilter.standalone.matches(cached, combinedModuleEnabled: true))
+        XCTAssertTrue(PublishCoordinator.shouldPublishStandalone(cached, destination: .gitHub))
 
         let github = RelayModule(
             name: "GH",
@@ -240,8 +212,8 @@ final class AppSettingsTests: XCTestCase {
             outputFileName: "GH",
             storageLocation: .gitHub
         )
-        XCTAssertTrue(ModuleFilter.github.matches(github, combinedModuleEnabled: true))
-        XCTAssertFalse(ModuleFilter.local.matches(github, combinedModuleEnabled: true))
+        XCTAssertTrue(ModuleFilter.github.matches(github))
+        XCTAssertFalse(ModuleFilter.local.matches(github))
     }
 
     func testModuleFilterGroupingAndPresets() {
@@ -255,8 +227,6 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(ModuleFilter.subscribed.group, .source)
         XCTAssertEqual(ModuleFilter.remoteSource.group, .source)
         XCTAssertEqual(ModuleFilter.selfAuthored.group, .source)
-        XCTAssertEqual(ModuleFilter.standalone.group, .behavior)
-        XCTAssertEqual(ModuleFilter.includedInCombined.group, .combined)
         XCTAssertEqual(ModuleFilter.attention.group, .status)
         XCTAssertNil(ModuleFilter.all.group)
     }

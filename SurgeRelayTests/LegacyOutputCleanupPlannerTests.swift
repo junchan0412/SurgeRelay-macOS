@@ -34,8 +34,7 @@ final class LegacyOutputCleanupPlannerTests: XCTestCase {
 
     func testLegacyOutputCleanupPlannerBuildsKnownPublishedPaths() {
         XCTAssertEqual(
-            LegacyOutputCleanupPlanner.publishedRelativePaths(
-                combinedModuleFileName: "Daily Relay",
+            LegacyOutputCleanupPlanner.publishedRelativePaths(combinedModuleFileName: "Daily Relay",
                 managedEngineFileName: "Engine Relay"
             ),
             [

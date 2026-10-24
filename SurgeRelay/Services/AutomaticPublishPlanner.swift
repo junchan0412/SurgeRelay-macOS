@@ -81,7 +81,7 @@ enum AutomaticPublishPlanner {
     }
 
     static func shouldRunScheduledPublish(plan: PublishPlan) -> Bool {
-        plan.hasStandaloneModuleSelection
+        plan.hasPublishableModuleSelection
     }
 
     static func skippedAfterModuleUpdateStatus(contentChanged: Bool, failures: Int) -> String {

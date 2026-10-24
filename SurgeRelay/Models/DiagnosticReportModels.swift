@@ -11,11 +11,11 @@ struct DiagnosticModuleSnapshot: Codable, Sendable {
     var initialSourceTitle: String
     var relationshipSummary: String
     var localStorageRelativePath: String?
-    var enabled: Bool
     var state: String
     var lastUpdatedAt: Date?
     var sourceCheckedAt: Date?
     var lastError: String?
+    var localOutputError: String?
     var hasOverrideConflict: Bool
 }
 

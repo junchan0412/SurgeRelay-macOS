@@ -7,15 +7,11 @@ enum ModuleFilter: String, CaseIterable, Identifiable, Sendable {
     case nonUpdatable
     case failed
     case neverUpdated
-    case includedInCombined
-    case excludedFromCombined
     case local
     case github
     case subscribed
     case remoteSource
     case selfAuthored
-    case standalone
-    case cachedOnly
     case attention
     case overrideConflict
     case uncategorized
@@ -29,15 +25,11 @@ enum ModuleFilter: String, CaseIterable, Identifiable, Sendable {
         case .nonUpdatable: "不可更新"
         case .failed: "更新失败"
         case .neverUpdated: "尚未更新"
-        case .includedInCombined: "参与总模块"
-        case .excludedFromCombined: "不参与总模块"
         case .local: "本地"
         case .github: "GitHub"
         case .subscribed: "订阅来源"
         case .remoteSource: "远程来源"
         case .selfAuthored: "自写模块"
-        case .standalone: "独立发布"
-        case .cachedOnly: "仅缓存"
         case .attention: "需要处理"
         case .overrideConflict: "覆盖冲突"
         case .uncategorized: "未分类"
@@ -51,15 +43,11 @@ enum ModuleFilter: String, CaseIterable, Identifiable, Sendable {
         case .nonUpdatable: "pause.circle"
         case .failed: "xmark.octagon"
         case .neverUpdated: "circle.dashed"
-        case .includedInCombined: "shippingbox.fill"
-        case .excludedFromCombined: "shippingbox"
         case .local: "folder"
         case .github: "cloud"
         case .subscribed: "arrow.down.doc"
         case .remoteSource: "link"
         case .selfAuthored: "pencil.and.outline"
-        case .standalone: "doc.badge.gearshape"
-        case .cachedOnly: "internaldrive"
         case .attention: "exclamationmark.triangle"
         case .overrideConflict: "exclamationmark.arrow.triangle.2.circlepath"
         case .uncategorized: "link.badge.plus"
@@ -85,24 +73,18 @@ enum ModuleFilter: String, CaseIterable, Identifiable, Sendable {
             .source
         case .local, .github:
             .storage
-        case .includedInCombined, .excludedFromCombined:
-            .combined
-        case .standalone, .cachedOnly:
-            .behavior
         case .attention, .overrideConflict, .uncategorized:
             .status
         }
     }
 
     static func counts(
-        for modules: [RelayModule],
-        combinedModuleEnabled: Bool
+        for modules: [RelayModule]
     ) -> [ModuleFilter: Int] {
         var result = Dictionary(uniqueKeysWithValues: allCases.map { ($0, 0) })
         for module in modules {
             for filter in allCases where filter.matches(
-                module,
-                combinedModuleEnabled: combinedModuleEnabled
+                module
             ) {
                 result[filter, default: 0] += 1
             }
@@ -110,34 +92,22 @@ enum ModuleFilter: String, CaseIterable, Identifiable, Sendable {
         return result
     }
 
-    func matches(_ module: RelayModule, combinedModuleEnabled: Bool) -> Bool {
+    func matches(_ module: RelayModule) -> Bool {
         switch self {
         case .all:
             true
         case .updatable:
             ModuleRefreshPlanner.isUpdateable(
-                module,
-                combinedModuleEnabled: combinedModuleEnabled
+                module
             )
         case .nonUpdatable:
             !ModuleRefreshPlanner.isUpdateable(
-                module,
-                combinedModuleEnabled: combinedModuleEnabled
+                module
             )
         case .failed:
-            module.state == .failed
+            module.state == .failed || module.localOutputError != nil
         case .neverUpdated:
             module.state == .never
-        case .includedInCombined:
-            ModuleRefreshPlanner.contributesToCombined(
-                module,
-                combinedModuleEnabled: combinedModuleEnabled
-            )
-        case .excludedFromCombined:
-            !ModuleRefreshPlanner.contributesToCombined(
-                module,
-                combinedModuleEnabled: combinedModuleEnabled
-            )
         case .local:
             module.hasLocalStorageTarget
         case .github:
@@ -148,12 +118,8 @@ enum ModuleFilter: String, CaseIterable, Identifiable, Sendable {
             module.initialSource.isRemote
         case .selfAuthored:
             module.initialSource == .selfAuthored
-        case .standalone:
-            module.publishesStandalone
-        case .cachedOnly:
-            !module.publishesStandalone
         case .attention:
-            module.state == .failed || module.hasOverrideConflict || module.hasSyncConflict
+            module.localOutputError != nil || module.state == .failed || module.hasOverrideConflict || module.hasSyncConflict
         case .overrideConflict:
             module.hasOverrideConflict
         case .uncategorized:
@@ -167,8 +133,6 @@ enum ModuleFilterGroup: String, CaseIterable, Identifiable, Sendable {
     case updateState
     case source
     case storage
-    case combined
-    case behavior
     case status
 
     var id: String { rawValue }
@@ -178,8 +142,6 @@ enum ModuleFilterGroup: String, CaseIterable, Identifiable, Sendable {
         case .updateState: "更新状态"
         case .source: "来源"
         case .storage: "存放位置"
-        case .combined: "总模块"
-        case .behavior: "发布行为"
         case .status: "状态"
         }
     }

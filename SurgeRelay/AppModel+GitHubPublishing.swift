@@ -11,7 +11,7 @@ extension AppModel {
     var githubPublishPlan: PublishPlan {
         PublishCoordinator.plan(
             modules: modules,
-            combinedModuleEnabled: settings.combinedModuleEnabled,
+
             destination: .gitHub
         )
     }
@@ -91,11 +91,9 @@ extension AppModel {
         let plan = githubPublishPlan
         try GitHubPublishPlanner.validatePublishableSelection(plan)
         let token = try await githubPublishTokenAndRefreshRepositoryPrivacy()
-        let data = settings.combinedModuleEnabled ? try await fileStore.readCombined() : nil
         try checkCurrentWorkCancellation()
         let files = try await publishedFiles(
             plan: plan,
-            combinedData: data,
             includeAssets: true,
             destination: .gitHub
         )
@@ -122,7 +120,7 @@ extension AppModel {
         let plan = PublishCoordinator.selectedPlan(
             modules: modules,
             moduleIDs: moduleIDs,
-            combinedModuleEnabled: settings.combinedModuleEnabled,
+
             destination: .gitHub
         )
         try GitHubPublishPlanner.validatePublishableSelection(plan)
@@ -173,7 +171,6 @@ extension AppModel {
     private func selectedPublishedFiles(plan: PublishPlan) async throws -> [PublishFile] {
         try await publishedFiles(
             plan: plan,
-            combinedData: nil,
             includeAssets: true,
             destination: .gitHub
         )

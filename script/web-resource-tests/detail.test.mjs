@@ -89,8 +89,6 @@ function createController(overrides = {}) {
   controller.patchLiveDetail({ modules: [module], combined }, next);
   assert.equal(controller.getTab(), 'info');
 
-  setSelected('combined');
-  controller.patchLiveDetail({ modules: [module], combined }, { modules: [module], combined });
 }
 
 console.log('web-detail behavior tests passed');

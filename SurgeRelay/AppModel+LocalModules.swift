@@ -10,7 +10,6 @@ extension AppModel {
         defer { endWork(.scanningLocalModules) }
         statusMessage = LocalModuleImportPlanner.scanStartedStatus
         let rootDirectoryPath = settings.localModuleDirectory
-        let combinedFileName = settings.combinedModuleFileName
         let existingModules = modules
         let publishedFilePaths = LocalSourcePathResolver.canonicalDirectoryURL(for: settings.localPublishedRootDirectory ?? "") ==
             LocalSourcePathResolver.canonicalDirectoryURL(for: rootDirectoryPath)
@@ -18,7 +17,6 @@ extension AppModel {
         let report = try await Task.detached(priority: .userInitiated) {
             try LocalModuleScanner.report(
                 in: rootDirectoryPath,
-                combinedFileName: combinedFileName,
                 existingModules: existingModules,
                 publishedFilePaths: publishedFilePaths
             )
@@ -56,7 +54,7 @@ extension AppModel {
                 let importPlan = LocalModuleImportPlanner.plan(
                     candidates: [snapshot.candidate],
                     existingModules: modules + imported,
-                    combinedModuleFileName: settings.combinedModuleFileName,
+
                     localModuleDirectory: rootDirectoryPath
                 )
                 failures.append(contentsOf: importPlan.failures)
@@ -108,11 +106,7 @@ extension AppModel {
             return
         }
         refreshLocalSourceWatching()
-        guard await rebuildCombinedFromCache(schedulesAutomaticPublish: false, exportsLocalOutput: false) else { return }
-        statusMessage = LocalModuleImportPlanner.importStatus(
-            importedCount: imported.count,
-            failureCount: failures.count
-        )
+        statusMessage = LocalModuleImportPlanner.importStatus(importedCount: imported.count, failureCount: failures.count)
         if let failureDetails = LocalModuleImportPlanner.failureDetails(failures, isPartialImport: true) {
             presentedError = failureDetails
         }

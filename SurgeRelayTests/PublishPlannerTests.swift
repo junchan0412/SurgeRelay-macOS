@@ -12,8 +12,8 @@ final class PublishPlannerTests: XCTestCase {
         )
         XCTAssertTrue(module.hasLocalStorageTarget)
         XCTAssertTrue(module.hasGitHubStorageTarget)
-        let local = PublishCoordinator.plan(modules: [module], combinedModuleEnabled: false, destination: .local)
-        let github = PublishCoordinator.plan(modules: [module], combinedModuleEnabled: false, destination: .gitHub)
+        let local = PublishCoordinator.plan(modules: [module], destination: .local)
+        let github = PublishCoordinator.plan(modules: [module], destination: .gitHub)
         XCTAssertEqual(local.standaloneModules.map(\.id), [module.id])
         XCTAssertEqual(github.standaloneModules.map(\.id), [module.id])
     }
@@ -27,178 +27,8 @@ final class PublishPlannerTests: XCTestCase {
         let decoded = try JSONDecoder().decode(RelayModule.self, from: legacyData)
         XCTAssertEqual(decoded.storageTargets, [.local])
     }
-    func testPublishCoordinatorRequiresAtLeastOnePublishableModule() {
-        let gitHubStandalone = RelayModule(
-            id: UUID(),
-            name: "GitHub Standalone",
-            sourceURL: "https://example.com/github.sgmodule",
-            outputFileName: "GitHub",
-            storageLocation: .gitHub,
-            publishesStandalone: true,
-            isEnabled: false
-        )
-        let localStandalone = RelayModule(
-            id: UUID(),
-            name: "Local Standalone",
-            sourceURL: "file:///Users/example/Surge/Local.sgmodule",
-            outputFileName: "Local.sgmodule",
-            storageLocation: .local,
-            localStorageRelativePath: "Local.sgmodule",
-            publishesStandalone: true,
-            isEnabled: false
-        )
-        let combinedOnly = RelayModule(
-            id: UUID(),
-            name: "Combined",
-            sourceURL: "https://example.com/combined.sgmodule",
-            outputFileName: "Combined",
-            publishesStandalone: false,
-            isEnabled: true
-        )
-        let ignored = RelayModule(
-            id: UUID(),
-            name: "Ignored",
-            sourceURL: "https://example.com/ignored.sgmodule",
-            outputFileName: "Ignored",
-            publishesStandalone: false,
-            isEnabled: false
-        )
 
-        let gitHubPlan = PublishCoordinator.plan(
-            modules: [gitHubStandalone, localStandalone, combinedOnly, ignored],
-            combinedModuleEnabled: true,
-            destination: .gitHub
-        )
-        XCTAssertEqual(gitHubPlan.standaloneModules.map(\.id), [gitHubStandalone.id])
-        XCTAssertEqual(gitHubPlan.combinedModuleIDs, Set([combinedOnly.id]))
-        XCTAssertEqual(gitHubPlan.assetModuleIDs, Set([gitHubStandalone.id, combinedOnly.id]))
-        XCTAssertTrue(gitHubPlan.hasStandaloneModuleSelection)
-        XCTAssertEqual(gitHubPlan.scopeTitle, "总模块与独立模块")
 
-        let localPlan = PublishCoordinator.plan(
-            modules: [gitHubStandalone, localStandalone, combinedOnly, ignored],
-            combinedModuleEnabled: true,
-            destination: .local
-        )
-        XCTAssertEqual(localPlan.standaloneModules.map(\.id), [localStandalone.id])
-        XCTAssertEqual(localPlan.combinedModuleIDs, Set([combinedOnly.id]))
-        XCTAssertEqual(localPlan.assetModuleIDs, Set([localStandalone.id, combinedOnly.id]))
-
-        let combinedOnlyPlan = PublishCoordinator.plan(
-            modules: [combinedOnly, ignored],
-            combinedModuleEnabled: true,
-            destination: .gitHub
-        )
-        XCTAssertTrue(combinedOnlyPlan.hasPublishableModuleSelection)
-        XCTAssertFalse(combinedOnlyPlan.hasStandaloneModuleSelection)
-
-        let standalonePlan = PublishCoordinator.plan(
-            modules: [gitHubStandalone, localStandalone, combinedOnly, ignored],
-            combinedModuleEnabled: false,
-            destination: .gitHub
-        )
-        XCTAssertEqual(standalonePlan.standaloneModules.map(\.id), [gitHubStandalone.id])
-        XCTAssertTrue(standalonePlan.combinedModuleIDs.isEmpty)
-        XCTAssertEqual(standalonePlan.assetModuleIDs, Set([gitHubStandalone.id]))
-        XCTAssertEqual(standalonePlan.scopeTitle, "独立模块")
-
-        XCTAssertFalse(PublishCoordinator.plan(
-            modules: [ignored],
-            combinedModuleEnabled: true,
-            destination: .gitHub
-        ).hasPublishableModuleSelection)
-    }
-
-    func testSelectedPublishPlanIgnoresNonStandaloneModules() {
-        let standalone = RelayModule(
-            id: UUID(),
-            name: "Standalone",
-            sourceURL: "https://example.com/standalone.sgmodule",
-            outputFileName: "Standalone",
-            publishesStandalone: true,
-            isEnabled: false
-        )
-        let combinedOnly = RelayModule(
-            id: UUID(),
-            name: "Combined",
-            sourceURL: "https://example.com/combined.sgmodule",
-            outputFileName: "Combined",
-            publishesStandalone: false,
-            isEnabled: true
-        )
-
-        let plan = PublishCoordinator.selectedPlan(
-            modules: [standalone, combinedOnly],
-            moduleIDs: [standalone.id, combinedOnly.id],
-            combinedModuleEnabled: true,
-            destination: .gitHub
-        )
-
-        XCTAssertEqual(plan.standaloneModules.map(\.id), [standalone.id])
-        XCTAssertTrue(plan.combinedModuleIDs.isEmpty)
-        XCTAssertEqual(plan.assetModuleIDs, Set([standalone.id]))
-        XCTAssertTrue(plan.hasPublishableModuleSelection)
-
-        let emptyPlan = PublishCoordinator.selectedPlan(
-            modules: [standalone, combinedOnly],
-            moduleIDs: [combinedOnly.id],
-            combinedModuleEnabled: true,
-            destination: .gitHub
-        )
-        XCTAssertFalse(emptyPlan.hasPublishableModuleSelection)
-        XCTAssertTrue(emptyPlan.assetModuleIDs.isEmpty)
-    }
-
-    func testLocalPlanWritesCacheOnlyLocalModulesWhenNotCarriedByCombined() {
-        // A local module that does not publish a standalone output still needs its
-        // own on-disk file when the combined module is disabled — otherwise
-        // updating it would leave the source file untouched.
-        let cacheOnlyLocal = RelayModule(
-            id: UUID(),
-            name: "Reven",
-            sourceURL: "https://gist.example/raw/Reven.sgmodule",
-            outputFileName: "reven.sgmodule",
-            storageLocation: .local,
-            localStorageRelativePath: "Sgmodule(#8会员模块)/reven.sgmodule",
-            publishesStandalone: false,
-            isEnabled: true
-        )
-        let cacheOnlyGitHub = RelayModule(
-            id: UUID(),
-            name: "RemoteCacheOnly",
-            sourceURL: "https://example.com/remote.sgmodule",
-            outputFileName: "Remote",
-            storageLocation: .gitHub,
-            publishesStandalone: false,
-            isEnabled: true
-        )
-
-        // Combined disabled: the local cache-only module writes its own file;
-        // the GitHub cache-only module still does not.
-        let localPlanCombinedOff = PublishCoordinator.plan(
-            modules: [cacheOnlyLocal, cacheOnlyGitHub],
-            combinedModuleEnabled: false,
-            destination: .local
-        )
-        XCTAssertEqual(localPlanCombinedOff.standaloneModules.map(\.id), [cacheOnlyLocal.id])
-
-        // Combined enabled and the module participates: it is represented by the
-        // combined module, so it must not also be written standalone (no duplicate).
-        let localPlanCombinedOn = PublishCoordinator.plan(
-            modules: [cacheOnlyLocal, cacheOnlyGitHub],
-            combinedModuleEnabled: true,
-            destination: .local
-        )
-        XCTAssertTrue(localPlanCombinedOn.standaloneModules.isEmpty)
-
-        // GitHub destination is unaffected: cache-only modules never publish.
-        let gitHubPlan = PublishCoordinator.plan(
-            modules: [cacheOnlyLocal, cacheOnlyGitHub],
-            combinedModuleEnabled: false,
-            destination: .gitHub
-        )
-        XCTAssertTrue(gitHubPlan.standaloneModules.isEmpty)
-    }
 
     func testGitHubPublishPlannerBuildsStalePathPlanOnlyForSameRepository() {
         var settings = GitHubSettings()
@@ -234,8 +64,7 @@ final class PublishPlannerTests: XCTestCase {
             id: UUID(),
             name: "Standalone",
             sourceURL: "https://example.com/standalone.sgmodule",
-            outputFileName: "Standalone",
-            publishesStandalone: true
+            outputFileName: "Standalone"
         )
         var settings = GitHubSettings()
         settings.owner = "someone"
@@ -243,7 +72,7 @@ final class PublishPlannerTests: XCTestCase {
         settings.branch = "main"
         settings.directory = "surge/modules"
         let repositoryKey = PublishCoordinator.repositoryKey(settings)
-        let plan = PublishPlan(standaloneModules: [standalone], combinedModuleIDs: [])
+        let plan = PublishPlan(standaloneModules: [standalone])
         let files = [
             PublishFile(name: "Standalone.sgmodule", data: Data("standalone".utf8)),
             PublishFile(name: "Assets/icon.png", data: Data("icon".utf8))
@@ -263,7 +92,7 @@ final class PublishPlannerTests: XCTestCase {
         XCTAssertEqual(prepared.pathPlan.stalePaths, ["Old.sgmodule"])
 
         XCTAssertThrowsError(try GitHubPublishPlanner.validatePublishableSelection(
-            PublishPlan(standaloneModules: [], combinedModuleIDs: [])
+            PublishPlan(standaloneModules: [])
         )) { error in
             XCTAssertTrue(GitHubPublishPlanner.isNoFilesToPublish(error))
         }
@@ -401,7 +230,7 @@ final class PublishPlannerTests: XCTestCase {
 
         XCTAssertEqual(
             GitHubPublishPlanner.noFilesStatus(for: .publishAll),
-            "没有可发布的 GitHub 模块；请将模块存放位置设为 GitHub，或开启总模块"
+            "没有可发布的 GitHub 模块；请将模块存放位置设为 GitHub"
         )
         XCTAssertEqual(GitHubPublishPlanner.noFilesStatus(for: .publishSelected), "所选模块没有可发布的独立输出")
         XCTAssertEqual(GitHubPublishPlanner.noFilesStatus(for: .preview), "没有可发布的模块文件，已跳过 GitHub 发布预览")
@@ -449,7 +278,7 @@ final class PublishPlannerTests: XCTestCase {
         )
         XCTAssertEqual(
             GitHubPublishPlanner.automaticReportStatus(changedReport),
-            "远端分支已更新并重新同步；已合并发布到 GitHub（2 个文件变更）"
+            "远端分支已更新并重新同步；已发布到 GitHub（2 个文件变更）"
         )
         XCTAssertEqual(
             GitHubPublishPlanner.automaticReportStatus(unchangedReport),
@@ -471,7 +300,7 @@ final class PublishPlannerTests: XCTestCase {
         )
         XCTAssertEqual(
             GitHubPublishPlanner.automaticSuccessMessage(report: report),
-            "远端分支已更新并重新同步；已合并发布到 GitHub（2 个文件变更）"
+            "远端分支已更新并重新同步；已发布到 GitHub（2 个文件变更）"
         )
         XCTAssertEqual(
             GitHubPublishPlanner.selectedSuccessMessage(report: report),

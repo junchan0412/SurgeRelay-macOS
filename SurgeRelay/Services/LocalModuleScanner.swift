@@ -256,13 +256,11 @@ enum LocalModuleScanner {
 
     static func candidates(
         in rootDirectoryPath: String,
-        combinedFileName: String,
         existingModules: [RelayModule],
         publishedFilePaths: [String]
     ) throws -> [LocalModuleScanCandidate] {
         try report(
             in: rootDirectoryPath,
-            combinedFileName: combinedFileName,
             existingModules: existingModules,
             publishedFilePaths: publishedFilePaths
         ).candidates
@@ -270,7 +268,6 @@ enum LocalModuleScanner {
 
     static func report(
         in rootDirectoryPath: String,
-        combinedFileName: String,
         existingModules: [RelayModule],
         publishedFilePaths: [String]
     ) throws -> LocalModuleScanReport {
@@ -287,11 +284,6 @@ enum LocalModuleScanner {
             throw RelayError.invalidOutput("本地模块根目录不存在。")
         }
 
-        let combined = ModuleOutputFolder.relativePath(
-            fileName: combinedFileName,
-            folder: ModuleOutputFolder.root
-        )
-        let combinedKey = LocalSourcePathResolver.pathIdentity(combined)
         var existingSources = Set(existingModules.flatMap {
             [$0.updateSourceURL, $0.sourceURL].map(ModuleSourceIdentity.canonicalValue)
         })
@@ -301,7 +293,6 @@ enum LocalModuleScanner {
             LocalSourcePathResolver.storageRelativePath(for: $0, rootDirectoryPath: root.path)
         }.map(LocalSourcePathResolver.pathIdentity))
         existingPaths.formUnion(publishedFilePaths.map(LocalSourcePathResolver.pathIdentity))
-        existingPaths.insert(combinedKey)
 
         guard let enumerator = FileManager.default.enumerator(
             at: root,
@@ -335,13 +326,6 @@ enum LocalModuleScanner {
             }
             let normalizedRelativePath = relativePath
             let relativeKey = LocalSourcePathResolver.pathIdentity(relativePath)
-            if relativeKey == combinedKey {
-                skipped.append(LocalModuleScanSkippedFile(
-                    relativePath: normalizedRelativePath,
-                    reason: "这是当前总模块文件"
-                ))
-                continue
-            }
             if existingPaths.contains(relativeKey) {
                 skipped.append(LocalModuleScanSkippedFile(
                     relativePath: normalizedRelativePath,

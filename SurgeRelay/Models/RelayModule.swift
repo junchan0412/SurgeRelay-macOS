@@ -25,8 +25,6 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     }
     var localStorageRelativePath: String?
     var preservesOutputFileName: Bool
-    var publishesStandalone: Bool
-    var isEnabled: Bool
     var scriptHubOptions: ScriptHubOptions
     var argumentOverrides: [String: String]
     var iconURL: String?
@@ -54,13 +52,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     var syncConflict: ModuleSyncConflictMetadata?
     var state: ModuleUpdateState
     var lastError: String?
-
-    /// Compatibility-backed name for the persisted `isEnabled` field.
-    /// The value controls whether this source is included in the combined module.
-    var isIncludedInCombined: Bool {
-        get { isEnabled }
-        set { isEnabled = newValue }
-    }
+    var localOutputError: String?
 
     init(
         id: UUID = UUID(),
@@ -75,8 +67,6 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         storageTargets: Set<ModuleStorageLocation>? = nil,
         localStorageRelativePath: String? = nil,
         preservesOutputFileName: Bool? = nil,
-        publishesStandalone: Bool = true,
-        isEnabled: Bool = false,
         scriptHubOptions: ScriptHubOptions = ScriptHubOptions(),
         argumentOverrides: [String: String] = [:],
         iconURL: String? = nil,
@@ -103,7 +93,8 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         syncBaseScope: String? = nil,
         syncConflict: ModuleSyncConflictMetadata? = nil,
         state: ModuleUpdateState = .never,
-        lastError: String? = nil
+        lastError: String? = nil,
+        localOutputError: String? = nil
     ) {
         let normalizedLocalStorageRelativePath = Self.normalizedOptionalRelativePath(localStorageRelativePath)
         let inferredStorageLocation = normalizedLocalStorageRelativePath != nil
@@ -125,8 +116,6 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         self.storageTargets = storageTargets?.isEmpty == false ? storageTargets! : [inferredStorageLocation]
         self.localStorageRelativePath = normalizedLocalStorageRelativePath
         self.preservesOutputFileName = shouldPreserveOutputFileName
-        self.publishesStandalone = publishesStandalone
-        self.isEnabled = isEnabled
         self.scriptHubOptions = scriptHubOptions
         self.argumentOverrides = argumentOverrides
         self.iconURL = iconURL
@@ -154,16 +143,17 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         self.syncConflict = syncConflict
         self.state = state
         self.lastError = lastError
+        self.localOutputError = localOutputError
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, name, sourceURL, sourceFormat, outputFileName, category, outputFolder
         case moduleDescription
         case storageLocation, storageTargets, localStorageRelativePath, preservesOutputFileName
-        case publishesStandalone, isEnabled, scriptHubOptions, argumentOverrides, iconURL, customIconURL, scriptHubSubscription, detectedSourceFormat
+        case scriptHubOptions, argumentOverrides, iconURL, customIconURL, scriptHubSubscription, detectedSourceFormat
         case createdAt, lastUpdatedAt, contentHash, sourceETag, sourceLastModified, sourceContentHash, sourceCheckedAt
         case refreshIntervalMinutes, lastRefreshAttemptAt, consecutiveFailureCount, nextRetryAt, serverRetryAfter, serverRetrySourceURL
-        case conversionEngineRevision, overrideBaseHash, hasOverrideConflict, syncBaseHash, syncBaseScope, syncConflict, state, lastError
+        case conversionEngineRevision, overrideBaseHash, hasOverrideConflict, syncBaseHash, syncBaseScope, syncConflict, state, lastError, localOutputError
     }
 
     func encode(to encoder: Encoder) throws {
@@ -180,8 +170,6 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         try container.encode(storageTargets, forKey: .storageTargets)
         try container.encodeIfPresent(localStorageRelativePath, forKey: .localStorageRelativePath)
         try container.encode(preservesOutputFileName, forKey: .preservesOutputFileName)
-        try container.encode(publishesStandalone, forKey: .publishesStandalone)
-        try container.encode(isEnabled, forKey: .isEnabled)
         try container.encode(scriptHubOptions, forKey: .scriptHubOptions)
         try container.encode(argumentOverrides, forKey: .argumentOverrides)
         try container.encodeIfPresent(iconURL, forKey: .iconURL)
@@ -208,6 +196,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         try container.encodeIfPresent(syncBaseScope, forKey: .syncBaseScope)
         try container.encodeIfPresent(syncConflict, forKey: .syncConflict)
         try container.encode(state, forKey: .state)
+        try container.encodeIfPresent(localOutputError, forKey: .localOutputError)
         try container.encodeIfPresent(lastError, forKey: .lastError)
     }
 
@@ -242,8 +231,6 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         outputFolder = ModuleOutputFolder.normalized(
             try container.decodeIfPresent(String.self, forKey: .outputFolder) ?? ModuleOutputFolder.root
         )
-        publishesStandalone = try container.decodeIfPresent(Bool.self, forKey: .publishesStandalone) ?? true
-        isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? false
         scriptHubOptions = try container.decodeIfPresent(ScriptHubOptions.self, forKey: .scriptHubOptions) ?? ScriptHubOptions()
         argumentOverrides = try container.decodeIfPresent([String: String].self, forKey: .argumentOverrides) ?? [:]
         iconURL = try container.decodeIfPresent(String.self, forKey: .iconURL)
@@ -272,6 +259,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         syncBaseScope = try container.decodeIfPresent(String.self, forKey: .syncBaseScope)
         syncConflict = try container.decodeIfPresent(ModuleSyncConflictMetadata.self, forKey: .syncConflict)
         state = try container.decodeIfPresent(ModuleUpdateState.self, forKey: .state) ?? .never
+        localOutputError = try container.decodeIfPresent(String.self, forKey: .localOutputError)
         lastError = try container.decodeIfPresent(String.self, forKey: .lastError)
     }
 
@@ -317,15 +305,12 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     }
 
     var standaloneStorageDetail: String {
-        guard publishesStandalone else {
-            return "未开启独立发布；转换结果保存在本地缓存"
-        }
         if hasLocalStorageTarget && hasGitHubStorageTarget { return "同时储存在本地模块根目录和 GitHub 模块目录" }
         return storageLocation.detail
     }
 
     var standaloneStorageSystemImage: String {
-        publishesStandalone ? storageLocation.systemImage : "internaldrive"
+        displayStorageLocationSystemImage
     }
 
     var initialSourceURL: String? {

@@ -2,8 +2,8 @@ import Foundation
 
 struct ModuleCollectionSummary: Equatable, Sendable {
     var totalCount = 0
-    var enabledCount = 0
-    var standaloneCount = 0
+    var localCount = 0
+    var githubCount = 0
     var failedCount = 0
     var overrideConflictCount = 0
     var updateableCount = 0
@@ -21,11 +21,11 @@ struct ModuleCollectionSummary: Equatable, Sendable {
     ) {
         for module in modules {
             totalCount += 1
-            if module.isIncludedInCombined { enabledCount += 1 }
-            if module.publishesStandalone { standaloneCount += 1 }
+            if module.hasLocalStorageTarget { localCount += 1 }
+            if module.hasGitHubStorageTarget { githubCount += 1 }
             if module.state == .failed { failedCount += 1 }
             if module.hasOverrideConflict { overrideConflictCount += 1 }
-            if module.state == .failed || module.hasOverrideConflict || module.hasSyncConflict { attentionCount += 1 }
+            if module.localOutputError != nil || module.state == .failed || module.hasOverrideConflict || module.hasSyncConflict { attentionCount += 1 }
             if isUpdateable(module) { updateableCount += 1 }
             if let lastUpdatedAt = module.lastUpdatedAt {
                 if let currentLatest = latestUpdatedAt {

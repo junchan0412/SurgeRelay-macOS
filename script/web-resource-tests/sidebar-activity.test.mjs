@@ -65,7 +65,7 @@ const sidebarController = sidebarHelpers.createSidebarController({
 sidebarController.render();
 assert.equal(sidebarUI.filterRow.hidden, false);
 assert.equal(sidebarUI.failureFilter.attrs['aria-pressed'], 'false');
-assert.equal(sidebarUI.summaryRow.classList.selected, true);
+assert.equal(sidebarUI.summaryRow.classList.selected, null, "No aggregate navigation is rendered");
 assert.match(sidebarUI.list.innerHTML, /Failed Module/);
 sidebarController.toggleFailuresOnly();
 assert.equal(sidebarFailuresOnly, true);
@@ -75,8 +75,8 @@ sidebarState = {
   modules: [{ ...sidebarState.modules[0], isEnabled: true }]
 };
 sidebarController.patchLive();
-assert.equal(sidebarToggle.checked, true);
-assert.equal(sidebarRow.classList.disabled, false);
+assert.equal(sidebarToggle.checked, false);
+assert.equal(sidebarRow.classList.disabled, null);
 
 const activityCancelLabel = { textContent: '' };
 const activityUI = {
@@ -98,7 +98,7 @@ const activityUI = {
   latestUpdate: { textContent: '' }
 };
 let activityState = {
-  combined: { lastUpdatedAt: '2026-07-05T12:34:00Z' },
+  modules: [{lastUpdatedAt: '2026-07-05T12:34:00Z'}],
   activity: {
     title: '更新模块',
     status: '正在更新',
@@ -126,7 +126,7 @@ assert.equal(activityUI.progressTrack.hidden, false);
 assert.equal(activityUI.progressFill.style.width, '42%');
 assert.match(activityUI.latestUpdate.textContent, /2026/);
 activityState = {
-  combined: { lastUpdatedAt: null },
+  modules: [],
   activity: {
     title: '',
     status: '准备就绪',
@@ -235,7 +235,7 @@ assert.equal(
     publishesStandalone: false,
     state: 'current'
   }),
-  '远程模块 · 自写模块 · Ads · Folder · 不发布独立模块'
+  '远程模块 · 自写模块 · Ads · Folder'
 );
 
 assert.equal(

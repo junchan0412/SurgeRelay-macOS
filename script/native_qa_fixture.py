@@ -69,7 +69,7 @@ def generate(root, counts=COUNTS):
                 "id": module_id, "name": name, "sourceURL": source.as_uri(), "sourceFormat": "surge",
                 "outputFileName": filename, "category": "Native QA", "outputFolder": "",
                 "storageLocation": "local", "storageTargets": ["local"], "localStorageRelativePath": filename,
-                "preservesOutputFileName": True, "publishesStandalone": True, "isEnabled": False,
+                "preservesOutputFileName": True,
                 "createdAt": "2026-10-02T00:00:00Z", "lastUpdatedAt": "2026-10-02T00:00:00Z",
                 "contentHash": digest, "refreshIntervalMinutes": 0, "state": "current"
             })
@@ -81,7 +81,7 @@ def generate(root, counts=COUNTS):
         write_json(configuration / "modules.json", modules)
         write_json(configuration / "settings.json", {
             "outputDirectory": str(output), "localModuleDirectory": str(sources), "localPublishedRootDirectory": str(output),
-            "combinedModuleEnabled": False, "refreshIntervalMinutes": 0, "automaticallyUpdateOnLaunch": False,
+            "refreshIntervalMinutes": 0, "automaticallyUpdateOnLaunch": False,
             "automaticallyUpdateScriptHub": False, "automaticallyPublish": False, "watchesLocalModuleChanges": False,
             "launchAtLogin": False, "publishToLocal": False, "publishToGitHub": False, "webServerEnabled": False,
             "github": {"owner": "", "repository": "", "branch": "main", "directory": "modules"}, "githubToken": ""

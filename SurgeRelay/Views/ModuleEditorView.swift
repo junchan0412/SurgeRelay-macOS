@@ -130,7 +130,6 @@ struct ModuleEditorView: View {
         var parts = [draftRelationship.storageTitle, draftRelationship.initialSource.title]
         let category = draft.category.trimmingCharacters(in: .whitespacesAndNewlines)
         if !category.isEmpty { parts.append(category) }
-        if !draft.publishesStandalone { parts.append("不发布独立模块") }
         return parts.joined(separator: " · ")
     }
 
@@ -148,17 +147,11 @@ struct ModuleEditorView: View {
     }
 
     private var outputPathNotice: ModuleOutputPathNotice? {
-        let requiresLocalFile = draft.storageTargets.contains(.local)
-            && (!model.settings.combinedModuleEnabled || !draft.isEnabled)
-        return ModuleOutputPathInspector.notice(
+        ModuleOutputPathInspector.notice(
             for: previewPublishedRelativePath,
-            publishesStandalone: draft.publishesStandalone || requiresLocalFile,
             modules: model.modules,
-            editingModuleID: module?.id,
-            combinedFileName: model.settings.combinedModuleFileName
-        ) ?? (requiresLocalFile && !draft.publishesStandalone
-            ? ModuleOutputPathNotice(message: "未参与总模块时，转换结果仍会写入本地模块文件。", isWarning: false)
-            : nil)
+            editingModuleID: module?.id
+        )
     }
 
     private var displayedIconPreviewURL: URL? {
@@ -215,10 +208,8 @@ struct ModuleEditorView: View {
 
     private var publishingSection: some View {
         ModuleEditorPublishingSection(
-            isEnabled: $draft.isEnabled,
-            publishesStandalone: $draft.publishesStandalone,
             outputFileName: $draft.outputFileName,
-            combinedModuleEnabled: model.settings.combinedModuleEnabled,
+
             publishedRelativePath: previewPublishedRelativePath,
             outputPathNotice: outputPathNotice
         )

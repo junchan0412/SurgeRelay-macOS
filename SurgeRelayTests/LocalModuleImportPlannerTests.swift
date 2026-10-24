@@ -19,7 +19,6 @@ final class LocalModuleImportPlannerTests: XCTestCase {
         let plan = LocalModuleImportPlanner.plan(
             candidates: [candidate],
             existingModules: [],
-            combinedModuleFileName: "Relay",
             plannedAt: plannedAt
         )
 
@@ -35,8 +34,6 @@ final class LocalModuleImportPlannerTests: XCTestCase {
         XCTAssertEqual(imported.localStorageRelativePath, "Ads/My Module.sgmodule")
         XCTAssertEqual(imported.publishedRelativePath, "Ads/My Module.sgmodule")
         XCTAssertTrue(imported.preservesOutputFileName)
-        XCTAssertFalse(imported.isEnabled)
-        XCTAssertTrue(imported.publishesStandalone)
         XCTAssertEqual(imported.detectedSourceFormat, .loon)
         XCTAssertEqual(imported.sourceContentHash, "source-hash")
         XCTAssertEqual(imported.sourceCheckedAt, plannedAt)
@@ -60,15 +57,13 @@ final class LocalModuleImportPlannerTests: XCTestCase {
 
         let plan = LocalModuleImportPlanner.plan(
             candidates: candidates,
-            existingModules: [existing],
-            combinedModuleFileName: "Relay"
+            existingModules: [existing]
         )
 
-        XCTAssertTrue(plan.entries.isEmpty)
-        XCTAssertEqual(plan.failures.count, 3)
-        XCTAssertTrue(plan.failures[0].contains("与总模块冲突"))
-        XCTAssertTrue(plan.failures[1].contains("路径已纳入管理"))
-        XCTAssertTrue(plan.failures[2].contains("来源文件已纳入管理"))
+        XCTAssertEqual(plan.entries.map { $0.module.publishedRelativePath }, ["Relay.sgmodule"])
+        XCTAssertEqual(plan.failures.count, 2)
+        XCTAssertTrue(plan.failures[0].contains("路径已纳入管理"))
+        XCTAssertTrue(plan.failures[1].contains("来源文件已纳入管理"))
     }
 
     func testLocalModuleImportPlannerDeduplicatesSourceAndPhysicalPath() {
@@ -80,8 +75,7 @@ final class LocalModuleImportPlannerTests: XCTestCase {
 
         let plan = LocalModuleImportPlanner.plan(
             candidates: [blank, first, repeatedPath, repeatedSource, distinct],
-            existingModules: [],
-            combinedModuleFileName: "Relay"
+            existingModules: []
         )
 
         XCTAssertEqual(plan.failures.count, 3)
@@ -89,8 +83,7 @@ final class LocalModuleImportPlannerTests: XCTestCase {
         XCTAssertEqual(plan.entries.map(\.module.publishedRelativePath), ["Tools/Demo.sgmodule", "Tools/Demo Two.sgmodule"])
         let repeatedPlan = LocalModuleImportPlanner.plan(
             candidates: [first, distinct],
-            existingModules: plan.entries.map(\.module),
-            combinedModuleFileName: "Relay"
+            existingModules: plan.entries.map(\.module)
         )
         XCTAssertTrue(repeatedPlan.entries.isEmpty)
         XCTAssertEqual(repeatedPlan.failures.count, 2)
@@ -103,7 +96,6 @@ final class LocalModuleImportPlannerTests: XCTestCase {
         let plan = LocalModuleImportPlanner.plan(
             candidates: [candidate],
             existingModules: [],
-            combinedModuleFileName: "Relay",
             localModuleDirectory: base.appending(path: "New").path
         )
         XCTAssertTrue(plan.entries.isEmpty)
@@ -120,8 +112,7 @@ final class LocalModuleImportPlannerTests: XCTestCase {
         var candidate = scanCandidate(relativePath: "Demo.sgmodule", sourceURL: subscription.originalURL)
         candidate.scriptHubSubscription = subscription
 
-        let plan = LocalModuleImportPlanner.plan(candidates: [candidate], existingModules: [existing],
-            combinedModuleFileName: "Relay", localModuleDirectory: root.path)
+        let plan = LocalModuleImportPlanner.plan(candidates: [candidate], existingModules: [existing], localModuleDirectory: root.path)
 
         XCTAssertTrue(plan.entries.isEmpty)
         XCTAssertEqual(plan.failures.count, 1)

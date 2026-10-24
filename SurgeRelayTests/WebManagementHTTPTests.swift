@@ -27,7 +27,6 @@ final class WebManagementHTTPTests: XCTestCase {
             model.settings.publishToLocal = false
             model.settings.publishToGitHub = false
             model.settings.refreshIntervalMinutes = 0
-            model.settings.combinedModuleEnabled = true
             model.settings.localModuleDirectory = root.appending(path: "outputs").path
             model.settings.github.owner = "benchmark-owner"
             model.settings.github.repository = "benchmark-repository"
@@ -35,7 +34,7 @@ final class WebManagementHTTPTests: XCTestCase {
             model.modules = (0..<5_000).map { index in
                 RelayModule(name: String(format: "Module %05d", index), sourceURL: "https://benchmark.invalid/module-\(index).sgmodule",
                             outputFileName: "Module-\(index)", moduleDescription: "Production state projection fixture",
-                            isEnabled: index.isMultiple(of: 2), createdAt: fixtureDate, lastUpdatedAt: fixtureDate, state: .current)
+                            createdAt: fixtureDate, lastUpdatedAt: fixtureDate, state: .current)
             }
             let probe = WebLoadEncodingProbe()
             let server = model.webServer
@@ -1042,7 +1041,6 @@ extension WebManagementHTTPTests {
         model.settings.publishToLocal = false
         model.settings.publishToGitHub = false
         model.settings.automaticallyPublish = false
-        model.settings.combinedModuleEnabled = false
         let module = RelayModule(name: "Large Preview", sourceURL: root.appending(path: "source.sgmodule").absoluteString,
             sourceFormat: .surge, outputFileName: "Large Preview")
         model.modules = [module]

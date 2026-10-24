@@ -3,6 +3,18 @@ import XCTest
 @testable import SurgeRelay
 
 final class ModuleDraftPlannerTests: XCTestCase {
+    func testChangingOutputTargetClearsOnlyTheOldLocalOutputError() throws {
+        let module = RelayModule(name: "Move", sourceURL: "https://example.com/source.sgmodule", outputFileName: "Move",
+            storageLocation: .local, localOutputError: "Old target is occupied")
+        var draft = ModuleDraft(module: module)
+        draft.outputFolder = "New Folder"
+        let plan = try XCTUnwrap(ModuleDraftPlanner.updatePlan(id: module.id, from: draft, modules: [module],
+            localModuleDirectory: "/tmp/SurgeRelay-TargetMigration"))
+        XCTAssertNil(plan.module.localOutputError)
+        XCTAssertEqual(plan.module.sourceURL, module.sourceURL)
+        XCTAssertEqual(plan.module.publishedRelativePath, "New Folder/Move.sgmodule")
+    }
+
     func testChangingConversionOptionsDoesNotBypassSameSourceRetryAfter() throws {
         let deadline = Date.now.addingTimeInterval(600)
         let module = RelayModule(name: "Policy", sourceURL: "https://example.com/policy.conf", outputFileName: "Policy",
@@ -10,13 +22,11 @@ final class ModuleDraftPlannerTests: XCTestCase {
         var draft = ModuleDraft(module: module)
         draft.refreshIntervalMinutes = 5
         draft.scriptHubOptions.policy = "Proxy"
-        let plan = try XCTUnwrap(ModuleDraftPlanner.updatePlan(id: module.id, from: draft, modules: [module],
-                                                               combinedModuleFileName: "Combined.sgmodule", localModuleDirectory: "/tmp"))
+        let plan = try XCTUnwrap(ModuleDraftPlanner.updatePlan(id: module.id, from: draft, modules: [module], localModuleDirectory: "/tmp"))
         XCTAssertEqual(plan.module.refreshIntervalMinutes, 5)
         XCTAssertEqual(plan.module.serverRetryAfter, deadline)
         draft.sourceURL = "https://other.example/new.conf"
-        let replaced = try XCTUnwrap(ModuleDraftPlanner.updatePlan(id: module.id, from: draft, modules: [module],
-                                                                   combinedModuleFileName: "Combined.sgmodule", localModuleDirectory: "/tmp"))
+        let replaced = try XCTUnwrap(ModuleDraftPlanner.updatePlan(id: module.id, from: draft, modules: [module], localModuleDirectory: "/tmp"))
         XCTAssertNil(replaced.module.serverRetryAfter)
     }
 
@@ -28,7 +38,6 @@ final class ModuleDraftPlannerTests: XCTestCase {
         let plan = try ModuleDraftPlanner.addPlan(
             from: draft,
             modules: [],
-            combinedModuleFileName: "Surge Relay",
             localModuleDirectory: ""
         )
 
@@ -45,7 +54,6 @@ final class ModuleDraftPlannerTests: XCTestCase {
         let plan = try ModuleDraftPlanner.addPlan(
             from: draft,
             modules: [],
-            combinedModuleFileName: "Surge Relay",
             localModuleDirectory: ""
         )
 
@@ -122,7 +130,6 @@ final class ModuleDraftPlannerTests: XCTestCase {
         draft.sourceFormat = .automatic
 
         XCTAssertNil(draft.validationMessage)
-        XCTAssertFalse(draft.isEnabled)
         XCTAssertTrue(ModuleSourceIdentity.matches(
             draft.sourceURL,
             URL(filePath: "/tmp/./Local Demo.sgmodule").standardizedFileURL.absoluteString
@@ -190,13 +197,11 @@ final class ModuleDraftPlannerTests: XCTestCase {
         draft.outputFolder = " Converted "
         draft.category = " #工具 "
         draft.storageLocation = .local
-        draft.publishesStandalone = true
         draft.iconURL = " https://example.com/icon.png "
 
         let plan = try ModuleDraftPlanner.addPlan(
             from: draft,
             modules: [],
-            combinedModuleFileName: "Surge Relay",
             localModuleDirectory: root.path
         )
 
@@ -226,7 +231,6 @@ final class ModuleDraftPlannerTests: XCTestCase {
         XCTAssertThrowsError(try ModuleDraftPlanner.addPlan(
             from: draft,
             modules: [existing],
-            combinedModuleFileName: "Surge Relay",
             localModuleDirectory: ""
         )) { error in
             XCTAssertEqual(error.localizedDescription, RelayError.duplicateSourceURL.localizedDescription)
@@ -258,12 +262,11 @@ final class ModuleDraftPlannerTests: XCTestCase {
         draft.sourceURL = alias.appending(path: "Tools/Demo.sgmodule").absoluteString
 
         for registered in registeredModules {
-            XCTAssertThrowsError(try ModuleDraftPlanner.addPlan(from: draft, modules: [registered],
-                combinedModuleFileName: "Relay", localModuleDirectory: modulesDirectory.path)) {
+            XCTAssertThrowsError(try ModuleDraftPlanner.addPlan(from: draft, modules: [registered], localModuleDirectory: modulesDirectory.path)) {
                 XCTAssertEqual($0.localizedDescription, RelayError.duplicateSourceURL.localizedDescription)
             }
             XCTAssertThrowsError(try ModuleDraftPlanner.updatePlan(id: edited.id, from: draft,
-                modules: [registered, edited], combinedModuleFileName: "Relay",
+                modules: [registered, edited],
                 localModuleDirectory: modulesDirectory.path)) {
                 XCTAssertEqual($0.localizedDescription, RelayError.duplicateSourceURL.localizedDescription)
             }
@@ -278,12 +281,11 @@ final class ModuleDraftPlannerTests: XCTestCase {
         var draft = ModuleDraft(module: edited)
         draft.sourceURL = "https://script.hub/file/_start_/https://example.com/demo.conf/_end_/Demo.sgmodule?type=qx-rewrite&target=surge-module"
 
-        XCTAssertThrowsError(try ModuleDraftPlanner.addPlan(from: draft, modules: [existing],
-            combinedModuleFileName: "Relay", localModuleDirectory: "")) {
+        XCTAssertThrowsError(try ModuleDraftPlanner.addPlan(from: draft, modules: [existing], localModuleDirectory: "")) {
             XCTAssertEqual($0.localizedDescription, RelayError.duplicateSourceURL.localizedDescription)
         }
         XCTAssertThrowsError(try ModuleDraftPlanner.updatePlan(id: edited.id, from: draft,
-            modules: [existing, edited], combinedModuleFileName: "Relay", localModuleDirectory: "")) {
+            modules: [existing, edited], localModuleDirectory: "")) {
             XCTAssertEqual($0.localizedDescription, RelayError.duplicateSourceURL.localizedDescription)
         }
     }
@@ -296,15 +298,12 @@ final class ModuleDraftPlannerTests: XCTestCase {
             outputFileName: "Stable",
             category: "#工具",
             outputFolder: "Tools",
-            publishesStandalone: true,
-            isEnabled: false,
             customIconURL: "https://example.com/icon.png"
         )
         let plan = try XCTUnwrap(ModuleDraftPlanner.updatePlan(
             id: module.id,
             from: ModuleDraft(module: module),
             modules: [module],
-            combinedModuleFileName: "Surge Relay",
             localModuleDirectory: ""
         ))
 
@@ -335,7 +334,6 @@ final class ModuleDraftPlannerTests: XCTestCase {
             id: module.id,
             from: draft,
             modules: [module],
-            combinedModuleFileName: "Surge Relay",
             localModuleDirectory: root.path
         ))
 
@@ -350,15 +348,13 @@ final class ModuleDraftPlannerTests: XCTestCase {
         let path = "Sgmodule(#3广告模块)/百度网盘去广告.beta.sgmodule"
         let module = RelayModule(name: "百度网盘去广告", sourceURL: root.appending(path: path).absoluteString,
             sourceFormat: .surge, outputFileName: "百度网盘去广告.beta.sgmodule", outputFolder: "Sgmodule(#3广告模块)",
-            storageLocation: .local, localStorageRelativePath: path, publishesStandalone: false)
+            storageLocation: .local, localStorageRelativePath: path)
         var draft = ModuleDraft(module: module)
         draft.sourceURL = "https://example.com/Baidu.plugin"
         draft.sourceFormat = .loon
-        let plan = try XCTUnwrap(ModuleDraftPlanner.updatePlan(id: module.id, from: draft, modules: [module],
-            combinedModuleFileName: "Combined", localModuleDirectory: root.path))
-        XCTAssertFalse(plan.module.publishesStandalone)
+        let plan = try XCTUnwrap(ModuleDraftPlanner.updatePlan(id: module.id, from: draft, modules: [module], localModuleDirectory: root.path))
         XCTAssertEqual(plan.adoptedLocalPublishedPath, path)
-        XCTAssertTrue(PublishCoordinator.shouldPublishStandalone(plan.module, destination: .local, combinedModuleEnabled: false))
+        XCTAssertTrue(PublishCoordinator.shouldPublishStandalone(plan.module, destination: .local))
     }
 
     func testModuleDraftPlannerDoesNotAdoptUnrelatedSourceChanges() throws {
@@ -379,7 +375,6 @@ final class ModuleDraftPlannerTests: XCTestCase {
             id: module.id,
             from: draft,
             modules: [module],
-            combinedModuleFileName: "Surge Relay",
             localModuleDirectory: root.path
         ))
 
@@ -400,8 +395,7 @@ final class ModuleDraftPlannerTests: XCTestCase {
             draft.sourceURL = "https://example.com/remote.sgmodule"
             draft.outputFileName = fileName
             draft.outputFolder = folder
-            let plan = try XCTUnwrap(ModuleDraftPlanner.updatePlan(id: module.id, from: draft, modules: [module],
-                combinedModuleFileName: "Combined", localModuleDirectory: root.path))
+            let plan = try XCTUnwrap(ModuleDraftPlanner.updatePlan(id: module.id, from: draft, modules: [module], localModuleDirectory: root.path))
             XCTAssertNil(plan.adoptedLocalPublishedPath)
         }
         XCTAssertEqual(try Data(contentsOf: source), Data("personal source".utf8))
@@ -423,8 +417,7 @@ final class ModuleDraftPlannerTests: XCTestCase {
             localStorageRelativePath: "Tools/Personal.sgmodule")
         var draft = ModuleDraft(module: module)
         draft.sourceURL = "https://example.com/remote.sgmodule"
-        let plan = try XCTUnwrap(ModuleDraftPlanner.updatePlan(id: module.id, from: draft, modules: [module],
-            combinedModuleFileName: "Combined", localModuleDirectory: newRoot.path))
+        let plan = try XCTUnwrap(ModuleDraftPlanner.updatePlan(id: module.id, from: draft, modules: [module], localModuleDirectory: newRoot.path))
         XCTAssertNil(plan.adoptedLocalPublishedPath)
         XCTAssertEqual(try Data(contentsOf: unrelated), Data("unrelated new root file".utf8))
     }
@@ -443,8 +436,7 @@ final class ModuleDraftPlannerTests: XCTestCase {
             localStorageRelativePath: "Tools/Personal.sgmodule")
         var draft = ModuleDraft(module: module)
         draft.sourceURL = "https://example.com/remote.sgmodule"
-        let plan = try XCTUnwrap(ModuleDraftPlanner.updatePlan(id: module.id, from: draft, modules: [module],
-            combinedModuleFileName: "Combined", localModuleDirectory: alias.path))
+        let plan = try XCTUnwrap(ModuleDraftPlanner.updatePlan(id: module.id, from: draft, modules: [module], localModuleDirectory: alias.path))
         XCTAssertEqual(plan.adoptedLocalPublishedPath, "Tools/Personal.sgmodule")
     }
 
@@ -483,7 +475,6 @@ final class ModuleDraftPlannerTests: XCTestCase {
             id: module.id,
             from: draft,
             modules: [module],
-            combinedModuleFileName: "Surge Relay",
             localModuleDirectory: ""
         ))
 

@@ -43,7 +43,7 @@ enum ModulePreviewEditPlanner {
             shouldWriteOverride: true,
             overrideContent: namedContent,
             module: nextModule,
-            statusMessage: automaticallyPublish ? "已写入 \(module.name)，等待合并发布" : "已写入 \(module.name)"
+            statusMessage: automaticallyPublish ? "已写入 \(module.name)，等待发布" : "已写入 \(module.name)"
         )
     }
 
@@ -54,7 +54,7 @@ enum ModulePreviewEditPlanner {
         return ModulePreviewRestorePlan(
             module: nextModule,
             statusMessage: automaticallyPublish
-                ? "已恢复 \(module.name) 的转换结果，等待合并发布"
+                ? "已恢复 \(module.name) 的转换结果，等待发布"
                 : "已恢复 \(module.name) 的转换结果"
         )
     }

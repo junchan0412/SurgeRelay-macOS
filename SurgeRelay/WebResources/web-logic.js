@@ -23,8 +23,8 @@
       module.storageLocation, module.storageLocationTitle, module.storageLocationDetail, module.initialSourceTitle,
       module.storageTargets, module.hasOverrideConflict, module.hasSyncConflict, module.syncConflictLocalUpdatedAt, module.syncConflictGitHubUpdatedAt,
       module.relationshipSummary, module.localStorageRelativePath,
-      module.iconURL, module.customIconURL, module.isEnabled, module.publishesStandalone,
-      module.state, module.stateTitle, module.lastError, module.lastUpdatedAt, module.sourceCheckedAt,
+      module.iconURL, module.customIconURL,
+      module.state, module.stateTitle, module.localOutputError, module.lastError, module.lastUpdatedAt, module.sourceCheckedAt,
       module.contentHash, module.sourceContentHash, module.sourceETag, module.sourceLastModified,
       module.conversionEngineRevision, module.refreshIntervalMinutes, module.nextRetryAt, module.serverRetryAfter, module.consecutiveFailureCount
     ].map(value => String(value ?? '')));
@@ -32,7 +32,6 @@
 
   function sidebarListSignature(snapshot) {
     return JSON.stringify([
-      snapshot?.combined?.isEnabled ? 'combined-on' : 'combined-off',
       (snapshot?.modules || []).map(moduleListSignature)
     ]);
   }
@@ -41,7 +40,7 @@
     if (!previousModule || !nextModule) return false;
     const fields = ['name', 'sourceURL', 'initialSourceURL', 'updateSourceURL', 'outputFileName', 'publishedRelativePath',
       'category', 'outputFolder', 'iconURL', 'customIconURL', 'advancedSummary', 'hasOverrideConflict',
-      'hasSyncConflict', 'syncConflictLocalUpdatedAt', 'syncConflictGitHubUpdatedAt', 'refreshIntervalMinutes', 'nextRetryAt', 'serverRetryAfter', 'consecutiveFailureCount'];
+      'localOutputError', 'hasSyncConflict', 'syncConflictLocalUpdatedAt', 'syncConflictGitHubUpdatedAt', 'refreshIntervalMinutes', 'nextRetryAt', 'serverRetryAfter', 'consecutiveFailureCount'];
     return fields.some(key => previousModule[key] !== nextModule[key]) ||
       Boolean(previousModule.contentHash) !== Boolean(nextModule.contentHash) ||
       Boolean(previousModule.sourceContentHash) !== Boolean(nextModule.sourceContentHash) ||
@@ -51,21 +50,21 @@
       previousModule.storageLocationDetail !== nextModule.storageLocationDetail ||
       previousModule.initialSourceTitle !== nextModule.initialSourceTitle ||
       previousModule.localStorageRelativePath !== nextModule.localStorageRelativePath ||
-      previousModule.publishesStandalone !== nextModule.publishesStandalone ||
       previousModule.lastError !== nextModule.lastError;
   }
 
   function moduleSubtitle(module) {
+    if (module.localOutputError) return `本地输出需要处理 · ${module.publishedRelativePath || module.outputFileName}`;
     const parts = module.state === 'failed' && failureSummary(module.lastError)
       ? [`更新失败：${failureSummary(module.lastError)}`]
       : [module.relationshipSummary || module.sourceFormatTitle || '模块'];
     if (module.category) parts.push(module.category);
     if (module.outputFolder) parts.push(folderTitle(module.outputFolder));
-    if (!module.publishesStandalone) parts.push('不发布独立模块');
     return [...new Set(parts)].join(' · ');
   }
 
   function moduleStatusTitle(module) {
+    if (module.localOutputError) return `本地输出失败：${failureSummary(module.localOutputError)}`;
     const stateTitle = module.stateTitle || '状态未知';
     const summary = module.state === 'failed' ? failureSummary(module.lastError) : '';
     return summary ? `${stateTitle}：${summary}` : stateTitle;
@@ -92,8 +91,9 @@
       module.sourceContentHash,
       module.sourceETag,
       module.sourceLastModified,
+      module.localOutputError,
       module.lastError,
-      module.publishesStandalone ? '独立模块' : '不发布独立模块'
+      '独立模块'
     ].map(value => String(value ?? '')).join('\n').toLocaleLowerCase();
   }
 
@@ -186,7 +186,7 @@
   }
 
   function isFailedModule(module) {
-    return module?.state === 'failed' || Boolean(module?.hasOverrideConflict || module?.hasSyncConflict);
+    return module?.state === 'failed' || Boolean(module?.localOutputError || module?.hasOverrideConflict || module?.hasSyncConflict);
   }
 
   function folderTitle(folder) {
@@ -199,8 +199,7 @@
     return [folder, fileName].filter(Boolean).join('/');
   }
 
-  function outputPathNotice(path, publishesStandalone, context = {}) {
-    if (!publishesStandalone) return { message: '未开启独立发布时，不会写出这个独立模块文件。', warning: false };
+  function outputPathNotice(path, context = {}) {
     if (context.storageLocation === 'both') {
       const disabled = [];
       if (context.publishToLocal === false) disabled.push('本地');
@@ -214,10 +213,6 @@
       return { message: '该模块设为 GitHub 存放，但全局“发布到 GitHub”尚未开启；保存后暂不会发布独立文件。', warning: true };
     }
     const normalizedPath = String(path || '').toLowerCase();
-    const combinedFile = sgmoduleName(context.combinedFileName || 'Surge Relay');
-    if (normalizedPath === combinedFile.toLowerCase()) {
-      return { message: '该路径与总模块文件冲突，保存时会自动加编号避免覆盖。', warning: true };
-    }
     const editingID = context.editingID ?? null;
     const owner = (context.modules || []).find(module =>
       module.id !== editingID && String(module.publishedRelativePath || '').toLowerCase() === normalizedPath
@@ -260,7 +255,6 @@
 
   function moduleEditorPayload(fields = {}, context = {}) {
     const existingModule = context.existingModule || {};
-    const combinedEnabled = Boolean(context.combinedEnabled);
     return {
       ...(Object.prototype.hasOwnProperty.call(fields, 'refreshIntervalMinutes') ? { refreshIntervalMinutes: fields.refreshIntervalMinutes } : {}),
       name: String(fields.name || '').trim(),
@@ -272,8 +266,6 @@
       iconURL: String(fields.iconURL || '').trim(),
       outputFolder: String(fields.outputFolder || ''),
       outputFileName: String(fields.outputFileName || '').trim(),
-      isEnabled: combinedEnabled ? Boolean(fields.isEnabled) : Boolean(existingModule.isEnabled ?? false),
-      publishesStandalone: Boolean(fields.publishesStandalone),
       scriptHubOptions: fields.scriptHubOptions || {}
     };
   }
@@ -350,6 +342,7 @@
     moduleSearchText,
     moduleMatchesSearch,
     failedModuleCount,
+    isFailedModule,
     sidebarFailureFilterState,
     sidebarModules,
     sidebarEmptyText,

@@ -24,19 +24,19 @@ assert.equal(
 );
 
 assert.equal(
-  logic.outputPathNotice('Surge-Relay.sgmodule', true, { combinedFileName: 'Surge Relay' }).warning,
-  true
+  logic.outputPathNotice('Surge-Relay.sgmodule'),
+  null
 );
 
 assert.match(
-  logic.outputPathNotice('Folder/Demo.sgmodule', true, {
+  logic.outputPathNotice('Folder/Demo.sgmodule', {
     modules: [{ id: 'one', name: 'Demo', publishedRelativePath: 'Folder/Demo.sgmodule' }]
   }).message,
   /Demo/
 );
 
 assert.equal(
-  logic.outputPathNotice('Folder/Demo.sgmodule', true, {
+  logic.outputPathNotice('Folder/Demo.sgmodule', {
     modules: [{ id: 'one', name: 'Demo', publishedRelativePath: 'Folder/Demo.sgmodule' }],
     editingID: 'one'
   }),
@@ -44,8 +44,8 @@ assert.equal(
 );
 
 assert.equal(
-  logic.outputPathNotice('Folder/Demo.sgmodule', false).message,
-  '未开启独立发布时，不会写出这个独立模块文件。'
+  logic.outputPathNotice('Folder/Demo.sgmodule'),
+  null
 );
 
 assert.equal(logic.isValidHTTPURL('https://example.com/icon.png'), true);
@@ -76,8 +76,6 @@ assert.deepEqual(
     iconURL: ' https://example.com/icon.png ',
     outputFolder: 'Folder',
     outputFileName: ' Demo Module.sgmodule ',
-    isEnabled: true,
-    publishesStandalone: false,
     scriptHubOptions: { jqEnabled: true }
   }, {
     combinedEnabled: true,
@@ -93,27 +91,11 @@ assert.deepEqual(
     iconURL: 'https://example.com/icon.png',
     outputFolder: 'Folder',
     outputFileName: 'Demo Module.sgmodule',
-    isEnabled: true,
-    publishesStandalone: false,
     scriptHubOptions: { jqEnabled: true }
   }
 );
-assert.equal(
-  logic.moduleEditorPayload({ isEnabled: true }, {
-    combinedEnabled: false,
-    existingModule: { isEnabled: false }
-  }).isEnabled,
-  false,
-  'saving while combined module is disabled should preserve the existing include state'
-);
-assert.equal(
-  logic.moduleEditorPayload({ isEnabled: false }, {
-    combinedEnabled: false,
-    existingModule: { isEnabled: true }
-  }).isEnabled,
-  true,
-  'editing while combined module is disabled should not silently remove a previous include state'
-);
+
+
 
 const signatureBase = {
   id: 'module-1',
@@ -162,7 +144,7 @@ assert.notEqual(
   logic.moduleListSignature({ ...signatureBase, name: 'A', sourceURL: 'B\u001fC' }),
   'module list signatures should not collide when field values contain legacy separators'
 );
-assert.notEqual(
+assert.equal(
   logic.sidebarListSignature({ combined: { isEnabled: false }, modules: [signatureBase] }),
   logic.sidebarListSignature({ combined: { isEnabled: true }, modules: [signatureBase] })
 );
@@ -212,7 +194,7 @@ assert.equal(
     outputFileName: 'Demo File.sgmodule',
     category: 'Ads',
     publishesStandalone: false
-  }, '不发布独立模块'),
+  }, '独立模块'),
   true
 );
 assert.equal(
@@ -266,13 +248,14 @@ const selectedModuleRow = markup.moduleRowMarkup({
   selectedID: 'module<1',
   combinedEnabled: true
 });
-assert.match(selectedModuleRow, /module-row selected disabled/);
+assert.match(selectedModuleRow, /module-row selected/);
+assert.doesNotMatch(selectedModuleRow, /disabled/);
 assert.match(selectedModuleRow, /data-id="module&lt;1"/);
-assert.match(selectedModuleRow, /data-module-toggle="module&lt;1"/);
+assert.doesNotMatch(selectedModuleRow, /data-module-toggle/);
 assert.match(selectedModuleRow, /Demo &lt;Module&gt;/);
 assert.match(selectedModuleRow, /https:\/\/example.com\/icon.png\?a=1&amp;b=2/);
 assert.match(selectedModuleRow, /更新失败：原始链接返回 404/);
-assert.match(selectedModuleRow, /不发布独立模块/);
+assert.doesNotMatch(selectedModuleRow, /不发布独立模块/);
 const standaloneModuleRow = markup.moduleRowMarkup({
   ...signatureBase,
   id: 'module-2',
@@ -341,35 +324,8 @@ assert.match(markup.latestPublishSection({
 }), /A&amp;B\.sgmodule/);
 assert.match(markup.detailToolbar('preview', true), /data-action="edit"/);
 assert.match(markup.detailToolbar('preview', true), /tab-preview" class="selected"/);
-assert.match(markup.combinedDetailMarkup({
-  isEnabled: true,
-  name: 'Surge Relay 汇总',
-  fileName: 'Surge Relay.sgmodule',
-  enabledCount: 2,
-  sourceCount: 3,
-  subscriptionURL: 'https://example.com/combined.sgmodule',
-  lastUpdatedAt: '2026-07-04T12:00:00Z'
-}, {
-  selectedTab: 'info',
-  latestGitHubPublish: {
-    commitSHA: 'abcdef123456',
-    commitURL: 'https://example.com/commit/abcdef',
-    date: '2026-07-04T12:00:00Z',
-    publishedFiles: ['Combined.sgmodule'],
-    deletedFiles: []
-  }
-}), /总模块订阅地址/);
-assert.match(
-  markup.combinedDetailMarkup({ isEnabled: false }, { selectedTab: 'info' }),
-  /总模块功能未开启/
-);
-assert.match(
-  markup.combinedDetailMarkup({
-    isEnabled: true,
-    fileName: 'Surge Relay.sgmodule'
-  }, { selectedTab: 'preview' }),
-  /code-view/
-);
+assert.equal(markup.combinedDetailMarkup, undefined, 'Aggregate detail renderer was removed');
+
 const failedModuleDetail = markup.moduleDetailMarkup({
   ...signatureBase,
   name: 'Unsafe <Module>',
@@ -396,7 +352,6 @@ const failedModuleDetail = markup.moduleDetailMarkup({
 }, {
   selectedTab: 'info',
   combined: {
-    isEnabled: true,
     subscriptionURL: 'https://example.com/combined.sgmodule'
   }
 });
@@ -417,3 +372,9 @@ assert.match(
   markup.moduleDetailMarkup(signatureBase, { selectedTab: 'preview', combined: { isEnabled: false } }),
   /code-editor/
 );
+
+const outputFailure = { id: 'output-failed', name: 'Local output', state: 'current', storageTargets: ['local'], localOutputError: 'Target is occupied' };
+assert.equal(logic.isFailedModule(outputFailure), true);
+assert.equal(logic.failedModuleCount([outputFailure]), 1);
+assert.match(markup.workspaceMarkup({ modules: [outputFailure], activity: {}, moduleEditor: {} }), /Target is occupied/);
+assert.match(markup.moduleRowMarkup(outputFailure), /state-failed/);

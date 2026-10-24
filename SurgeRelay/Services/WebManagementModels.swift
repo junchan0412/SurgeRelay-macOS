@@ -1,7 +1,6 @@
 import Foundation
 
 struct WebStatePayload: Encodable, Sendable {
-    let combined: WebCombinedPayload
     let moduleEditor: WebModuleEditorPayload
     let modules: [WebModulePayload]
     var activity: WebActivityPayload
@@ -35,16 +34,6 @@ struct WebModuleEditorPayload: Encodable, Sendable {
     let publishToGitHub: Bool
 }
 
-struct WebCombinedPayload: Encodable, Sendable {
-    let name: String
-    let isEnabled: Bool
-    let fileName: String
-    let sourceCount: Int
-    let enabledCount: Int
-    let lastUpdatedAt: Date?
-    let subscriptionURL: String?
-}
-
 struct WebModulePayload: Encodable, Sendable {
     let id: String
     let name: String
@@ -66,8 +55,6 @@ struct WebModulePayload: Encodable, Sendable {
     let storageLocationIcon: String
     let relationshipSummary: String
     let localStorageRelativePath: String?
-    let publishesStandalone: Bool
-    let isEnabled: Bool
     let state: String
     let stateTitle: String
     let createdAt: Date
@@ -83,6 +70,7 @@ struct WebModulePayload: Encodable, Sendable {
     var consecutiveFailureCount: Int = 0
     let conversionEngineRevision: String?
     let lastError: String?
+    let localOutputError: String?
     let iconURL: String?
     let customIconURL: String?
     let publishedURL: String?
@@ -119,7 +107,7 @@ struct WebActivityPayload: Encodable, Sendable {
     let cancellationRequested: Bool
     let canStartUpdate: Bool
     let updateBlockedReason: String?
-    let enabledModuleCount: Int
+    let updateableModuleCount: Int
     let automaticPublishScheduledAt: Date?
     let automaticPublishRunsAt: Date?
     let latestGitHubPublish: GitHubPublishSnapshot?
@@ -131,10 +119,6 @@ struct ActionPayload: Encodable {
     let ok: Bool
     let message: String
     var content: String? = nil
-}
-
-struct WebEnabledRequest: Decodable {
-    let enabled: Bool
 }
 
 struct WebSourceNameRequest: Decodable {
@@ -171,8 +155,6 @@ struct WebModuleMutation: Decodable {
     let iconURL: String?
     let outputFolder: String?
     let outputFileName: String?
-    let publishesStandalone: Bool?
-    let isEnabled: Bool?
     let policy: String?
     let includeKeywords: String?
     let excludeKeywords: String?
@@ -185,7 +167,7 @@ struct WebModuleMutation: Decodable {
     let changesRefreshInterval: Bool
 
     private enum CodingKeys: String, CodingKey {
-        case name, sourceURL, sourceFormat, storageLocation, storageTargets, category, iconURL, outputFolder, outputFileName, publishesStandalone, isEnabled, policy, includeKeywords, excludeKeywords, mitmAdd, mitmRemove, noResolve, enableJQ, scriptHubOptions, refreshIntervalMinutes
+        case name, sourceURL, sourceFormat, storageLocation, storageTargets, category, iconURL, outputFolder, outputFileName, policy, includeKeywords, excludeKeywords, mitmAdd, mitmRemove, noResolve, enableJQ, scriptHubOptions, refreshIntervalMinutes
     }
 
     init(from decoder: Decoder) throws {
@@ -199,8 +181,6 @@ struct WebModuleMutation: Decodable {
         iconURL = try values.decodeIfPresent(String.self, forKey: .iconURL)
         outputFolder = try values.decodeIfPresent(String.self, forKey: .outputFolder)
         outputFileName = try values.decodeIfPresent(String.self, forKey: .outputFileName)
-        publishesStandalone = try values.decodeIfPresent(Bool.self, forKey: .publishesStandalone)
-        isEnabled = try values.decodeIfPresent(Bool.self, forKey: .isEnabled)
         policy = try values.decodeIfPresent(String.self, forKey: .policy)
         includeKeywords = try values.decodeIfPresent(String.self, forKey: .includeKeywords)
         excludeKeywords = try values.decodeIfPresent(String.self, forKey: .excludeKeywords)
@@ -250,8 +230,6 @@ struct WebModuleMutation: Decodable {
         if let iconURL { draft.iconURL = iconURL }
         if let outputFolder { draft.outputFolder = outputFolder }
         if let outputFileName { draft.outputFileName = outputFileName }
-        if let publishesStandalone { draft.publishesStandalone = publishesStandalone }
-        if let isEnabled { draft.isEnabled = isEnabled }
         if let scriptHubOptions { draft.scriptHubOptions = scriptHubOptions }
         if let policy { draft.scriptHubOptions.policy = policy }
         if let includeKeywords { draft.scriptHubOptions.includeKeywords = includeKeywords }

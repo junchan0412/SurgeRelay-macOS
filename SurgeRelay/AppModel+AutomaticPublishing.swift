@@ -34,9 +34,9 @@ extension AppModel {
             }
             self.clearAutomaticPublishSchedule()
             self.beginWork(.automaticPublishing)
-            self.setWorkStage(.publish, moduleID: Self.combinedModuleSelectionID, moduleName: "GitHub 自动发布")
+            self.setWorkStage(.publish, moduleID: Self.publishingActivityID, moduleName: "GitHub 自动发布")
             defer {
-                self.setWorkStage(nil, moduleID: Self.combinedModuleSelectionID, moduleName: "GitHub 自动发布")
+                self.setWorkStage(nil, moduleID: Self.publishingActivityID, moduleName: "GitHub 自动发布")
                 self.endWork(.automaticPublishing)
                 self.automaticPublishTask = nil
             }

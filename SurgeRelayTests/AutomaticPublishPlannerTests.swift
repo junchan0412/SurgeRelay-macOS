@@ -27,17 +27,13 @@ final class AutomaticPublishPlannerTests: XCTestCase {
             id: UUID(),
             name: "Standalone",
             sourceURL: "https://example.com/standalone.sgmodule",
-            outputFileName: "Standalone",
-            publishesStandalone: true
+            outputFileName: "Standalone"
         )
-        let combinedID = UUID()
         let standalonePlan = PublishPlan(
-            standaloneModules: [standalone],
-            combinedModuleIDs: [combinedID]
+            standaloneModules: [standalone]
         )
-        let combinedOnlyPlan = PublishPlan(
-            standaloneModules: [],
-            combinedModuleIDs: [combinedID]
+        let emptyPlan = PublishPlan(
+            standaloneModules: []
         )
 
         XCTAssertTrue(AutomaticPublishPlanner.shouldRunScheduledPublish(plan: standalonePlan))
@@ -49,9 +45,9 @@ final class AutomaticPublishPlannerTests: XCTestCase {
             plan: standalonePlan,
             contentChanged: false
         ))
-        XCTAssertFalse(AutomaticPublishPlanner.shouldRunScheduledPublish(plan: combinedOnlyPlan))
+        XCTAssertFalse(AutomaticPublishPlanner.shouldRunScheduledPublish(plan: emptyPlan))
         XCTAssertFalse(AutomaticPublishPlanner.shouldQueueAfterModuleUpdate(
-            plan: combinedOnlyPlan,
+            plan: emptyPlan,
             contentChanged: true
         ))
     }
@@ -110,16 +106,13 @@ final class AutomaticPublishPlannerTests: XCTestCase {
             id: UUID(),
             name: "Standalone",
             sourceURL: "https://example.com/standalone.sgmodule",
-            outputFileName: "Standalone",
-            publishesStandalone: true
+            outputFileName: "Standalone"
         )
         let standalonePlan = PublishPlan(
-            standaloneModules: [standalone],
-            combinedModuleIDs: [UUID()]
+            standaloneModules: [standalone]
         )
-        let combinedOnlyPlan = PublishPlan(
-            standaloneModules: [],
-            combinedModuleIDs: [UUID()]
+        let emptyPlan = PublishPlan(
+            standaloneModules: []
         )
         let readyContext = AutomaticPublishContext(
             publishToGitHub: true,
@@ -151,7 +144,7 @@ final class AutomaticPublishPlannerTests: XCTestCase {
         XCTAssertEqual(
             AutomaticPublishPlanner.scheduleAdmission(
                 context: readyContext,
-                plan: combinedOnlyPlan
+                plan: emptyPlan
             ),
             .rejected()
         )
@@ -166,7 +159,7 @@ final class AutomaticPublishPlannerTests: XCTestCase {
         XCTAssertEqual(
             AutomaticPublishPlanner.runAdmission(
                 context: readyContext,
-                plan: combinedOnlyPlan,
+                plan: emptyPlan,
                 hasCachedStandaloneOutput: true
             ),
             .rejected(statusMessage: AutomaticPublishPlanner.noStandaloneModulesStatus)
@@ -187,21 +180,17 @@ final class AutomaticPublishPlannerTests: XCTestCase {
             id: standaloneID,
             name: "Standalone",
             sourceURL: "https://example.com/standalone.sgmodule",
-            outputFileName: "Standalone",
-            publishesStandalone: true
+            outputFileName: "Standalone"
         )
         let secondStandaloneID = UUID()
         let secondStandalone = RelayModule(
             id: secondStandaloneID,
             name: "Second Standalone",
             sourceURL: "https://example.com/second.sgmodule",
-            outputFileName: "Second",
-            publishesStandalone: true
+            outputFileName: "Second"
         )
-        let combinedOnlyID = UUID()
         let plan = PublishPlan(
-            standaloneModules: [standalone],
-            combinedModuleIDs: [combinedOnlyID]
+            standaloneModules: [standalone]
         )
 
         let hasStandaloneOutput = await AutomaticPublishPlanner.hasAnyCachedStandaloneOutput(
@@ -212,8 +201,7 @@ final class AutomaticPublishPlannerTests: XCTestCase {
         XCTAssertTrue(hasStandaloneOutput)
 
         let mixedCachePlan = PublishPlan(
-            standaloneModules: [standalone, secondStandalone],
-            combinedModuleIDs: [combinedOnlyID]
+            standaloneModules: [standalone, secondStandalone]
         )
         let oneStandaloneOutputIsEnough = await AutomaticPublishPlanner.hasAnyCachedStandaloneOutput(
             plan: mixedCachePlan
@@ -222,16 +210,15 @@ final class AutomaticPublishPlannerTests: XCTestCase {
         }
         XCTAssertTrue(oneStandaloneOutputIsEnough)
 
-        let onlyCombinedPlan = PublishPlan(
-            standaloneModules: [],
-            combinedModuleIDs: [combinedOnlyID]
+        let emptyPlan = PublishPlan(
+            standaloneModules: []
         )
-        let combinedOutputDoesNotCount = await AutomaticPublishPlanner.hasAnyCachedStandaloneOutput(
-            plan: onlyCombinedPlan
+        let emptyOutputDoesNotCount = await AutomaticPublishPlanner.hasAnyCachedStandaloneOutput(
+            plan: emptyPlan
         ) { _ in
             true
         }
-        XCTAssertFalse(combinedOutputDoesNotCount)
+        XCTAssertFalse(emptyOutputDoesNotCount)
 
         let missingStandaloneOutput = await AutomaticPublishPlanner.hasAnyCachedStandaloneOutput(
             plan: plan

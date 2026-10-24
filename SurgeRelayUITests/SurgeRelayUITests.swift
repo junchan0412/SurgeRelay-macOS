@@ -352,14 +352,14 @@ final class SurgeRelayUITests: XCTestCase {
             "id": moduleID, "name": name, "sourceURL": source.absoluteString, "sourceFormat": "surge",
             "outputFileName": fileName, "category": "Native Layout QA", "outputFolder": sourceFolder.lastPathComponent,
             "storageLocation": "local", "storageTargets": ["local"], "localStorageRelativePath": relativePath,
-            "preservesOutputFileName": true, "publishesStandalone": true, "isEnabled": failing,
+            "preservesOutputFileName": true,
             "createdAt": "2026-10-02T00:00:00Z", "lastUpdatedAt": "2026-10-02T00:00:00Z",
             "contentHash": "layout-fixture", "refreshIntervalMinutes": 0, "state": failing ? "failed" : "current",
             "lastError": failing ? String(repeating: "无法读取来源：" + source.absoluteString + "\n", count: 30) as Any : NSNull()
         ]], to: configuration.appending(path: "modules.json"))
         try writeJSON([
             "outputDirectory": output.path, "localModuleDirectory": modules.path,
-            "combinedModuleEnabled": failing, "refreshIntervalMinutes": 0,
+            "refreshIntervalMinutes": 0,
             "automaticallyUpdateOnLaunch": false, "automaticallyUpdateScriptHub": false,
             "automaticallyPublish": false, "watchesLocalModuleChanges": false, "launchAtLogin": false,
             "publishToLocal": false, "publishToGitHub": false, "webServerEnabled": false,

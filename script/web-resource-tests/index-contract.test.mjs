@@ -35,3 +35,5 @@ assert.match(indexHTML, /id="output-path-preview"/);
 assert.match(indexHTML, /<option value="both">本地与 GitHub<\/option>/);
 
 assert.match(readFileSync(new URL('../../SurgeRelay/WebResources/app.css', import.meta.url), 'utf8'), /\*::backdrop \{ animation-duration: \.01ms !important/);
+
+assert.doesNotMatch(indexHTML, /summary-row|name="isEnabled"|name="publishesStandalone"|总模块/);

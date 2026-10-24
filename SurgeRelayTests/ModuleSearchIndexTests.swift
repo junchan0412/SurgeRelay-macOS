@@ -10,7 +10,6 @@ final class ModuleSearchIndexTests: XCTestCase {
             outputFileName: "Video.sgmodule",
             category: "Streaming",
             outputFolder: "Media",
-            publishesStandalone: false,
             iconURL: "https://example.com/source-icon.png",
             customIconURL: "https://example.com/custom-icon.png",
             state: .current
@@ -20,7 +19,6 @@ final class ModuleSearchIndexTests: XCTestCase {
 
         XCTAssertTrue(text.contains("streaming"))
         XCTAssertTrue(text.contains("media"))
-        XCTAssertTrue(text.contains("不发布独立模块"))
         XCTAssertTrue(text.contains("source-icon.png"))
         XCTAssertTrue(text.contains("custom-icon.png"))
         XCTAssertTrue(text.contains("domain-suffix"))

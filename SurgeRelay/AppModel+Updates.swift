@@ -10,7 +10,7 @@ extension AppModel {
             return
         }
         let candidates = ModuleRefreshPlanner.updateableModules(
-            in: modules, combinedModuleEnabled: settings.combinedModuleEnabled
+            in: modules
         ).filter { module in moduleIDs.map { $0.contains(module.id) } ?? true }
         let selectionGeneration = localChangeGeneration
         let now = Date.now
@@ -80,27 +80,24 @@ extension AppModel {
             completedHistory = outcomes.flatMap(\.history).sorted { $0.date < $1.date }
             guard shouldContinueCurrentWork(generation: generation) else { return }
             let outputMetrics = StageMetricsRecorder()
-            setWorkStage(.cache, moduleID: Self.combinedModuleSelectionID, moduleName: "输出整理")
+            setWorkStage(.cache, moduleID: Self.publishingActivityID, moduleName: "输出整理")
             let outputStarted = ContinuousClock.now
             let outputSucceeded = await StageMetricsContext.$current.withValue(outputMetrics) {
                 await finishModuleUpdateRun(
                 ModuleUpdateRunResult(
-                    components: outcomes.flatMap(\.components),
+                    moduleIDs: Set(outcomes.map(\.moduleID)),
                     failures: outcomes.reduce(0) { $0 + $1.failures },
-                    missingCacheModuleNames: outcomes.flatMap(\.missingCache),
-                    missingCacheDetails: outcomes.flatMap(\.missingCacheDetails),
                     contentChanged: outcomes.contains(where: \.contentChanged)
                 ),
-                generation: generation,
-                rebuildFromCache: moduleIDs != nil || updateModules.count != candidates.count
+                generation: generation
             )
             }
-            setWorkStage(nil, moduleID: Self.combinedModuleSelectionID, moduleName: "输出整理")
+            setWorkStage(nil, moduleID: Self.publishingActivityID, moduleName: "输出整理")
             let stages = outputMetrics.snapshot.filter { $0.stage != .publish }
             if !stages.isEmpty {
                 completedHistory.append(UpdateHistoryEntry(moduleName: "输出整理", outcome: outputSucceeded ? .updated : .failed,
                                                            duration: StageMetricsRecorder.elapsed(since: outputStarted),
-                                                           message: outputSucceeded ? "汇总缓存与输出准备完成；总耗时可能包含本地导出" : "输出整理未完成；总耗时可能包含本地导出",
+                                                           message: outputSucceeded ? "所选模块输出已分别处理；总耗时可能包含本地导出" : "输出整理未完成；总耗时可能包含本地导出",
                                                            stageMetrics: stages))
             }
         }()
@@ -125,7 +122,7 @@ extension AppModel {
     }
 
     func update(moduleID: UUID) async {
-        // 仅更新指定模块；若总模块开启，会从全部缓存组件重建总模块，避免丢失其他参与者。
+        // 仅更新并写出指定模块，不重新发布其他模块。
         guard let module = modules.first(where: { $0.id == moduleID }) else { return }
         let admission = updateAdmission(for: module)
         guard admission.isAccepted else {

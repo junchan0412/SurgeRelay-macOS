@@ -33,10 +33,6 @@
         query,
         failuresOnly: filterState.failuresOnly
       });
-      ui.summaryRow.hidden = !state.combined.isEnabled;
-      if (state.combined.isEnabled) {
-        ui.summarySubtitle.textContent = `${state.combined.enabledCount} 个来源 · 总模块订阅`;
-      }
       const selectedID = getSelectedID();
       const count = documentRef?.querySelector?.('#module-count');
       const resultCount = query || filterState.failuresOnly ? `${modules.length} / ${state.modules.length}` : String(modules.length);
@@ -49,14 +45,12 @@
         element?.classList.toggle('selected', selectedID === id);
         element?.setAttribute('aria-current', selectedID === id ? 'page' : 'false');
       }
-      ui.summaryRow.classList.toggle('selected', state.combined.isEnabled && selectedID === 'combined');
-      ui.summaryRow.setAttribute?.('aria-current', selectedID === 'combined' ? 'page' : 'false');
       const emptyText = logic.sidebarEmptyText({ query, failuresOnly: filterState.failuresOnly });
       const nextIDs = modules.map(module => module.id);
       const focused = documentRef?.activeElement;
       const focusedRow = focused?.closest?.('.module-row');
       const focusedID = focusedRow?.dataset.id;
-      const context = { combinedEnabled: state.combined.isEnabled };
+      const context = {};
       const nextRows = new Map(modules.map(module => [module.id, markup.moduleRowMarkup(module, context)]));
       let rebuild = !nextIDs.length || nextIDs.length !== visibleIDs.length || nextIDs.some((id, index) => id !== visibleIDs[index]);
       if (!rebuild) {
@@ -82,7 +76,7 @@
       }
       if (focusedID && documentRef.activeElement !== focused) {
         const replacement = rowElements.get(focusedID);
-        const target = focused?.matches?.('[data-module-toggle]') ? '[data-module-toggle]' : '.module-open';
+        const target = '.module-open';
         (replacement?.querySelector(target) || ui.search).focus?.({ preventScroll: true });
       }
       visibleIDs = nextIDs;
@@ -93,17 +87,7 @@
     function patchLive() {
       const state = getState();
       if (!state) return;
-      ui.summaryRow.hidden = !state.combined.isEnabled;
-      if (state.combined.isEnabled) {
-        ui.summarySubtitle.textContent = `${state.combined.enabledCount} 个来源 · 总模块订阅`;
-      }
-      state.modules.forEach(module => {
-        const row = rowElements.get(module.id) || ui.list.querySelector(`.module-row[data-id="${module.id}"]`);
-        if (!row) return;
-        row.classList.toggle('disabled', state.combined.isEnabled && !module.isEnabled);
-        const toggle = row.querySelector('[data-module-toggle]');
-        if (toggle && toggle.checked !== module.isEnabled) toggle.checked = module.isEnabled;
-      });
+
     }
 
     function toggleFailuresOnly() {

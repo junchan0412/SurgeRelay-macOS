@@ -691,7 +691,6 @@ struct ModuleCodeTextView: NSViewRepresentable {
         if context.coordinator.needsHighlight(text: currentText, selectedModuleID: selectedModuleID) {
             context.coordinator.scheduleHighlighting(modules: modules, selectedModuleID: selectedModuleID)
         }
-        context.coordinator.scrollToSelectedModule(selectedModuleID, modules: modules)
     }
 
     /// Report the laid-out content height so an enclosing SwiftUI `ScrollView`
@@ -847,59 +846,11 @@ struct ModuleCodeTextView: NSViewRepresentable {
                     for (index, group) in ranges.enumerated() {
                         for range in group { storage.addAttributes(attributes[index], range: range) }
                     }
-                    self.applyModuleColors(modules: modules, selectedModuleID: selectedModuleID, textStorage: storage)
                     storage.endEditing()
                     textView.typingAttributes = Self.defaultAttributes
                 }
                 textView.refreshGutter()
                 self.highlightTask = nil
-            }
-        }
-
-        func scrollToSelectedModule(_ id: UUID?, modules: [RelayModule]) {
-            guard let id, id != lastSelectedModuleID, let textView,
-                  let module = modules.first(where: { $0.id == id }) else { return }
-            lastSelectedModuleID = id
-            let key = ModuleMerger.toggleKey(for: module)
-            let nsString = textView.string as NSString
-            var range = nsString.range(of: "%\(key)%")
-            if range.location == NSNotFound { range = nsString.range(of: key) }
-            if range.location != NSNotFound {
-                textView.scrollRangeToVisible(range)
-                textView.setSelectedRange(range)
-            }
-        }
-
-        private func applyModuleColors(
-            modules: [RelayModule],
-            selectedModuleID: UUID?,
-            textStorage: NSTextStorage
-        ) {
-            let palette: [NSColor] = [.controlAccentColor]
-            let colors = Dictionary(uniqueKeysWithValues: modules.enumerated().map {
-                (ModuleMerger.toggleKey(for: $0.element), palette[$0.offset % palette.count])
-            })
-            let selectedKey = selectedModuleID
-                .flatMap { id in modules.first(where: { $0.id == id }) }
-                .map { ModuleMerger.toggleKey(for: $0) }
-            let string = textStorage.string as NSString
-            for (key, color) in colors {
-                let marker = "%\(key)%"
-                var searchRange = NSRange(location: 0, length: string.length)
-                while searchRange.length > 0 {
-                    let markerRange = string.range(of: marker, options: [], range: searchRange)
-                    guard markerRange.location != NSNotFound else { break }
-                    let lineRange = string.lineRange(for: markerRange)
-                    if markerRange.location == lineRange.location {
-                        textStorage.addAttributes([
-                            .foregroundColor: color,
-                            .backgroundColor: color.withAlphaComponent(key == selectedKey ? 0.16 : 0.06),
-                        ], range: lineRange)
-                        break
-                    }
-                    let nextLocation = NSMaxRange(markerRange)
-                    searchRange = NSRange(location: nextLocation, length: string.length - nextLocation)
-                }
             }
         }
 

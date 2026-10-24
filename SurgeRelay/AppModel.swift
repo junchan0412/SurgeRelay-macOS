@@ -23,7 +23,7 @@ enum AppRuntimeOptions {
 @MainActor
 @Observable
 final class AppModel {
-    static let combinedModuleSelectionID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+    static let publishingActivityID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
     static let overviewSelectionID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
     static let activitySelectionID = UUID(uuidString: "00000000-0000-0000-0000-000000000003")!
 
@@ -51,13 +51,7 @@ final class AppModel {
         }
     }
     private(set) var moduleRevision: UInt64 = 0
-    var settings: AppSettings {
-        didSet {
-            if oldValue.combinedModuleEnabled != settings.combinedModuleEnabled {
-                cachedModuleSummary = nil
-            }
-        }
-    }
+    var settings: AppSettings
     var upstreamState: ScriptHubUpstreamState
     var selectedModuleID: UUID?
     var isWorking = false
@@ -178,7 +172,7 @@ final class AppModel {
                 module.state = ModuleUpdatePipeline.restoredState(for: module)
                 return module
             },
-            combinedFileName: loadedSettings.combinedModuleFileName,
+
             localModuleDirectory: loadedSettings.localModuleDirectory
         )
         let legacyGitHubToken = loadedSettings.githubToken.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -271,7 +265,7 @@ final class AppModel {
             if settings.automaticallyUpdateOnLaunch,
                await ModuleRefreshPlanner.shouldUpdateOnLaunch(
                    modules: modules,
-                   combinedModuleEnabled: settings.combinedModuleEnabled,
+
                    refreshIntervalMinutes: settings.refreshIntervalMinutes,
                    componentExists: { [fileStore] id in
                        await fileStore.hasComponent(id: id)
@@ -302,19 +296,6 @@ final class AppModel {
         enqueueConfiguration(settings, fileName: "settings.json")
     }
 
-    func setCombinedModuleEnabled(_ enabled: Bool) {
-        guard settings.combinedModuleEnabled != enabled else { return }
-        settings.combinedModuleEnabled = enabled
-        if !enabled, selectedModuleID == Self.combinedModuleSelectionID {
-            selectedModuleID = modules.first?.id
-        } else if enabled, selectedModuleID == nil {
-            selectedModuleID = Self.combinedModuleSelectionID
-        }
-        saveSettings()
-        statusMessage = enabled ? "总模块功能已开启，正在准备合并" : "总模块功能已关闭"
-        Task { await rebuildCombinedFromCache() }
-    }
-
     var modulePreviewProvider: ModulePreviewContentProvider {
         ModulePreviewContentProvider(
             hasComponent: { [fileStore] id in
@@ -328,9 +309,6 @@ final class AppModel {
             },
             writeComponent: { [fileStore] content, id in
                 try await fileStore.writeComponent(content, id: id)
-            },
-            readCombined: { [fileStore] in
-                try await fileStore.readCombined()
             },
             materialize: { [processingWorker] content, overrides in
                 await processingWorker.materialize(content, overrides: overrides)

@@ -114,7 +114,6 @@ final class ModuleVersionHistoryTests: XCTestCase {
             try await original.commitConversion(conversion("new", id: id), id: id)
             let currentValue = try await original.currentVersionContent(id: id)
             let current = try XCTUnwrap(currentValue)
-            try await original.writeCombined("previous combined data")
             let interrupted = ModuleFileStore(cacheDirectory: cache, configurationDirectory: config, restoreInterruption: {
                 if $0 == phase { throw VersionRestoreCrash.interrupted }
             })
@@ -124,7 +123,7 @@ final class ModuleVersionHistoryTests: XCTestCase {
             } catch {}
             let restarted = ModuleFileStore(cacheDirectory: cache, configurationDirectory: config)
             let needsRebuild = try await restarted.recoverInterruptedVersionRestores()
-            XCTAssertTrue(needsRebuild)
+            XCTAssertEqual(needsRebuild, phase == .committed || phase == .finalized)
             let expected = phase == .committed || phase == .finalized ? "old" : "new"
             let content = try await restarted.readComponent(id: id)
             let converted = try await restarted.readConvertedComponent(id: id)
@@ -132,14 +131,11 @@ final class ModuleVersionHistoryTests: XCTestCase {
             XCTAssertTrue(content.contains("\(expected).example"), "boundary: \(phase)")
             XCTAssertEqual(content, converted)
             XCTAssertEqual(assets.map(\.data), [Data("\(expected) script".utf8)])
-            do { _ = try await restarted.readCombined(); XCTFail("Old combined output must not be readable") }
-            catch { XCTAssertTrue(error.localizedDescription.contains("重建")) }
             let pending = try await restarted.pendingVersionRestoreModuleIDs()
             XCTAssertEqual(pending, phase == .committed || phase == .finalized ? [id] : [])
-            try await restarted.writeCombined("rebuilt combined data")
             try await restarted.acknowledgeVersionRestoreMetadata(ids: pending)
-            let combined = try await restarted.readCombined()
-            XCTAssertEqual(combined, Data("rebuilt combined data".utf8))
+            let remaining = try await restarted.pendingVersionRestoreModuleIDs()
+            XCTAssertTrue(remaining.isEmpty)
         }
     }
 
@@ -257,15 +253,14 @@ final class ModuleVersionHistoryTests: XCTestCase {
 
 @MainActor
 final class ModuleVersionRuntimeTests: XCTestCase {
-    func testRestorePreservesNewDraftAndPublishedFilesAndRebuildsCombinedCache() async throws {
+    func testRestorePreservesNewDraftPublishedFilesAndRestoresOnlyOwnCache() async throws {
         guard AppRuntimeOptions.isUIQAMode else { throw XCTSkip("Requires isolated QA configuration") }
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let model = AppModel()
-        let module = RelayModule(name: "History", sourceURL: "https://test.invalid/history.sgmodule", outputFileName: "History", storageTargets: [.local, .gitHub], isEnabled: true)
+        let module = RelayModule(name: "History", sourceURL: "https://test.invalid/history.sgmodule", outputFileName: "History", storageTargets: [.local, .gitHub])
         model.modules = [module]
-        model.settings.combinedModuleEnabled = true
         model.settings.publishToLocal = true
         model.settings.publishToGitHub = true
         model.settings.localModuleDirectory = root.path
@@ -283,9 +278,9 @@ final class ModuleVersionRuntimeTests: XCTestCase {
         XCTAssertEqual(model.modulePreviewDrafts[module.id]?.text, "new unsaved draft")
         XCTAssertEqual(try Data(contentsOf: published), publishedData)
         XCTAssertNil(model.automaticPublishRunsAt)
-        let combined = try await model.fileStore.readCombined()
-        XCTAssertTrue(String(decoding: combined, as: UTF8.self).contains("old.example"))
-        XCTAssertFalse(String(decoding: combined, as: UTF8.self).contains("new.example"))
+        let restored = try await model.fileStore.readComponent(id: module.id)
+        XCTAssertTrue(restored.contains("old.example"))
+        XCTAssertFalse(restored.contains("new.example"))
         XCTAssertFalse(model.isWorking)
         XCTAssertTrue(model.statusMessage.contains("未发布"))
         model.modulePreviewDrafts.removeValue(forKey: module.id)
@@ -293,7 +288,6 @@ final class ModuleVersionRuntimeTests: XCTestCase {
         try await model.fileStore.removeComponent(id: module.id)
         try await model.fileStore.removeAssets(id: module.id)
         try await model.fileStore.removeModuleVersions(id: module.id)
-        try await model.fileStore.removeCombined()
     }
 
     func testHistoryListingAndRestoreRemainAvailableWhenCurrentBodyIsCorrupt() async throws {

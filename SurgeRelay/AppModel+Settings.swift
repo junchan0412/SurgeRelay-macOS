@@ -106,7 +106,7 @@ extension AppModel {
         saveSettings()
         refreshLocalSourceWatching()
         Task { await refreshModuleOutputFolders(force: true) }
-        if settings.publishToLocal { Task { await rebuildCombinedFromCache() } }
+        if settings.publishToLocal { Task { await refreshModuleOutputs() } }
     }
 
     func setPublishToLocal(_ enabled: Bool) {
@@ -119,7 +119,7 @@ extension AppModel {
         settings.publishToLocal = enabled
         saveSettings()
         statusMessage = enabled ? "已开启本地发布" : "已关闭本地发布"
-        Task { await rebuildCombinedFromCache() }
+        Task { await refreshModuleOutputs() }
     }
 
     func setPublishToGitHub(_ enabled: Bool) {
@@ -157,7 +157,7 @@ extension AppModel {
             while !Task.isCancelled {
                 guard let self else { return }
                 let cooldowns = modules.filter { $0.serverRetryAfter.map { $0 > .now } ?? false }
-                let dates = ModuleRefreshPlanner.updateableModules(in: modules, combinedModuleEnabled: settings.combinedModuleEnabled)
+                let dates = ModuleRefreshPlanner.updateableModules(in: modules)
                     .compactMap { ModuleRefreshPlanner.nextDueDate(for: $0, among: cooldowns, globalIntervalMinutes: settings.refreshIntervalMinutes) }
                 guard let next = dates.min() else { return }
                 do { try await Task.sleep(for: .seconds(max(1, next.timeIntervalSinceNow))) } catch { return }

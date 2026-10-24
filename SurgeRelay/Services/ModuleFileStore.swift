@@ -50,16 +50,6 @@ actor ModuleFileStore {
         cacheDirectory.appending(path: "Assets", directoryHint: .isDirectory)
     }
 
-    private var combinedCacheURL: URL {
-        cacheDirectory.appending(path: "Combined.cache")
-    }
-
-    private var combinedOverrideURL: URL {
-        cacheDirectory.appending(path: "CombinedOverride.cache")
-    }
-
-    private var combinedRebuildMarkerURL: URL { cacheDirectory.appending(path: "CombinedNeedsRebuild") }
-
     func writeComponent(_ content: String, id: UUID) throws {
         try recoverInterruptedRestore(id: id)
         try FileManager.default.createDirectory(at: componentDirectory, withIntermediateDirectories: true)
@@ -284,7 +274,7 @@ actor ModuleFileStore {
             }
         }
         let pending = try pendingRestoreMetadataIDs()
-        return FileManager.default.fileExists(atPath: combinedRebuildMarkerURL.path) || !pending.isEmpty
+        return !pending.isEmpty
     }
 
     func pendingVersionRestoreModuleIDs() throws -> Set<UUID> {
@@ -293,9 +283,6 @@ actor ModuleFileStore {
     }
 
     func acknowledgeVersionRestoreMetadata(ids: Set<UUID>) throws {
-        guard !FileManager.default.fileExists(atPath: combinedRebuildMarkerURL.path) else {
-            throw RelayError.invalidOutput("总模块缓存尚未重建，不能确认历史恢复已完成。")
-        }
         for id in ids {
             let url = restoreMetadataURL(id: id)
             if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
@@ -324,11 +311,6 @@ actor ModuleFileStore {
         let url = restoreMetadataURL(id: journal.moduleID)
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try writeRestoreData(JSONEncoder().encode(RestoreMetadataPending(moduleID: journal.moduleID, transactionID: journal.id)), to: url)
-    }
-
-    private func markCombinedForRebuild() throws {
-        try FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
-        try writeRestoreData(Data("version-restore\n".utf8), to: combinedRebuildMarkerURL)
     }
 
     private func restoreCheckpoint(_ phase: ModuleRestorePhase) throws {
@@ -470,7 +452,7 @@ actor ModuleFileStore {
         try writeRestoreData(JSONEncoder().encode(journal), to: journalURL)
         prepared = true
         do {
-            try markCombinedForRebuild()
+
             try restoreCheckpoint(.prepared)
             try installRawRestoreState(next, id: id, recovery: false)
             guard try rawRestoreFingerprint(captureRawRestoreState(id: id)) == rawRestoreFingerprint(next) else {
@@ -548,7 +530,7 @@ actor ModuleFileStore {
                 throw RelayError.invalidOutput("恢复事务归属无效，未读取可能不一致的缓存。")
             }
             if journal.phase != .finalized {
-                try markCombinedForRebuild()
+
                 let state = try readRestoreBundle(id: id, at: transaction.appending(path: journal.phase == .prepared ? "Old" : "New"))
                 try installRawRestoreState(state, id: id, recovery: true)
                 guard try rawRestoreFingerprint(captureRawRestoreState(id: id)) == rawRestoreFingerprint(state) else {
@@ -635,20 +617,6 @@ actor ModuleFileStore {
         if FileManager.default.fileExists(atPath: overrideURL.path) { try FileManager.default.removeItem(at: overrideURL) }
         let pending = restoreMetadataURL(id: id)
         if FileManager.default.fileExists(atPath: pending.path) { try FileManager.default.removeItem(at: pending) }
-    }
-
-    func writeCombined(_ content: String) throws {
-        try FileManager.default.createDirectory(at: combinedCacheURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try Data(content.utf8).write(to: combinedCacheURL, options: .atomic)
-        if FileManager.default.fileExists(atPath: combinedRebuildMarkerURL.path) { try FileManager.default.removeItem(at: combinedRebuildMarkerURL) }
-    }
-
-    func readCombined() throws -> Data {
-        guard try !recoverInterruptedVersionRestores() else {
-            throw RelayError.invalidOutput("版本恢复后尚未完成元数据确认或总模块重建，请先完成恢复。")
-        }
-        let url = FileManager.default.fileExists(atPath: combinedOverrideURL.path) ? combinedOverrideURL : combinedCacheURL
-        return try Data(contentsOf: url)
     }
 
     func adoptLocalPublishedFile(relativePath: String, rootDirectoryPath: String, moduleID: UUID,
@@ -781,16 +749,6 @@ actor ModuleFileStore {
             throw LocalPublishPartialFailure(underlyingError: error, writtenPaths: writtenPaths)
         }
         return removedPaths
-    }
-
-    func removeCombined() throws {
-        if FileManager.default.fileExists(atPath: combinedCacheURL.path) {
-            try FileManager.default.removeItem(at: combinedCacheURL)
-        }
-        if FileManager.default.fileExists(atPath: combinedOverrideURL.path) {
-            try FileManager.default.removeItem(at: combinedOverrideURL)
-        }
-        if FileManager.default.fileExists(atPath: combinedRebuildMarkerURL.path) { try FileManager.default.removeItem(at: combinedRebuildMarkerURL) }
     }
 
     func replaceAssets(_ assets: [GeneratedAsset], id: UUID) throws {
@@ -1294,9 +1252,10 @@ actor ModuleFileStore {
         let permitsLegacyMigration = isKnownManagedPath && !ManagedPublishedFile.hasManagementHeader(existing)
             && (!deleting || !ManagedPublishedFile.requiresInlineMarker(relativePath))
         guard ManagedPublishedFile.isManaged(existing, relativePath: relativePath) || permitsLegacyMigration else {
-            throw RelayError.invalidOutput(deleting
-                ? "旧文件 \(relativePath) 不属于 Surge Relay 管理，已停止自动清理。"
-                : "目标文件 \(relativePath) 已存在且不属于 Surge Relay 管理，已停止写入。")
+            if deleting {
+                throw RelayError.invalidOutput("旧文件 \(relativePath) 不属于 Surge Relay 管理，已停止自动清理。")
+            }
+            throw RelayError.localOutputConflict(relativePath)
         }
         return try ManagedPublishedFile.validatedConflictVersions(at: url,
             allowingKnownManagedPath: permitsLegacyMigration, relativePath: relativePath)

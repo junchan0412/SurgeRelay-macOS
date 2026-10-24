@@ -7,11 +7,9 @@ const ui = {
   sidebar: document.querySelector('.sidebar'),
   detailPane: document.querySelector('#detail'),
   list: document.querySelector('#module-list'),
-  summaryRow: document.querySelector('#summary-row'),
   overview: document.querySelector('#overview-button'),
   history: document.querySelector('#history-button'),
   connection: document.querySelector('#connection-status'),
-  summarySubtitle: document.querySelector('#summary-subtitle'),
   detail: document.querySelector('#detail-content'),
   search: document.querySelector('#search-input'),
   clearSearch: document.querySelector('#clear-search'),
@@ -221,7 +219,6 @@ ui.failureFilter.addEventListener('click', sidebarController.toggleFailuresOnly)
 ui.add.addEventListener('click', () => openEditor());
 ui.refresh.addEventListener('click', updateAll);
 ui.cancelActivity.addEventListener('click', cancelCurrentWork);
-ui.summaryRow.addEventListener('click', () => { if (combinedEnabled()) selectItem('combined'); });
 ui.overview?.addEventListener('click', () => selectItem('overview'));
 ui.history?.addEventListener('click', () => selectItem('activity'));
 ui.back.addEventListener('click', navigateBackToList);
@@ -250,7 +247,6 @@ ui.moduleForm.elements.storageLocation.addEventListener('change', () => {
 });
 ui.moduleForm.elements.outputFileName.addEventListener('input', updateOutputPathPreview);
 ui.moduleForm.elements.iconURL.addEventListener('input', moduleEditor.updateIconURLPreview);
-ui.moduleForm.elements.publishesStandalone.addEventListener('change', updateOutputPathPreview);
 document.querySelectorAll('.close-module-dialog').forEach(button => button.addEventListener('click', () => closeDialog(ui.moduleDialog)));
 ui.moduleDialog.addEventListener('click', async event => {
   const copyButton = event.target.closest('[data-action="copy-output-path"]');
@@ -266,7 +262,6 @@ ui.confirmCancel.addEventListener('click', () => resolveConfirmation(false));
 ui.confirmAccept.addEventListener('click', () => resolveConfirmation(true));
 ui.confirmDialog.addEventListener('click', event => { if (event.target === ui.confirmDialog) resolveConfirmation(false); });
 ui.list.addEventListener('click', handleListClick);
-ui.list.addEventListener('change', handleListChange);
 ui.list.addEventListener('keydown', sidebarController.handleListKeydown);
 ui.detail.addEventListener('click', handleDetailClick);
 ui.detail.addEventListener('change', handleDetailChange);
@@ -424,10 +419,6 @@ function applyActivity(activity, context = {}) {
   }
 }
 
-function combinedEnabled(snapshot = state) {
-  return webState.combinedEnabled(snapshot);
-}
-
 function fallbackSelection(snapshot = state) {
   return webState.fallbackSelection(snapshot, mobileLayout.matches);
 }
@@ -463,14 +454,6 @@ function handleListClick(event) {
   if (event.target.closest('.module-toggle')) return;
   const row = event.target.closest('.module-row');
   if (row) selectItem(row.dataset.id);
-}
-
-async function handleListChange(event) {
-  const input = event.target.closest('[data-module-toggle]');
-  if (!input) return;
-  if (!combinedEnabled()) return;
-  try { await api(`/api/modules/${input.dataset.moduleToggle}/enabled`, { method: 'POST', json: { enabled: input.checked } }); await loadState(false, true); }
-  catch (error) { input.checked = !input.checked; showToast(error.message, true); }
 }
 
 async function handleDetailClick(event) {
@@ -535,7 +518,7 @@ async function acceptOverride(module) {
 
 async function handleDetailChange(event) {
   const input = event.target.closest('[data-argument-key]');
-  if (!input || selectedID === 'combined') return;
+  if (!input) return;
   const value = input.type === 'checkbox' ? String(input.checked) : input.value;
   try { await api(`/api/modules/${selectedID}/arguments`, { method: 'PUT', json: { key: input.dataset.argumentKey, value } }); showToast('模块参数已更新'); }
   catch (error) { showToast(error.message, true); }
@@ -543,8 +526,7 @@ async function handleDetailChange(event) {
 
 function selectItem(id, pushHistory = true) {
   if (!state) return;
-  if (id === 'combined' && !state.combined.isEnabled) id = fallbackSelection();
-  if (!['combined', 'overview', 'activity'].includes(id) && !state.modules.some(module => module.id === id)) id = fallbackSelection();
+  if (!['overview', 'activity'].includes(id) && !state.modules.some(module => module.id === id)) id = fallbackSelection();
   if (!id) { showModuleList(pushHistory); return; }
   const cameFromList = mobileLayout.matches && !ui.body.classList.contains('has-selection');
   if (cameFromList) mobileListScrollY = window.scrollY;
@@ -622,7 +604,6 @@ function handleHistoryNavigation(event) {
 function openEditor(module = null) {
   const editorState = moduleEditor.populateModuleForm(module, {
     state,
-    combinedEnabled: combinedEnabled()
   });
   editingID = editorState.editingID;
   openDialog(ui.moduleDialog);
@@ -645,7 +626,6 @@ async function saveModule(event) {
     return;
   }
   const payload = webLogic.moduleEditorPayload(editorFields, {
-    combinedEnabled: combinedEnabled(),
     existingModule
   });
   ui.saveModule.disabled = true;
@@ -678,9 +658,7 @@ async function cancelCurrentWork() {
 }
 
 async function deleteModule(module) {
-  const message = combinedEnabled()
-    ? `“${module.name}”会从 Surge Relay 和总模块中移除。`
-    : `“${module.name}”会从 Surge Relay 管理列表中移除。`;
+  const message = `“${module.name}”会从 Surge Relay 管理列表中移除。`;
   const accepted = await askConfirmation('删除模块？', message, '删除');
   if (!accepted) return;
   try {

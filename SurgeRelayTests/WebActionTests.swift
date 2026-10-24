@@ -3,6 +3,24 @@ import XCTest
 
 @MainActor
 final class WebActionTests: XCTestCase {
+    func testAggregateRoutesAndStateFieldsHaveBeenRemoved() async throws {
+        let (model, module, root) = try await model()
+        defer { try? FileManager.default.removeItem(at: root) }
+        for (method, path, status) in [("GET", "/api/combined/preview", 404), ("POST", "/api/modules/\(module.id.uuidString)/enabled", 405)] {
+            let response = await WebManagementAPI.response(for: WebHTTPRequest(method: method, path: path,
+                query: [:], headers: [:], body: Data("{\"enabled\":true}".utf8), isLoopback: true), model: model)
+            XCTAssertEqual(response.status, status)
+        }
+        let response = await WebManagementAPI.response(for: WebHTTPRequest(method: "GET", path: "/api/state",
+            query: [:], headers: [:], body: Data(), isLoopback: true), model: model)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: response.body) as? [String: Any])
+        XCTAssertNil(object["combined"])
+        let modules = try XCTUnwrap(object["modules"] as? [[String: Any]])
+        XCTAssertEqual(modules.count, 1)
+        XCTAssertNil(modules[0]["isEnabled"])
+        XCTAssertNil(modules[0]["publishesStandalone"])
+    }
+
     private func model() async throws -> (AppModel, RelayModule, URL) {
         let root = FileManager.default.temporaryDirectory.appending(path: "WebActionTests-\(UUID())")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -11,7 +29,6 @@ final class WebActionTests: XCTestCase {
         let model = AppModel(context: context, persistsOnInit: false)
         model.settings.publishToLocal = true
         model.settings.publishToGitHub = false
-        model.settings.combinedModuleEnabled = false
         model.settings.localModuleDirectory = root.path
         var module = RelayModule(name: "Reviewed", sourceURL: "https://test.invalid/reviewed.sgmodule", outputFileName: "Reviewed")
         module.storageTargets = [.local]
@@ -129,7 +146,6 @@ final class WebActionTests: XCTestCase {
         let model = AppModel(githubClient: GitHubClient(session: URLSession(configuration: configuration)))
         model.settings.publishToLocal = false
         model.settings.publishToGitHub = true
-        model.settings.combinedModuleEnabled = false
         model.settings.github.owner = "owner"
         model.settings.github.repository = "repo"
         model.settings.github.branch = "main"
@@ -193,11 +209,11 @@ final class WebActionTests: XCTestCase {
     func testAutomaticLocalExportRejectsInvalidContentAndPreservesOutput() async throws {
         let (model, module, root) = try await model()
         defer { try? FileManager.default.removeItem(at: root) }
-        try await model.publishCurrentFiles(combinedData: nil)
+        try await model.writeLocalModuleOutput(moduleID: module.id)
         let output = root.appending(path: module.publishedRelativePath)
         let valid = try Data(contentsOf: output)
         try await model.fileStore.writeComponent("[Rule\nDOMAIN,broken.example,DIRECT", id: module.id)
-        do { try await model.publishCurrentFiles(combinedData: nil); XCTFail("Automatic exports must lint before changing files") }
+        do { try await model.writeLocalModuleOutput(moduleID: module.id); XCTFail("Automatic exports must lint before changing files") }
         catch { XCTAssertTrue(error.localizedDescription.contains("发布前检查")) }
         XCTAssertEqual(try Data(contentsOf: output), valid)
     }
@@ -250,7 +266,10 @@ final class WebActionTests: XCTestCase {
         _ = try await model.fileStore.exportPublishedFiles([PublishFile(name: oldPath, data: Data("[Rule]\nFINAL,DIRECT".utf8))], toRootDirectory: root.path)
         model.settings.localPublishedRootDirectory = root.path
         model.settings.localPublishedFilePaths = [oldPath]
-        try await model.publishCurrentFiles(combinedData: nil)
+        let oldData = try Data(contentsOf: root.appending(path: oldPath))
+        model.pendingPublishPreview = PublishPreview(destination: .local, targetDescription: root.path, activeFiles: [],
+            changedFiles: [], deletedFiles: [oldPath], localExpectedHashes: [oldPath: oldData.sha256String],
+            localReviewFingerprint: model.localCleanupReviewFingerprint())
         XCTAssertEqual(model.pendingPublishPreview?.deletedFiles, [oldPath])
         _ = try await model.fileStore.exportPublishedFiles([PublishFile(name: oldPath, data: Data("[Rule]\nFINAL,REJECT".utf8))],
             toRootDirectory: root.path, knownManagedRelativePaths: [oldPath])
@@ -274,16 +293,15 @@ final class WebActionTests: XCTestCase {
         if case .stopped = model.webServerState {} else { XCTFail("Disabled service must be stopped even if its stored port is invalid") }
     }
 
-    func testStartupCompletesCommittedRestoreMetadataBeforeCombinedAccess() async throws {
+    func testStartupCompletesCommittedRestoreMetadataIndependently() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "RestoreStartup-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         let context = WorkspaceContext(id: UUID(), name: "Recovery", configurationDirectory: root.appending(path: "Config"),
             cacheDirectory: root.appending(path: "Cache"), allowsLegacyFallback: false)
         let model = AppModel(context: context, persistsOnInit: false)
-        var module = RelayModule(name: "Restore", sourceURL: "https://test.invalid/restore.sgmodule", outputFileName: "Restore", isEnabled: true)
+        var module = RelayModule(name: "Restore", sourceURL: "https://test.invalid/restore.sgmodule", outputFileName: "Restore")
         module.sourceContentHash = "new-upstream-hash"
         model.modules = [module]
-        model.settings.combinedModuleEnabled = true
         model.settings.publishToLocal = false
         model.settings.publishToGitHub = false
         try model.persistModules()
@@ -305,8 +323,8 @@ final class WebActionTests: XCTestCase {
         XCTAssertNil(relaunched.modules.first?.sourceContentHash)
         let pending = try await relaunched.fileStore.pendingVersionRestoreModuleIDs()
         XCTAssertTrue(pending.isEmpty)
-        let combined = try await relaunched.fileStore.readCombined()
-        XCTAssertTrue(String(decoding: combined, as: UTF8.self).contains("old.example"))
+        let restored = try await relaunched.fileStore.readComponent(id: module.id)
+        XCTAssertTrue(restored.contains("old.example"))
         XCTAssertNil(relaunched.automaticPublishScheduledAt)
         let reopened = AppModel(context: context, persistsOnInit: false)
         XCTAssertEqual(reopened.modules.first?.refreshIntervalMinutes, 0)
@@ -322,24 +340,6 @@ final class WebActionTests: XCTestCase {
         XCTAssertEqual(LocalSourceSyncPlanner.sourceFiles(in: [module], includesManualOnly: true).count, 1)
     }
 
-    func testInvalidCombinedOnlyContributorCannotReplaceValidCombinedCache() async throws {
-        let (model, original, root) = try await model()
-        defer { try? FileManager.default.removeItem(at: root) }
-        var module = original
-        module.isEnabled = true
-        module.publishesStandalone = false
-        model.modules = [module]
-        model.settings.combinedModuleEnabled = true
-        model.settings.publishToLocal = false
-        let initial = await model.rebuildCombinedFromCache(schedulesAutomaticPublish: false)
-        XCTAssertTrue(initial)
-        let valid = try await model.fileStore.readCombined()
-        try await model.fileStore.writeComponent("[Rule\nDOMAIN,broken.example,DIRECT", id: module.id)
-        let rebuilt = await model.rebuildCombinedFromCache(schedulesAutomaticPublish: false)
-        XCTAssertFalse(rebuilt)
-        let retained = try await model.fileStore.readCombined()
-        XCTAssertEqual(retained, valid)
-    }
 
     func testLegacyWebMetadataEditPreservesUnchangedDualTargetProjection() throws {
         var module = RelayModule(name: "Both", sourceURL: "https://test.invalid/both.sgmodule", outputFileName: "Both")

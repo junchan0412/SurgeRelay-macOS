@@ -160,42 +160,19 @@ final class ModulePlanningTests: XCTestCase {
             outputFolder: "Ads"
         )
 
-        XCTAssertEqual(
-            ModuleOutputPathInspector.notice(
-                for: "Ads/New.sgmodule",
-                publishesStandalone: false,
-                modules: [existing],
-                editingModuleID: nil,
-                combinedFileName: "Surge Relay"
-            ),
-            ModuleOutputPathNotice(message: "未开启独立发布时，不会写出这个独立模块文件。", isWarning: false)
-        )
-        XCTAssertEqual(
-            ModuleOutputPathInspector.notice(
-                for: "Surge-Relay.sgmodule",
-                publishesStandalone: true,
-                modules: [existing],
-                editingModuleID: nil,
-                combinedFileName: "Surge Relay"
-            ),
-            ModuleOutputPathNotice(message: "该路径与总模块文件冲突，保存时会自动加编号避免覆盖。", isWarning: true)
-        )
+        XCTAssertNil(ModuleOutputPathInspector.notice(for: "Surge-Relay.sgmodule", modules: [existing], editingModuleID: nil))
         XCTAssertEqual(
             ModuleOutputPathInspector.notice(
                 for: "Ads/Existing.sgmodule",
-                publishesStandalone: true,
                 modules: [existing],
-                editingModuleID: nil,
-                combinedFileName: "Surge Relay"
+                editingModuleID: nil
             ),
             ModuleOutputPathNotice(message: "该路径已被“Existing”使用，保存时会自动加编号避免覆盖。", isWarning: true)
         )
         XCTAssertNil(ModuleOutputPathInspector.notice(
             for: "Ads/Existing.sgmodule",
-            publishesStandalone: true,
             modules: [existing],
-            editingModuleID: existingID,
-            combinedFileName: "Surge Relay"
+            editingModuleID: existingID
         ))
     }
 
@@ -208,11 +185,9 @@ final class ModulePlanningTests: XCTestCase {
             sourceURL: source.absoluteString,
             sourceFormat: .surge,
             outputFileName: "YouTube Ads.sgmodule",
-            outputFolder: "Ads",
-            publishesStandalone: true
+            outputFolder: "Ads"
         )
 
-        XCTAssertTrue(module.publishesStandalone)
         XCTAssertTrue(PublishCoordinator.shouldSkipStandaloneLocalExport(
             module,
             isLocalExport: true,
@@ -229,8 +204,7 @@ final class ModulePlanningTests: XCTestCase {
             sourceURL: source.absoluteString,
             sourceFormat: .surge,
             outputFileName: "YouTube Copy.sgmodule",
-            outputFolder: "Ads",
-            publishesStandalone: true
+            outputFolder: "Ads"
         )
         XCTAssertFalse(PublishCoordinator.shouldSkipStandaloneLocalExport(
             copiedModule,
@@ -248,8 +222,7 @@ final class ModulePlanningTests: XCTestCase {
             outputFolder: "Converted",
             storageLocation: .local,
             localStorageRelativePath: "Converted/Remote Backed.sgmodule",
-            preservesOutputFileName: true,
-            publishesStandalone: true
+            preservesOutputFileName: true
         )
 
         XCTAssertEqual(module.storageLocation, .local)
@@ -300,7 +273,7 @@ final class ModulePlanningTests: XCTestCase {
         ))
     }
 
-    func testModuleNamingPlannerAvoidsCombinedAndExistingOutputPaths() {
+    func testModuleNamingPlannerReservesOnlyExistingOutputPaths() {
         let existing = RelayModule(
             name: "Existing",
             sourceURL: "https://example.com/existing.sgmodule",
@@ -316,8 +289,7 @@ final class ModulePlanningTests: XCTestCase {
             ModuleNamingPlanner.uniqueOutputFileName(
                 for: draft,
                 source: draft.sourceURL,
-                modules: [existing],
-                combinedModuleFileName: "Surge Relay"
+                modules: [existing]
             ),
             "Existing-2.sgmodule"
         )
@@ -328,10 +300,9 @@ final class ModulePlanningTests: XCTestCase {
             ModuleNamingPlanner.uniqueOutputFileName(
                 for: draft,
                 source: draft.sourceURL,
-                modules: [],
-                combinedModuleFileName: "Surge Relay"
+                modules: []
             ),
-            "Surge-Relay-2.sgmodule"
+            "Surge-Relay.sgmodule"
         )
 
         XCTAssertEqual(
@@ -367,7 +338,6 @@ final class ModulePlanningTests: XCTestCase {
 
         let normalized = ModuleNamingPlanner.normalizedModuleNaming(
             [local, combinedCollision],
-            combinedFileName: "Surge Relay",
             localModuleDirectory: root.path
         )
 
@@ -375,7 +345,7 @@ final class ModulePlanningTests: XCTestCase {
         XCTAssertEqual(normalized[0].outputFileName, "My Module.sgmodule")
         XCTAssertEqual(normalized[0].localStorageRelativePath, "Ads/My Module.sgmodule")
         XCTAssertTrue(normalized[0].preservesOutputFileName)
-        XCTAssertEqual(normalized[1].outputFileName, "Surge-Relay-2.sgmodule")
+        XCTAssertEqual(normalized[1].outputFileName, "Surge-Relay.sgmodule")
     }
 
     func testLoadedNamingReservesPhysicalLocalPathBeforeRemoteModule() {
@@ -399,7 +369,6 @@ final class ModulePlanningTests: XCTestCase {
 
         let normalized = ModuleNamingPlanner.normalizedModuleNaming(
             [remote, local],
-            combinedFileName: "Relay",
             localModuleDirectory: root.path
         )
 
@@ -408,7 +377,6 @@ final class ModulePlanningTests: XCTestCase {
         XCTAssertEqual(normalized[1].localStorageRelativePath, "Tools/My Module.sgmodule")
         XCTAssertEqual(ModuleNamingPlanner.normalizedModuleNaming(
             normalized,
-            combinedFileName: "Relay",
             localModuleDirectory: root.path
         ), normalized)
     }
@@ -430,8 +398,7 @@ final class ModulePlanningTests: XCTestCase {
         XCTAssertEqual(ModuleNamingPlanner.uniqueOutputFileName(
             for: draft,
             source: draft.sourceURL,
-            modules: [existing],
-            combinedModuleFileName: "Relay"
+            modules: [existing]
         ), "Cafe\u{301}-2.sgmodule")
     }
 
@@ -447,7 +414,7 @@ final class ModulePlanningTests: XCTestCase {
         )
 
         let restored = ModuleNamingPlanner.normalizedModuleNaming(
-            [module], combinedFileName: "Relay", localModuleDirectory: root.path
+            [module], localModuleDirectory: root.path
         )
 
         XCTAssertEqual(restored, [module])
@@ -565,8 +532,7 @@ final class ModulePlanningTests: XCTestCase {
             name: "Remote",
             sourceURL: "https://example.com/remote.sgmodule",
             outputFileName: "Remote",
-            storageLocation: .gitHub,
-            publishesStandalone: false
+            storageLocation: .gitHub
         )
         let invalid = RelayModule(
             name: "Invalid",

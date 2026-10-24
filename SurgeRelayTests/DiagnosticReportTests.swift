@@ -17,8 +17,7 @@ final class DiagnosticReportTests: XCTestCase {
         let module = RelayModule(
             name: "Private Source",
             sourceURL: "https://user:pass@example.com/path/module.sgmodule?token=secret#fragment",
-            outputFileName: "Private Source",
-            publishesStandalone: true
+            outputFileName: "Private Source"
         )
         let request = DiagnosticReportBuildRequest(
             generatedAt: Date(timeIntervalSince1970: 1_000),

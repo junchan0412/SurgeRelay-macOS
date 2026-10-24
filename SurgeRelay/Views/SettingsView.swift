@@ -75,7 +75,7 @@ struct SettingsView: View {
 
     private var pageDescription: String {
         switch model.settingsPage {
-        case .general: "配置自动更新、启动行为与总模块。"
+        case .general: "配置自动更新与启动行为。"
         case .workspaces: "在独立工作区之间切换，并复用模块设置。"
         case .publishing: "选择输出目录，连接 GitHub，管理稳定订阅地址。"
         case .credentials: "管理保存在本机加密文件中的访问凭据。"

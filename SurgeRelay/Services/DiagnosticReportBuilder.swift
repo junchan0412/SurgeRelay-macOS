@@ -94,11 +94,11 @@ enum DiagnosticReportBuilder {
             initialSourceTitle: module.initialSource.title,
             relationshipSummary: module.relationshipSummary,
             localStorageRelativePath: module.localStorageRelativePath,
-            enabled: module.isEnabled,
             state: module.state.rawValue,
             lastUpdatedAt: module.lastUpdatedAt,
             sourceCheckedAt: module.sourceCheckedAt,
             lastError: module.lastError,
+            localOutputError: module.localOutputError,
             hasOverrideConflict: module.hasOverrideConflict
         )
     }

@@ -191,27 +191,6 @@ final class ModelAndCoordinatorTests: XCTestCase {
         XCTAssertTrue(output.contains("argument=关闭通知"))
     }
 
-    func testRelayModuleDefaultsDoNotJoinCombinedModule() throws {
-        let module = RelayModule(
-            name: "Default",
-            sourceURL: "https://example.com/default.sgmodule",
-            outputFileName: "Default"
-        )
-        XCTAssertFalse(module.isEnabled)
-
-        let legacyData = Data("""
-        {
-          "id": "11111111-1111-1111-1111-111111111111",
-          "name": "Legacy",
-          "sourceURL": "https://example.com/legacy.sgmodule",
-          "sourceFormat": "automatic",
-          "outputFileName": "Legacy",
-          "publishesStandalone": true
-        }
-        """.utf8)
-        let decoded = try JSONDecoder().decode(RelayModule.self, from: legacyData)
-        XCTAssertFalse(decoded.isEnabled)
-    }
 
     func testLocalModuleScannerRestoresScriptHubOriginalSource() throws {
         let root = FileManager.default.temporaryDirectory
@@ -229,7 +208,6 @@ final class ModelAndCoordinatorTests: XCTestCase {
 
         let report = try LocalModuleScanner.report(
             in: root.path,
-            combinedFileName: "Surge Relay",
             existingModules: [],
             publishedFilePaths: []
         )
@@ -288,36 +266,26 @@ final class ModelAndCoordinatorTests: XCTestCase {
         settings.github.repositoryIsPrivate = false
         settings.publishToGitHub = true
         settings.publishToLocal = true
-        settings.combinedModuleEnabled = true
-        settings.combinedModuleFileName = "Surge Relay"
+        settings.legacyCombinedModuleFileName = "Surge Relay"
         settings.localModuleDirectory = "/tmp/Surge Relay"
         let published = RelayModule(
             name: "Ads",
             sourceURL: "https://example.com/ads.sgmodule",
             outputFileName: "Ads",
-            outputFolder: "Folder",
-            publishesStandalone: true
+            outputFolder: "Folder"
         )
         let combinedOnly = RelayModule(
             name: "Combined",
             sourceURL: "https://example.com/combined.sgmodule",
-            outputFileName: "Combined",
-            publishesStandalone: false
+            outputFileName: "Combined"
         )
 
         XCTAssertEqual(
             try XCTUnwrap(PublishedAddressResolver.standaloneURL(for: published, settings: settings)).absoluteString,
             "https://raw.githubusercontent.com/someone/relay/main/surge/modules/Folder/Ads.sgmodule"
         )
-        XCTAssertNil(PublishedAddressResolver.standaloneURL(for: combinedOnly, settings: settings))
-        XCTAssertEqual(
-            try XCTUnwrap(PublishedAddressResolver.combinedGitHubURL(settings: settings)).lastPathComponent,
-            "Surge-Relay.sgmodule"
-        )
-        XCTAssertEqual(
-            try XCTUnwrap(PublishedAddressResolver.combinedLocalFileURL(settings: settings)).path,
-            "/tmp/Surge Relay/Surge-Relay.sgmodule"
-        )
+        XCTAssertNotNil(PublishedAddressResolver.standaloneURL(for: combinedOnly, settings: settings))
+
 
         settings.github.repositoryIsPrivate = true
         XCTAssertNil(PublishedAddressResolver.standaloneURL(for: published, settings: settings))
@@ -328,7 +296,6 @@ final class ModelAndCoordinatorTests: XCTestCase {
         )
 
         settings.publishToGitHub = false
-        XCTAssertNil(PublishedAddressResolver.combinedGitHubURL(settings: settings))
         XCTAssertNil(PublishedAddressResolver.standaloneURL(for: published, settings: settings))
     }
 
@@ -338,9 +305,7 @@ final class ModelAndCoordinatorTests: XCTestCase {
         var failed = RelayModule(
             name: "Failed",
             sourceURL: "https://example.com/failed.sgmodule",
-            outputFileName: "Failed",
-            publishesStandalone: true,
-            isEnabled: true
+            outputFileName: "Failed"
         )
         failed.state = .failed
         failed.lastUpdatedAt = olderDate
@@ -348,9 +313,7 @@ final class ModelAndCoordinatorTests: XCTestCase {
         var conflicted = RelayModule(
             name: "Conflicted",
             sourceURL: "file:///Users/example/Surge/Conflicted.sgmodule",
-            outputFileName: "Conflicted",
-            publishesStandalone: false,
-            isEnabled: true
+            outputFileName: "Conflicted"
         )
         conflicted.hasOverrideConflict = true
         conflicted.lastUpdatedAt = newerDate
@@ -358,9 +321,7 @@ final class ModelAndCoordinatorTests: XCTestCase {
         let ignored = RelayModule(
             name: "Ignored",
             sourceURL: "https://example.com/ignored.sgmodule",
-            outputFileName: "Ignored",
-            publishesStandalone: false,
-            isEnabled: false
+            outputFileName: "Ignored"
         )
 
         let summary = ModuleCollectionSummary(modules: [failed, conflicted, ignored]) { module in
@@ -368,8 +329,8 @@ final class ModelAndCoordinatorTests: XCTestCase {
         }
 
         XCTAssertEqual(summary.totalCount, 3)
-        XCTAssertEqual(summary.enabledCount, 2)
-        XCTAssertEqual(summary.standaloneCount, 1)
+        XCTAssertEqual(summary.localCount, 1)
+        XCTAssertEqual(summary.githubCount, 2)
         XCTAssertEqual(summary.failedCount, 1)
         XCTAssertEqual(summary.overrideConflictCount, 1)
         XCTAssertEqual(summary.attentionCount, 2)

@@ -20,64 +20,13 @@ final class WebManagementStateBuilderTests: XCTestCase {
         XCTAssertFalse(payload.publishToGitHub)
     }
 
-    func testCombinedPayloadHidesSubscriptionWhenCombinedModuleIsDisabled() throws {
-        let lastUpdatedAt = Date(timeIntervalSince1970: 100)
-        let modules = [
-            RelayModule(
-                name: "Enabled",
-                sourceURL: "https://example.com/enabled.conf",
-                outputFileName: "Enabled",
-                isEnabled: true,
-                lastUpdatedAt: lastUpdatedAt
-            ),
-            RelayModule(
-                name: "Disabled",
-                sourceURL: "https://example.com/disabled.conf",
-                outputFileName: "Disabled",
-                isEnabled: false
-            )
-        ]
-        let summary = ModuleCollectionSummary(modules: modules, isUpdateable: { $0.isEnabled })
-        var settings = AppSettings()
-        settings.combinedModuleFileName = "My Relay"
-        let rawURL = try XCTUnwrap(URL(string: "https://example.com/modules/My-Relay.sgmodule"))
-        let localURL = URL(fileURLWithPath: "/tmp/My-Relay.sgmodule")
-
-        settings.combinedModuleEnabled = false
-        let disabled = WebManagementStateBuilder.combinedPayload(
-            summary: summary,
-            settings: settings,
-            rawURL: rawURL,
-            localFileURL: localURL
-        )
-
-        XCTAssertFalse(disabled.isEnabled)
-        XCTAssertEqual(disabled.sourceCount, 2)
-        XCTAssertEqual(disabled.enabledCount, 0)
-        XCTAssertEqual(disabled.lastUpdatedAt, lastUpdatedAt)
-        XCTAssertNil(disabled.subscriptionURL)
-
-        settings.combinedModuleEnabled = true
-        let enabled = WebManagementStateBuilder.combinedPayload(
-            summary: summary,
-            settings: settings,
-            rawURL: rawURL,
-            localFileURL: localURL
-        )
-
-        XCTAssertTrue(enabled.isEnabled)
-        XCTAssertEqual(enabled.fileName, "My-Relay.sgmodule")
-        XCTAssertEqual(enabled.enabledCount, 1)
-        XCTAssertEqual(enabled.subscriptionURL, rawURL.absoluteString)
-    }
 
     func testActivityPayloadClampsProgressAndCarriesUpdateAdmission() {
         let moduleID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
         let module = RelayModule(
             name: "Remote",
             sourceURL: "https://example.com/remote.conf",
-            outputFileName: "Remote",
-            isEnabled: true
+            outputFileName: "Remote"
         )
         let summary = ModuleCollectionSummary(modules: [module], isUpdateable: { _ in true })
         let workActivity = WorkActivity(
@@ -121,7 +70,7 @@ final class WebManagementStateBuilderTests: XCTestCase {
         XCTAssertTrue(payload.cancellationRequested)
         XCTAssertFalse(payload.canStartUpdate)
         XCTAssertEqual(payload.updateBlockedReason, "正在执行任务。")
-        XCTAssertEqual(payload.enabledModuleCount, 1)
+        XCTAssertEqual(payload.updateableModuleCount, 1)
         XCTAssertEqual(payload.error, "网络超时")
     }
 
@@ -146,8 +95,6 @@ final class WebManagementStateBuilderTests: XCTestCase {
             outputFolder: "Rules",
             storageLocation: .local,
             localStorageRelativePath: "Rules/Managed Local.sgmodule",
-            publishesStandalone: false,
-            isEnabled: true,
             scriptHubOptions: options,
             customIconURL: "https://example.com/icon.png",
             state: .failed,
@@ -167,12 +114,11 @@ final class WebManagementStateBuilderTests: XCTestCase {
         XCTAssertEqual(payload.updateSourceURL, module.sourceURL)
         XCTAssertEqual(payload.storageLocation, ModuleStorageLocation.local.rawValue)
         XCTAssertEqual(payload.storageLocationTitle, "本地模块")
-        XCTAssertEqual(payload.storageLocationDetail, "未开启独立发布；转换结果保存在本地缓存")
+        XCTAssertEqual(payload.storageLocationDetail, "储存在本地模块根目录")
         XCTAssertEqual(payload.relationshipSummary, "本地模块 · 自写模块")
         XCTAssertEqual(payload.outputFileName, "Managed Local.sgmodule")
         XCTAssertEqual(payload.publishedRelativePath, "Rules/Managed Local.sgmodule")
         XCTAssertEqual(payload.localStorageRelativePath, "Rules/Managed Local.sgmodule")
-        XCTAssertFalse(payload.publishesStandalone)
         XCTAssertEqual(payload.state, ModuleUpdateState.failed.rawValue)
         XCTAssertEqual(payload.stateTitle, "更新失败")
         XCTAssertEqual(payload.lastError, "原链接 404")

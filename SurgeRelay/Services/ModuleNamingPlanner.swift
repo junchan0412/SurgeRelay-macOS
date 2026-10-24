@@ -48,19 +48,14 @@ enum ModuleNamingPlanner {
         for draft: ModuleDraft,
         source: String,
         modules: [RelayModule],
-        combinedModuleFileName: String,
         excluding excludedID: UUID? = nil
     ) -> String {
         let preservesExistingFileName = URL(string: source)?.isFileURL == true
         let normalized = draft.normalizedOutputFileName(for: source)
         let folder = ModuleOutputFolder.normalized(draft.outputFolder)
-        let combined = ModuleOutputFolder.relativePath(
-            fileName: combinedModuleFileName,
-            folder: ModuleOutputFolder.root
-        )
         let unavailable = Set(modules.filter { $0.id != excludedID }.flatMap { module in
             [module.publishedRelativePath] + [module.localStorageRelativePath].compactMap { $0 }
-        }.map(LocalSourcePathResolver.pathIdentity) + [LocalSourcePathResolver.pathIdentity(combined)])
+        }.map(LocalSourcePathResolver.pathIdentity))
         let relativePath = ModuleOutputFolder.relativePath(
             fileName: normalized,
             folder: folder,
@@ -114,7 +109,6 @@ enum ModuleNamingPlanner {
 
     static func normalizedModuleNaming(
         _ modules: [RelayModule],
-        combinedFileName: String,
         localModuleDirectory: String
     ) -> [RelayModule] {
         let normalizedModules = modules.map { value in
@@ -151,11 +145,6 @@ enum ModuleNamingPlanner {
         var used = Set(normalizedModules.filter(\.hasLocalStorageTarget).flatMap {
             [$0.publishedRelativePath] + [$0.localStorageRelativePath].compactMap { $0 }
         }.map(LocalSourcePathResolver.pathIdentity))
-        let combined = ModuleOutputFolder.relativePath(
-            fileName: combinedFileName,
-            folder: ModuleOutputFolder.root
-        )
-        used.insert(LocalSourcePathResolver.pathIdentity(combined))
         return normalizedModules.map { value in
             var module = value
             guard !module.hasLocalStorageTarget else { return module }

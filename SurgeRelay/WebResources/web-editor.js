@@ -203,10 +203,6 @@
           || 'gitHub';
       }
       refreshOutputFolders(context.state, module?.outputFolder || '', Boolean(module));
-      const includeRow = form.isEnabled?.closest?.('.switch-row');
-      if (includeRow) includeRow.hidden = !context.combinedEnabled;
-      if (form.isEnabled) form.isEnabled.checked = module?.isEnabled ?? false;
-      if (form.publishesStandalone) form.publishesStandalone.checked = module?.publishesStandalone ?? true;
       populateScriptHubOptions(module?.scriptHubOptions || scriptHubDefaults);
       setAdvancedExpanded(Boolean(module?.advancedSummary || hasAdvancedValues(module?.scriptHubOptions)));
       updateNativeModuleState();
@@ -232,8 +228,6 @@
         iconURL: form.iconURL?.value || '',
         outputFolder: form.outputFolder?.value || '',
         outputFileName: form.outputFileName?.value || '',
-        isEnabled: Boolean(form.isEnabled?.checked),
-        publishesStandalone: Boolean(form.publishesStandalone?.checked),
         scriptHubOptions: collectScriptHubOptions()
       };
     }
@@ -249,8 +243,7 @@
         outputFileName: form.outputFileName?.value
       });
       ui.outputPathPreview.textContent = path;
-      const notice = logic.outputPathNotice(path, form.publishesStandalone?.checked, {
-        combinedFileName: context.state?.combined?.fileName || 'Surge Relay',
+      const notice = logic.outputPathNotice(path, {
         modules: context.state?.modules || [],
         editingID: context.editingID,
         storageLocation: form.storageLocation?.value || 'gitHub',

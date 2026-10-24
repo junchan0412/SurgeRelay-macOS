@@ -23,8 +23,7 @@ final class SurgeRelayTests: XCTestCase {
             sourceURL: "https://example.com/surge/demo.sgmodule",
             sourceFormat: .surge,
             outputFileName: "Demo",
-            storageLocation: .gitHub,
-            publishesStandalone: false
+            storageLocation: .gitHub
         )
 
         XCTAssertEqual(githubModule.storageLocation, .gitHub)
@@ -38,7 +37,7 @@ final class SurgeRelayTests: XCTestCase {
         XCTAssertEqual(localModule.standaloneStorageDetail, "储存在本地模块根目录")
         XCTAssertEqual(remoteOnlyModule.displayStorageLocationTitle, "GitHub 模块")
         XCTAssertEqual(remoteOnlyModule.displayStorageLocationSystemImage, "cloud")
-        XCTAssertEqual(remoteOnlyModule.standaloneStorageDetail, "未开启独立发布；转换结果保存在本地缓存")
+        XCTAssertEqual(remoteOnlyModule.standaloneStorageDetail, "储存在 GitHub 模块目录")
         XCTAssertEqual(remoteOnlyModule.relationshipSummary, "GitHub 模块 · 远程 Surge 模块")
     }
 
@@ -74,14 +73,12 @@ final class SurgeRelayTests: XCTestCase {
         let decoded = try JSONDecoder().decode(RelayModule.self, from: legacyData)
 
         XCTAssertEqual(decoded.name, "Legacy")
-        XCTAssertFalse(decoded.isEnabled)
         XCTAssertEqual(decoded.scriptHubOptions, ScriptHubOptions())
         XCTAssertTrue(decoded.argumentOverrides.isEmpty)
         XCTAssertNil(decoded.iconURL)
         XCTAssertNil(decoded.customIconURL)
         XCTAssertEqual(decoded.category, "")
         XCTAssertEqual(decoded.outputFolder, "")
-        XCTAssertTrue(decoded.publishesStandalone)
         XCTAssertNil(decoded.sourceETag)
         XCTAssertNil(decoded.sourceContentHash)
         XCTAssertFalse(decoded.hasOverrideConflict)

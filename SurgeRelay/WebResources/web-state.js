@@ -1,7 +1,4 @@
 (function installSurgeRelayWebState(global) {
-  function combinedEnabled(snapshot) {
-    return Boolean(snapshot?.combined?.isEnabled);
-  }
 
   function fallbackSelection(snapshot, isMobile = false) {
     if (!snapshot || isMobile) return null;
@@ -11,8 +8,7 @@
   function resolveInitialSelection(snapshot, options = {}) {
     const requested = options.requestedModuleID || '';
     const isMobile = Boolean(options.isMobile);
-    const requestedExists = requested === 'overview' || requested === 'activity' ? true : requested === 'combined'
-      ? combinedEnabled(snapshot)
+    const requestedExists = requested === 'overview' || requested === 'activity' ? true
       : Boolean(requested && snapshot?.modules?.some(module => module.id === requested));
 
     if (requestedExists) {
@@ -30,10 +26,7 @@
     const before = selectedID;
     let next = selectedID;
 
-    if (next === 'combined' && !combinedEnabled(snapshot)) {
-      next = fallbackSelection(snapshot, isMobile);
-    }
-    if (next && !['combined', 'overview', 'activity'].includes(next) && !snapshot?.modules?.some(module => module.id === next)) {
+    if (next && !['overview', 'activity'].includes(next) && !snapshot?.modules?.some(module => module.id === next)) {
       next = fallbackSelection(snapshot, isMobile);
     }
     if (!next && !isMobile) {
@@ -305,7 +298,6 @@
   }
 
   global.SurgeRelayWebState = {
-    combinedEnabled,
     fallbackSelection,
     resolveInitialSelection,
     normalizeSelection,

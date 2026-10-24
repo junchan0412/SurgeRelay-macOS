@@ -19,7 +19,7 @@ const detailSource = readFileSync(new URL('SurgeRelay/WebResources/web-detail.js
 const appSource = readFileSync(new URL('SurgeRelay/WebResources/app.js', root), 'utf8');
 
 const requiredIDs = [
-  'module-list', 'summary-row', 'summary-subtitle', 'detail-content', 'search-input', 'clear-search', 'search-status',
+  'module-list', 'detail-content', 'search-input', 'clear-search', 'search-status',
   'filter-row', 'failure-filter', 'add-button', 'refresh-button', 'mobile-back', 'mobile-title', 'workspace-name', 'mobile-workspace-name', 'activity-status',
   'activity-stages', 'activity-percent', 'progress-track', 'progress-fill', 'activity-cancel', 'latest-update',
   'module-dialog', 'module-dialog-message', 'module-form', 'icon-url-preview',
@@ -31,7 +31,7 @@ const requiredIDs = [
 
 const requiredFormNames = [
   'name', 'category', 'iconURL', 'storageLocation', 'outputFolder', 'outputFileName',
-  'isEnabled', 'publishesStandalone', 'sourceURL', 'sourceFormat', 'refreshIntervalMinutes', 'customRefreshIntervalMinutes'
+  'sourceURL', 'sourceFormat', 'refreshIntervalMinutes', 'customRefreshIntervalMinutes'
 ];
 
 for (const id of requiredIDs) {
@@ -552,12 +552,6 @@ assert.equal(
   'local output preview should preserve existing file names'
 );
 
-form.publishesStandalone.checked = false;
-form.publishesStandalone.dispatch('change');
-const note = document.querySelector('#output-path-note');
-assert.equal(note.hidden, false);
-assert.match(note.textContent, /不会写出这个独立模块文件/);
-
 form.storageLocation.value = 'both';
 form.storageLocation.dispatch('change');
 assert.match(form.outputFolder.innerHTML, /Local/);
@@ -570,7 +564,6 @@ form.customRefreshIntervalMinutes.value = '37';
 form.category.value = 'Ads';
 form.sourceFormat.value = 'quantumultX';
 form.iconURL.value = 'https://example.com/icon.png';
-form.publishesStandalone.checked = true;
 document.querySelector('#module-form').dispatch('submit', { preventDefault() {} });
 await flushAsync();
 await flushAsync();
@@ -587,8 +580,6 @@ assert.deepEqual(JSON.parse(saveRequest.options.body), {
   iconURL: 'https://example.com/icon.png',
   outputFolder: 'Local',
   outputFileName: 'YouTube Ads.sgmodule',
-  isEnabled: false,
-  publishesStandalone: true,
   scriptHubOptions: JSON.parse(JSON.stringify(context.SurgeRelayWebOptions.scriptHubDefaults))
 });
 

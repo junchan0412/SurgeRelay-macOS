@@ -2,13 +2,6 @@ import Foundation
 
 @MainActor
 extension AppModel {
-    var combinedRawURL: URL? {
-        PublishedAddressResolver.combinedGitHubURL(settings: settings)
-    }
-
-    var combinedLocalFileURL: URL? {
-        PublishedAddressResolver.combinedLocalFileURL(settings: settings)
-    }
 
     var latestGitHubPublish: GitHubPublishSnapshot? {
         GitHubPublishSnapshot.latest(in: updateHistory, settings: settings.github)
@@ -41,12 +34,6 @@ extension AppModel {
         return await Task.detached(priority: .utility) {
             LocalModuleOutputSnapshot.read(relativePath: relativePath, rootDirectoryPath: rootDirectoryPath)
         }.value
-    }
-
-    func combinedPreviewContent() async throws -> String {
-        try await modulePreviewProvider.combinedPreviewContent(
-            combinedModuleEnabled: settings.combinedModuleEnabled
-        )
     }
 
     func convertedPreviewContent(for module: RelayModule) async throws -> String {

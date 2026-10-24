@@ -11,24 +11,18 @@
   }
 
   function moduleRowMarkup(module, context = {}) {
-    const combinedEnabled = Boolean(context.combinedEnabled);
     const selected = context.selectedID === module.id;
-    const disabled = combinedEnabled && !module.isEnabled;
     const icon = module.iconURL
       ? `<img src="${escapeAttribute(module.iconURL)}" alt="" loading="lazy">`
       : '<span class="symbol" data-symbol="shippingbox"></span>';
-    const stateClass = `state-${module.state || 'never'}`;
+    const stateClass = `state-${module.localOutputError ? 'failed' : module.state || 'never'}`;
     const stateTitle = logic.moduleStatusTitle(module);
-    const toggle = combinedEnabled
-      ? `<label class="module-toggle" title="${module.isEnabled ? '从总模块中停用' : '包含在总模块中'}"><input type="checkbox" data-module-toggle="${escapeAttribute(module.id)}" ${module.isEnabled ? 'checked' : ''} aria-label="包含 ${escapeAttribute(module.name)}"><span class="toggle-track" aria-hidden="true"></span></label>`
-      : '';
-    return `<div class="module-row ${selected ? 'selected' : ''} ${disabled ? 'disabled' : ''}" data-id="${escapeAttribute(module.id)}">
+    return `<div class="module-row ${selected ? 'selected' : ''}" data-id="${escapeAttribute(module.id)}">
     <button class="module-open" type="button" aria-current="${selected ? 'page' : 'false'}" aria-label="${escapeAttribute(module.name)}，${escapeAttribute(stateTitle)}">
     <span class="module-icon ${module.iconURL ? '' : 'placeholder'}">${icon}</span>
     <span class="module-copy"><strong>${escapeHTML(module.name)}</strong><small>${escapeHTML(logic.moduleSubtitle(module))}</small></span>
     <span class="module-state-dot ${escapeAttribute(stateClass)}" title="${escapeAttribute(stateTitle)}" aria-hidden="true"></span>
     </button>
-    ${toggle}
   </div>`;
   }
 
@@ -47,7 +41,7 @@
   }
 
   function previewShell(label, editable) {
-    return `<section class="preview-shell" id="detail-panel" role="tabpanel" aria-labelledby="detail-tab-preview"><div class="preview-toolbar"><div class="preview-caption"><span class="preview-label" title="${escapeAttribute(label)}">${escapeHTML(label)}</span><span id="preview-status" class="preview-status" role="status" aria-live="polite" aria-atomic="true" data-state="loading">正在载入</span></div><div class="preview-actions"><button class="button" data-action="copy-preview" disabled><span class="symbol" data-symbol="doc.on.doc"></span>拷贝全部</button>${editable ? `<button class="button" data-action="restore-preview" title="丢弃本地编辑并恢复转换结果" disabled><span class="symbol" data-symbol="arrow.uturn.backward"></span>恢复</button><button class="button" data-action="compare-preview" hidden>查看服务器版本</button><button class="button" data-action="recover-draft" hidden>恢复草稿</button><button class="button" data-action="discard-draft" hidden>删除草稿</button><button class="button primary" data-action="save-preview" aria-keyshortcuts="Meta+s Control+s" title="写入修改（⌘/Ctrl+S）" disabled>写入</button>` : ''}<button class="button" data-action="retry-preview" hidden><span class="symbol" data-symbol="arrow.clockwise"></span>重试</button></div></div><p class="preview-message" id="preview-message" role="alert" hidden></p>${editable ? '<pre id="server-preview" class="code-view" tabindex="0" aria-label="当前服务器版本，仅供比较" hidden></pre><textarea class="code-editor" id="code-editor" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" aria-label="模块内容" disabled>正在载入…</textarea>' : '<pre class="code-view" id="code-view" tabindex="0" aria-label="总模块内容">正在载入…</pre>'}</section>`;
+    return `<section class="preview-shell" id="detail-panel" role="tabpanel" aria-labelledby="detail-tab-preview"><div class="preview-toolbar"><div class="preview-caption"><span class="preview-label" title="${escapeAttribute(label)}">${escapeHTML(label)}</span><span id="preview-status" class="preview-status" role="status" aria-live="polite" aria-atomic="true" data-state="loading">正在载入</span></div><div class="preview-actions"><button class="button" data-action="copy-preview" disabled><span class="symbol" data-symbol="doc.on.doc"></span>拷贝全部</button>${editable ? `<button class="button" data-action="restore-preview" title="丢弃本地编辑并恢复转换结果" disabled><span class="symbol" data-symbol="arrow.uturn.backward"></span>恢复</button><button class="button" data-action="compare-preview" hidden>查看服务器版本</button><button class="button" data-action="recover-draft" hidden>恢复草稿</button><button class="button" data-action="discard-draft" hidden>删除草稿</button><button class="button primary" data-action="save-preview" aria-keyshortcuts="Meta+s Control+s" title="写入修改（⌘/Ctrl+S）" disabled>写入</button>` : ''}<button class="button" data-action="retry-preview" hidden><span class="symbol" data-symbol="arrow.clockwise"></span>重试</button></div></div><p class="preview-message" id="preview-message" role="alert" hidden></p>${editable ? '<pre id="server-preview" class="code-view" tabindex="0" aria-label="当前服务器版本，仅供比较" hidden></pre><textarea class="code-editor" id="code-editor" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" aria-label="模块内容" disabled>正在载入…</textarea>' : '<pre class="code-view" id="code-view" tabindex="0" aria-label="模块内容">正在载入…</pre>'}</section>`;
   }
 
   function publishFileList(title, files, destructive = false) {
@@ -84,48 +78,28 @@
   </div>`;
   }
 
-  function combinedDetailMarkup(combined, context = {}) {
-    const selectedTab = context.selectedTab || 'info';
-    if (!combined?.isEnabled) {
-      return `<div class="empty-state"><div><span class="symbol" data-symbol="square.stack.3d.up"></span><div>总模块功能未开启</div></div></div>`;
-    }
-    if (selectedTab === 'preview') {
-      return detailToolbar(selectedTab) + previewShell(combined.fileName, false);
-    }
-    const subscription = copyableValueSection('总模块订阅地址', combined.subscriptionURL);
-    const latestPublish = latestPublishSection(context.latestGitHubPublish);
-    return `${detailToolbar(selectedTab)}<div id="detail-panel" role="tabpanel" aria-labelledby="detail-tab-info">
-    <section class="form-section-view"><h3 class="section-heading">汇总模块</h3><div class="group-box">
-      ${detailRow('square.stack.3d.up.fill', '名称', combined.name)}
-      ${detailRow('shippingbox', '包含来源', `${combined.enabledCount} / ${combined.sourceCount}`)}
-      ${detailRow('clock', '最新更新', formatDate(combined.lastUpdatedAt, '尚未更新'))}
-    </div></section>${subscription}${latestPublish}</div>`;
-  }
-
   function moduleDetailMarkup(module, context = {}) {
     const selectedTab = context.selectedTab || 'info';
     if (selectedTab === 'preview') {
       return detailToolbar(selectedTab, true) + previewShell(module.publishedRelativePath || module.outputFileName, true);
     }
-    const combined = context.combined || {};
     const advanced = module.advancedSummary ? `<section class="form-section-view"><h3 class="section-heading">高级设置</h3><div class="group-box"><div class="detail-row"><div class="detail-label"><span class="symbol" data-symbol="slider.horizontal.3"></span><span>已应用</span></div><div class="detail-value advanced-summary">${escapeHTML(module.advancedSummary)}</div></div></div></section>` : '';
     const publishedTitle = module.publishedURL?.includes('workers.dev') ? 'Cloudflare' : 'GitHub';
     const published = copyableValueSection(publishedTitle, module.publishedURL);
-    const errorNote = combined.isEnabled ? '如果该来源有缓存，总模块会继续沿用它上一次成功版本。' : '如果该来源有缓存，模块输出会继续沿用它上一次成功版本。';
+    const errorNote = '此模块的缓存和已有输出会保留，其他模块继续独立更新。';
+    const localOutputError = module.localOutputError ? `<section class="form-section-view"><h3 class="section-heading">本地输出需要处理</h3><div class="group-box"><div class="detail-row error-box">${escapeHTML(module.localOutputError).replace(/\n/g, '<br>')}<small>请在 macOS 模块详情的“本地文件”区域比较差异并备份接管。</small></div></div></section>` : '';
     const errorBody = module.lastError ? escapeHTML(module.lastError).replace(/\n/g, '<br>') : '';
     const errorActions = module.lastError ? `<div><button class="button" data-action="copy" data-value="${escapeAttribute(module.lastError)}"><span class="symbol" data-symbol="copy"></span>复制错误</button></div>` : '';
     const error = module.lastError ? `<section class="form-section-view"><h3 class="section-heading">最近一次更新失败</h3><div class="group-box"><div class="detail-row action-row error-box"><strong>${escapeHTML(logic.moduleStatusTitle(module))}</strong><div>${errorBody}</div><small>${escapeHTML(errorNote)}</small>${errorActions}</div></div></section>` : '';
     const conflict = module.hasOverrideConflict ? `<section class="form-section-view"><h3 class="section-heading">本地编辑冲突</h3><div class="group-box"><div class="detail-row action-row error-box"><strong>上游内容已经变化</strong><div>当前仍在使用本地编辑。可在预览中比较内容后保留或恢复。</div><div><button class="button" data-action="accept-override">保留本地编辑</button><button class="button" data-action="tab-preview">前往预览</button></div></div></div></section>` : '';
     const syncConflict = module.hasSyncConflict ? `<section class="form-section-view"><h3 class="section-heading">本地与 GitHub 内容冲突</h3><div class="group-box"><div class="detail-row action-row error-box"><strong>检测到两端输出内容不同</strong><div>本地最后更新：${escapeHTML(formatDate(module.syncConflictLocalUpdatedAt, '未知'))}</div><div>GitHub 最后更新：${escapeHTML(formatDate(module.syncConflictGitHubUpdatedAt, '未知'))}</div><button class="button" data-action="compare-sync">比较两端并处理</button></div></div></section>` : '';
-    const combinedSubscription = combined.subscriptionURL || '';
-    const combinedRow = combined.isEnabled ? detailRow('square.stack.3d.up.fill', '汇总订阅', combinedSubscription || '等待发布配置', false, combinedSubscription || null) : '';
     const iconURL = module.customIconURL || module.iconURL;
     const iconSource = module.customIconURL ? '自定义图标（写入输出）' : (module.iconURL ? '来源图标' : '默认图标');
     const iconAddressRow = iconURL ? detailRow('link', '图标地址', `<a href="${escapeAttribute(iconURL)}" target="_blank" rel="noreferrer">${escapeHTML(iconURL)}</a>`, true, iconURL) : '';
     const sourceHashRow = module.sourceContentHash ? detailRow('curlybraces', '来源 hash', module.sourceContentHash.slice(0, 12), false, module.sourceContentHash) : '';
     const sourceETagRow = module.sourceETag ? detailRow('tag', '来源 ETag', module.sourceETag, false, module.sourceETag) : '';
     const sourceLastModifiedRow = module.sourceLastModified ? detailRow('clock', '来源修改时间', module.sourceLastModified) : '';
-    const outputPath = module.publishesStandalone ? (module.publishedRelativePath || module.outputFileName) : '';
+    const outputPath = module.publishedRelativePath || module.outputFileName;
     const initialSourceAddress = module.initialSourceURL || '';
     const configuredSourceAddress = module.sourceURL || '';
     const updateSourceAddress = module.updateSourceURL || configuredSourceAddress;
@@ -145,7 +119,7 @@
       ? detailRow('folder', '本地相对路径', module.localStorageRelativePath, false, module.localStorageRelativePath)
       : '';
     return `${moduleHeaderMarkup(module, context.activity)}${detailToolbar(selectedTab, true)}<div id="detail-panel" role="tabpanel" aria-labelledby="detail-tab-info">
-    ${error}${conflict}${syncConflict}
+    ${error}${localOutputError}${conflict}${syncConflict}
     <section class="form-section-view"><h3 class="section-heading">管理关系</h3><div class="group-box">
       ${updateSourceRow || initialSourceRow}
       ${detailRow('doc.on.doc', '输出路径', outputPath || '未开启独立发布', false, outputPath || null)}
@@ -155,7 +129,7 @@
       ${detailRow('hourglass', '服务器冷却', logic.serverCooldownRemaining(module) > 0 ? `${formatDate(module.serverRetryAfter)} 前不可手动更新` : '无（或已结束）')}
       ${detailRow('exclamationmark.triangle', '连续失败', `${Number(module.consecutiveFailureCount || 0)} 次${module.consecutiveFailureCount > 0 ? '；手动更新可跳过普通退避' : ''}`)}
       <details class="metadata-details"><summary>来源与同步详情<span class="symbol" data-symbol="chevron.right"></span></summary>
-      ${detailRow(module.publishesStandalone ? (module.storageLocationIcon || 'folder') : 'folder', '独立模块存放', module.storageLocationDetail || module.storageLocationTitle || '未开启独立发布')}
+      ${detailRow(module.storageLocationIcon || 'folder', '独立模块存放', module.storageLocationDetail || module.storageLocationTitle || '未开启独立发布')}
       ${detailRow(module.initialSourceIcon || 'link', '初始来源', module.initialSourceTitle || '自写模块')}
       ${initialSourceRow}
       ${updateSourceRow}
@@ -167,8 +141,6 @@
       ${detailRow('doc.on.doc', '输出文件', outputPath || '未开启独立发布', false, outputPath || null)}
       ${detailRow('info.circle', '图标来源', iconSource)}
       ${iconAddressRow}
-      ${detailRow('doc.text', '独立模块', module.publishesStandalone ? '发布' : '不发布')}
-      ${combinedRow}
       ${detailRow('checkmark', '更新状态', logic.moduleStatusTitle(module))}
       ${detailRow('clock', '创建时间', formatDate(module.createdAt, '—'))}
       ${detailRow('clock', '上次更新', formatDate(module.lastUpdatedAt, '从未更新'))}
@@ -253,24 +225,24 @@
 
   function workspaceMarkup(snapshot) {
     const modules = snapshot.modules || [];
-    const attention = modules.filter(module => module.state === 'failed' || module.hasOverrideConflict || module.hasSyncConflict);
-    const standalone = modules.filter(module => module.publishesStandalone).length;
+    const attention = modules.filter(logic.isFailedModule);
+    const localCount = modules.filter(module => (module.storageTargets || [module.storageLocation]).includes('local')).length;
     const workspace = snapshot.workspace || {};
     const targets = snapshot.moduleEditor || {};
     const metric = (label, value, action = '', tone = '') => `<${action ? 'button' : 'div'} class="workspace-metric ${tone}" ${action ? `data-action="${action}"` : ''}><span>${label}</span><strong>${value}</strong></${action ? 'button' : 'div'}>`;
-    const issueRows = attention.slice(0, 3).map(module => `<button class="attention-item" data-action="show-module" data-id="${escapeAttribute(module.id)}"><span class="symbol" data-symbol="exclamationmark.triangle"></span><span><strong>${escapeHTML(module.name)}</strong><small>${escapeHTML(module.lastError ? logic.failureSummary(module.lastError) : '本地内容与更新版本存在冲突')}</small></span><span class="symbol" data-symbol="chevron.right"></span></button>`).join('');
+    const issueRows = attention.slice(0, 3).map(module => `<button class="attention-item" data-action="show-module" data-id="${escapeAttribute(module.id)}"><span class="symbol" data-symbol="exclamationmark.triangle"></span><span><strong>${escapeHTML(module.name)}</strong><small>${escapeHTML((module.localOutputError || module.lastError) ? logic.failureSummary(module.localOutputError || module.lastError) : '本地内容与更新版本存在冲突')}</small></span><span class="symbol" data-symbol="chevron.right"></span></button>`).join('');
     const normal = `<div class="workspace-healthy"><span class="symbol" data-symbol="checkmark"></span><div><strong>没有需要处理的问题</strong><p>更新失败和内容冲突会集中显示在这里。</p></div><button class="button" data-action="update-all" ${snapshot.activity?.canStartUpdate === false ? 'disabled' : ''}>检查更新</button></div>`;
     const onboarding = '<div class="workspace-empty"><span class="symbol" data-symbol="square.stack.3d.up"></span><h2>把第一个模块交给 Relay</h2><p>添加 Surge、Loon 或 Quantumult X 来源，维护转换结果与稳定订阅地址。</p><button class="button primary" data-action="add-module">添加来源</button></div>';
     const target = (title, icon, enabled, detail, note) => `<article class="destination-card"><div><span class="symbol" data-symbol="${icon}"></span><h3>${title}</h3><span class="status-label ${enabled ? 'success' : 'neutral'}">${enabled ? '已开启' : '未开启'}</span></div><strong title="${escapeAttribute(detail)}">${escapeHTML(detail)}</strong><p>${escapeHTML(note)}</p></article>`;
     return `<div class="workspace-heading"><div class="eyebrow">SURGE RELAY</div><div class="workspace-heading-line"><div><h1>模块工作台</h1><p>从来源更新到稳定发布，每一步都在这里。</p></div><button class="button primary" data-action="add-module"><span class="symbol" data-symbol="plus"></span>添加模块</button></div></div>
-      <section class="workspace-metrics" aria-label="模块概况">${metric('模块总数', modules.length)}${metric('可更新', snapshot.activity?.enabledModuleCount ?? modules.length)}${metric('独立发布', standalone)}${metric('需要处理', attention.length, 'show-attention', attention.length ? 'warning' : '')}</section>
+      <section class="workspace-metrics" aria-label="模块概况">${metric('模块总数', modules.length)}${metric('可更新', snapshot.activity?.updateableModuleCount ?? modules.length)}${metric('本地模块', localCount)}${metric('需要处理', attention.length, 'show-attention', attention.length ? 'warning' : '')}</section>
       <section class="workspace-section"><div class="workspace-section-heading"><h2>运行状态</h2>${attention.length ? '<button class="text-button" data-action="show-attention">查看全部</button>' : ''}</div><div class="workspace-panel">${!modules.length ? onboarding : attention.length ? issueRows : normal}</div></section>
       <section class="workspace-section"><div class="workspace-section-heading"><h2>发布去向</h2><span>在 Mac App 的设置中管理</span></div><div class="operation-buttons"><button class="button" data-action="publish-selected">发布所选模块</button><button class="button" data-action="publish-github" ${targets.publishToGitHub ? '' : 'disabled'}>预览发布到 GitHub</button><button class="button" data-action="publish-results">上次发布结果</button></div><div class="destination-grid">${target('本地目录', 'externaldrive', targets.publishToLocal, workspace.localDirectory || '选择 Surge 模块目录', `${modules.filter(m => (m.storageTargets || [m.storageLocation]).includes('local')).length} 个模块存放在本地`)}${target('GitHub', 'network', targets.publishToGitHub, workspace.githubRepository || '连接仓库以分发模块', workspace.githubBranch ? `分支 ${workspace.githubBranch}` : '配置仓库后可自动发布更新')}</div></section>
       <section class="workspace-section"><div class="workspace-section-heading"><h2>最近活动</h2><button class="text-button" data-action="show-activity">全部记录<span class="symbol" data-symbol="chevron.right"></span></button></div><div class="workspace-panel">${historyMarkup(workspace.recentHistory || [])}</div></section>`;
   }
 
   function publicationSelectionMarkup(modules, selectedIDs) {
-    const eligible = modules.filter(module => module.publishesStandalone);
+    const eligible = modules;
     return `<p>选择要发布的独立模块。预览会按每个模块的存放目标计算文件变更；此步骤不会发布。</p><div class="operation-buttons"><button class="button" data-operation="select-all">全选</button><button class="button" data-operation="select-none">清空选择</button><button class="button" data-operation="last-result">上次发布结果</button></div><fieldset class="publication-selection"><legend>独立模块（${eligible.length}）</legend>${eligible.map(module => `<label><input type="checkbox" data-publish-module="${escapeAttribute(module.id)}" ${selectedIDs.has(module.id) ? 'checked' : ''}><span>${escapeHTML(module.name)}<small>${escapeHTML(module.storageLocationTitle || '')}</small></span></label>`).join('') || '<p>没有开启独立发布的模块。</p>'}</fieldset><div class="operation-buttons"><button class="button primary" data-operation="preview-selected" ${selectedIDs.size ? '' : 'disabled'}>预览所选发布</button></div>`;
   }
 
@@ -310,7 +282,7 @@
   function moduleHeaderMarkup(module, activity = {}) {
     const cooling = logic.serverCooldownRemaining(module) > 0;
     const icon = module.iconURL ? `<img src="${escapeAttribute(module.iconURL)}" alt="">` : '<span class="symbol" data-symbol="shippingbox"></span>';
-    return `<header class="module-heading"><div class="module-heading-title"><span class="module-hero-icon">${icon}</span><div><p class="eyebrow">${escapeHTML(module.initialSourceTitle || '模块来源')}</p><h1>${escapeHTML(module.name)}</h1><p>${escapeHTML(module.category || module.sourceFormatTitle || 'Surge 模块')}</p></div></div><div class="module-heading-meta"><span class="status-label ${module.state === 'failed' ? 'error' : module.state === 'current' ? 'success' : 'neutral'}">${escapeHTML(logic.moduleStatusTitle(module))}</span><span>更新于 ${escapeHTML(formatDate(module.lastUpdatedAt, '尚未更新'))}</span><button class="button" data-action="version-history">版本历史</button>${module.publishesStandalone ? '<button class="button" data-action="publish-selected">发布此模块</button>' : ''}${(module.storageTargets || []).length > 1 && !module.hasSyncConflict ? '<button class="button" data-action="compare-sync">比较两端</button>' : ''}<button class="button primary" data-action="update-module" title="${escapeAttribute(cooling ? `服务器冷却至 ${formatDate(module.serverRetryAfter)}，手动更新也需等待` : '更新模块')}" ${activity.isWorking || cooling ? 'disabled' : ''}><span class="symbol" data-symbol="refresh"></span>${cooling ? '服务器冷却中' : '更新模块'}</button></div></header>`;
+    return `<header class="module-heading"><div class="module-heading-title"><span class="module-hero-icon">${icon}</span><div><p class="eyebrow">${escapeHTML(module.initialSourceTitle || '模块来源')}</p><h1>${escapeHTML(module.name)}</h1><p>${escapeHTML(module.category || module.sourceFormatTitle || 'Surge 模块')}</p></div></div><div class="module-heading-meta"><span class="status-label ${module.localOutputError || module.state === 'failed' ? 'error' : module.state === 'current' ? 'success' : 'neutral'}">${escapeHTML(logic.moduleStatusTitle(module))}</span><span>更新于 ${escapeHTML(formatDate(module.lastUpdatedAt, '尚未更新'))}</span><button class="button" data-action="version-history">版本历史</button><button class="button" data-action="publish-selected">发布此模块</button>${(module.storageTargets || []).length > 1 && !module.hasSyncConflict ? '<button class="button" data-action="compare-sync">比较两端</button>' : ''}<button class="button primary" data-action="update-module" title="${escapeAttribute(cooling ? `服务器冷却至 ${formatDate(module.serverRetryAfter)}，手动更新也需等待` : '更新模块')}" ${activity.isWorking || cooling ? 'disabled' : ''}><span class="symbol" data-symbol="refresh"></span>${cooling ? '服务器冷却中' : '更新模块'}</button></div></header>`;
   }
 
   global.SurgeRelayWebMarkup = {
@@ -326,7 +298,6 @@
     publishFileList,
     latestPublishSection,
     detailToolbar,
-    combinedDetailMarkup,
     moduleDetailMarkup,
     argumentMarkup,
     argumentsSectionMarkup,

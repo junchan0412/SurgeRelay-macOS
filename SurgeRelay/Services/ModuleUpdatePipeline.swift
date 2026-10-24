@@ -42,10 +42,8 @@ enum ModuleUpdatePipeline {
 }
 
 struct ModuleUpdateOutcome: Sendable {
-    var components: [(RelayModule, String)]
+    var moduleID: UUID
     var failures: Int
-    var missingCache: [String]
-    var missingCacheDetails: [String]
     var contentChanged: Bool
     var history: [UpdateHistoryEntry]
 }

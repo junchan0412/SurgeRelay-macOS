@@ -84,7 +84,7 @@ struct ModuleDetailView: View {
     private var moduleSummaryHeader: some View {
         ModuleDetailSummaryHeader(
             module: module,
-            combinedModuleEnabled: model.settings.combinedModuleEnabled,
+
             localOutput: currentLocalOutput,
             onEdit: onEdit
         )
@@ -124,10 +124,10 @@ struct ModuleDetailView: View {
                 detailRow("存放文件夹", value: ModuleOutputFolder.displayTitle(for: module.outputFolder), icon: "folder")
                 detailRow(
                     "输出文件",
-                    value: module.publishesStandalone || expectsLocalOutput ? module.publishedRelativePath : "未开启独立发布",
+                    value: module.publishedRelativePath,
                     icon: "doc.badge.gearshape",
-                    monospaced: module.publishesStandalone || expectsLocalOutput,
-                    copyValue: module.publishesStandalone || expectsLocalOutput ? module.publishedRelativePath : nil
+                    monospaced: true,
+                    copyValue: module.publishedRelativePath
                 )
                 detailRow("图标来源", value: module.iconSourceDescription, icon: "photo")
                 if let iconURLDisplay {
@@ -181,16 +181,7 @@ struct ModuleDetailView: View {
                     monospaced: module.conversionEngineRevision != nil,
                     copyValue: module.conversionEngineRevision
                 )
-                if model.settings.combinedModuleEnabled {
-                    detailRow("总模块", value: module.isEnabled ? "包含" : "不包含", icon: "square.stack.3d.up")
-                    detailRow(
-                        "汇总输出",
-                        value: combinedOutputLocation,
-                        icon: "square.stack.3d.up",
-                        monospaced: true,
-                        copyValue: combinedOutputCopyValue
-                    )
-                }
+
             }
             .font(.system(size: 13))
             .padding(.vertical, 6)
@@ -247,10 +238,7 @@ struct ModuleDetailView: View {
     private var publishingSection: some View {
         if model.settings.publishToGitHub, module.hasGitHubStorageTarget {
             detailSection(model.settings.github.repositoryIsPrivate == true ? "Cloudflare" : "GitHub") {
-                if !module.publishesStandalone {
-                    Label("该模块未开启独立发布。", systemImage: "pause.circle")
-                        .foregroundStyle(.secondary)
-                } else if let rawURL = model.rawURL(for: module) {
+                if let rawURL = model.rawURL(for: module) {
                     detailRow("订阅地址", value: rawURL.absoluteString, icon: "link", monospaced: true, copyValue: rawURL.absoluteString)
                 } else {
                     Label("完成发布配置后，这里会出现该模块自己的稳定地址。", systemImage: "info.circle")
@@ -260,6 +248,9 @@ struct ModuleDetailView: View {
         }
         if expectsLocalOutput {
             detailSection("本地文件") {
+                if let error = module.localOutputError {
+                    Text(error).font(.callout).foregroundStyle(Design.Palette.error).textSelection(.enabled)
+                }
                 detailRow("文件状态", value: currentLocalOutput?.message ?? "正在检查本地文件…",
                           icon: currentLocalOutput?.systemImage ?? "clock")
                 if !localPublishedPath.isEmpty {
@@ -359,21 +350,6 @@ struct ModuleDetailView: View {
         }
     }
 
-    private var combinedOutputLocation: String {
-        var values: [String] = []
-        if let localURL = model.combinedLocalFileURL {
-            values.append(localURL.path)
-        }
-        if let rawURL = model.combinedRawURL {
-            values.append(rawURL.absoluteString)
-        }
-        return values.isEmpty ? "等待发布配置" : values.joined(separator: "\n")
-    }
-
-    private var combinedOutputCopyValue: String? {
-        combinedOutputLocation == "等待发布配置" ? nil : combinedOutputLocation
-    }
-
     private var localPublishedPath: String {
         let root = model.settings.localModuleDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !root.isEmpty else { return "" }
@@ -383,8 +359,7 @@ struct ModuleDetailView: View {
     }
 
     private var expectsLocalOutput: Bool {
-        PublishCoordinator.shouldPublishStandalone(module, destination: .local,
-            combinedModuleEnabled: model.settings.combinedModuleEnabled)
+        PublishCoordinator.shouldPublishStandalone(module, destination: .local)
     }
 
     private var currentLocalOutput: LocalModuleOutputSnapshot? {
@@ -392,7 +367,7 @@ struct ModuleDetailView: View {
     }
 
     private var localOutputRefreshKey: String {
-        "\(module.id)|\(localPublishedPath)|\(model.moduleRevision)|\(model.isWorking)|\(model.settings.combinedModuleEnabled)|\(scenePhase)"
+        "\(module.id)|\(localPublishedPath)|\(model.moduleRevision)|\(model.isWorking)|\(scenePhase)"
     }
 
     private func refreshLocalOutput() async {
@@ -418,17 +393,7 @@ struct ModuleDetailView: View {
         return module.localStorageRelativePath ?? module.publishedRelativePath
     }
 
-    private var standaloneStorageDescription: String {
-        if expectsLocalOutput, !module.publishesStandalone {
-            return "未参与总模块，转换结果写入本地模块根目录"
-        }
-        guard !module.publishesStandalone,
-              model.settings.combinedModuleEnabled,
-              module.isEnabled else {
-            return module.standaloneStorageDetail
-        }
-        return "未开启独立发布；转换结果保存在本地缓存，可作为总模块来源"
-    }
+    private var standaloneStorageDescription: String { module.standaloneStorageDetail }
 
     private var iconURLDisplay: String? {
         module.customIconURL ?? module.iconURL
@@ -464,11 +429,7 @@ struct ModuleDetailView: View {
         return sourceURL
     }
 
-    private var failureCacheNote: String {
-        model.settings.combinedModuleEnabled
-            ? "如果该来源有缓存，总模块会继续沿用它上一次成功版本。"
-            : "如果该来源有缓存，模块输出会继续沿用它上一次成功版本。"
-    }
+    private var failureCacheNote: String { "此模块的缓存和已有输出会保留，其他模块继续独立更新。" }
 
     private func detailSection<Content: View>(_ title: String, @ViewBuilder content: @escaping () -> Content) -> some View {
         DetailInfoSection(title, content: content)

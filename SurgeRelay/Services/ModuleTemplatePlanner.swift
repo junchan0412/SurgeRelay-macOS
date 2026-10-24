@@ -35,8 +35,8 @@ enum ModuleTemplatePlanner {
         options.enableJQ = source.enableJQ
         return ModuleTemplate(name: name, sourceFormat: module.sourceFormat, category: module.category,
                               moduleDescription: module.moduleDescription, outputFolder: module.outputFolder,
-                              storageTargets: module.storageTargets, publishesStandalone: module.publishesStandalone,
-                              isIncludedInCombined: module.isIncludedInCombined, refreshIntervalMinutes: module.refreshIntervalMinutes,
+                              storageTargets: module.storageTargets,
+                              refreshIntervalMinutes: module.refreshIntervalMinutes,
                               scriptHubOptions: options)
     }
 
@@ -48,8 +48,7 @@ enum ModuleTemplatePlanner {
         draft.moduleDescription = template.moduleDescription
         draft.outputFolder = template.outputFolder
         draft.storageTargets = template.storageTargets
-        draft.publishesStandalone = template.publishesStandalone
-        draft.isEnabled = template.isIncludedInCombined
+
         draft.refreshIntervalMinutes = template.refreshIntervalMinutes
         draft.scriptHubOptions = template.scriptHubOptions
         return draft

@@ -53,11 +53,6 @@
       </div>
 
       <nav class="module-navigation" aria-label="模块库">
-        <button class="summary-row" id="summary-row" type="button">
-          <span class="module-icon summary-icon"><span class="symbol" data-symbol="arrow.triangle.2.circlepath" aria-hidden="true"></span></span>
-          <span class="module-copy"><strong>总模块</strong><small id="summary-subtitle">正在载入…</small></span>
-          <span class="symbol disclosure" data-symbol="chevron.right"></span>
-        </button>
         <div class="section-label">模块库 <span id="module-count"></span></div>
         <div id="module-list" class="module-list"></div>
       </nav>
@@ -100,8 +95,6 @@
             <label class="form-row"><span>存放文件夹</span><select name="outputFolder"><option value="">根目录</option></select></label>
             <label class="form-row"><span>输出文件名</span><input name="outputFileName" type="text" placeholder="留空时根据显示名称生成"></label>
             <div class="form-row output-path-row"><span>输出路径</span><span class="output-path-value"><span><code id="output-path-preview">Untitled.sgmodule</code><small id="output-path-note" class="field-note output-path-note" hidden></small></span><button class="button output-path-copy" type="button" data-action="copy-output-path"><span class="symbol" data-symbol="copy"></span>拷贝</button></span></div>
-            <label class="form-row switch-row"><span>包含在总模块中</span><input name="isEnabled" type="checkbox" role="switch"><span class="toggle-track" aria-hidden="true"></span></label>
-            <label class="form-row switch-row"><span>发布为独立模块</span><input name="publishesStandalone" type="checkbox" role="switch" checked><span class="toggle-track" aria-hidden="true"></span></label>
           </div>
         </section>
         <section class="editor-section">
@@ -124,7 +117,7 @@
             <button class="advanced-master" id="advanced-master" type="button" aria-expanded="false"><span class="symbol" data-symbol="chevron.right"></span><strong>高级</strong></button>
             <div class="advanced-master-content" id="advanced-master-content" aria-hidden="true">
               <div class="advanced-master-inner">
-                <div class="native-module-note" id="native-module-note" hidden><span class="symbol" data-symbol="arrow.triangle.2.circlepath"></span><span>该地址是 Surge 模块，将直接参与合并，不经过 Script‑Hub；高级转换选项不会应用。</span></div>
+                <div class="native-module-note" id="native-module-note" hidden><span class="symbol" data-symbol="arrow.triangle.2.circlepath"></span><span>该地址是 Surge 模块，将直接生成独立输出，不经过 Script‑Hub；高级转换选项不会应用。</span></div>
                 <div id="advanced-options"></div>
               </div>
             </div>

@@ -59,7 +59,7 @@ const navigationState = {
   combined: { isEnabled: true },
   modules: [{ id: 'module-1' }, { id: 'module-2' }]
 };
-assert.equal(stateHelpers.combinedEnabled(navigationState), true);
+assert.equal(stateHelpers.combinedEnabled, undefined, 'Aggregate enablement API was removed');
 assert.equal(stateHelpers.fallbackSelection(navigationState, false), 'overview');
 assert.equal(stateHelpers.fallbackSelection(navigationState, true), null);
 const requestedSelection = stateHelpers.resolveInitialSelection(navigationState, {

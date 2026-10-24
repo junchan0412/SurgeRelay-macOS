@@ -97,13 +97,12 @@ final class WorkActivityTests: XCTestCase {
             statusMessage: "准备就绪"
         )
         XCTAssertFalse(empty.isAccepted)
-        XCTAssertEqual(empty.message, "没有可更新的模块。请添加 HTTP/HTTPS 更新地址，或让本地模块参与独立/总模块输出。")
+        XCTAssertEqual(empty.message, "没有可更新的模块。请添加有效的 HTTP/HTTPS 更新地址或本地文件来源。")
 
         let disabled = RelayModule(
             name: "Demo",
             sourceURL: URL(filePath: "/tmp/demo.sgmodule").absoluteString,
-            outputFileName: "Demo",
-            isEnabled: false
+            outputFileName: "Demo"
         )
         let disabledAdmission = UpdateAdmission.module(
             disabled,
@@ -113,13 +112,12 @@ final class WorkActivityTests: XCTestCase {
             statusMessage: "准备就绪"
         )
         XCTAssertFalse(disabledAdmission.isAccepted)
-        XCTAssertEqual(disabledAdmission.message, "“Demo”没有远程更新地址，也未参与独立或总模块输出。")
+        XCTAssertEqual(disabledAdmission.message, "“Demo”没有有效的 HTTP/HTTPS 更新地址或本地文件来源。")
 
         let enabled = RelayModule(
             name: "Demo",
             sourceURL: "https://example.com/demo.sgmodule",
-            outputFileName: "Demo",
-            isEnabled: true
+            outputFileName: "Demo"
         )
         let accepted = UpdateAdmission.module(
             enabled,

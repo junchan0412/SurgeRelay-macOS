@@ -33,13 +33,6 @@ struct MenuBarContent: View {
             .disabled(!model.canCancelCurrentWork)
         }
 
-        if let url = model.combinedRawURL {
-            Button("拷贝总订阅地址") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(url.absoluteString, forType: .string)
-            }
-        }
-
         Divider()
 
         Toggle("自动发布", isOn: Binding(
@@ -83,10 +76,7 @@ struct MenuBarContent: View {
 
     private var moduleScopeText: String {
         let summary = model.moduleSummary
-        if model.settings.combinedModuleEnabled {
-            return "包含来源：\(summary.enabledCount) / \(summary.totalCount)"
-        }
-        return "独立模块：\(summary.standaloneCount) / \(summary.totalCount)"
+        return "模块：\(summary.totalCount) · 本地：\(summary.localCount) · GitHub：\(summary.githubCount)"
     }
 
     private var attentionCount: Int {

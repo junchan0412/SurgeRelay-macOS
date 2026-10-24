@@ -180,7 +180,7 @@ actor WebManagementJSONEncoder {
     private var coreSnapshot: WebCoreSnapshot?
     private var activitySnapshot: WebActivitySnapshot?
     private var cachedProjection: (runtimeID: String, moduleRevision: UInt64, settings: AppSettings, cacheDirectory: URL, modules: [WebModulePayload])?
-    private var cachedSummary: (runtimeID: String, moduleRevision: UInt64, combinedEnabled: Bool, value: ModuleCollectionSummary)?
+    private var cachedSummary: (runtimeID: String, moduleRevision: UInt64, value: ModuleCollectionSummary)?
 
     func encodeState(_ snapshot: WebManagementSnapshot) throws -> Data {
         try Task.checkCancellation()
@@ -264,12 +264,11 @@ actor WebManagementJSONEncoder {
 
     private func summary(for core: WebCoreSnapshot) -> ModuleCollectionSummary {
         if let cachedSummary, cachedSummary.runtimeID == core.runtimeID,
-           cachedSummary.moduleRevision == core.moduleRevision,
-           cachedSummary.combinedEnabled == core.settings.combinedModuleEnabled { return cachedSummary.value }
+           cachedSummary.moduleRevision == core.moduleRevision { return cachedSummary.value }
         let summary = ModuleCollectionSummary(modules: core.modules) {
-            ModuleRefreshPlanner.isUpdateable($0, combinedModuleEnabled: core.settings.combinedModuleEnabled)
+            ModuleRefreshPlanner.isUpdateable($0)
         }
-        cachedSummary = (core.runtimeID, core.moduleRevision, core.settings.combinedModuleEnabled, summary)
+        cachedSummary = (core.runtimeID, core.moduleRevision, summary)
         return summary
     }
 

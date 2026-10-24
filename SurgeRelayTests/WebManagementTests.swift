@@ -100,7 +100,6 @@ final class WebManagementTests: XCTestCase {
 
     func testAppSettingsDecodesWebManagementDefaults() throws {
         let settings = try JSONDecoder().decode(AppSettings.self, from: Data("{}".utf8))
-        XCTAssertFalse(settings.combinedModuleEnabled)
         XCTAssertFalse(settings.webServerEnabled)
         XCTAssertEqual(settings.webServerPort, 8787)
         XCTAssertFalse(settings.webServerAllowRemoteAccess)

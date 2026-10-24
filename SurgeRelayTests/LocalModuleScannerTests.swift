@@ -15,7 +15,7 @@ final class LocalModuleScannerTests: XCTestCase {
         try Data("# Surge Relay managed output\n[Rule]\n".utf8)
             .write(to: root.appending(path: "Damaged-Output.sgmodule"))
 
-        let report = try LocalModuleScanner.report(in: root.path, combinedFileName: "Relay",
+        let report = try LocalModuleScanner.report(in: root.path,
             existingModules: [], publishedFilePaths: [])
 
         XCTAssertEqual(report.candidates.map(\.relativePath), ["Original.sgmodule"])
@@ -31,8 +31,7 @@ final class LocalModuleScannerTests: XCTestCase {
         let source = root.appending(path: "Demo.sgmodule")
         let original = Data("#!name=Demo\n[Rule]\nFINAL,DIRECT\n".utf8)
         try original.write(to: source)
-        let candidate = try XCTUnwrap(LocalModuleScanner.candidates(in: root.path,
-            combinedFileName: "Relay", existingModules: [], publishedFilePaths: []).first)
+        let candidate = try XCTUnwrap(LocalModuleScanner.candidates(in: root.path, existingModules: [], publishedFilePaths: []).first)
         let published = ManagedPublishedFile.dataWrapping(original, relativePath: "Demo.sgmodule")
         try published.write(to: source)
 
@@ -59,12 +58,11 @@ final class LocalModuleScannerTests: XCTestCase {
 
         let candidates = try LocalModuleScanner.candidates(
             in: root.path,
-            combinedFileName: "Surge Relay",
             existingModules: [],
             publishedFilePaths: []
         )
 
-        XCTAssertEqual(candidates.count, 1)
+        XCTAssertEqual(candidates.count, 2)
         XCTAssertEqual(candidates[0].relativePath, "Ads/YouTube Ads.sgmodule")
         XCTAssertEqual(candidates[0].id, "Ads/YouTube Ads.sgmodule")
         XCTAssertEqual(candidates[0].name, "YouTube")
@@ -84,18 +82,16 @@ final class LocalModuleScannerTests: XCTestCase {
 
         let report = try LocalModuleScanner.report(
             in: root.path,
-            combinedFileName: "Surge Relay",
             existingModules: [],
             publishedFilePaths: ["Managed.sgmodule"]
         )
 
-        XCTAssertTrue(report.candidates.isEmpty)
+        XCTAssertEqual(report.candidates.map(\.relativePath), ["Surge-Relay.sgmodule"])
         XCTAssertEqual(
             Dictionary(uniqueKeysWithValues: report.skippedFiles.map { ($0.relativePath, $0.reason) }),
             [
                 "Empty.sgmodule": "文件为空",
-                "Managed.sgmodule": "发布路径已纳入管理",
-                "Surge-Relay.sgmodule": "这是当前总模块文件"
+                "Managed.sgmodule": "发布路径已纳入管理"
             ]
         )
     }
@@ -188,7 +184,6 @@ final class LocalModuleScannerTests: XCTestCase {
 
         let report = try LocalModuleScanner.report(
             in: root.path,
-            combinedFileName: "Relay",
             existingModules: [],
             publishedFilePaths: []
         )
@@ -198,12 +193,10 @@ final class LocalModuleScannerTests: XCTestCase {
                        LocalSourcePathResolver.canonicalDirectoryURL(for: root.path)?.path)
         let plan = LocalModuleImportPlanner.plan(
             candidates: report.candidates,
-            existingModules: [],
-            combinedModuleFileName: "Relay"
+            existingModules: []
         )
         let repeated = try LocalModuleScanner.report(
             in: root.path,
-            combinedFileName: "Relay",
             existingModules: plan.entries.map(\.module),
             publishedFilePaths: []
         )
@@ -225,7 +218,7 @@ final class LocalModuleScannerTests: XCTestCase {
         let registered = RelayModule(name: "Registered", sourceURL: source.absoluteString,
             outputFileName: "Published-Elsewhere.sgmodule", storageLocation: .gitHub)
 
-        let report = try LocalModuleScanner.report(in: root.path, combinedFileName: "Relay",
+        let report = try LocalModuleScanner.report(in: root.path,
             existingModules: [registered], publishedFilePaths: [])
 
         XCTAssertTrue(report.candidates.isEmpty)
@@ -249,7 +242,6 @@ final class LocalModuleScannerTests: XCTestCase {
 
         let report = try LocalModuleScanner.report(
             in: alias.path,
-            combinedFileName: "Relay",
             existingModules: [],
             publishedFilePaths: []
         )
@@ -295,7 +287,7 @@ final class LocalModuleScannerTests: XCTestCase {
         let source = root.appending(path: "Demo.sgmodule")
         try Data("#!name=Demo\n[General]".utf8).write(to: source)
         let candidates = try LocalModuleScanner.candidates(
-            in: root.path, combinedFileName: "Relay", existingModules: [], publishedFilePaths: []
+            in: root.path, existingModules: [], publishedFilePaths: []
         )
         let outside = base.appending(path: "Outside.sgmodule")
         try Data("private content".utf8).write(to: outside)
@@ -307,7 +299,6 @@ final class LocalModuleScannerTests: XCTestCase {
         let plan = LocalModuleImportPlanner.plan(
             candidates: candidates,
             existingModules: [],
-            combinedModuleFileName: "Relay",
             localModuleDirectory: root.path
         )
 
@@ -322,7 +313,7 @@ final class LocalModuleScannerTests: XCTestCase {
         let source = root.appending(path: "Demo.sgmodule")
         try Data("#!name=Demo\n[General]".utf8).write(to: source)
         let candidates = try LocalModuleScanner.candidates(
-            in: root.path, combinedFileName: "Relay", existingModules: [], publishedFilePaths: []
+            in: root.path, existingModules: [], publishedFilePaths: []
         )
         let current = Data("""
         #!name=Demo

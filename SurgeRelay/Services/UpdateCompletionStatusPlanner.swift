@@ -17,9 +17,7 @@ enum UpdateCompletionStatusPlanner {
         publishPlan: PublishPlan,
         contentChanged: Bool,
         failures: Int,
-        pendingLocalCleanupFileCount: Int?,
-        combinedModuleEnabled: Bool,
-        combinedSourceCount: Int
+        pendingLocalCleanupFileCount: Int?
     ) -> UpdateCompletionDecision {
         if canUseAutomaticGitHubPublish {
             if AutomaticPublishPlanner.shouldRunScheduledPublish(plan: publishPlan) {
@@ -56,8 +54,6 @@ enum UpdateCompletionStatusPlanner {
         return UpdateCompletionDecision(
             scheduleAction: .none,
             statusMessage: refreshedOutputStatus(
-                combinedModuleEnabled: combinedModuleEnabled,
-                combinedSourceCount: combinedSourceCount,
                 failures: failures
             )
         )
@@ -81,15 +77,8 @@ enum UpdateCompletionStatusPlanner {
     }
 
     static func refreshedOutputStatus(
-        combinedModuleEnabled: Bool,
-        combinedSourceCount: Int,
         failures: Int
     ) -> String {
-        if combinedModuleEnabled {
-            return failures == 0
-                ? "总模块已由 \(combinedSourceCount) 个来源合并完成"
-                : "总模块已更新；\(failures) 个来源沿用上次成功版本"
-        }
         return failures == 0
             ? "模块输出已刷新"
             : "模块输出已刷新；\(failures) 个来源沿用上次成功版本"

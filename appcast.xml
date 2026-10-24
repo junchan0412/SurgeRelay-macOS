@@ -3,6 +3,24 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>2.4.0</title>
+            <pubDate>Sat, 24 Oct 2026 20:52:46 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v2.4.0</link>
+            <sparkle:version>111</sparkle:version>
+            <sparkle:shortVersionString>2.4.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 2.4.0
+
+
+- 独立模块：移除总模块设置、合并器、汇总缓存、参与合并开关及对应的原生/Web 入口与 API；每个模块按自己的来源、参数、缓存、历史和本地/GitHub 目标分别管理。旧配置保留模块身份和输出位置，忽略已移除的合并与仅缓存标记。
+- 更新与输出：更新、编辑正文或修改参数只刷新相关模块；一个模块遇到本地文件冲突或缺缓存时，不再中断其他模块的输出。版本恢复只处理对应模块，不再依赖汇总缓存。
+- 文件冲突：本地输出错误独立记录在对应模块中，侧栏和“需要处理”可定位；同名文件冲突不再误报为转换结果无效或弹出整批刷新失败，比较差异、备份并接管后会清除对应错误。
+- 发布与界面：所有模块分别发布到自己的目标，移除独立发布开关与总模块文件名保留；发布/旧文件清理预览保留为专门的确认窗口，双目标同步、脚本资源和恢复事务保护继续生效。
+- 验证：570 项 Release 单元测试通过、2 项可选性能测试跳过；Web 行为/DOM 和迁移检查通过。使用本次构建的隔离 App 实测百度网盘冲突定位、Biliverse 独立写入、备份接管及设置入口移除。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v2.4.0/Surge-Relay-2.4.0.app.zip" length="12611605" type="application/zip" sparkle:edSignature="3ElbPqWKPcb+gHQ3NQuLh7j7UscxS9EfRDNJAWS/gswnsyFkdb7I5PvGT/RnL3YylMwiI6r4YdJSvsWTFcfiCQ=="/>
+        </item>
+        <item>
             <title>2.3.2</title>
             <pubDate>Sat, 24 Oct 2026 19:44:30 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v2.3.2</link>

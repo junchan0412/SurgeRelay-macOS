@@ -30,32 +30,24 @@ final class UpdateCompletionStatusPlannerTests: XCTestCase {
         )
         XCTAssertEqual(
             UpdateCompletionStatusPlanner.refreshedOutputStatus(
-                combinedModuleEnabled: true,
-                combinedSourceCount: 4,
-                failures: 0
-            ),
-            "总模块已由 4 个来源合并完成"
-        )
-        XCTAssertEqual(
-            UpdateCompletionStatusPlanner.refreshedOutputStatus(
-                combinedModuleEnabled: true,
-                combinedSourceCount: 4,
-                failures: 1
-            ),
-            "总模块已更新；1 个来源沿用上次成功版本"
-        )
-        XCTAssertEqual(
-            UpdateCompletionStatusPlanner.refreshedOutputStatus(
-                combinedModuleEnabled: false,
-                combinedSourceCount: 0,
                 failures: 0
             ),
             "模块输出已刷新"
         )
         XCTAssertEqual(
             UpdateCompletionStatusPlanner.refreshedOutputStatus(
-                combinedModuleEnabled: false,
-                combinedSourceCount: 0,
+                failures: 1
+            ),
+            "模块输出已刷新；1 个来源沿用上次成功版本"
+        )
+        XCTAssertEqual(
+            UpdateCompletionStatusPlanner.refreshedOutputStatus(
+                failures: 0
+            ),
+            "模块输出已刷新"
+        )
+        XCTAssertEqual(
+            UpdateCompletionStatusPlanner.refreshedOutputStatus(
                 failures: 1
             ),
             "模块输出已刷新；1 个来源沿用上次成功版本"
@@ -67,16 +59,13 @@ final class UpdateCompletionStatusPlannerTests: XCTestCase {
             id: UUID(),
             name: "Standalone",
             sourceURL: "https://example.com/standalone.sgmodule",
-            outputFileName: "Standalone",
-            publishesStandalone: true
+            outputFileName: "Standalone"
         )
         let standalonePlan = PublishPlan(
-            standaloneModules: [standalone],
-            combinedModuleIDs: []
+            standaloneModules: [standalone]
         )
         let combinedOnlyPlan = PublishPlan(
-            standaloneModules: [],
-            combinedModuleIDs: [UUID()]
+            standaloneModules: []
         )
 
         XCTAssertEqual(
@@ -85,9 +74,7 @@ final class UpdateCompletionStatusPlannerTests: XCTestCase {
                 publishPlan: standalonePlan,
                 contentChanged: true,
                 failures: 1,
-                pendingLocalCleanupFileCount: nil,
-                combinedModuleEnabled: true,
-                combinedSourceCount: 2
+                pendingLocalCleanupFileCount: nil
             ),
             UpdateCompletionDecision(
                 scheduleAction: .scheduleAutomaticPublish,
@@ -101,9 +88,7 @@ final class UpdateCompletionStatusPlannerTests: XCTestCase {
                 publishPlan: standalonePlan,
                 contentChanged: false,
                 failures: 0,
-                pendingLocalCleanupFileCount: nil,
-                combinedModuleEnabled: true,
-                combinedSourceCount: 2
+                pendingLocalCleanupFileCount: nil
             ),
             UpdateCompletionDecision(
                 scheduleAction: .none,
@@ -117,9 +102,7 @@ final class UpdateCompletionStatusPlannerTests: XCTestCase {
                 publishPlan: combinedOnlyPlan,
                 contentChanged: true,
                 failures: 2,
-                pendingLocalCleanupFileCount: nil,
-                combinedModuleEnabled: true,
-                combinedSourceCount: 2
+                pendingLocalCleanupFileCount: nil
             ),
             UpdateCompletionDecision(
                 scheduleAction: .clearAutomaticPublishSchedule,
@@ -129,7 +112,7 @@ final class UpdateCompletionStatusPlannerTests: XCTestCase {
     }
 
     func testUpdateCompletionStatusPlannerFallsBackToLocalCleanupAndRefreshDecision() {
-        let plan = PublishPlan(standaloneModules: [], combinedModuleIDs: [])
+        let plan = PublishPlan(standaloneModules: [])
 
         XCTAssertEqual(
             UpdateCompletionStatusPlanner.decision(
@@ -137,9 +120,7 @@ final class UpdateCompletionStatusPlannerTests: XCTestCase {
                 publishPlan: plan,
                 contentChanged: true,
                 failures: 1,
-                pendingLocalCleanupFileCount: 4,
-                combinedModuleEnabled: true,
-                combinedSourceCount: 3
+                pendingLocalCleanupFileCount: 4
             ),
             UpdateCompletionDecision(
                 scheduleAction: .none,
@@ -153,13 +134,11 @@ final class UpdateCompletionStatusPlannerTests: XCTestCase {
                 publishPlan: plan,
                 contentChanged: false,
                 failures: 0,
-                pendingLocalCleanupFileCount: nil,
-                combinedModuleEnabled: true,
-                combinedSourceCount: 3
+                pendingLocalCleanupFileCount: nil
             ),
             UpdateCompletionDecision(
                 scheduleAction: .none,
-                statusMessage: "总模块已由 3 个来源合并完成"
+                statusMessage: "模块输出已刷新"
             )
         )
     }

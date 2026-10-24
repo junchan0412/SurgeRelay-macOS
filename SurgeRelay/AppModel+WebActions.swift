@@ -30,8 +30,7 @@ extension AppModel {
         } else {
             guard !ids.isEmpty, ids.isSubset(of: Set(modules.map(\.id))) else { throw WebAPIError.moduleNotFound }
             destinations = Set(PublishDestination.allCases.filter {
-                PublishCoordinator.selectedPlan(modules: modules, moduleIDs: ids,
-                    combinedModuleEnabled: settings.combinedModuleEnabled, destination: $0).hasStandaloneModuleSelection
+                PublishCoordinator.selectedPlan(modules: modules, moduleIDs: ids, destination: $0).hasPublishableModuleSelection
             })
         }
         guard !destinations.isEmpty else { throw RelayError.noFilesToPublish }
@@ -147,10 +146,9 @@ extension AppModel {
 
     private func webPublishFiles(scope: String, moduleIDs: Set<UUID>, destination: PublishDestination) async throws -> (files: [PublishFile], pathPlan: GitHubPublishedPathPlan?) {
         let plan = scope == "githubAll" ? githubPublishPlan : PublishCoordinator.selectedPlan(
-            modules: modules, moduleIDs: moduleIDs, combinedModuleEnabled: settings.combinedModuleEnabled, destination: destination)
+            modules: modules, moduleIDs: moduleIDs, destination: destination)
         try GitHubPublishPlanner.validatePublishableSelection(plan)
-        let combined = scope == "githubAll" && settings.combinedModuleEnabled ? try await fileStore.readCombined() : nil
-        let files = try await publishedFiles(plan: plan, combinedData: combined, includeAssets: true, destination: destination)
+        let files = try await publishedFiles(plan: plan, includeAssets: true, destination: destination)
         let issues = await Task.detached { ModuleLintPlanner.check(files: files, ownedModuleIDs: plan.assetModuleIDs) }.value
         try ModuleLintPlanner.throwIfBlocking(issues)
         let paths = scope == "githubAll" ? GitHubPublishPlanner.pathPlan(currentPaths: files.map(\.name), settings: settings.github,
@@ -161,7 +159,6 @@ extension AppModel {
     static func samePublishConfiguration(_ lhs: AppSettings, _ rhs: AppSettings) -> Bool {
         lhs.publishToLocal == rhs.publishToLocal && lhs.publishToGitHub == rhs.publishToGitHub &&
         lhs.localModuleDirectory == rhs.localModuleDirectory && lhs.github == rhs.github &&
-        lhs.combinedModuleEnabled == rhs.combinedModuleEnabled && lhs.combinedModuleFileName == rhs.combinedModuleFileName &&
         lhs.localPublishedRootDirectory == rhs.localPublishedRootDirectory && lhs.localPublishedFilePaths == rhs.localPublishedFilePaths &&
         lhs.githubPublishedRepositoryKey == rhs.githubPublishedRepositoryKey && lhs.githubPublishedFilePaths == rhs.githubPublishedFilePaths
     }

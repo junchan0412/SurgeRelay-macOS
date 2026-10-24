@@ -45,18 +45,6 @@ struct SettingsGeneralView: View {
                     .buttonStyle(.borderless)
                 }
             }
-            SettingsToggleRow("使用总模块功能", icon: "square.stack.3d.up", isOn: Binding(
-                get: { model.settings.combinedModuleEnabled },
-                set: { model.setCombinedModuleEnabled($0) }
-            ))
-            if model.settings.combinedModuleEnabled {
-                SettingsTextFieldRow(
-                    "总模块文件名",
-                    icon: "doc",
-                    text: combinedFileNameBinding,
-                    prompt: "Surge-Relay"
-                )
-            }
             SettingsControlRow("软件更新", icon: "arrow.down.circle") {
                 Button("检查更新", systemImage: "arrow.clockwise") {
                     model.presentsUpdateChecker = true
@@ -187,24 +175,6 @@ struct SettingsGeneralView: View {
                     .textSelection(.enabled)
             }
         }
-    }
-
-    /// Edits the combined module file name without the `.sgmodule` extension so it
-    /// can't be deleted by accident. The on-disk file always keeps the extension,
-    /// since every consumer normalizes through `FilenameSanitizer.sgmoduleName`.
-    private var combinedFileNameBinding: Binding<String> {
-        Binding(
-            get: {
-                let value = model.settings.combinedModuleFileName
-                return value.lowercased().hasSuffix(".sgmodule")
-                    ? String(value.dropLast(".sgmodule".count))
-                    : value
-            },
-            set: {
-                model.settings.combinedModuleFileName = $0
-                model.saveSettings()
-            }
-        )
     }
 
     private func stringBinding(_ keyPath: WritableKeyPath<AppSettings, String>) -> Binding<String> {

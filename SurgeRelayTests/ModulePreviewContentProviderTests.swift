@@ -29,7 +29,7 @@ final class ModulePreviewContentProviderTests: XCTestCase {
                 XCTAssertEqual(id, moduleID)
                 cachedComponent = content
             },
-            readCombined: { Data() },
+
             materialize: { content, overrides in
                 ModuleArgumentProcessor.materialize(content, overrides: overrides)
             },
@@ -72,7 +72,7 @@ final class ModulePreviewContentProviderTests: XCTestCase {
             readComponent: { _ in throw RelayError.invalidOutput("missing component") },
             readConvertedComponent: { _ in throw RelayError.invalidOutput("missing converted") },
             writeComponent: { _, _ in },
-            readCombined: { Data() },
+
             materialize: { content, _ in content },
             argumentInfo: { _ in ModuleArgumentInfo() },
             applyingModuleMetadata: { _, _, _, _, content in content }
@@ -105,7 +105,7 @@ final class ModulePreviewContentProviderTests: XCTestCase {
                 return "#!name=Converted\n[Rule]\nFINAL,DIRECT\n"
             },
             writeComponent: { _, _ in },
-            readCombined: { Data() },
+
             materialize: { content, _ in content },
             argumentInfo: { _ in ModuleArgumentInfo() },
             applyingModuleMetadata: { _, _, _, _, content in content }
@@ -131,7 +131,7 @@ final class ModulePreviewContentProviderTests: XCTestCase {
             readComponent: { _ in "" },
             readConvertedComponent: { _ in "\n" },
             writeComponent: { _, _ in },
-            readCombined: { Data() },
+
             materialize: { content, _ in content },
             argumentInfo: { _ in ModuleArgumentInfo() },
             applyingModuleMetadata: { _, _, _, _, content in content }

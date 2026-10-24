@@ -82,9 +82,6 @@ extension AppModel {
         replace(module)
         try persistModules()
         try await flushPersistence()
-        guard await rebuildCombinedFromCache(schedulesAutomaticPublish: false, exportsLocalOutput: false) else {
-            throw RelayError.invalidOutput("版本正文和脚本已恢复，但总模块缓存刷新失败。请检查错误后重新合并。")
-        }
         recordHistory([UpdateHistoryEntry(moduleID: module.id, moduleName: module.name, outcome: .updated,
                                          duration: Date.now.timeIntervalSince(startedAt),
                                          message: "已恢复历史版本到缓存，本次未发布")])
@@ -98,9 +95,9 @@ extension AppModel {
 @MainActor
 extension AppModel {
     func recoverPersistedVersionState() async throws {
-        let needsRebuild = try await fileStore.recoverInterruptedVersionRestores()
+        let needsRecovery = try await fileStore.recoverInterruptedVersionRestores()
         let ids = try await fileStore.pendingVersionRestoreModuleIDs()
-        guard needsRebuild || !ids.isEmpty else { return }
+        guard needsRecovery || !ids.isEmpty else { return }
         for id in ids {
             guard var module = modules.first(where: { $0.id == id }) else { continue }
             let state = try await fileStore.currentVersionState(id: id)
@@ -123,9 +120,6 @@ extension AppModel {
         }
         try persistModulesIfNeeded(force: true)
         try await flushPersistence()
-        guard await rebuildCombinedFromCache(schedulesAutomaticPublish: false, exportsLocalOutput: false) else {
-            throw RelayError.invalidOutput("模块已恢复，但汇总缓存尚未重建；没有启动自动发布。")
-        }
         try await fileStore.acknowledgeVersionRestoreMetadata(ids: ids)
     }
 }

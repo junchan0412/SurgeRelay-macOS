@@ -90,8 +90,6 @@ enum WebManagementAPI {
             case ("POST", "/api/source/name"):
                 let payload = try request.decodeBody(WebSourceNameRequest.self)
                 return .json(try await sourceNamePayload(for: payload.url))
-            case ("GET", "/api/combined/preview"):
-                return .text(try await model.combinedPreviewContent())
             default:
                 return try await moduleResponse(for: request, model: model)
             }
@@ -191,11 +189,6 @@ enum WebManagementAPI {
         }
 
         switch (request.method, components[3]) {
-        case ("POST", "enabled"):
-            let payload = try request.decodeBody(WebEnabledRequest.self)
-            model.setModuleIncludedInCombined(id: id, included: payload.enabled)
-            try await model.flushPersistence()
-                return .json(ActionPayload(ok: true, message: model.statusMessage))
         case ("POST", "update"):
             let admission = model.updateAdmission(for: module)
             guard admission.isAccepted else {

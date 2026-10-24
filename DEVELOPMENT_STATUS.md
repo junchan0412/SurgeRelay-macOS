@@ -6,7 +6,7 @@
 
 | 项目 | 当前值 |
 | --- | --- |
-| 版本 | 2.3.2 (110) |
+| 版本 | 2.4.0 (111) |
 | macOS deployment target | 26.0 |
 | Swift | 6.0，strict concurrency complete |
 
@@ -21,7 +21,7 @@
 ## 当前能力
 
 - 集中管理远程、本地与 Script-Hub 转换模块，并区分 storageTargets 与 initialSource（storageLocation 保留旧单目标兼容）。
-- 本地与 GitHub 发布可并存；独立模块可选本地、GitHub 或双目标，总模块可同时发布到两个目标；所选发布记录逐目标结果并支持只重试未完成目标。
+- 本地与 GitHub 发布可并存；每个模块独立选择本地、GitHub 或双目标，更新或编辑仅刷新自身输出；所选发布记录逐目标结果并支持只重试未完成目标。
 - 支持本地模块扫描、转换预览、文本覆盖、冲突处理、发布预览、受管文件清理和自动发布。
 - 监听本地模块目录，源文件在 App 外改动后按来源内容 sha256 只重新转换改动过的模块。
 - 模块内容编辑器支持撤销/重做、查找与替换（含正则）、跳转到行、切换注释和缩进操作。
@@ -41,12 +41,12 @@
 | 指标 | 数量 |
 | --- | --- |
 | 应用 Swift 文件 | 167 |
-| Swift 测试文件（unit / UI） | 53 / 1 |
-| 源码中的 XCTest 方法 | 587 |
+| Swift 测试文件（unit / UI） | 52 / 1 |
+| 源码中的 XCTest 方法 | 576 |
 | Services / Models / Views / Utilities / App-Core | 71 / 26 / 38 / 3 / 29 |
-| 应用 Swift 行数 | 29,870 |
-| 测试 Swift 行数 | 15,477 |
-| CHANGELOG release 段落 | 110 |
+| 应用 Swift 行数 | 28,508 |
+| 测试 Swift 行数 | 14,825 |
+| CHANGELOG release 段落 | 111 |
 
 ## 主要维护热点
 
@@ -54,16 +54,16 @@
 
 | 文件 | 行数 |
 | --- | --- |
-| SurgeRelay/Services/ModuleFileStore.swift | 1354 |
-| SurgeRelay/Views/ModuleCodeTextView.swift | 907 |
-| SurgeRelay/Views/ModuleDetailView.swift | 739 |
-| SurgeRelay/Views/ModulePreviewViews.swift | 659 |
+| SurgeRelay/Services/ModuleFileStore.swift | 1313 |
+| SurgeRelay/Views/ModuleCodeTextView.swift | 858 |
+| SurgeRelay/Views/ModuleDetailView.swift | 700 |
+| SurgeRelay/Views/ModulePreviewViews.swift | 583 |
 | SurgeRelay/Utilities/ModuleMetadataParser.swift | 517 |
 | SurgeRelay/Views/NativeQAPerformanceRecorder.swift | 482 |
-| SurgeRelay/AppModel+ModuleUpdate.swift | 477 |
-| SurgeRelay/Models/RelayModule.swift | 477 |
 | SurgeRelay/Services/PersistenceStore.swift | 476 |
 | SurgeRelay/Views/ModuleCodeEditorController.swift | 472 |
+| SurgeRelay/Services/WebManagementServer.swift | 465 |
+| SurgeRelay/Models/RelayModule.swift | 462 |
 
 ## 当前优化顺序
 
@@ -83,7 +83,7 @@ git diff --check
 node script/generate_project_status.mjs --check
 node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs
-VERSION=2.3.2 BUILD=110 ./script/check_release_configuration.sh
+VERSION=2.4.0 BUILD=111 ./script/check_release_configuration.sh
 
 DEVELOPER_DIR="$(xcode-select -p)" \
 xcodebuild test \

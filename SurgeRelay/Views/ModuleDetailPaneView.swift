@@ -16,7 +16,6 @@ struct ModuleDetailPaneView: View {
     }
 
     private enum SelectionKind: Equatable {
-        case combined
         case module(UUID)
     }
 
@@ -35,10 +34,6 @@ struct ModuleDetailPaneView: View {
     }
 
     private var selectionKind: SelectionKind? {
-        if model.settings.combinedModuleEnabled,
-           model.selectedModuleID == AppModel.combinedModuleSelectionID {
-            return .combined
-        }
         if let id = model.selectedModuleID,
            model.modules.contains(where: { $0.id == id }) {
             return .module(id)
@@ -102,7 +97,6 @@ struct ModuleDetailPaneView: View {
 
     private func kindID(_ kind: SelectionKind) -> String {
         switch kind {
-        case .combined: "combined"
         case let .module(id): id.uuidString
         }
     }
@@ -113,19 +107,6 @@ struct ModuleDetailPaneView: View {
         // editor text survives tab switches; animate only visibility.
         ZStack {
             switch kind {
-            case .combined:
-                CombinedModuleDetailView()
-                    .opacity(selectedTab == .info ? 1 : 0)
-                    .offset(y: selectedTab == .info ? 0 : 6)
-                    .allowsHitTesting(selectedTab == .info)
-                    .accessibilityHidden(selectedTab != .info)
-                if hasPresentedPreview {
-                    CombinedPreviewPane()
-                        .opacity(selectedTab == .preview ? 1 : 0)
-                        .offset(y: selectedTab == .preview ? 0 : 6)
-                        .allowsHitTesting(selectedTab == .preview)
-                        .accessibilityHidden(selectedTab != .preview)
-                }
             case .module:
                 if let module = selectedModule {
                     ModuleDetailView(module: module, onEdit: { editModule(module) })

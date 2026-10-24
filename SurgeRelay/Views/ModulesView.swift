@@ -30,7 +30,7 @@ struct ModulesView: View {
 
     private var sidebarRefreshToken: SidebarRefreshKey {
         SidebarRefreshKey(revision: model.moduleRevision, query: normalizedSearchText, filter: sidebarFilter,
-                          sort: sortOrder, combined: model.settings.combinedModuleEnabled,
+                          sort: sortOrder,
                           contentKeys: contentIndexState.contentIndexCacheKeys)
     }
 
@@ -70,16 +70,14 @@ struct ModulesView: View {
         let metadata = metadataIndexState
         let filter = sidebarFilter
         let sort = sortOrder
-        let combined = model.settings.combinedModuleEnabled
         let (nextMetadata, next) = await Task.detached(priority: .userInitiated) {
             let plan = ModuleSearchIndex.filterPlan(modules: modules, query: query, contentState: content, metadataState: metadata)
-            let filtered = filter == .all ? plan.matches : plan.matches.filter { filter.matches($0, combinedModuleEnabled: combined) }
+            let filtered = filter == .all ? plan.matches : plan.matches.filter { filter.matches($0) }
             let sorted = sort.sorted(filtered)
             let presentation = SidebarPresentation(
                 sections: ModuleSidebarSectionPlanner.sections(for: sorted),
                 filteredModulesAreEmpty: sorted.isEmpty, allModulesAreEmpty: modules.isEmpty,
-                combinedModuleEnabled: combined,
-                filterCounts: ModuleFilter.counts(for: plan.matches, combinedModuleEnabled: combined),
+                filterCounts: ModuleFilter.counts(for: plan.matches),
                 resultCount: sorted.count
             )
             return (plan.metadataState, presentation)
@@ -92,7 +90,7 @@ struct ModulesView: View {
     private func showModules(_ filter: ModuleFilter) {
         sidebarFilter = filter
         searchText = ""
-        if let first = sortOrder.sorted(model.modules).first(where: { filter.matches($0, combinedModuleEnabled: model.settings.combinedModuleEnabled) }) {
+        if let first = sortOrder.sorted(model.modules).first(where: { filter.matches($0) }) {
             model.selectedModuleID = first.id
         }
         columnVisibility = .all
@@ -105,7 +103,6 @@ struct ModulesView: View {
                 sections: sidebarPresentation.sections,
                 filteredModulesAreEmpty: sidebarPresentation.filteredModulesAreEmpty,
                 allModulesAreEmpty: sidebarPresentation.allModulesAreEmpty,
-                combinedModuleEnabled: sidebarPresentation.combinedModuleEnabled,
                 filterCounts: sidebarPresentation.filterCounts,
                 resultCount: sidebarPresentation.resultCount,
                 hasSearchQuery: !normalizedSearchText.isEmpty,
@@ -141,6 +138,9 @@ struct ModulesView: View {
                 )
             )
                 .environment(model)
+        }
+        .sheet(item: $model.pendingPublishPreview) { preview in
+            PublishReviewView(preview: preview).environment(model)
         }
         .sheet(item: $model.pendingSelectedPublishLintReview) { review in
             ModuleLintView(issues: review.issues) {
@@ -249,7 +249,6 @@ private struct SidebarPresentation: Equatable, Sendable {
     var sections: [ModuleSidebarSection]
     var filteredModulesAreEmpty: Bool
     var allModulesAreEmpty: Bool
-    var combinedModuleEnabled: Bool
     var filterCounts: [ModuleFilter: Int]
     var resultCount: Int
 
@@ -257,7 +256,6 @@ private struct SidebarPresentation: Equatable, Sendable {
         sections: [],
         filteredModulesAreEmpty: true,
         allModulesAreEmpty: true,
-        combinedModuleEnabled: false,
         filterCounts: [:],
         resultCount: 0
     )
@@ -278,6 +276,5 @@ private struct SidebarRefreshKey: Equatable {
     var query: String
     var filter: ModuleFilter
     var sort: ModuleSortOrder
-    var combined: Bool
     var contentKeys: [UUID: String]
 }

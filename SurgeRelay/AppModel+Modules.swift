@@ -17,7 +17,7 @@ extension AppModel {
         let plan = try ModuleDraftPlanner.addPlan(
             from: draft,
             modules: modules,
-            combinedModuleFileName: settings.combinedModuleFileName,
+
             localModuleDirectory: settings.localModuleDirectory
         )
         let module = plan.module
@@ -43,7 +43,7 @@ extension AppModel {
             id: id,
             from: draft,
             modules: modules,
-            combinedModuleFileName: settings.combinedModuleFileName,
+
             localModuleDirectory: settings.localModuleDirectory
         ) else {
             return
@@ -82,30 +82,10 @@ extension AppModel {
         if plan.sourceChanged, shouldUpdateModule(modules[index]) {
             scheduleAutomaticUpdate(moduleID: id)
         } else {
-            Task { await rebuildCombinedFromCache() }
+            Task { await refreshModuleOutputs(moduleIDs: [id]) }
         }
         if plan.customIconChanged, plan.customIconURL == nil, !plan.sourceChanged {
             Task { await refreshModuleMetadataFromCache() }
-        }
-    }
-
-    func setModuleIncludedInCombined(id: UUID, included: Bool) {
-        guard !isWorking else { statusMessage = PreviewContentSaveError.busy.localizedDescription; return }
-        guard let index = modules.firstIndex(where: { $0.id == id }) else { return }
-        guard modules[index].isIncludedInCombined != included else { return }
-        registerLocalChange()
-        modules[index].isIncludedInCombined = included
-        invalidateModuleSummaryCache()
-        try? persistModules()
-        if settings.combinedModuleEnabled {
-            statusMessage = included ? "已将 \(modules[index].name) 加入总模块" : "已将 \(modules[index].name) 从总模块移除"
-        } else {
-            statusMessage = included ? "已记录 \(modules[index].name) 将在开启总模块后加入" : "已记录 \(modules[index].name) 不加入总模块"
-        }
-        if included, shouldUpdateModule(modules[index]) {
-            scheduleAutomaticUpdate(moduleID: id)
-        } else {
-            Task { await rebuildCombinedFromCache() }
         }
     }
 
@@ -156,7 +136,7 @@ extension AppModel {
         try? persistModules()
         refreshLocalSourceWatching()
         selectedModuleID = modules.first?.id
-        let rebuiltOutput = await rebuildCombinedFromCache()
+        let rebuiltOutput = true
         do { try await flushPersistence() }
         catch { statusMessage = "模块已从内存移除，但删除记录尚未保存到磁盘"; return }
         if rebuiltOutput { statusMessage = "已删除 \(module.name)，输出已刷新" }
@@ -173,8 +153,7 @@ extension AppModel {
         let outputFileName = ModuleNamingPlanner.uniqueOutputFileName(
             for: draft,
             source: draft.sourceURL,
-            modules: modules,
-            combinedModuleFileName: settings.combinedModuleFileName
+            modules: modules
         )
         var copy = source
         copy.id = UUID()
@@ -189,6 +168,7 @@ extension AppModel {
         copy.sourceCheckedAt = nil
         copy.state = .never
         copy.lastError = nil
+        copy.localOutputError = nil
         if copy.hasLocalStorageTarget {
             copy.localStorageRelativePath = copy.publishedRelativePath
             copy.preservesOutputFileName = true
@@ -288,7 +268,7 @@ extension AppModel {
         modules[index].argumentOverrides = plan.overrides
         try? persistModules()
         statusMessage = plan.statusMessage
-        Task { await rebuildCombinedFromCache() }
+        Task { await refreshModuleOutputs(moduleIDs: [moduleID]) }
     }
 
     func resetModuleArguments(moduleID: UUID) {
@@ -299,7 +279,7 @@ extension AppModel {
         modules[index].argumentOverrides = plan.overrides
         try? persistModules()
         statusMessage = plan.statusMessage
-        Task { await rebuildCombinedFromCache() }
+        Task { await refreshModuleOutputs(moduleIDs: [moduleID]) }
     }
 
     func replace(_ module: RelayModule) {

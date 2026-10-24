@@ -120,7 +120,7 @@ struct UpdateAdmission: Equatable, Sendable {
             return .rejected(reason)
         }
         guard updateableModuleCount > 0 else {
-            return .rejected("没有可更新的模块。请添加 HTTP/HTTPS 更新地址，或让本地模块参与独立/总模块输出。")
+            return .rejected("没有可更新的模块。请添加有效的 HTTP/HTTPS 更新地址或本地文件来源。")
         }
         return .accepted("已开始更新全部模块。")
     }
@@ -134,7 +134,7 @@ struct UpdateAdmission: Equatable, Sendable {
             return .rejected(busyMessage(statusMessage: statusMessage))
         }
         guard updateableModuleCount > 0 else {
-            return .rejected("没有可更新的模块。请添加 HTTP/HTTPS 更新地址，或让本地模块参与独立/总模块输出。")
+            return .rejected("没有可更新的模块。请添加有效的 HTTP/HTTPS 更新地址或本地文件来源。")
         }
         return .accepted("已开始更新全部模块。")
     }
@@ -150,10 +150,10 @@ struct UpdateAdmission: Equatable, Sendable {
             return .rejected(reason)
         }
         guard moduleIsUpdateable else {
-            return .rejected("“\(module.name)”没有远程更新地址，也未参与独立或总模块输出。")
+            return .rejected("“\(module.name)”没有有效的 HTTP/HTTPS 更新地址或本地文件来源。")
         }
         guard updateableModuleCount > 0 else {
-            return .rejected("没有可更新的模块。请添加 HTTP/HTTPS 更新地址，或让本地模块参与独立/总模块输出。")
+            return .rejected("没有可更新的模块。请添加有效的 HTTP/HTTPS 更新地址或本地文件来源。")
         }
         return .accepted("已开始更新 \(module.name)。")
     }
@@ -169,10 +169,10 @@ struct UpdateAdmission: Equatable, Sendable {
             return .rejected(busyMessage(statusMessage: statusMessage))
         }
         guard moduleIsUpdateable else {
-            return .rejected("“\(module.name)”没有远程更新地址，也未参与独立或总模块输出。")
+            return .rejected("“\(module.name)”没有有效的 HTTP/HTTPS 更新地址或本地文件来源。")
         }
         guard updateableModuleCount > 0 else {
-            return .rejected("没有可更新的模块。请添加 HTTP/HTTPS 更新地址，或让本地模块参与独立/总模块输出。")
+            return .rejected("没有可更新的模块。请添加有效的 HTTP/HTTPS 更新地址或本地文件来源。")
         }
         return .accepted("已开始更新 \(module.name)。")
     }

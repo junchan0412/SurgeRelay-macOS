@@ -9,7 +9,7 @@ struct WorkspaceOverviewView: View {
     private var summary: ModuleCollectionSummary { model.moduleSummary }
     private var attention: [RelayModule] {
         Array(model.modules.lazy.filter {
-            ModuleFilter.attention.matches($0, combinedModuleEnabled: model.settings.combinedModuleEnabled)
+            ModuleFilter.attention.matches($0)
         }.prefix(3))
     }
 
@@ -70,14 +70,14 @@ struct WorkspaceOverviewView: View {
                 Divider().padding(.vertical, 22)
                 metric("可更新", count: summary.updateableCount, filter: .updatable)
                 Divider().padding(.vertical, 22)
-                metric("独立发布", count: summary.standaloneCount, filter: .standalone)
+                metric("本地模块", count: summary.localCount, filter: .local)
                 Divider().padding(.vertical, 22)
                 metric("需要处理", count: summary.attentionCount, filter: .attention)
             }
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 0), GridItem(.flexible())], spacing: 0) {
                 metric("模块总数", count: summary.totalCount, filter: .all)
                 metric("可更新", count: summary.updateableCount, filter: .updatable)
-                metric("独立发布", count: summary.standaloneCount, filter: .standalone)
+                metric("本地模块", count: summary.localCount, filter: .local)
                 metric("需要处理", count: summary.attentionCount, filter: .attention)
             }
         }
@@ -226,6 +226,7 @@ struct WorkspaceOverviewView: View {
     }
 
     private func attentionMessage(for module: RelayModule) -> String {
+        if let error = module.localOutputError { return error.components(separatedBy: .newlines).first ?? error }
         if module.state == .failed { return module.failureSummary ?? "更新失败，请查看错误详情" }
         if module.hasSyncConflict { return "本地发布文件与 GitHub 内容不同，需要选择保留的版本" }
         return "上游内容已变化，需要检查本地编辑"

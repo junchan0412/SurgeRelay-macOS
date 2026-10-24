@@ -71,11 +71,10 @@ enum ModuleSearchIndex {
         hash.combine(module.outputFolder)
         hash.combine(module.storageTargets)
         hash.combine(module.localStorageRelativePath)
-        hash.combine(module.publishesStandalone)
-        hash.combine(module.isIncludedInCombined)
         hash.combine(module.state)
         hash.combine(module.iconURL)
         hash.combine(module.customIconURL)
+        hash.combine(module.localOutputError)
         hash.combine(module.lastError)
         hash.combine(module.scriptHubSubscription)
         hash.combine(module.argumentOverrides)
@@ -124,12 +123,11 @@ enum ModuleSearchIndex {
             module.standaloneStorageDetail,
             module.initialSource.title,
             module.relationshipSummary,
-            module.isIncludedInCombined ? "参与总模块 包含在总模块" : "不参与总模块",
-            module.publishesStandalone ? "独立模块" : "不发布独立模块",
             module.state.title,
         ]
         if let iconURL = module.iconURL { parts.append(iconURL) }
         if let customIconURL = module.customIconURL { parts.append(customIconURL) }
+        if let error = module.localOutputError { parts.append(error) }
         if let lastError = module.lastError { parts.append(lastError) }
         if let subscription = module.scriptHubSubscription {
             parts.append(subscription.subscriptionURL)

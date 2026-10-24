@@ -19,7 +19,6 @@ enum LocalModuleImportPlanner {
     static func plan(
         candidates: [LocalModuleScanCandidate],
         existingModules: [RelayModule],
-        combinedModuleFileName: String,
         localModuleDirectory: String? = nil,
         plannedAt: Date = .now
     ) -> LocalModuleImportPlan {
@@ -36,12 +35,6 @@ enum LocalModuleImportPlanner {
         var unavailableSources = Set(existingModules.flatMap {
             [$0.updateSourceURL, $0.sourceURL].map(ModuleSourceIdentity.canonicalValue)
         })
-        let combinedPath = ModuleOutputFolder.relativePath(
-            fileName: combinedModuleFileName,
-            folder: ModuleOutputFolder.root
-        )
-        let combinedKey = LocalSourcePathResolver.pathIdentity(combinedPath)
-        unavailablePaths.insert(combinedKey)
 
         for candidate in candidates {
             let name = candidate.name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -95,7 +88,7 @@ enum LocalModuleImportPlanner {
                 }
             }
             guard !unavailablePaths.contains(pathKey) else {
-                failures.append("\(candidate.relativePath)：本地模块路径已纳入管理或与总模块冲突，请重新扫描")
+                failures.append("\(candidate.relativePath)：本地模块路径已纳入管理或与其他模块冲突，请重新扫描")
                 continue
             }
             let sourceKey = ModuleSourceIdentity.canonicalValue(for: source)
@@ -116,7 +109,6 @@ enum LocalModuleImportPlanner {
                 storageLocation: .local,
                 localStorageRelativePath: outputPath,
                 preservesOutputFileName: true,
-                isEnabled: false,
                 scriptHubOptions: candidate.scriptHubOptions,
                 scriptHubSubscription: candidate.scriptHubSubscription,
                 detectedSourceFormat: candidate.sourceFormat == .automatic ? nil : candidate.sourceFormat,

@@ -133,7 +133,7 @@ enum GitHubPublishPlanner {
     static func noFilesStatus(for action: GitHubPublishAction) -> String {
         switch action {
         case .publishAll:
-            return "没有可发布的 GitHub 模块；请将模块存放位置设为 GitHub，或开启总模块"
+            return "没有可发布的 GitHub 模块；请将模块存放位置设为 GitHub"
         case .publishSelected:
             return "所选模块没有可发布的独立输出"
         case .preview:
@@ -193,7 +193,7 @@ enum GitHubPublishPlanner {
     }
 
     static func automaticSuccessMessage(report: PublishReport) -> String {
-        "\(PublishCoordinator.retryPrefix(report))已合并发布到 GitHub（\(report.changedFileCount) 个文件变更）"
+        "\(PublishCoordinator.retryPrefix(report))已发布到 GitHub（\(report.changedFileCount) 个文件变更）"
     }
 
     static func selectedSuccessMessage(report: PublishReport) -> String {

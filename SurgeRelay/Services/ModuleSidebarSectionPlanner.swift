@@ -59,7 +59,7 @@ enum ModuleSidebarSectionPlanner {
     }
 
     private static func needsAttention(_ module: RelayModule) -> Bool {
-        module.state == .failed || module.hasOverrideConflict || module.hasSyncConflict
+        module.localOutputError != nil || module.state == .failed || module.hasOverrideConflict || module.hasSyncConflict
     }
 
     private static func hasValidSource(_ module: RelayModule) -> Bool {

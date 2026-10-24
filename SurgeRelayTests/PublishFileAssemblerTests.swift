@@ -9,8 +9,8 @@ final class PublishFileAssemblerTests: XCTestCase {
         var requestedAssets = false
         do {
             _ = try await PublishFileAssembler.files(
-                request: PublishFileAssemblyRequest(plan: PublishPlan(standaloneModules: [ready, missing], combinedModuleIDs: []),
-                    combinedData: nil, combinedFileName: "Combined", includeAssets: true, destination: .local,
+                request: PublishFileAssemblyRequest(plan: PublishPlan(standaloneModules: [ready, missing]),
+                    includeAssets: true, destination: .local,
                     localModuleDirectory: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path),
                 readComponent: { id in id == ready.id ? "[Rule]\nFINAL,DIRECT" : nil },
                 generatedAssetFiles: { _ in requestedAssets = true; return [] },
@@ -26,71 +26,6 @@ final class PublishFileAssemblerTests: XCTestCase {
         XCTAssertFalse(requestedAssets)
     }
 
-    func testPublishFileAssemblerBuildsCombinedStandaloneAndAssets() async throws {
-        let standaloneID = UUID()
-        let combinedID = UUID()
-        let standalone = RelayModule(
-            id: standaloneID,
-            name: "Standalone",
-            sourceURL: "https://example.com/standalone.sgmodule",
-            outputFileName: "Standalone",
-            category: "Rules",
-            outputFolder: "Folder",
-            publishesStandalone: true,
-            argumentOverrides: ["mode": "strict"]
-        )
-        let combinedOnly = RelayModule(
-            id: combinedID,
-            name: "Combined",
-            sourceURL: "https://example.com/combined.sgmodule",
-            outputFileName: "Combined",
-            publishesStandalone: false,
-            isEnabled: true
-        )
-        var requestedAssetIDs = Set<UUID>()
-
-        let files = try await PublishFileAssembler.files(
-            request: PublishFileAssemblyRequest(
-                plan: PublishPlan(
-                    standaloneModules: [standalone],
-                    combinedModuleIDs: [combinedOnly.id]
-                ),
-                combinedData: Data("combined".utf8),
-                combinedFileName: "Combined",
-                includeAssets: true,
-                destination: .gitHub,
-                localModuleDirectory: "/Users/example/Surge"
-            ),
-            readComponent: { id in
-                id == standaloneID ? "source" : nil
-            },
-            generatedAssetFiles: { ids in
-                requestedAssetIDs = ids
-                return [PublishFile(name: "assets/icon.png", data: Data("asset".utf8))]
-            },
-            materialize: { content, overrides in
-                "\(content):\(overrides["mode"] ?? "")"
-            },
-            applyingModuleMetadata: { name, category, _, iconURL, content in
-                "\(name)|\(category)|\(iconURL ?? "nil")|\(content)"
-            },
-            cancellationCheckpoint: {}
-        )
-
-        XCTAssertEqual(files.map(\.name), ["Combined.sgmodule", "Folder/Standalone.sgmodule", "assets/icon.png"])
-        XCTAssertEqual(String(data: files[0].data, encoding: .utf8), "combined")
-        // The standalone export now carries the reconstructed Script-Hub
-        // `#SUBSCRIBED` marker, matching the in-app preview transformation.
-        let expectedStandalone = ModuleMetadataParser.applyingScriptHubSubscription(
-            ModuleMetadataParser.scriptHubSubscription(for: standalone),
-            to: "Standalone|Rules|nil|source:strict"
-        )
-        XCTAssertEqual(String(data: files[1].data, encoding: .utf8), expectedStandalone)
-        XCTAssertTrue(expectedStandalone.hasPrefix("#SUBSCRIBED "))
-        XCTAssertTrue(expectedStandalone.contains("https://example.com/standalone.sgmodule"))
-        XCTAssertEqual(String(data: files[2].data, encoding: .utf8), "asset")
-        XCTAssertEqual(requestedAssetIDs, [standaloneID, combinedID])
-    }
 
     func testPublishFileAssemblerWritesSubscribedMarkerBelowHeaderForRemoteSource() async throws {
         let module = RelayModule(
@@ -99,16 +34,13 @@ final class PublishFileAssemblerTests: XCTestCase {
             sourceURL: "https://gist.githubusercontent.com/example/raw/Reven.sgmodule",
             sourceFormat: .surge,
             outputFileName: "reven.sgmodule",
-            category: "#8会员模块",
-            publishesStandalone: true
+            category: "#8会员模块"
         )
         let source = "#!name=Reven\n#!category=#8会员模块\n\n[MITM]\nhostname = %APPEND% api.example.com\n"
 
         let files = try await PublishFileAssembler.files(
             request: PublishFileAssemblyRequest(
-                plan: PublishPlan(standaloneModules: [module], combinedModuleIDs: []),
-                combinedData: nil,
-                combinedFileName: "Combined",
+                plan: PublishPlan(standaloneModules: [module]),
                 includeAssets: false,
                 destination: .local,
                 localModuleDirectory: "/Users/example/Surge"
@@ -140,16 +72,13 @@ final class PublishFileAssemblerTests: XCTestCase {
             name: "SelfAuthored",
             sourceURL: "file:///Users/example/Surge/SelfAuthored.sgmodule",
             sourceFormat: .surge,
-            outputFileName: "SelfAuthored.sgmodule",
-            publishesStandalone: true
+            outputFileName: "SelfAuthored.sgmodule"
         )
         let source = "#!name=SelfAuthored\n[MITM]\nhostname = %APPEND% a.example.com\n"
 
         let files = try await PublishFileAssembler.files(
             request: PublishFileAssemblyRequest(
-                plan: PublishPlan(standaloneModules: [module], combinedModuleIDs: []),
-                combinedData: nil,
-                combinedFileName: "Combined",
+                plan: PublishPlan(standaloneModules: [module]),
                 includeAssets: false,
                 destination: .gitHub,
                 localModuleDirectory: "/Users/example/Surge"
@@ -176,16 +105,13 @@ final class PublishFileAssemblerTests: XCTestCase {
             sourceURL: source.absoluteString,
             sourceFormat: .surge,
             outputFileName: "Original.sgmodule",
-            outputFolder: "Ads",
-            publishesStandalone: true
+            outputFolder: "Ads"
         )
-        let plan = PublishPlan(standaloneModules: [module], combinedModuleIDs: [])
+        let plan = PublishPlan(standaloneModules: [module])
 
         let localFiles = try await PublishFileAssembler.files(
             request: PublishFileAssemblyRequest(
                 plan: plan,
-                combinedData: nil,
-                combinedFileName: "Combined",
                 includeAssets: false,
                 destination: .local,
                 localModuleDirectory: root.path
@@ -199,8 +125,6 @@ final class PublishFileAssemblerTests: XCTestCase {
         let gitHubFiles = try await PublishFileAssembler.files(
             request: PublishFileAssemblyRequest(
                 plan: plan,
-                combinedData: nil,
-                combinedFileName: "Combined",
                 includeAssets: false,
                 destination: .gitHub,
                 localModuleDirectory: root.path

@@ -1,10 +1,8 @@
 import Foundation
 
 struct ModuleUpdateRunResult {
-    var components: [(RelayModule, String)]
+    var moduleIDs: Set<UUID>
     var failures: Int
-    var missingCacheModuleNames: [String]
-    var missingCacheDetails: [String]
     var contentChanged: Bool
 }
 
@@ -13,62 +11,36 @@ extension AppModel {
     @discardableResult
     func finishModuleUpdateRun(
         _ result: ModuleUpdateRunResult,
-        generation: Int,
-        rebuildFromCache: Bool = false
+        generation: Int
     ) async -> Bool {
-        if let blockage = UpdateFailurePlanner.missingCacheBlockage(
-            moduleNames: result.missingCacheModuleNames,
-            details: result.missingCacheDetails
-        ) {
-            statusMessage = blockage.statusMessage
-            presentedError = blockage.presentedError
-            return false
+        let outputSucceeded = await refreshModuleOutputs(moduleIDs: result.moduleIDs, schedulesAutomaticPublish: false)
+        guard shouldContinueCurrentWork(generation: generation) else { return false }
+        await cleanupLegacyOutputFiles()
+        guard shouldContinueCurrentWork(generation: generation) else { return false }
+        let canUseAutomaticGitHubPublish = AutomaticPublishPlanner.canUseAutomaticPublishing(
+            context: automaticPublishContext()
+        )
+        let pendingLocalCleanupFileCount = pendingPublishPreview?.destination == .local
+            ? pendingPublishPreview?.deletedFiles.count
+            : nil
+        let completionDecision = UpdateCompletionStatusPlanner.decision(
+            canUseAutomaticGitHubPublish: canUseAutomaticGitHubPublish,
+            publishPlan: githubPublishPlan,
+            contentChanged: result.contentChanged,
+            failures: result.failures + (outputSucceeded ? 0 : 1),
+            pendingLocalCleanupFileCount: pendingLocalCleanupFileCount
+        )
+        switch completionDecision.scheduleAction {
+        case .none:
+            break
+        case .scheduleAutomaticPublish:
+            scheduleAutomaticPublish()
+        case .clearAutomaticPublishSchedule:
+            clearAutomaticPublishSchedule()
         }
+        statusMessage = outputSucceeded ? completionDecision.statusMessage
+            : "模块已分别处理；本地输出失败的模块请查看“需要处理”"
+        return outputSucceeded
 
-        do {
-            if rebuildFromCache {
-                // 单模块（过滤）更新：从全部缓存组件重建总模块并发布本地输出，
-                // 避免总模块只包含被更新模块而丢失其他参与者。
-                guard await rebuildCombinedFromCache(schedulesAutomaticPublish: false) else { return false }
-            } else if settings.combinedModuleEnabled {
-                guard try await writeCombinedModule(result.components, generation: generation) else { return false }
-            } else {
-                try await fileStore.removeCombined()
-                try await publishCurrentFiles(combinedData: nil)
-            }
-            guard shouldContinueCurrentWork(generation: generation) else { return false }
-            await cleanupLegacyOutputFiles()
-            guard shouldContinueCurrentWork(generation: generation) else { return false }
-            let canUseAutomaticGitHubPublish = AutomaticPublishPlanner.canUseAutomaticPublishing(
-                context: automaticPublishContext()
-            )
-            let pendingLocalCleanupFileCount = pendingPublishPreview?.destination == .local
-                ? pendingPublishPreview?.deletedFiles.count
-                : nil
-            let completionDecision = UpdateCompletionStatusPlanner.decision(
-                canUseAutomaticGitHubPublish: canUseAutomaticGitHubPublish,
-                publishPlan: githubPublishPlan,
-                contentChanged: result.contentChanged,
-                failures: result.failures,
-                pendingLocalCleanupFileCount: pendingLocalCleanupFileCount,
-                combinedModuleEnabled: settings.combinedModuleEnabled,
-                combinedSourceCount: result.components.count
-            )
-            switch completionDecision.scheduleAction {
-            case .none:
-                break
-            case .scheduleAutomaticPublish:
-                scheduleAutomaticPublish()
-            case .clearAutomaticPublishSchedule:
-                clearAutomaticPublishSchedule()
-            }
-            statusMessage = completionDecision.statusMessage
-            return true
-        } catch {
-            if isCurrentWorkCancellation(error) { return false }
-            statusMessage = "输出刷新失败，请查看错误详情"
-            presentedError = "刷新模块输出失败：\(error.localizedDescription)"
-            return false
-        }
     }
 }

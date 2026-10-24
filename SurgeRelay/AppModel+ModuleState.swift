@@ -2,17 +2,10 @@ import Foundation
 
 @MainActor
 extension AppModel {
-    func shouldContributeToCombined(_ module: RelayModule) -> Bool {
-        ModuleRefreshPlanner.contributesToCombined(
-            module,
-            combinedModuleEnabled: settings.combinedModuleEnabled
-        )
-    }
 
     func shouldUpdateModule(_ module: RelayModule) -> Bool {
         ModuleRefreshPlanner.isUpdateable(
-            module,
-            combinedModuleEnabled: settings.combinedModuleEnabled
+            module
         )
     }
 
@@ -36,7 +29,6 @@ extension AppModel {
 
     var moduleSummary: ModuleCollectionSummary {
         _ = moduleRevision
-        _ = settings.combinedModuleEnabled
         if let cachedModuleSummary {
             return cachedModuleSummary
         }

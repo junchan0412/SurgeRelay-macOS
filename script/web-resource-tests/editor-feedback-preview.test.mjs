@@ -351,7 +351,7 @@ const previewController = previewHelpers.createPreviewController({
     if (path === '/api/modules/module-1/preview' && options.method === 'PUT') return { message: '预览已保存' };
     if (path === '/api/modules/module-1/preview' && options.method === 'DELETE') return 'restored content';
     if (path === '/api/modules/module-1/preview') return 'editable content';
-    if (path === '/api/combined/preview') return '[General]\nkey = value';
+    if (path === '/api/modules/read-only-fixture/preview') return '[General]\nkey = value';
     throw new Error('missing route');
   },
   document: {
@@ -361,7 +361,7 @@ const previewController = previewHelpers.createPreviewController({
   askConfirmation: async () => true,
   showToast: (message, isError = false) => previewToasts.push({ message, isError })
 });
-await previewController.loadPreview('/api/combined/preview', false);
+await previewController.loadPreview('/api/modules/read-only-fixture/preview', false);
 assert.equal(previewElements['#code-view'].innerHTML, '<pre>[General]\nkey = value</pre>');
 assert.equal(previewController.text, '[General]\nkey = value');
 await previewController.loadPreview('/api/modules/module-1/preview', true);
@@ -401,7 +401,7 @@ let dualPayload = logic.moduleEditorPayload(editorController.collectModuleFields
 assert.deepEqual(Array.from(dualPayload.storageTargets), ['local', 'gitHub']);
 assert.equal(dualPayload.storageLocation, 'local', 'legacy location stays a valid API enum');
 assert.equal(editorController.updateOutputPathPreview({ state: dualState }).path, 'Dual Name.sgmodule');
-assert.match(logic.outputPathNotice('Dual.sgmodule', true, { storageLocation: 'both', publishToLocal: false, publishToGitHub: false }).message, /本地、GitHub/);
+assert.match(logic.outputPathNotice('Dual.sgmodule', { storageLocation: 'both', publishToLocal: false, publishToGitHub: false }).message, /本地、GitHub/);
 for (const location of ['local', 'gitHub']) {
   editorController.populateModuleForm({ name: 'Legacy', storageLocation: location }, { state: dualState });
   assert.equal(editorFormElements.storageLocation.value, location);

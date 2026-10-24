@@ -54,7 +54,6 @@ extension AppModel {
         guard var preview = payload.previews.first else { return }
         preview.reviewToken = payload.token
         pendingPublishPreview = preview
-        selectedModuleID = Self.combinedModuleSelectionID
         statusMessage = GitHubPublishPlanner.previewStatus(preview)
     }
 
@@ -96,7 +95,7 @@ extension AppModel {
                 let recorder = StageMetricsRecorder()
                 metrics[destination] = recorder
                 started[destination] = .now
-                self.setWorkStage(.publish, moduleID: Self.combinedModuleSelectionID, moduleName: destination.title + " 所选模块发布")
+                self.setWorkStage(.publish, moduleID: Self.publishingActivityID, moduleName: destination.title + " 所选模块发布")
                 return try await StageMetricsContext.$current.withValue(recorder) {
                 guard attempt.moduleIDs.isSubset(of: Set(self.modules.map(\.id))) else {
                     throw RelayError.invalidOutput("部分模块已移除，请重新选择发布模块。")
@@ -129,7 +128,7 @@ extension AppModel {
                 }
             },
             didComplete: { latest, target in
-                self.setWorkStage(nil, moduleID: Self.combinedModuleSelectionID, moduleName: target.destination.title)
+                self.setWorkStage(nil, moduleID: Self.publishingActivityID, moduleName: target.destination.title)
                 self.workActivity.canCancel = true
                 self.selectedPublishAttempt = latest
                 self.statusMessage = latest.summary

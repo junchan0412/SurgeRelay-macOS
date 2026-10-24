@@ -19,7 +19,6 @@
     }
 
     const emptyStateMarkup = markup.emptyStateMarkup || (() => '');
-    const combinedDetailMarkup = markup.combinedDetailMarkup || (() => '');
     const moduleDetailMarkup = markup.moduleDetailMarkup || (() => '');
     const argumentsSectionMarkup = markup.argumentsSectionMarkup || (() => '');
 
@@ -67,11 +66,7 @@
         renderHistory(animate);
         return;
       }
-      if (selectedID === 'combined') {
-        if (!state.combined.isEnabled) { normalizeSelection?.(); renderDetail(animate); return; }
-        ui.mobileTitle.textContent = state.combined.name;
-        renderCombinedDetail(animate);
-      }
+
       else {
         const module = state.modules.find(item => item.id === selectedID);
         if (module) {
@@ -101,25 +96,11 @@
       }).catch(() => { if (request === historyRequest) historyVersion = null; });
     }
 
-    function renderCombinedDetail(animate = true) {
-      const state = getState();
-      const combined = state.combined;
-      setDetailHTML(combinedDetailMarkup(combined, {
-        selectedTab: detailTab,
-        latestGitHubPublish: state.activity?.latestGitHubPublish
-      }), animate);
-      if (!combined.isEnabled) return;
-      if (detailTab === 'preview') {
-        previewController.loadPreview('/api/combined/preview', false);
-      }
-    }
-
     function renderModuleDetail(module, animate = true) {
       scheduleCooldown(module);
       const state = getState();
       setDetailHTML(moduleDetailMarkup(module, {
         selectedTab: detailTab,
-        combined: state.combined,
         activity: state.activity
       }), animate);
       if (detailTab === 'preview') {
@@ -175,12 +156,6 @@
         if (JSON.stringify(previous?.workspace) !== JSON.stringify(next.workspace) || logic.sidebarListSignature(previous) !== logic.sidebarListSignature(next)) renderDetail(false);
         return;
       }
-      if (selectedID === 'combined') {
-        if (!next.combined.isEnabled) return;
-        patchDetailValue('包含来源', `${next.combined.enabledCount} / ${next.combined.sourceCount}`);
-        patchDetailValue('最新更新', formatDate(next.combined.lastUpdatedAt, '尚未更新'));
-        return;
-      }
 
       const module = next.modules.find(item => item.id === selectedID);
       if (!module) return;
@@ -195,7 +170,6 @@
       patchDetailValue('更新状态', logic.moduleStatusTitle(module));
       patchDetailValue('初始来源', module.initialSourceTitle || '自写模块');
       patchDetailValue('来源格式', module.sourceFormatTitle);
-      if (next.combined.isEnabled) patchDetailValue('汇总订阅', next.combined.subscriptionURL || '等待发布配置');
       patchDetailValue('创建时间', formatDate(module.createdAt, '—'));
       patchDetailValue('上次更新', formatDate(module.lastUpdatedAt, '从未更新'));
       patchDetailValue('来源检查', formatDate(module.sourceCheckedAt, '尚未检查'));
@@ -408,7 +382,7 @@
       case 'compare-version': await compareVersion(source.dataset.versionId); break;
       case 'refresh-version': await compareVersion(versionID); break;
       case 'restore-version': await restoreVersion(); break;
-      case 'select-all': selectedIDs = new Set((getState().modules || []).filter(module => module.publishesStandalone).map(module => module.id)); render(markup.publicationSelectionMarkup(getState().modules || [], selectedIDs)); break;
+      case 'select-all': selectedIDs = new Set((getState().modules || []).map(module => module.id)); render(markup.publicationSelectionMarkup(getState().modules || [], selectedIDs)); break;
       case 'select-none': selectedIDs.clear(); render(markup.publicationSelectionMarkup(getState().modules || [], selectedIDs)); break;
       case 'choose-modules': openSelected(); break;
       case 'preview-selected': if (selectedIDs.size) await requestPreview({ moduleIDs: [...selectedIDs] }); break;

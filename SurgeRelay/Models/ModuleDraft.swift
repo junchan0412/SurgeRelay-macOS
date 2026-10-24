@@ -26,9 +26,7 @@ struct ModuleDraft: Sendable {
         get { storageTargets.count == 1 ? storageTargets.first! : (storageTargets.contains(.local) ? .local : .gitHub) }
         set { storageTargets = [newValue] }
     }
-    var publishesStandalone = true
     var refreshIntervalMinutes: Int?
-    var isEnabled = false
     var scriptHubOptions = ScriptHubOptions()
     var iconURL = ""
 
@@ -45,9 +43,7 @@ struct ModuleDraft: Sendable {
         moduleDescription = module.moduleDescription
         outputFolder = module.outputFolder
         storageTargets = module.storageTargets
-        publishesStandalone = module.publishesStandalone
         refreshIntervalMinutes = module.refreshIntervalMinutes
-        isEnabled = module.isEnabled
         scriptHubOptions = module.scriptHubOptions
         iconURL = module.customIconURL ?? ""
     }

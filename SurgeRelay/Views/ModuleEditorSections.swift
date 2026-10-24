@@ -94,19 +94,12 @@ struct ModuleEditorIconSection: View {
 }
 
 struct ModuleEditorPublishingSection: View {
-    @Binding var isEnabled: Bool
-    @Binding var publishesStandalone: Bool
     @Binding var outputFileName: String
-    let combinedModuleEnabled: Bool
     let publishedRelativePath: String
     let outputPathNotice: ModuleOutputPathNotice?
 
     var body: some View {
-        ModuleEditorSection("发布") {
-            if combinedModuleEnabled {
-                ModuleEditorToggleRow(title: "包含在总模块中", icon: "square.stack.3d.up", isOn: $isEnabled)
-            }
-            ModuleEditorToggleRow(title: "发布为独立模块", icon: "doc.badge.gearshape", isOn: $publishesStandalone)
+        ModuleEditorSection("输出") {
             ModuleEditorTextFieldRow(title: "输出文件名", icon: "doc", text: $outputFileName, prompt: "留空时根据显示名称生成")
             ModuleEditorInfoRow("输出路径", icon: "folder") {
                 ModuleEditorOutputPathRow(
@@ -174,7 +167,7 @@ struct ModuleEditorConversionSection: View {
             if isAdvancedExpanded {
                 if isNativeSurgeModule {
                     Label(
-                        "该地址是 Surge 模块，将直接参与合并，不经过 Script-Hub；高级转换选项不会应用。",
+                        "该地址是 Surge 模块，将直接生成独立输出，不经过 Script-Hub；高级转换选项不会应用。",
                         systemImage: "arrow.triangle.branch"
                     )
                     .font(.callout)

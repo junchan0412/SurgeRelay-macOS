@@ -38,7 +38,7 @@ struct SettingsPublishingView: View {
                     )
                 }
                 SettingsInfoRow("文件规则", icon: "folder.badge.gearshape") {
-                    Text(model.settings.combinedModuleEnabled ? "总模块保存在根目录；独立模块可选择根目录下的文件夹。" : "独立模块可选择根目录下的文件夹。")
+                    Text("每个模块分别保存，可选择根目录下的文件夹。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

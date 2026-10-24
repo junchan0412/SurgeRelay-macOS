@@ -4,6 +4,82 @@ import XCTest
 
 @MainActor
 final class RelayRuntimeTests: XCTestCase {
+    func testUnmanagedBaiduOutputDoesNotBlockOtherModulesAndCanBeAdopted() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let context = WorkspaceContext(id: UUID(), name: "Independent local outputs",
+            configurationDirectory: root.appending(path: "Config"), cacheDirectory: root.appending(path: "Cache"),
+            allowsLegacyFallback: false)
+        let model = AppModel(context: context, persistsOnInit: false)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        let directory = root.appending(path: "Modules")
+        model.settings.localModuleDirectory = directory.path
+        model.settings.publishToLocal = true
+        model.settings.publishToGitHub = false
+        let blocked = RelayModule(name: "百度网盘去广告", sourceURL: "https://test.invalid/Baidu.plugin", sourceFormat: .loon,
+            outputFileName: "百度网盘去广告.beta.sgmodule", outputFolder: "Sgmodule(#3广告模块)", storageLocation: .local)
+        let ready = RelayModule(name: "Biliverse.Enhanced", sourceURL: "https://test.invalid/Biliverse.sgmodule",
+            outputFileName: "Biliverse.Enhanced.sgmodule", outputFolder: "Sgmodule(#7增强模块)", storageLocation: .local)
+        model.modules = [blocked, ready]
+        let originalURL = directory.appending(path: blocked.publishedRelativePath)
+        let original = Data("#!name=Personal\n[Rule]\nDOMAIN,original.example,DIRECT\n".utf8)
+        try FileManager.default.createDirectory(at: originalURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try original.write(to: originalURL)
+        for module in model.modules {
+            try await model.fileStore.writeComponent("#!name=Cached\n[Rule]\nDOMAIN,updated.example,REJECT\n", id: module.id)
+        }
+
+        let succeeded = await model.refreshModuleOutputs(schedulesAutomaticPublish: false)
+
+        XCTAssertFalse(succeeded)
+        XCTAssertNil(model.presentedError, "One output conflict must not open a global failure dialog")
+        XCTAssertNotNil(model.modules[0].localOutputError)
+        XCTAssertNil(model.modules[1].localOutputError)
+        XCTAssertEqual(model.moduleSummary.attentionCount, 1)
+        XCTAssertTrue(ModuleFilter.attention.matches(model.modules[0]))
+        XCTAssertEqual(ModuleSidebarSectionPlanner.sections(for: model.modules).first?.modules.map(\.id), [blocked.id])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: directory.appending(path: ready.publishedRelativePath).path))
+        XCTAssertEqual(try Data(contentsOf: originalURL), original)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: context.cacheDirectory.appending(path: "Combined.cache").path))
+
+        let review = try await model.prepareLocalOutputAdoption(moduleID: blocked.id)
+        try await model.confirmLocalOutputAdoption(review)
+
+        XCTAssertNil(model.modules[0].localOutputError)
+        XCTAssertEqual(model.moduleSummary.attentionCount, 0)
+        XCTAssertTrue(String(decoding: try Data(contentsOf: originalURL), as: UTF8.self).contains("updated.example"))
+        let backups = try XCTUnwrap(FileManager.default.enumerator(at: context.configurationDirectory.appending(path: "Backups/LocalOutputAdoption"), includingPropertiesForKeys: nil))
+            .allObjects.compactMap { $0 as? URL }.filter { $0.pathExtension == "sgmodule" }
+        XCTAssertEqual(backups.count, 1)
+        XCTAssertEqual(try Data(contentsOf: XCTUnwrap(backups.first)), original)
+    }
+
+    func testRefreshingOneModuleDoesNotReadOrPublishUnrelatedModules() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let context = WorkspaceContext(id: UUID(), name: "Selected output isolation",
+            configurationDirectory: root.appending(path: "Config"), cacheDirectory: root.appending(path: "Cache"),
+            allowsLegacyFallback: false)
+        let model = AppModel(context: context, persistsOnInit: false)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        model.settings.localModuleDirectory = root.appending(path: "Modules").path
+        model.settings.publishToLocal = true
+        model.settings.publishToGitHub = false
+        let unrelated = RelayModule(name: "No cache", sourceURL: "https://test.invalid/missing.sgmodule",
+            outputFileName: "Missing", storageLocation: .local)
+        let selected = RelayModule(name: "Selected", sourceURL: "https://test.invalid/selected.sgmodule",
+            outputFileName: "Selected", storageLocation: .local)
+        model.modules = [unrelated, selected]
+        try await model.fileStore.writeComponent("[Rule]\nDOMAIN,selected.example,DIRECT", id: selected.id)
+
+        let succeeded = await model.refreshModuleOutputs(moduleIDs: [selected.id], schedulesAutomaticPublish: false)
+
+        XCTAssertTrue(succeeded)
+        XCTAssertNil(model.modules[0].localOutputError)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appending(path: "Modules/Selected.sgmodule").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appending(path: "Modules/Missing.sgmodule").path))
+    }
+
     func testNativeUpdateCommitsSnapshotAndFinishesActivity() async throws {
         guard AppRuntimeOptions.isUIQAMode else { throw XCTSkip("Requires isolated QA configuration") }
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
@@ -12,7 +88,7 @@ final class RelayRuntimeTests: XCTestCase {
         let source = root.appending(path: "Runtime.sgmodule")
         try Data("#!name=Runtime\n[Rule]\nDOMAIN,example.org,DIRECT\n".utf8).write(to: source)
         let model = isolatedModel()
-        let module = RelayModule(name: "Runtime", sourceURL: source.absoluteString, outputFileName: "Runtime", publishesStandalone: true)
+        let module = RelayModule(name: "Runtime", sourceURL: source.absoluteString, outputFileName: "Runtime")
         model.modules = [module]
         await model.updateAll(refreshesScriptHubEngine: false)
         XCTAssertFalse(model.isWorking)
@@ -72,40 +148,7 @@ final class RelayRuntimeTests: XCTestCase {
         XCTAssertNotEqual(before, ModuleSearchIndex.contentCacheKey(for: module))
     }
 
-    func testPartialUpdateDoesNotReportSuccessWhenCombinedCacheIsMissing() async throws {
-        guard AppRuntimeOptions.isUIQAMode else { throw XCTSkip("Requires isolated QA configuration") }
-        let model = isolatedModel()
-        model.settings.combinedModuleEnabled = true
-        model.modules = [RelayModule(name: "Missing", sourceURL: "https://test.invalid/missing.sgmodule", outputFileName: "Missing", isEnabled: true)]
-        try await model.fileStore.writeCombined("previous combined output")
-        await model.finishModuleUpdateRun(
-            ModuleUpdateRunResult(components: [], failures: 0, missingCacheModuleNames: [], missingCacheDetails: [], contentChanged: true),
-            generation: model.localChangeGeneration,
-            rebuildFromCache: true
-        )
-        XCTAssertTrue(model.statusMessage.contains("缺少模块缓存"))
-        XCTAssertTrue(model.presentedError?.contains("Missing") == true)
-        XCTAssertNil(model.automaticPublishRunsAt)
-        let combined = try await model.fileStore.readCombined()
-        XCTAssertEqual(String(data: combined, encoding: .utf8), "previous combined output")
-        try await model.fileStore.removeCombined()
-    }
 
-    func testRebuildReportsLocalExportFailureWithoutCombinedContributors() async throws {
-        guard AppRuntimeOptions.isUIQAMode else { throw XCTSkip("Requires isolated QA configuration") }
-        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
-        try Data("not a directory".utf8).write(to: root)
-        defer { try? FileManager.default.removeItem(at: root) }
-        let model = isolatedModel()
-        model.modules = []
-        model.settings.publishToLocal = true
-        model.settings.localModuleDirectory = root.path
-        let succeeded = await model.rebuildCombinedFromCache()
-        XCTAssertFalse(succeeded)
-        XCTAssertTrue(model.statusMessage.contains("输出刷新失败"))
-        XCTAssertNotNil(model.presentedError)
-        XCTAssertNil(model.automaticPublishRunsAt)
-    }
 
     func testSelectedPublishCannotReuseOverwritePermissionFromAnotherRoot() async throws {
         guard AppRuntimeOptions.isUIQAMode else { throw XCTSkip("Requires isolated QA configuration") }
@@ -128,29 +171,6 @@ final class RelayRuntimeTests: XCTestCase {
         XCTAssertNotEqual(model.settings.localPublishedRootDirectory, root.path)
     }
 
-    func testFullUpdateReportsExportFailureWithoutClaimingCacheWasUnchanged() async throws {
-        guard AppRuntimeOptions.isUIQAMode else { throw XCTSkip("Requires isolated QA configuration") }
-        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
-        try Data("not a directory".utf8).write(to: root)
-        defer { try? FileManager.default.removeItem(at: root) }
-        let model = isolatedModel()
-        model.settings.combinedModuleEnabled = true
-        model.settings.publishToLocal = true
-        model.settings.localModuleDirectory = root.path
-        let module = RelayModule(name: "Updated", sourceURL: "https://test.invalid/updated.sgmodule", outputFileName: "Updated", isEnabled: true)
-        model.modules = [module]
-        await model.finishModuleUpdateRun(
-            ModuleUpdateRunResult(components: [(module, "[Rule]\nDOMAIN,updated.example,DIRECT")], failures: 0, missingCacheModuleNames: [], missingCacheDetails: [], contentChanged: true),
-            generation: model.localChangeGeneration
-        )
-        XCTAssertTrue(model.presentedError?.contains("刷新模块输出失败") == true)
-        XCTAssertFalse(model.presentedError?.contains("未被覆盖") == true)
-        XCTAssertTrue(model.statusMessage.contains("输出刷新失败"))
-        XCTAssertNil(model.automaticPublishRunsAt)
-        let cached = try await model.fileStore.readCombined()
-        XCTAssertTrue(String(data: cached, encoding: .utf8)?.contains("updated.example") == true)
-        try await model.fileStore.removeCombined()
-    }
 
     func testSelectedPublishDropsUnrelatedManifestAfterRootChange() async throws {
         guard AppRuntimeOptions.isUIQAMode else { throw XCTSkip("Requires isolated QA configuration") }
@@ -281,7 +301,7 @@ final class RelayRuntimeTests: XCTestCase {
         XCTAssertThrowsError(try model.duplicateModule(id: module.id)) { XCTAssertEqual($0 as? PreviewContentSaveError, .busy) }
         model.setModuleArgument(moduleID: module.id, key: "policy", value: "New", defaultValue: "Default")
         model.resetModuleArguments(moduleID: module.id)
-        model.setModuleIncludedInCombined(id: module.id, included: true)
+        model.resetModuleArguments(moduleID: module.id)
         await model.deleteModule(id: module.id)
         await model.acceptOverrideConflict(moduleID: module.id)
         XCTAssertEqual(model.modules, [module])
@@ -376,24 +396,25 @@ final class RelayRuntimeTests: XCTestCase {
         model.settings.publishToLocal = false
         model.settings.publishToGitHub = false
         model.settings.localModuleDirectory = root.appending(path: "Modules").path
-        let source = RelayModule(
+        var source = RelayModule(
             name: "Local",
             sourceURL: root.appending(path: "Modules/My Module.sgmodule").absoluteString,
             outputFileName: "My Module.sgmodule",
             storageLocation: .local,
             localStorageRelativePath: "My Module.sgmodule"
         )
+        source.localOutputError = "Original target is occupied"
         model.modules = [source]
 
         try model.duplicateModule(id: source.id)
         try await model.flushPersistence()
         let copy = try XCTUnwrap(model.modules.last)
+        XCTAssertNil(copy.localOutputError)
         XCTAssertEqual(copy.outputFileName, "My Module-2.sgmodule")
         XCTAssertEqual(copy.localStorageRelativePath, "My Module-2.sgmodule")
         XCTAssertNotEqual(copy.publishedRelativePath, source.publishedRelativePath)
         let restored = ModuleNamingPlanner.normalizedModuleNaming(
             model.modules,
-            combinedFileName: model.settings.combinedModuleFileName,
             localModuleDirectory: model.settings.localModuleDirectory
         )
         XCTAssertEqual(restored, model.modules)
@@ -412,11 +433,9 @@ final class RelayRuntimeTests: XCTestCase {
         model.settings.localModuleDirectory = directory.path
         model.settings.publishToLocal = true
         model.settings.publishToGitHub = true
-        model.settings.combinedModuleEnabled = false
         var missing = RelayModule(name: "Biliverse.Enhanced", sourceURL: "https://test.invalid/Biliverse.sgmodule",
             outputFileName: "Biliverse.Enhanced.sgmodule", outputFolder: "Sgmodule(#7增强模块)",
-            storageLocation: .local, localStorageRelativePath: "Sgmodule(#7增强模块)/Biliverse.Enhanced.sgmodule",
-            publishesStandalone: true, isEnabled: false)
+            storageLocation: .local, localStorageRelativePath: "Sgmodule(#7增强模块)/Biliverse.Enhanced.sgmodule")
         missing.storageTargets = [.local, .gitHub]
         let blocked = RelayModule(name: "Unmanaged", sourceURL: "https://test.invalid/Unmanaged.sgmodule",
             outputFileName: "Unmanaged.sgmodule", storageLocation: .local)
@@ -429,7 +448,7 @@ final class RelayRuntimeTests: XCTestCase {
         }
         let before = await model.localModuleOutputSnapshot(for: missing)
         XCTAssertEqual(before.state, .missing)
-        let rebuilt = await model.rebuildCombinedFromCache(schedulesAutomaticPublish: false)
+        let rebuilt = await model.refreshModuleOutputs(schedulesAutomaticPublish: false)
         XCTAssertFalse(rebuilt)
 
         try await model.writeLocalModuleOutput(moduleID: missing.id)
@@ -455,11 +474,9 @@ final class RelayRuntimeTests: XCTestCase {
         model.settings.localModuleDirectory = directory.path
         model.settings.publishToLocal = true
         model.settings.publishToGitHub = false
-        model.settings.combinedModuleEnabled = false
         let module = RelayModule(name: "百度网盘去广告", sourceURL: "https://test.invalid/Baidu.plugin", sourceFormat: .loon,
             outputFileName: "百度网盘去广告.beta.sgmodule", outputFolder: "Sgmodule(#3广告模块)",
-            storageLocation: .local, localStorageRelativePath: "Sgmodule(#3广告模块)/百度网盘去广告.beta.sgmodule",
-            publishesStandalone: false)
+            storageLocation: .local, localStorageRelativePath: "Sgmodule(#3广告模块)/百度网盘去广告.beta.sgmodule")
         model.modules = [module]
         let destination = directory.appending(path: module.publishedRelativePath)
         try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -498,11 +515,10 @@ final class RelayRuntimeTests: XCTestCase {
         model.settings.localModuleDirectory = directory.path
         model.settings.publishToLocal = true
         model.settings.publishToGitHub = false
-        model.settings.combinedModuleEnabled = false
         model.settings.watchesLocalModuleChanges = false
         model.settings.automaticallyPublish = false
         let module = RelayModule(name: "With assets", sourceURL: "https://test.invalid/assets.sgmodule", sourceFormat: .surge,
-            outputFileName: "With-assets.sgmodule", storageLocation: .local, isEnabled: true)
+            outputFileName: "With-assets.sgmodule", storageLocation: .local)
         model.modules = [module]
         let assetPath = "assets/\(module.id.uuidString.lowercased())/demo.js"
         let content = "#!name=With assets\n[Script]\nDemo = type=http-request, pattern=^https://example.org, script-path=\(assetPath)\n"
@@ -513,11 +529,10 @@ final class RelayRuntimeTests: XCTestCase {
         try await model.publishSelectedLocalFiles(selected)
         XCTAssertEqual(try Data(contentsOf: directory.appending(path: assetPath)), firstAsset)
 
-        for includesCombined in [false, true] {
-            model.settings.combinedModuleEnabled = includesCombined
-            let currentAsset = Data("const combined = \(includesCombined);".utf8)
+        for revision in [1, 2] {
+            let currentAsset = Data("const revision = \(revision);".utf8)
             try await model.fileStore.replaceAssets([GeneratedAsset(relativePath: assetPath, data: currentAsset)], id: module.id)
-            let succeeded = await model.rebuildCombinedFromCache(schedulesAutomaticPublish: false)
+            let succeeded = await model.refreshModuleOutputs(schedulesAutomaticPublish: false)
             XCTAssertTrue(succeeded, model.presentedError ?? "Local rebuild failed")
             XCTAssertNil(model.pendingPublishPreview, "Current assets must never appear in obsolete-file cleanup")
             XCTAssertTrue(model.settings.localPublishedFilePaths.contains(assetPath))
@@ -537,7 +552,6 @@ final class RelayRuntimeTests: XCTestCase {
         model.settings.localModuleDirectory = directory.path
         model.settings.publishToLocal = true
         model.settings.publishToGitHub = false
-        model.settings.combinedModuleEnabled = false
         model.settings.watchesLocalModuleChanges = false
         model.settings.automaticallyPublish = false
         let sourcePath = "Source.sgmodule"
@@ -552,9 +566,13 @@ final class RelayRuntimeTests: XCTestCase {
         model.modules = [RelayModule(name: "Source", sourceURL: source.absoluteString, sourceFormat: .surge,
             outputFileName: sourcePath, storageLocation: .local, localStorageRelativePath: sourcePath)]
 
-        try await model.publishCurrentFiles(combinedData: nil)
-        XCTAssertEqual(model.pendingPublishPreview?.deletedFiles, ["Old.sgmodule"])
+        _ = await model.refreshModuleOutputs(schedulesAutomaticPublish: false)
+        XCTAssertNil(model.pendingPublishPreview)
         XCTAssertEqual(model.settings.localPublishedFilePaths, ["Old.sgmodule"])
+        let oldData = try Data(contentsOf: directory.appending(path: "Old.sgmodule"))
+        model.pendingPublishPreview = PublishPreview(destination: .local, targetDescription: directory.path, activeFiles: [],
+            changedFiles: [], deletedFiles: ["Old.sgmodule"], localExpectedHashes: ["Old.sgmodule": oldData.sha256String],
+            localReviewFingerprint: model.localCleanupReviewFingerprint())
         await model.confirmPendingPublish()
         XCTAssertEqual(try Data(contentsOf: source), original)
         XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appending(path: "Old.sgmodule").path))
@@ -585,7 +603,6 @@ final class RelayRuntimeTests: XCTestCase {
         let model = AppModel(context: context, persistsOnInit: false)
         model.settings.localModuleDirectory = directory.path
         model.settings.watchesLocalModuleChanges = false
-        model.settings.combinedModuleEnabled = false
         model.settings.publishToLocal = true
         model.settings.publishToGitHub = false
         model.settings.automaticallyPublish = false
@@ -621,7 +638,6 @@ final class RelayRuntimeTests: XCTestCase {
             cacheDirectory: root.appending(path: "Cache"), allowsLegacyFallback: false)
         let model = AppModel(context: context, persistsOnInit: false)
         model.settings.localModuleDirectory = directory.path
-        model.settings.combinedModuleEnabled = false
         model.settings.publishToLocal = false
         model.settings.publishToGitHub = false
         model.settings.watchesLocalModuleChanges = false
@@ -702,12 +718,11 @@ final class RelayRuntimeTests: XCTestCase {
         let model = AppModel(context: context, persistsOnInit: false)
         model.settings.localModuleDirectory = directory.path
         model.settings.watchesLocalModuleChanges = false
-        model.settings.combinedModuleEnabled = true
         model.settings.publishToLocal = true
         model.settings.publishToGitHub = true
         model.settings.automaticallyPublish = true
         let contributor = RelayModule(name: "Combined contributor", sourceURL: "https://test.invalid/existing.sgmodule",
-                                      outputFileName: "Existing", isEnabled: true)
+                                      outputFileName: "Existing")
         model.modules = [contributor]
         try await model.fileStore.writeComponent("[Rule]\nDOMAIN,existing.example,DIRECT", id: contributor.id)
 
@@ -725,8 +740,8 @@ final class RelayRuntimeTests: XCTestCase {
         let cached = try await model.fileStore.readConvertedComponent(id: imported.id)
         XCTAssertTrue(cached.contains("# Keep this local explanation"))
         XCTAssertTrue(cached.contains("script-path=assets/local.js"))
-        let combined = try await model.fileStore.readCombined()
-        XCTAssertTrue(String(decoding: combined, as: UTF8.self).contains("existing.example"))
+        let retained = try await model.fileStore.readComponent(id: contributor.id)
+        XCTAssertTrue(retained.contains("existing.example"))
         await model.importLocalModules(report.candidates)
         XCTAssertEqual(model.modules.count, 2)
         XCTAssertEqual(try Data(contentsOf: source), original)
@@ -735,18 +750,18 @@ final class RelayRuntimeTests: XCTestCase {
         model.persistenceFeedbackTask?.cancel()
     }
 
-    func testScheduledRefreshUpdatesOnlyDueModulesAndPreservesCombinedCache() async throws {
+    func testScheduledRefreshUpdatesOnlyDueModulesAndPreservesOtherCaches() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let fastURL = root.appending(path: "Fast.sgmodule")
         try Data("#!name=Fast\n[Rule]\nDOMAIN,fast-new.example,DIRECT".utf8).write(to: fastURL)
         let now = Date.now
-        let fast = RelayModule(name: "Fast", sourceURL: fastURL.absoluteString, outputFileName: "Fast", isEnabled: true,
+        let fast = RelayModule(name: "Fast", sourceURL: fastURL.absoluteString, outputFileName: "Fast",
                                lastUpdatedAt: now.addingTimeInterval(-7_200), refreshIntervalMinutes: 5,
                                lastRefreshAttemptAt: now.addingTimeInterval(-7_200))
         let slow = RelayModule(name: "Slow", sourceURL: root.appending(path: "Missing-but-not-due.sgmodule").absoluteString,
-                               outputFileName: "Slow", isEnabled: true, lastUpdatedAt: now,
+                               outputFileName: "Slow", lastUpdatedAt: now,
                                refreshIntervalMinutes: 60, lastRefreshAttemptAt: now)
         let context = WorkspaceContext(
             id: UUID(), name: "Scheduled refresh regression",
@@ -760,19 +775,18 @@ final class RelayRuntimeTests: XCTestCase {
         model.settings.automaticallyPublish = false
         model.settings.watchesLocalModuleChanges = false
         model.settings.localModuleDirectory = root.path
-        model.settings.combinedModuleEnabled = true
         model.modules = [fast, slow]
         try await model.fileStore.writeComponent("#!name=Fast\n[Rule]\nDOMAIN,fast-old.example,DIRECT", id: fast.id)
         try await model.fileStore.writeComponent("#!name=Slow\n[Rule]\nDOMAIN,slow-cached.example,DIRECT", id: slow.id)
         await model.updateAll(refreshesScriptHubEngine: false, trigger: .scheduled)
         XCTAssertEqual(model.synchronizationTotalCount, 1)
         XCTAssertEqual(model.modules.first(where: { $0.id == slow.id })?.lastRefreshAttemptAt, now)
-        let combined = String(decoding: try await model.fileStore.readCombined(), as: UTF8.self)
-        XCTAssertTrue(combined.contains("fast-new.example"))
-        XCTAssertTrue(combined.contains("slow-cached.example"))
+        let updatedFast = try await model.fileStore.readComponent(id: fast.id)
+        let retainedSlow = try await model.fileStore.readComponent(id: slow.id)
+        XCTAssertTrue(updatedFast.contains("fast-new.example"))
+        XCTAssertTrue(retainedSlow.contains("slow-cached.example"))
         try await model.fileStore.removeComponent(id: fast.id)
         try await model.fileStore.removeComponent(id: slow.id)
-        try await model.fileStore.removeCombined()
         model.persistenceFeedbackTask?.cancel()
     }
 
@@ -837,7 +851,6 @@ final class RelayRuntimeTests: XCTestCase {
         model.settings.localPublishedFilePaths = ["Existing.sgmodule"]
         model.settings.publishToLocal = true
         model.settings.publishToGitHub = false
-        model.settings.combinedModuleEnabled = false
         model.settings.automaticallyPublish = false
         model.settings.watchesLocalModuleChanges = false
         let module = RelayModule(name: "Context", sourceURL: "https://test.invalid/context.sgmodule", sourceFormat: .surge,
@@ -853,8 +866,11 @@ final class RelayRuntimeTests: XCTestCase {
                      PublishFile(name: assetPath, data: assetData)]
         let publish = Task { @MainActor in
             defer { checkpoint.continuation.finish() }
-            if selected { try await model.publishSelectedLocalFiles(files) }
-            else { try await model.publishCurrentFiles(combinedData: nil) }
+            if selected {
+                try await model.publishSelectedLocalFiles(files)
+                return true
+            }
+            return await model.refreshModuleOutputs(schedulesAutomaticPublish: false)
         }
         var events = checkpoint.stream.makeAsyncIterator()
         let reachedCheckpoint = await events.next()
@@ -875,8 +891,8 @@ final class RelayRuntimeTests: XCTestCase {
         let expectedPaths = model.settings.localPublishedFilePaths
         resume.signal()
         do {
-            try await publish.value
-            XCTFail("A stale publish must not commit the previous context's manifest")
+            let succeeded = try await publish.value
+            XCTAssertFalse(succeeded, "A stale publish must reject the previous context")
         } catch {
             XCTAssertTrue(error is CancellationError, error.localizedDescription)
         }
@@ -893,7 +909,6 @@ final class RelayRuntimeTests: XCTestCase {
         let model = AppModel()
         model.settings.publishToLocal = false
         model.settings.publishToGitHub = false
-        model.settings.combinedModuleEnabled = false
         model.settings.automaticallyUpdateScriptHub = false
         model.settings.automaticallyPublish = false
         model.settings.github.owner = ""

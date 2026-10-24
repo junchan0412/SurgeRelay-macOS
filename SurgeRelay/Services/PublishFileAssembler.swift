@@ -2,8 +2,6 @@ import Foundation
 
 struct PublishFileAssemblyRequest {
     var plan: PublishPlan
-    var combinedData: Data?
-    var combinedFileName: String
     var includeAssets: Bool
     var destination: PublishDestination
     var localModuleDirectory: String
@@ -26,12 +24,6 @@ enum PublishFileAssembler {
         cancellationCheckpoint: CancellationCheckpoint
     ) async throws -> [PublishFile] {
         var files: [PublishFile] = []
-        if request.plan.includesCombined, let combinedData = request.combinedData {
-            files.append(PublishFile(
-                name: FilenameSanitizer.sgmoduleName(from: request.combinedFileName),
-                data: combinedData
-            ))
-        }
         for module in request.plan.standaloneModules {
             try await cancellationCheckpoint()
             try Task.checkCancellation()

@@ -36,7 +36,7 @@ enum ModuleDraftRelationshipPlanner {
     ) -> ModuleDraftRelationshipPresentation {
         let initialSource = initialSource(draft: draft, existingModule: existingModule)
         let storageTitle = storageTargetsTitle(draft.storageTargets)
-        let isWarning = draft.publishesStandalone && (
+        let isWarning = (
             (draft.storageTargets.contains(.local) && !publishToLocal) ||
             (draft.storageTargets.contains(.gitHub) && !publishToGitHub)
         )
@@ -78,9 +78,6 @@ enum ModuleDraftRelationshipPlanner {
             if isWarning { return "该模块同时发布到本地和 GitHub；请开启对应的全局发布开关。" }
             return "双目标模块：转换结果会同时写入本地模块根目录并发布到 GitHub。两端内容不一致时，更新会暂停并要求选择覆盖方向。"
         }
-        if !draft.publishesStandalone {
-            return "未开启独立发布：转换结果保存在本地缓存，不会写入独立模块目录。"
-        }
         if isWarning {
             return "该模块的部分发布目标尚未开启；开启对应的本地或 GitHub 发布后才会生成独立文件。"
         }
@@ -118,18 +115,16 @@ enum ModuleDraftPlanner {
     static func addPlan(
         from draft: ModuleDraft,
         modules: [RelayModule],
-        combinedModuleFileName: String,
         localModuleDirectory: String
     ) throws -> ModuleDraftAddPlan {
         if let message = draft.validationMessage { throw RelayError.invalidOutput(message) }
         let normalizedDraft = try normalizedDraftValues(
             draft,
             modules: modules,
-            combinedModuleFileName: combinedModuleFileName,
             localModuleDirectory: localModuleDirectory
         )
         guard !hasRegisteredSource(normalizedDraft.source, modules: modules,
-                                   localModuleDirectory: localModuleDirectory) else {
+                       localModuleDirectory: localModuleDirectory) else {
             throw RelayError.duplicateSourceURL
         }
         var module = RelayModule(
@@ -144,8 +139,6 @@ enum ModuleDraftPlanner {
             storageTargets: draft.storageTargets,
             localStorageRelativePath: normalizedDraft.localStorageRelativePath,
             preservesOutputFileName: draft.storageTargets.contains(.local),
-            publishesStandalone: draft.publishesStandalone,
-            isEnabled: draft.isEnabled,
             scriptHubOptions: draft.scriptHubOptions,
             iconURL: normalizedDraft.customIconURL,
             customIconURL: normalizedDraft.customIconURL,
@@ -164,7 +157,6 @@ enum ModuleDraftPlanner {
         id: UUID,
         from draft: ModuleDraft,
         modules: [RelayModule],
-        combinedModuleFileName: String,
         localModuleDirectory: String
     ) throws -> ModuleDraftUpdatePlan? {
         if let message = draft.validationMessage { throw RelayError.invalidOutput(message) }
@@ -172,12 +164,11 @@ enum ModuleDraftPlanner {
         let normalizedDraft = try normalizedDraftValues(
             draft,
             modules: modules,
-            combinedModuleFileName: combinedModuleFileName,
             localModuleDirectory: localModuleDirectory,
             excluding: id
         )
         guard !hasRegisteredSource(normalizedDraft.source, modules: modules.filter { $0.id != id },
-                                   localModuleDirectory: localModuleDirectory) else {
+                       localModuleDirectory: localModuleDirectory) else {
             throw RelayError.duplicateSourceURL
         }
 
@@ -192,8 +183,6 @@ enum ModuleDraftPlanner {
             current.storageTargets != draft.storageTargets ||
             current.localStorageRelativePath != normalizedDraft.localStorageRelativePath ||
             current.preservesOutputFileName != draft.storageTargets.contains(.local) ||
-            current.publishesStandalone != draft.publishesStandalone ||
-            current.isEnabled != draft.isEnabled ||
             current.scriptHubOptions != draft.scriptHubOptions ||
             current.customIconURL != normalizedDraft.customIconURL
 
@@ -223,10 +212,12 @@ enum ModuleDraftPlanner {
         module.storageTargets = draft.storageTargets
         module.localStorageRelativePath = normalizedDraft.localStorageRelativePath
         module.preservesOutputFileName = draft.storageTargets.contains(.local)
-        module.publishesStandalone = draft.publishesStandalone
-        module.isEnabled = draft.isEnabled
+
         module.scriptHubOptions = draft.scriptHubOptions
         module.customIconURL = normalizedDraft.customIconURL
+        if current.publishedRelativePath != module.publishedRelativePath || current.storageTargets != module.storageTargets {
+            module.localOutputError = nil
+        }
         module.detectedSourceFormat = normalizedDraft.detectedSourceFormat
         if sourceChanged {
             clearSourceRevisionState(&module)
@@ -313,7 +304,6 @@ enum ModuleDraftPlanner {
     private static func normalizedDraftValues(
         _ draft: ModuleDraft,
         modules: [RelayModule],
-        combinedModuleFileName: String,
         localModuleDirectory: String,
         excluding excludedID: UUID? = nil
     ) throws -> NormalizedDraftValues {
@@ -323,8 +313,7 @@ enum ModuleDraftPlanner {
             for: draft,
             source: source,
             modules: modules,
-            combinedModuleFileName: combinedModuleFileName,
-            excluding: excludedID
+                        excluding: excludedID
         )
         let localStorageRelativePath = try ModuleNamingPlanner.localStorageRelativePath(
             storageLocation: draft.storageLocation,

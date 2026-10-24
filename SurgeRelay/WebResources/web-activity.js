@@ -36,7 +36,7 @@
         ui.progressTrack.hidden = true;
         ui.progressFill.style.width = activity.progressWidth;
       }
-      ui.latestUpdate.textContent = format.formatDate(state.combined.lastUpdatedAt, '尚未更新');
+      ui.latestUpdate.textContent = format.formatDate((state.modules || []).map(module => module.lastUpdatedAt).filter(Boolean).sort().at(-1), '尚未更新');
     }
 
     return { render };

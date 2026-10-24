@@ -3,135 +3,33 @@ import Foundation
 @MainActor
 extension AppModel {
     @discardableResult
-    func rebuildCombinedFromCache(schedulesAutomaticPublish: Bool = true, exportsLocalOutput: Bool = true) async -> Bool {
-        let rebuildGeneration = localChangeGeneration
-        let enabled = ModuleRefreshPlanner.combinedContributorModules(
-            in: modules,
-            combinedModuleEnabled: settings.combinedModuleEnabled
-        )
-        do {
-            try checkCurrentWorkCancellation()
-            var components: [(RelayModule, String)] = []
-            for module in enabled {
-                try checkCurrentWorkCancellation()
-                guard let content = try? await fileStore.readComponent(id: module.id) else {
-                    statusMessage = "缺少模块缓存，输出尚未刷新"
-                    presentedError = "“\(module.name)”缺少转换缓存，请先更新该模块。当前总模块已保留。"
-                    return false
-                }
-                let materialized = await processingWorker.materialize(content, overrides: module.argumentOverrides)
-                components.append((module, materialized))
-            }
-            try checkCurrentWorkCancellation()
-            guard rebuildGeneration == localChangeGeneration else {
-                return await rebuildCombinedFromCache(schedulesAutomaticPublish: schedulesAutomaticPublish, exportsLocalOutput: exportsLocalOutput)
-            }
-            if enabled.isEmpty {
-                try await fileStore.removeCombined()
-                if exportsLocalOutput { try await publishCurrentFiles(combinedData: nil) }
-            } else if !(try await writeCombinedModule(components, generation: rebuildGeneration, exportsLocalOutput: exportsLocalOutput)) {
-                guard !workCancellationRequested, !Task.isCancelled else { return false }
-                return await rebuildCombinedFromCache(schedulesAutomaticPublish: schedulesAutomaticPublish, exportsLocalOutput: exportsLocalOutput)
-            }
-            try checkCurrentWorkCancellation()
-            guard rebuildGeneration == localChangeGeneration else {
-                return await rebuildCombinedFromCache(schedulesAutomaticPublish: schedulesAutomaticPublish, exportsLocalOutput: exportsLocalOutput)
-            }
-            if schedulesAutomaticPublish { scheduleAutomaticPublish() }
-            return true
-        } catch {
-            if isCurrentWorkCancellation(error) { return false }
-            statusMessage = "输出刷新失败，请查看错误详情"
-            presentedError = "刷新模块输出失败：\(error.localizedDescription)"
-            return false
-        }
-    }
-
-    func writeCombinedModule(_ components: [(RelayModule, String)], generation: Int, exportsLocalOutput: Bool = true) async throws -> Bool {
-        try checkCurrentWorkCancellation()
-        let ids = Set(components.map { $0.0.id })
-        let sourceFiles = components.map { PublishFile(name: $0.0.publishedRelativePath, data: Data($0.1.utf8)) }
-        let assets = try await fileStore.generatedAssetFiles(for: ids)
-        let issues = await Task.detached { ModuleLintPlanner.check(files: sourceFiles + assets, ownedModuleIDs: ids) }.value
-        try ModuleLintPlanner.throwIfBlocking(issues)
-        guard shouldContinueCurrentWork(generation: generation) else { return false }
-        let merged = try await processingWorker.merge(
-            components,
-            engineRevision: upstreamState.revision
-        )
-        guard shouldContinueCurrentWork(generation: generation) else { return false }
-        try await fileStore.writeCombined(merged)
-        guard shouldContinueCurrentWork(generation: generation) else { return false }
-        if exportsLocalOutput { try await publishCurrentFiles(combinedData: Data(merged.utf8)) }
-        return true
-    }
-
-    func publishCurrentFiles(combinedData: Data?) async throws {
+    func refreshModuleOutputs(moduleIDs: Set<UUID>? = nil, schedulesAutomaticPublish: Bool = true) async -> Bool {
+        let generation = localChangeGeneration
+        let selected = modules.filter { moduleIDs?.contains($0.id) ?? true }
+        var failures = 0
         if settings.publishToLocal {
-            let generation = localChangeGeneration
-            let target = settings.localModuleDirectory
-            try await reconcileRecoveredLocalResources()
-            try checkLocalPublishContext(target: target, generation: generation)
-            let files = try await currentPublishedFiles(
-                combinedData: combinedData,
-                includeAssets: true,
-                destination: .local
-            )
-            let ids = PublishCoordinator.plan(modules: modules, combinedModuleEnabled: settings.combinedModuleEnabled,
-                destination: .local).assetModuleIDs
-            let issues = await Task.detached { ModuleLintPlanner.check(files: files, ownedModuleIDs: ids) }.value
-            try ModuleLintPlanner.throwIfBlocking(issues)
-            try checkCurrentWorkCancellation()
-            try checkLocalPublishContext(target: target, generation: generation)
-            let localPublishPlan = LocalPublishedFilesPlanner.plan(
-                files: files,
-                targetDirectory: target,
-                previousRootDirectory: settings.localPublishedRootDirectory,
-                previousPublishedPaths: settings.localPublishedFilePaths,
-                protectedSourcePaths: localProtectedSourcePaths(targetDirectory: target)
-            )
-            do {
-                let recorder = StageMetricsContext.current ?? StageMetricsRecorder()
-                _ = try await recorder.measure(.publish, reason: "本地", bytes: { paths in
-                    (nil, Int64(files.filter { paths.contains($0.name) }.reduce(0) { $0 + $1.data.count }))
-                }) {
-                    try await fileStore.exportPublishedFiles(files, toRootDirectory: localPublishPlan.targetDirectory,
-                        removingObsoleteRelativePaths: [], knownManagedRelativePaths: localPublishPlan.knownManagedPaths,
-                        protectedSourcePaths: localProtectedSourcePaths(targetDirectory: target))
+            for module in selected where module.hasLocalStorageTarget {
+                guard shouldContinueCurrentWork(generation: generation) else { return false }
+                do {
+                    let files = try await selectedLocalPublishedFiles(moduleIDs: [module.id])
+                    try await publishSelectedLocalFiles(files)
+                    if let index = modules.firstIndex(where: { $0.id == module.id }) { modules[index].localOutputError = nil }
+                } catch {
+                    if isCurrentWorkCancellation(error) { return false }
+                    failures += 1
+                    if let index = modules.firstIndex(where: { $0.id == module.id }) {
+                        modules[index].localOutputError = error.localizedDescription
+                    }
+                    recordHistory([UpdateHistoryEntry(moduleID: module.id, moduleName: module.name, outcome: .failed,
+                        duration: 0, message: "本地输出失败：\(error.localizedDescription)", publishDestination: .local)])
                 }
-            } catch let failure as LocalPublishPartialFailure {
-                try await retainPartialLocalPublish(failure.writtenPaths, target: target,
-                    generation: generation, knownPaths: localPublishPlan.knownManagedPaths)
-                throw failure
             }
-            try checkLocalPublishContext(target: target, generation: generation)
-            switch LocalPublishedFilesPlanner.completion(afterExporting: localPublishPlan) {
-            case .persisted(let rootDirectory, let filePaths):
-                settings.localPublishedRootDirectory = rootDirectory
-                settings.localPublishedFilePaths = filePaths
-                if pendingPublishPreview?.destination == .local {
-                    pendingPublishPreview = nil
-                }
-                saveSettings()
-            case .requiresCleanup(var preview, let message):
-                var hashes: [String: String] = [:]
-                for path in preview.deletedFiles {
-                    let data = try await fileStore.readPublishedFile(relativePath: path, rootDirectoryPath: localPublishPlan.targetDirectory)
-                    try checkLocalPublishContext(target: target, generation: generation)
-                    hashes[path] = data?.sha256String ?? "<missing>"
-                }
-                preview.localExpectedHashes = hashes
-                preview.localReviewFingerprint = localCleanupReviewFingerprint()
-                settings.localPublishedRootDirectory = localPublishPlan.targetDirectory
-                settings.localPublishedFilePaths = LocalPublishedFilesPlanner.mergedPaths(localPublishPlan.knownManagedPaths, adding: localPublishPlan.currentPaths)
-                saveSettings()
-                pendingPublishPreview = preview
-                statusMessage = message
-            }
-            try await flushPersistence()
-            try checkLocalPublishContext(target: target, generation: generation)
-            try await fileStore.acknowledgePublishedResources(paths: localPublishPlan.currentPaths, rootDirectoryPath: target)
         }
+        guard shouldContinueCurrentWork(generation: generation) else { return false }
+        try? persistModules()
+        if schedulesAutomaticPublish { scheduleAutomaticPublish() }
+        if failures > 0 { statusMessage = "\(failures) 个模块本地输出失败，其他模块已分别处理" }
+        return failures == 0
     }
 
     func cleanupLegacyOutputFiles() async {
@@ -143,15 +41,13 @@ extension AppModel {
 
     func publishedFiles(
         plan: PublishPlan,
-        combinedData: Data?,
         includeAssets: Bool,
         destination: PublishDestination
     ) async throws -> [PublishFile] {
         try await PublishFileAssembler.files(
             request: PublishFileAssemblyRequest(
                 plan: plan,
-                combinedData: combinedData,
-                combinedFileName: settings.combinedModuleFileName,
+
                 includeAssets: includeAssets,
                 destination: destination,
                 localModuleDirectory: settings.localModuleDirectory
@@ -181,24 +77,6 @@ extension AppModel {
         )
     }
 
-    private func currentPublishedFiles(
-        combinedData: Data?,
-        includeAssets: Bool,
-        destination: PublishDestination
-    ) async throws -> [PublishFile] {
-        let plan = PublishCoordinator.plan(
-            modules: modules,
-            combinedModuleEnabled: settings.combinedModuleEnabled,
-            destination: destination
-        )
-        return try await publishedFiles(
-            plan: plan,
-            combinedData: combinedData,
-            includeAssets: includeAssets,
-            destination: destination
-        )
-    }
-
     func writeLocalModuleOutput(moduleID: UUID) async throws {
         guard !isWorking else { throw PreviewContentSaveError.busy }
         guard settings.publishToLocal else { throw RelayError.invalidOutput("请先开启本地发布。") }
@@ -214,6 +92,8 @@ extension AppModel {
         try checkLocalPublishContext(target: target, generation: generation)
         try enterNonCancellableWorkPhase(statusMessage: "正在写入本地文件…")
         try await publishSelectedLocalFiles(files)
+        if let index = modules.firstIndex(where: { $0.id == moduleID }) { modules[index].localOutputError = nil }
+        try persistModules()
         presentedError = nil
         statusMessage = "已写入本地文件"
     }
@@ -222,8 +102,7 @@ extension AppModel {
         guard !isWorking else { throw PreviewContentSaveError.busy }
         guard let module = modules.first(where: { $0.id == moduleID }), module.hasRemoteUpdateSource,
               settings.publishToLocal,
-              PublishCoordinator.shouldPublishStandalone(module, destination: .local,
-                combinedModuleEnabled: settings.combinedModuleEnabled) else {
+              PublishCoordinator.shouldPublishStandalone(module, destination: .local) else {
             throw RelayError.invalidOutput("请选择需要写入本地的订阅模块。")
         }
         let target = settings.localModuleDirectory
@@ -259,8 +138,7 @@ extension AppModel {
         guard settings.publishToLocal,
               let module = modules.first(where: { $0.id == review.moduleID }), module.hasRemoteUpdateSource,
               module.publishedRelativePath == review.relativePath,
-              PublishCoordinator.shouldPublishStandalone(module, destination: .local,
-                combinedModuleEnabled: settings.combinedModuleEnabled) else { throw PreviewContentSaveError.changed }
+              PublishCoordinator.shouldPublishStandalone(module, destination: .local) else { throw PreviewContentSaveError.changed }
         beginWork(.publishing)
         workActivity.title = "接管本地输出"
         defer { endWork(.publishing) }
@@ -277,23 +155,24 @@ extension AppModel {
             protectedSourcePaths: localProtectedSourcePaths(targetDirectory: review.targetDirectory))
         try checkLocalPublishContext(target: review.targetDirectory, generation: review.generation)
         try await publishSelectedLocalFiles(current)
+        if let index = modules.firstIndex(where: { $0.id == review.moduleID }) { modules[index].localOutputError = nil }
+        try persistModules()
         presentedError = nil
         statusMessage = "已接管并更新本地文件；原文件备份：\(backup.path)"
         recordHistory([UpdateHistoryEntry(moduleID: module.id, moduleName: module.name, outcome: .published,
             duration: 0, message: statusMessage, publishedFiles: current.map(\.name), publishDestination: .local)])
     }
 
-    /// 收集所选本地模块的独立输出文件（不包含总模块）。
+    /// 收集所选本地模块及其脚本资源。
     func selectedLocalPublishedFiles(moduleIDs: Set<UUID>) async throws -> [PublishFile] {
         let plan = PublishCoordinator.selectedPlan(
             modules: modules,
             moduleIDs: moduleIDs,
-            combinedModuleEnabled: settings.combinedModuleEnabled,
+
             destination: .local
         )
         return try await publishedFiles(
             plan: plan,
-            combinedData: nil,
             includeAssets: true,
             destination: .local
         )
@@ -376,11 +255,11 @@ extension AppModel {
     }
 
     func localCleanupReviewFingerprint() -> String {
-        let plan = PublishCoordinator.plan(modules: modules, combinedModuleEnabled: settings.combinedModuleEnabled, destination: .local)
+        let plan = PublishCoordinator.plan(modules: modules, destination: .local)
         let paths = plan.standaloneModules.map { $0.id.uuidString + ":" + $0.publishedRelativePath }.sorted()
         let protectedPaths = localProtectedSourcePaths(targetDirectory: settings.localModuleDirectory)
             .map { "source:" + LocalSourcePathResolver.pathIdentity($0) }
-        return Data(([String(localChangeGeneration), String(settings.combinedModuleEnabled), settings.combinedModuleFileName]
+        return Data(([String(localChangeGeneration)]
             + paths + protectedPaths).joined(separator: "\n").utf8).sha256String
     }
 
@@ -398,7 +277,8 @@ extension AppModel {
 
     private func legacyPublishedRelativePaths() -> [String] {
         LegacyOutputCleanupPlanner.publishedRelativePaths(
-            combinedModuleFileName: settings.combinedModuleFileName,
+            combinedModuleFileName: settings.legacyCombinedModuleFileName,
+
             managedEngineFileName: settings.managedEngineFileName
         )
     }

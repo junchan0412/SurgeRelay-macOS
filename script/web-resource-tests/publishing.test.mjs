@@ -45,7 +45,7 @@ const controller = detailHelpers.createPublishingController({
 const click = action => controller.handleClick({ target: { closest: () => ({ dataset: { operation: action } }) } });
 controller.openSelected('m1');
 assert.match(ui.operationContent.innerHTML, /Module &lt;one&gt;/);
-assert.doesNotMatch(ui.operationContent.innerHTML, /Internal only/);
+assert.match(ui.operationContent.innerHTML, /Internal only/, "All modules are independently publishable");
 await click('preview-selected');
 assert.deepEqual(JSON.parse(JSON.stringify(requests.at(-1).options.json)), { moduleIDs: ['m1'] });
 assert.match(ui.operationContent.innerHTML, /old.sgmodule/);

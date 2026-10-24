@@ -4,9 +4,6 @@ enum WebManagementStateBuilder {
     static func payload(snapshot: WebCoreSnapshot, activity: WebActivityPayload, summary: ModuleCollectionSummary, modules: [WebModulePayload]) -> WebStatePayload {
         let settings = snapshot.settings
         return WebStatePayload(
-            combined: combinedPayload(summary: summary, settings: settings,
-                rawURL: PublishedAddressResolver.combinedGitHubURL(settings: settings),
-                localFileURL: PublishedAddressResolver.combinedLocalFileURL(settings: settings)),
             moduleEditor: moduleEditorPayload(settings: settings,
                 localOutputFolders: ModuleOutputFolderCatalog.options(settings: settings, modules: snapshot.modules,
                     localFolders: snapshot.localFolders, githubFolders: snapshot.githubFolders, storageLocation: .local),
@@ -60,26 +57,6 @@ enum WebManagementStateBuilder {
         )
     }
 
-    static func combinedPayload(
-        summary: ModuleCollectionSummary,
-        settings: AppSettings,
-        rawURL: URL?,
-        localFileURL: URL?
-    ) -> WebCombinedPayload {
-        let isEnabled = settings.combinedModuleEnabled
-        return WebCombinedPayload(
-            name: "Surge Relay 汇总",
-            isEnabled: isEnabled,
-            fileName: FilenameSanitizer.sgmoduleName(from: settings.combinedModuleFileName),
-            sourceCount: summary.totalCount,
-            enabledCount: isEnabled ? summary.enabledCount : 0,
-            lastUpdatedAt: summary.latestUpdatedAt,
-            subscriptionURL: isEnabled
-                ? rawURL?.absoluteString ?? localFileURL?.absoluteString
-                : nil
-        )
-    }
-
     static func modulePayload(
         _ module: RelayModule,
         publishedURL: URL?,
@@ -106,8 +83,7 @@ enum WebManagementStateBuilder {
             storageLocationIcon: module.displayStorageLocationSystemImage,
             relationshipSummary: module.relationshipSummary,
             localStorageRelativePath: module.localStorageRelativePath,
-            publishesStandalone: module.publishesStandalone,
-            isEnabled: module.isEnabled,
+
             state: module.state.rawValue,
             stateTitle: module.state.title,
             createdAt: module.createdAt,
@@ -123,6 +99,7 @@ enum WebManagementStateBuilder {
             consecutiveFailureCount: module.consecutiveFailureCount,
             conversionEngineRevision: module.conversionEngineRevision,
             lastError: module.lastError,
+            localOutputError: module.localOutputError,
             iconURL: iconURL,
             customIconURL: module.customIconURL,
             publishedURL: publishedURL?.absoluteString,
@@ -172,7 +149,7 @@ enum WebManagementStateBuilder {
             cancellationRequested: cancellationRequested,
             canStartUpdate: updateAdmission.isAccepted,
             updateBlockedReason: updateAdmission.blockedReason,
-            enabledModuleCount: summary.updateableCount,
+            updateableModuleCount: summary.updateableCount,
             automaticPublishScheduledAt: automaticPublishScheduledAt,
             automaticPublishRunsAt: automaticPublishRunsAt,
             latestGitHubPublish: latestGitHubPublish,
