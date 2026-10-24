@@ -2,7 +2,12 @@ import SwiftUI
 
 struct ModuleDetailView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.scenePhase) private var scenePhase
     @State private var argumentInfo = ModuleArgumentInfo()
+    @State private var localOutput: LocalModuleOutputSnapshot?
+    @State private var localOutputAdoption: LocalOutputAdoptionReview?
+    @State private var isPreparingLocalAdoption = false
+    @State private var localOutputError: String?
     @State private var syncComparison: ModuleSyncComparison?
     @State private var showsVersionHistory = false
     @State private var showsLint = false
@@ -60,15 +65,27 @@ struct ModuleDetailView: View {
         .sheet(item: $syncComparison) { comparison in
             ModuleSyncComparisonView(comparison: comparison).environment(model)
         }
+        .sheet(item: $localOutputAdoption, onDismiss: {
+            Task { await refreshLocalOutput() }
+        }) { review in
+            LocalOutputAdoptionView(review: review).environment(model)
+        }
         .task(id: "\(module.id.uuidString)-\(module.contentHash ?? "")") {
             argumentInfo = await model.moduleArgumentInfo(for: module)
         }
+        .task(id: localOutputRefreshKey) {
+            guard !model.isWorking else { return }
+            await refreshLocalOutput()
+        }
+        .onChange(of: module.id) { _, _ in localOutputError = nil }
+        .onChange(of: localPublishedPath) { _, _ in localOutputError = nil }
     }
 
     private var moduleSummaryHeader: some View {
         ModuleDetailSummaryHeader(
             module: module,
             combinedModuleEnabled: model.settings.combinedModuleEnabled,
+            localOutput: currentLocalOutput,
             onEdit: onEdit
         )
     }
@@ -107,10 +124,10 @@ struct ModuleDetailView: View {
                 detailRow("存放文件夹", value: ModuleOutputFolder.displayTitle(for: module.outputFolder), icon: "folder")
                 detailRow(
                     "输出文件",
-                    value: module.publishesStandalone ? module.publishedRelativePath : "未开启独立发布",
+                    value: module.publishesStandalone || expectsLocalOutput ? module.publishedRelativePath : "未开启独立发布",
                     icon: "doc.badge.gearshape",
-                    monospaced: module.publishesStandalone,
-                    copyValue: module.publishesStandalone ? module.publishedRelativePath : nil
+                    monospaced: module.publishesStandalone || expectsLocalOutput,
+                    copyValue: module.publishesStandalone || expectsLocalOutput ? module.publishedRelativePath : nil
                 )
                 detailRow("图标来源", value: module.iconSourceDescription, icon: "photo")
                 if let iconURLDisplay {
@@ -125,7 +142,7 @@ struct ModuleDetailView: View {
 
     private var synchronizationSection: some View {
         detailSection("同步状态") {
-            detailRow("更新状态", value: module.state.title, icon: module.state.systemImage)
+            detailRow("缓存更新状态", value: module.state.title, icon: module.state.systemImage)
             detailRow("上次更新", value: module.lastUpdatedAt?.formatted(date: .long, time: .standard) ?? "从未更新", icon: "clock")
             detailRow("来源检查", value: module.sourceCheckedAt?.formatted(date: .long, time: .standard) ?? "尚未检查", icon: "dot.radiowaves.left.and.right")
             detailRow("刷新策略", value: module.refreshIntervalMinutes.map { ModuleRefreshPlanner.intervalTitle($0) }
@@ -241,11 +258,41 @@ struct ModuleDetailView: View {
                 }
             }
         }
-        if model.settings.publishToLocal,
-           module.hasLocalStorageTarget,
-           module.publishesStandalone {
+        if expectsLocalOutput {
             detailSection("本地文件") {
-                detailRow("文件位置", value: localPublishedPath, icon: "doc", monospaced: true, copyValue: localPublishedPath)
+                detailRow("文件状态", value: currentLocalOutput?.message ?? "正在检查本地文件…",
+                          icon: currentLocalOutput?.systemImage ?? "clock")
+                if !localPublishedPath.isEmpty {
+                    detailRow("文件位置", value: localPublishedPath, icon: "doc", monospaced: true, copyValue: localPublishedPath)
+                }
+                if currentLocalOutput?.state == .missing {
+                    Button("写入本地文件", systemImage: "square.and.arrow.down") {
+                        Task {
+                            do { try await model.writeLocalModuleOutput(moduleID: module.id) }
+                            catch { localOutputError = error.localizedDescription }
+                            await refreshLocalOutput()
+                        }
+                    }
+                    .disabled(model.isWorking || !model.settings.publishToLocal)
+                    .accessibilityIdentifier("module-detail.write-local-file")
+                }
+                if let output = currentLocalOutput, output.state == .present,
+                   !output.hasManagementHeader, module.hasRemoteUpdateSource {
+                    Button(isPreparingLocalAdoption ? "正在比较本地文件…" : "接管并更新本地文件…",
+                           systemImage: "doc.badge.arrow.up") {
+                        Task { await prepareLocalOutputAdoption() }
+                    }
+                    .disabled(model.isWorking || isPreparingLocalAdoption || !model.settings.publishToLocal)
+                    .accessibilityIdentifier("module-detail.adopt-local-file")
+                }
+                if let localOutputError {
+                    Text(localOutputError).font(.caption)
+                        .foregroundStyle(Design.Palette.error).textSelection(.enabled)
+                }
+                if !model.settings.publishToLocal {
+                    Text("本地发布未开启，请在设置中开启后写入。")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
         }
     }
@@ -328,9 +375,42 @@ struct ModuleDetailView: View {
     }
 
     private var localPublishedPath: String {
-        URL(filePath: model.settings.localModuleDirectory, directoryHint: .isDirectory)
+        let root = model.settings.localModuleDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !root.isEmpty else { return "" }
+        return URL(filePath: root, directoryHint: .isDirectory)
             .appending(path: module.publishedRelativePath)
             .path
+    }
+
+    private var expectsLocalOutput: Bool {
+        PublishCoordinator.shouldPublishStandalone(module, destination: .local,
+            combinedModuleEnabled: model.settings.combinedModuleEnabled)
+    }
+
+    private var currentLocalOutput: LocalModuleOutputSnapshot? {
+        localOutput?.path == localPublishedPath ? localOutput : nil
+    }
+
+    private var localOutputRefreshKey: String {
+        "\(module.id)|\(localPublishedPath)|\(model.moduleRevision)|\(model.isWorking)|\(model.settings.combinedModuleEnabled)|\(scenePhase)"
+    }
+
+    private func refreshLocalOutput() async {
+        guard expectsLocalOutput else { localOutput = nil; return }
+        let snapshot = await model.localModuleOutputSnapshot(for: module)
+        guard !Task.isCancelled, snapshot.path == localPublishedPath else { return }
+        localOutput = snapshot
+    }
+
+    private func prepareLocalOutputAdoption() async {
+        isPreparingLocalAdoption = true
+        localOutputError = nil
+        defer { isPreparingLocalAdoption = false }
+        do {
+            localOutputAdoption = try await model.prepareLocalOutputAdoption(moduleID: module.id)
+        } catch {
+            localOutputError = error.localizedDescription
+        }
     }
 
     private var localStoragePath: String? {
@@ -339,6 +419,9 @@ struct ModuleDetailView: View {
     }
 
     private var standaloneStorageDescription: String {
+        if expectsLocalOutput, !module.publishesStandalone {
+            return "未参与总模块，转换结果写入本地模块根目录"
+        }
         guard !module.publishesStandalone,
               model.settings.combinedModuleEnabled,
               module.isEnabled else {
@@ -450,6 +533,114 @@ struct ModuleDetailView: View {
         copyValue: String? = nil
     ) -> some View {
         DetailInfoRow(label: label, value: value, icon: icon, monospaced: monospaced, copyValue: copyValue)
+    }
+}
+
+private struct LocalOutputAdoptionView: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    @State var review: LocalOutputAdoptionReview
+    @State private var isConfirming = false
+    @State private var isPreparing = false
+    @State private var errorMessage: String?
+
+    private var targetPath: String {
+        URL(filePath: review.targetDirectory, directoryHint: .isDirectory)
+            .appending(path: review.relativePath).path
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("接管并更新本地文件").font(.headline)
+            Text(targetPath).font(.caption.monospaced()).textSelection(.enabled)
+            Text("确认后会先备份原文件，再写入当前模块输出，并由 Surge Relay 管理此文件。")
+                .font(.callout)
+            Divider()
+            Text("现有本地文件 → 当前模块输出").font(.subheadline.weight(.medium))
+            Text("−\(review.diff.removedCount) 行 · +\(review.diff.addedCount) 行")
+                .font(.caption).foregroundStyle(.secondary)
+            if review.diff.usesCoarseComparison {
+                Text("变化较大，按整块删除和新增显示。")
+                    .font(.caption).foregroundStyle(Design.Palette.warning)
+            }
+            if review.diff.hasFinalNewlineDifference {
+                Text("文件末尾换行不同。")
+                    .font(.caption).foregroundStyle(Design.Palette.warning)
+            }
+            if review.diff.rows.isEmpty, !review.diff.hasFinalNewlineDifference {
+                Text("正文内容一致。").font(.caption).foregroundStyle(.secondary)
+            }
+            ScrollView([.horizontal, .vertical]) {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(review.diff.rows.enumerated()), id: \.offset) { _, row in
+                        HStack(alignment: .top, spacing: 10) {
+                            Text(row.localLine.map(String.init) ?? "–").frame(width: 52, alignment: .trailing)
+                            Text(row.githubLine.map(String.init) ?? "–").frame(width: 52, alignment: .trailing)
+                            Text(row.kind == .added ? "+" : row.kind == .removed ? "−" : " ").frame(width: 12)
+                            Text(String(row.text.prefix(4_000))).textSelection(.enabled)
+                        }
+                        .font(.system(size: 12, design: .monospaced))
+                        .padding(.vertical, 3)
+                        .padding(.horizontal, 8)
+                        .frame(minWidth: 760, alignment: .leading)
+                        .background(row.kind == .added ? Color.green.opacity(0.10) : row.kind == .removed ? Color.red.opacity(0.10) : Color.clear)
+                    }
+                }
+                .fixedSize(horizontal: true, vertical: false)
+            }
+            .background(Design.Palette.canvas)
+            Text(review.diff.isTruncated
+                 ? "差异超过 2,000 行，已截断显示；长行仅显示前 4,000 个字符，写入使用完整内容。"
+                 : "左列为原文件行号，右列为更新后行号；长行仅显示前 4,000 个字符。")
+                .font(.caption).foregroundStyle(.secondary)
+            if let errorMessage {
+                ScrollView {
+                    Text(errorMessage).font(.caption).foregroundStyle(Design.Palette.error)
+                        .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: 80)
+            }
+            HStack {
+                Button("重新比较") { Task { await prepare() } }
+                    .disabled(model.isWorking || isPreparing || isConfirming)
+                Spacer()
+                Button("取消") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                    .disabled(isPreparing || isConfirming)
+                Button(isConfirming ? "正在备份并写入…" : "备份并接管更新") {
+                    Task { await confirm() }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(model.isWorking || isPreparing || isConfirming)
+                .accessibilityIdentifier("local-output-adoption.confirm")
+            }
+        }
+        .padding(20)
+        .frame(minWidth: 840, minHeight: 560)
+        .interactiveDismissDisabled(isPreparing || isConfirming)
+    }
+
+    private func prepare() async {
+        isPreparing = true
+        errorMessage = nil
+        defer { isPreparing = false }
+        do {
+            review = try await model.prepareLocalOutputAdoption(moduleID: review.moduleID)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func confirm() async {
+        isConfirming = true
+        errorMessage = nil
+        defer { isConfirming = false }
+        do {
+            try await model.confirmLocalOutputAdoption(review)
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }
 

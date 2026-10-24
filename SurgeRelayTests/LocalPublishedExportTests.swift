@@ -3,6 +3,49 @@ import XCTest
 @testable import SurgeRelay
 
 final class LocalPublishedExportTests: XCTestCase {
+    func testExplicitLocalAdoptionBacksUpOriginalAndAllowsSubsequentExport() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = "Sgmodule(#3广告模块)/百度网盘去广告.beta.sgmodule"
+        let destination = root.appending(path: path)
+        try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let original = Data("#!name=自写模块\n[Rule]\nDOMAIN,original.example,DIRECT\n".utf8)
+        try original.write(to: destination)
+        let store = ModuleFileStore(cacheDirectory: root.appending(path: "Cache"), configurationDirectory: root.appending(path: "Config"))
+        let backup = try await store.adoptLocalPublishedFile(relativePath: path, rootDirectoryPath: root.path,
+            moduleID: UUID(), expectedExistingHash: original.sha256String, protectedSourcePaths: [])
+        XCTAssertEqual(try Data(contentsOf: backup), original)
+        XCTAssertTrue(ManagedPublishedFile.isManaged(try Data(contentsOf: destination), relativePath: path))
+        let replacement = Data("#!name=订阅模块\n[Rule]\nDOMAIN,new.example,REJECT\n".utf8)
+        _ = try await store.exportPublishedFiles([PublishFile(name: path, data: replacement)], toRootDirectory: root.path)
+        XCTAssertEqual(ModuleSyncPlanner.normalizedPublishedData(try Data(contentsOf: destination)), replacement)
+        XCTAssertEqual(try Data(contentsOf: backup), original)
+    }
+
+    func testLocalAdoptionRejectsChangedProtectedAndSymlinkFiles() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let original = Data("#!name=Personal\n[Rule]\nFINAL,DIRECT\n".utf8)
+        let destination = root.appending(path: "Personal.sgmodule")
+        try original.write(to: destination)
+        try FileManager.default.createSymbolicLink(at: root.appending(path: "Linked.sgmodule"), withDestinationURL: destination)
+        let store = ModuleFileStore(cacheDirectory: root.appending(path: "Cache"), configurationDirectory: root.appending(path: "Config"))
+        for (path, hash, protected) in [
+            ("Personal.sgmodule", "stale comparison", [String]()),
+            ("Personal.sgmodule", original.sha256String, ["PERSONAL.SGMODULE"]),
+            ("Linked.sgmodule", original.sha256String, [String]())
+        ] {
+            do {
+                _ = try await store.adoptLocalPublishedFile(relativePath: path, rootDirectoryPath: root.path,
+                    moduleID: UUID(), expectedExistingHash: hash, protectedSourcePaths: protected)
+                XCTFail("Unreviewed changes and registered sources must remain untouched")
+            } catch {}
+            XCTAssertEqual(try Data(contentsOf: destination), original)
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appending(path: "Config/Backups").path))
+    }
+
     func testKnownPathsCannotOverrideMalformedOrMismatchedManagementDeclarations() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: root) }

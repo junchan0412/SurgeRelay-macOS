@@ -252,7 +252,6 @@ enum ModuleDraftPlanner {
                                                    ["http", "https"].contains(newSourceURL.scheme?.lowercased()),
                                                    module.hasLocalStorageTarget,
                                                    module.localStorageRelativePath != nil,
-                                                   module.publishesStandalone,
                                                    let currentSourceURL = LocalSourcePathResolver.fileURL(relativePath: currentSourcePath,
                                                     rootDirectoryPath: localModuleDirectory),
                                                    currentSourceURL == LocalSourcePathResolver.fileURL(relativePath: module.publishedRelativePath,

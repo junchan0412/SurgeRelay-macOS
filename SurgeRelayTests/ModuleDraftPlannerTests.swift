@@ -345,6 +345,22 @@ final class ModuleDraftPlannerTests: XCTestCase {
         XCTAssertEqual(plan.adoptedLocalPublishedPath, "Tools/My Module.sgmodule")
     }
 
+    func testSelfAuthoredSourceBecomingLoonAdoptsOutputWithoutStandalonePublishing() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let path = "Sgmodule(#3广告模块)/百度网盘去广告.beta.sgmodule"
+        let module = RelayModule(name: "百度网盘去广告", sourceURL: root.appending(path: path).absoluteString,
+            sourceFormat: .surge, outputFileName: "百度网盘去广告.beta.sgmodule", outputFolder: "Sgmodule(#3广告模块)",
+            storageLocation: .local, localStorageRelativePath: path, publishesStandalone: false)
+        var draft = ModuleDraft(module: module)
+        draft.sourceURL = "https://example.com/Baidu.plugin"
+        draft.sourceFormat = .loon
+        let plan = try XCTUnwrap(ModuleDraftPlanner.updatePlan(id: module.id, from: draft, modules: [module],
+            combinedModuleFileName: "Combined", localModuleDirectory: root.path))
+        XCTAssertFalse(plan.module.publishesStandalone)
+        XCTAssertEqual(plan.adoptedLocalPublishedPath, path)
+        XCTAssertTrue(PublishCoordinator.shouldPublishStandalone(plan.module, destination: .local, combinedModuleEnabled: false))
+    }
+
     func testModuleDraftPlannerDoesNotAdoptUnrelatedSourceChanges() throws {
         let root = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)

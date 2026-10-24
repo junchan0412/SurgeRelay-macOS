@@ -283,6 +283,8 @@ The active maintenance machine may print CoreSimulator version warnings even for
 
 Output rebuilds report success explicitly. Callers must preserve missing-cache/export errors and only schedule publishing after a successful rebuild. Selected local publishing must derive managed paths through `LocalPublishedFilesPlanner` to avoid carrying overwrite permission across local roots. Read the converted source before deleting a preview override during restoration.
 
+Local output adoption requires a frozen diff, unchanged output and file hash, source-path protection, and an original-file backup before adding management markers. Missing-file recovery publishes only that module to the local target. Folder discovery excludes the active configuration/cache trees and validates stored folder candidates against files, packages, and symbolic links before presenting them.
+
 The module list should not eagerly read every converted preview at launch. `ModulesView` keeps metadata-only search available immediately and builds the heavier converted-content search index only after the user enters a search query. Preserve that lazy behavior when changing search or preview code.
 
 `ModuleIconView` must not synchronously read and decode cached icon files from `body`; icon data is loaded on a utility task keyed by module/icon revision. Keep disk I/O out of SwiftUI redraw paths.

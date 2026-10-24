@@ -81,8 +81,8 @@ struct ModuleEditorView: View {
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             }
             .scrollIndicators(.visible)
-            .task {
-                await model.refreshModuleOutputFolders()
+            .task(id: draft.storageTargets) {
+                await model.refreshModuleOutputFolders(preserving: draft.outputFolder)
             }
             .onChange(of: draft.sourceURL) { _, newValue in
                 autofillName(from: newValue)
@@ -148,13 +148,17 @@ struct ModuleEditorView: View {
     }
 
     private var outputPathNotice: ModuleOutputPathNotice? {
-        ModuleOutputPathInspector.notice(
+        let requiresLocalFile = draft.storageTargets.contains(.local)
+            && (!model.settings.combinedModuleEnabled || !draft.isEnabled)
+        return ModuleOutputPathInspector.notice(
             for: previewPublishedRelativePath,
-            publishesStandalone: draft.publishesStandalone,
+            publishesStandalone: draft.publishesStandalone || requiresLocalFile,
             modules: model.modules,
             editingModuleID: module?.id,
             combinedFileName: model.settings.combinedModuleFileName
-        )
+        ) ?? (requiresLocalFile && !draft.publishesStandalone
+            ? ModuleOutputPathNotice(message: "未参与总模块时，转换结果仍会写入本地模块文件。", isWarning: false)
+            : nil)
     }
 
     private var displayedIconPreviewURL: URL? {

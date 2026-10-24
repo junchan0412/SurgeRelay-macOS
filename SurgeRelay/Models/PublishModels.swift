@@ -5,6 +5,17 @@ struct PublishFile: Sendable {
     var data: Data
 }
 
+struct LocalOutputAdoptionReview: Identifiable, Sendable {
+    var id = UUID()
+    var moduleID: UUID
+    var targetDirectory: String
+    var relativePath: String
+    var expectedExistingHash: String
+    var generation: Int
+    var files: [PublishFile]
+    var diff: ModuleLineDiff
+}
+
 struct PublishReport: Sendable {
     var publishedFiles: [String]
     var deletedFiles: [String] = []

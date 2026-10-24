@@ -3,6 +3,23 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>2.3.2</title>
+            <pubDate>Sat, 24 Oct 2026 19:44:30 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v2.3.2</link>
+            <sparkle:version>110</sparkle:version>
+            <sparkle:shortVersionString>2.3.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 2.3.2
+
+
+- 本地覆盖：修复自写模块改为 Loon 等远程订阅时，关闭独立发布导致原路径未获覆盖授权的问题；已经发生的未受管文件冲突可在详情页比较差异、备份原文件后接管更新，确认前再次校验文件和输出内容。
+- 文件状态：详情页区分转换缓存状态与本地文件是否存在，显示完整物理路径；缺失的 Biliverse 等模块可单独补写本地输出，不受其他模块的同名文件冲突影响，也不会触发 GitHub 发布。
+- 文件夹：存放位置菜单排除 Surge Relay 配置、缓存、备份、应用包和符号链接；已保存路径同样校验，普通文件不能作为文件夹重新混入，目录切换后及时刷新。
+- 验证：581 项 Release 单元测试通过、2 项可选测试跳过；Web 行为/DOM 与发布配置预检通过；隔离工作区实测补写文件、差异确认、备份接管和目录筛选。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v2.3.2/Surge-Relay-2.3.2.app.zip" length="12924650" type="application/zip" sparkle:edSignature="W+pew131M9WUGr5SooguBE8SVtwg93OPAZ911XbsY5qXtJiKTv3Qj1dKUNZzTzyAa2HROyuFVIFoKRiZwQ3UBg=="/>
+        </item>
+        <item>
             <title>2.3.1</title>
             <pubDate>Sat, 24 Oct 2026 04:34:28 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v2.3.1</link>

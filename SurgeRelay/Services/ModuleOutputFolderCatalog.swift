@@ -31,6 +31,9 @@ enum ModuleOutputFolderCatalog {
         storageLocation: ModuleStorageLocation? = nil,
         preserving selected: String? = nil
     ) -> [String] {
+        if storageLocation == .local {
+            return ModuleOutputFolder.options(from: localFolders)
+        }
         var configuredFolders: [String] = []
         if settings.publishToLocal, storageLocation == nil || storageLocation == .local {
             configuredFolders.append(contentsOf: localFolders)
@@ -38,22 +41,35 @@ enum ModuleOutputFolderCatalog {
         if settings.publishToGitHub, storageLocation == nil || storageLocation == .gitHub {
             configuredFolders.append(contentsOf: githubFolders)
         }
-        let moduleFolders = modules.compactMap { module in
-            storageLocation == nil || (storageLocation == .local ? module.hasLocalStorageTarget : module.hasGitHubStorageTarget)
-                ? module.outputFolder
-                : nil
-        }
+        let moduleFolders = modules.filter(\.hasGitHubStorageTarget).map(\.outputFolder)
         return ModuleOutputFolder.options(
             from: configuredFolders + settings.customModuleOutputFolders + moduleFolders,
             preserving: selected
         )
     }
 
+    static func shouldRefreshLocalFolders(
+        rootPath: String,
+        cachedRootPath: String?,
+        lastRefreshedAt: Date?,
+        folders: [String],
+        preserving selected: String?,
+        now: Date,
+        force: Bool
+    ) -> Bool {
+        guard !force, cachedRootPath == rootPath,
+              let lastRefreshedAt,
+              now.timeIntervalSince(lastRefreshedAt) < cacheInterval else { return true }
+        guard let selected else { return false }
+        return !folders.contains(ModuleOutputFolder.normalized(selected))
+    }
+
     static func createPlan(
         named rawValue: String,
         storageLocation: ModuleStorageLocation,
         settings: AppSettings,
-        githubModuleOutputFolders: [String]
+        githubModuleOutputFolders: [String],
+        excludedLocalDirectories: [URL] = []
     ) throws -> ModuleOutputFolderCreatePlan {
         let folder = ModuleOutputFolder.normalized(rawValue)
         guard !folder.isEmpty else {
@@ -65,6 +81,9 @@ enum ModuleOutputFolderCatalog {
             let rootPath = settings.localModuleDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !rootPath.isEmpty else {
                 throw RelayError.invalidOutput("请先设置本地模块根目录。")
+            }
+            guard LocalModuleFolderScanner.isUsableFolder(folder, in: rootPath, excluding: excludedLocalDirectories) else {
+                throw RelayError.invalidOutput("该路径不是可用的模块文件夹，请避开文件、符号链接和应用内部目录。")
             }
             var destination = URL(filePath: rootPath, directoryHint: .isDirectory).standardizedFileURL
             for component in ModuleOutputFolder.components(folder) {
@@ -124,7 +143,7 @@ enum ModuleOutputFolderCatalog {
         refreshedAt: Date
     ) -> ModuleOutputFolderRefreshState {
         ModuleOutputFolderRefreshState(
-            githubModuleOutputFolders: ModuleOutputFolder.options(from: remoteFolders + modules.map(\.outputFolder)),
+            githubModuleOutputFolders: ModuleOutputFolder.options(from: remoteFolders + modules.filter(\.hasGitHubStorageTarget).map(\.outputFolder)),
             lastRefreshedAt: refreshedAt,
             configuration: settings
         )
@@ -136,7 +155,7 @@ enum ModuleOutputFolderCatalog {
         refreshedAt: Date
     ) -> ModuleOutputFolderRefreshState {
         ModuleOutputFolderRefreshState(
-            githubModuleOutputFolders: ModuleOutputFolder.options(from: modules.map(\.outputFolder)),
+            githubModuleOutputFolders: ModuleOutputFolder.options(from: modules.filter(\.hasGitHubStorageTarget).map(\.outputFolder)),
             lastRefreshedAt: refreshedAt,
             configuration: settings
         )

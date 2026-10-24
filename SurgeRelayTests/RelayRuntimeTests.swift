@@ -400,6 +400,93 @@ final class RelayRuntimeTests: XCTestCase {
         model.persistenceFeedbackTask?.cancel()
     }
 
+    func testMissingBiliverseOutputCanBeWrittenDespiteUnrelatedUnmanagedFile() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let context = WorkspaceContext(id: UUID(), name: "Missing local output",
+            configurationDirectory: root.appending(path: "Config"), cacheDirectory: root.appending(path: "Cache"),
+            allowsLegacyFallback: false)
+        let model = AppModel(context: context, persistsOnInit: false)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        let directory = root.appending(path: "Modules")
+        model.settings.localModuleDirectory = directory.path
+        model.settings.publishToLocal = true
+        model.settings.publishToGitHub = true
+        model.settings.combinedModuleEnabled = false
+        var missing = RelayModule(name: "Biliverse.Enhanced", sourceURL: "https://test.invalid/Biliverse.sgmodule",
+            outputFileName: "Biliverse.Enhanced.sgmodule", outputFolder: "Sgmodule(#7增强模块)",
+            storageLocation: .local, localStorageRelativePath: "Sgmodule(#7增强模块)/Biliverse.Enhanced.sgmodule",
+            publishesStandalone: true, isEnabled: false)
+        missing.storageTargets = [.local, .gitHub]
+        let blocked = RelayModule(name: "Unmanaged", sourceURL: "https://test.invalid/Unmanaged.sgmodule",
+            outputFileName: "Unmanaged.sgmodule", storageLocation: .local)
+        model.modules = [blocked, missing]
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let original = Data("#!name=Personal\n[Rule]\nFINAL,DIRECT\n".utf8)
+        try original.write(to: directory.appending(path: blocked.publishedRelativePath))
+        for module in model.modules {
+            try await model.fileStore.writeComponent("#!name=Cached\n[Rule]\nDOMAIN,example.org,DIRECT\n", id: module.id)
+        }
+        let before = await model.localModuleOutputSnapshot(for: missing)
+        XCTAssertEqual(before.state, .missing)
+        let rebuilt = await model.rebuildCombinedFromCache(schedulesAutomaticPublish: false)
+        XCTAssertFalse(rebuilt)
+
+        try await model.writeLocalModuleOutput(moduleID: missing.id)
+
+        let after = await model.localModuleOutputSnapshot(for: missing)
+        XCTAssertEqual(after.state, .present)
+        XCTAssertTrue(after.hasManagementHeader)
+        XCTAssertTrue(model.settings.localPublishedFilePaths.contains(missing.publishedRelativePath))
+        XCTAssertNil(model.presentedError)
+        XCTAssertNil(model.latestGitHubPublish)
+        XCTAssertEqual(try Data(contentsOf: directory.appending(path: blocked.publishedRelativePath)), original)
+    }
+
+    func testLocalOutputAdoptionReviewsCurrentOutputAndRejectsChangedFiles() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let context = WorkspaceContext(id: UUID(), name: "Recover changed source",
+            configurationDirectory: root.appending(path: "Config"), cacheDirectory: root.appending(path: "Cache"),
+            allowsLegacyFallback: false)
+        let model = AppModel(context: context, persistsOnInit: false)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        let directory = root.appending(path: "Modules")
+        model.settings.localModuleDirectory = directory.path
+        model.settings.publishToLocal = true
+        model.settings.publishToGitHub = false
+        model.settings.combinedModuleEnabled = false
+        let module = RelayModule(name: "百度网盘去广告", sourceURL: "https://test.invalid/Baidu.plugin", sourceFormat: .loon,
+            outputFileName: "百度网盘去广告.beta.sgmodule", outputFolder: "Sgmodule(#3广告模块)",
+            storageLocation: .local, localStorageRelativePath: "Sgmodule(#3广告模块)/百度网盘去广告.beta.sgmodule",
+            publishesStandalone: false)
+        model.modules = [module]
+        let destination = directory.appending(path: module.publishedRelativePath)
+        try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let original = Data("#!name=Personal\n[Rule]\nDOMAIN,old.example,DIRECT\n".utf8)
+        try original.write(to: destination)
+        try await model.fileStore.writeComponent("#!name=Converted\n[Rule]\nDOMAIN,new.example,REJECT\n", id: module.id)
+        let review = try await model.prepareLocalOutputAdoption(moduleID: module.id)
+        XCTAssertGreaterThan(review.diff.addedCount, 0)
+        XCTAssertEqual(try Data(contentsOf: destination), original)
+        let edited = original + Data("# Edited after review\n".utf8)
+        try edited.write(to: destination)
+        do {
+            try await model.confirmLocalOutputAdoption(review)
+            XCTFail("Adoption must reject a file changed since comparison")
+        } catch {}
+        XCTAssertEqual(try Data(contentsOf: destination), edited)
+
+        let refreshed = try await model.prepareLocalOutputAdoption(moduleID: module.id)
+        try await model.confirmLocalOutputAdoption(refreshed)
+        XCTAssertTrue(ManagedPublishedFile.isManaged(try Data(contentsOf: destination), relativePath: module.publishedRelativePath))
+        XCTAssertTrue(String(decoding: try Data(contentsOf: destination), as: UTF8.self).contains("DOMAIN,new.example,REJECT"))
+        let backups = try XCTUnwrap(FileManager.default.enumerator(at: context.configurationDirectory.appending(path: "Backups/LocalOutputAdoption"),
+            includingPropertiesForKeys: nil)).allObjects.compactMap { $0 as? URL }.filter { $0.pathExtension == "sgmodule" }
+        XCTAssertEqual(backups.count, 1)
+        XCTAssertEqual(try Data(contentsOf: XCTUnwrap(backups.first)), edited)
+    }
+
     func testFullLocalRebuildPublishesAndRetainsCurrentAssets() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

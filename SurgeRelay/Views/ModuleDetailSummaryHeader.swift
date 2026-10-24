@@ -4,6 +4,7 @@ struct ModuleDetailSummaryHeader: View {
     @Environment(AppModel.self) private var model
     let module: RelayModule
     let combinedModuleEnabled: Bool
+    let localOutput: LocalModuleOutputSnapshot?
     let onEdit: () -> Void
 
     private var source: URL? { URL(string: module.updateSourceURL) }
@@ -13,13 +14,19 @@ struct ModuleDetailSummaryHeader: View {
     }
 
     private var outputTitle: String {
-        if module.publishesStandalone { return module.displayStorageLocationTitle }
+        if expectsLocalOutput || module.publishesStandalone { return module.displayStorageLocationTitle }
         return contributesToCombined ? "总模块" : "模块缓存"
     }
 
     private var outputDetail: String {
+        if expectsLocalOutput { return localOutput?.message ?? "正在检查本地文件…" }
         if module.publishesStandalone { return module.publishedRelativePath }
         return contributesToCombined ? "参与合并输出，未独立发布" : "未开启独立发布"
+    }
+
+    private var expectsLocalOutput: Bool {
+        PublishCoordinator.shouldPublishStandalone(module, destination: .local,
+            combinedModuleEnabled: combinedModuleEnabled)
     }
 
     var body: some View {
@@ -38,6 +45,7 @@ struct ModuleDetailSummaryHeader: View {
                 Spacer(minLength: 0)
             }
             HStack(spacing: 10) {
+                Text("缓存状态").font(.system(size: 12)).foregroundStyle(.secondary)
                 StatusPill(state: module.state).fixedSize()
                 if let date = module.lastUpdatedAt {
                     Text("更新于 \(date.formatted(date: .abbreviated, time: .shortened))")
@@ -72,7 +80,7 @@ struct ModuleDetailSummaryHeader: View {
                 flowStep("转换", symbol: "arrow.triangle.2.circlepath",
                          value: isNative ? "原生 Surge" : "Script-Hub",
                          detail: isNative ? "保留原生模块格式" : "转换为 Surge 模块")
-                flowStep("输出", symbol: module.publishesStandalone ? module.standaloneStorageSystemImage
+                flowStep("输出", symbol: expectsLocalOutput ? "folder" : module.publishesStandalone ? module.standaloneStorageSystemImage
                          : contributesToCombined ? "square.stack.3d.up" : "internaldrive",
                          value: outputTitle, detail: outputDetail)
             }

@@ -199,6 +199,90 @@ extension AppModel {
         )
     }
 
+    func writeLocalModuleOutput(moduleID: UUID) async throws {
+        guard !isWorking else { throw PreviewContentSaveError.busy }
+        guard settings.publishToLocal else { throw RelayError.invalidOutput("请先开启本地发布。") }
+        let target = settings.localModuleDirectory
+        let generation = localChangeGeneration
+        beginWork(.publishing)
+        workActivity.title = "写入本地文件"
+        defer { endWork(.publishing) }
+        let files = try await selectedLocalPublishedFiles(moduleIDs: [moduleID])
+        guard !files.isEmpty else { throw RelayError.noFilesToPublish }
+        let issues = await Task.detached { ModuleLintPlanner.check(files: files) }.value
+        try ModuleLintPlanner.throwIfBlocking(issues)
+        try checkLocalPublishContext(target: target, generation: generation)
+        try enterNonCancellableWorkPhase(statusMessage: "正在写入本地文件…")
+        try await publishSelectedLocalFiles(files)
+        presentedError = nil
+        statusMessage = "已写入本地文件"
+    }
+
+    func prepareLocalOutputAdoption(moduleID: UUID) async throws -> LocalOutputAdoptionReview {
+        guard !isWorking else { throw PreviewContentSaveError.busy }
+        guard let module = modules.first(where: { $0.id == moduleID }), module.hasRemoteUpdateSource,
+              settings.publishToLocal,
+              PublishCoordinator.shouldPublishStandalone(module, destination: .local,
+                combinedModuleEnabled: settings.combinedModuleEnabled) else {
+            throw RelayError.invalidOutput("请选择需要写入本地的订阅模块。")
+        }
+        let target = settings.localModuleDirectory
+        let generation = localChangeGeneration
+        let path = module.publishedRelativePath
+        guard !localProtectedSourcePaths(targetDirectory: target).map(LocalSourcePathResolver.pathIdentity)
+            .contains(LocalSourcePathResolver.pathIdentity(path)) else {
+            throw RelayError.invalidOutput("该路径仍是已登记的本地来源，不能接管。")
+        }
+        beginWork(.publishing)
+        workActivity.title = "比较本地输出"
+        defer { endWork(.publishing) }
+        guard let original = try await fileStore.readPublishedFile(relativePath: path, rootDirectoryPath: target),
+              original.count <= 20 * 1024 * 1024,
+              let originalText = String(data: original, encoding: .utf8),
+              !ManagedPublishedFile.hasManagementHeader(original) else {
+            throw RelayError.invalidOutput("文件已不存在、已受管或不适合接管，请重新检查。")
+        }
+        let files = try await selectedLocalPublishedFiles(moduleIDs: [moduleID])
+        guard let output = files.first(where: { $0.name == path }),
+              let outputText = String(data: output.data, encoding: .utf8) else { throw RelayError.noFilesToPublish }
+        let issues = await Task.detached { ModuleLintPlanner.check(files: files) }.value
+        try ModuleLintPlanner.throwIfBlocking(issues)
+        let diff = await Task.detached { ModuleLineDiffPlanner.compare(local: originalText, github: outputText) }.value
+        try checkLocalPublishContext(target: target, generation: generation)
+        return LocalOutputAdoptionReview(moduleID: moduleID, targetDirectory: target, relativePath: path,
+            expectedExistingHash: original.sha256String, generation: generation, files: files, diff: diff)
+    }
+
+    func confirmLocalOutputAdoption(_ review: LocalOutputAdoptionReview) async throws {
+        guard !isWorking else { throw PreviewContentSaveError.busy }
+        try checkLocalPublishContext(target: review.targetDirectory, generation: review.generation)
+        guard settings.publishToLocal,
+              let module = modules.first(where: { $0.id == review.moduleID }), module.hasRemoteUpdateSource,
+              module.publishedRelativePath == review.relativePath,
+              PublishCoordinator.shouldPublishStandalone(module, destination: .local,
+                combinedModuleEnabled: settings.combinedModuleEnabled) else { throw PreviewContentSaveError.changed }
+        beginWork(.publishing)
+        workActivity.title = "接管本地输出"
+        defer { endWork(.publishing) }
+        let current = try await selectedLocalPublishedFiles(moduleIDs: [review.moduleID])
+        guard current.map({ $0.name + ":" + $0.data.sha256String })
+                == review.files.map({ $0.name + ":" + $0.data.sha256String }) else { throw PreviewContentSaveError.changed }
+        let issues = await Task.detached { ModuleLintPlanner.check(files: current) }.value
+        try ModuleLintPlanner.throwIfBlocking(issues)
+        try checkLocalPublishContext(target: review.targetDirectory, generation: review.generation)
+        try enterNonCancellableWorkPhase(statusMessage: "正在备份并接管本地文件…")
+        let backup = try await fileStore.adoptLocalPublishedFile(relativePath: review.relativePath,
+            rootDirectoryPath: review.targetDirectory, moduleID: review.moduleID,
+            expectedExistingHash: review.expectedExistingHash,
+            protectedSourcePaths: localProtectedSourcePaths(targetDirectory: review.targetDirectory))
+        try checkLocalPublishContext(target: review.targetDirectory, generation: review.generation)
+        try await publishSelectedLocalFiles(current)
+        presentedError = nil
+        statusMessage = "已接管并更新本地文件；原文件备份：\(backup.path)"
+        recordHistory([UpdateHistoryEntry(moduleID: module.id, moduleName: module.name, outcome: .published,
+            duration: 0, message: statusMessage, publishedFiles: current.map(\.name), publishDestination: .local)])
+    }
+
     /// 收集所选本地模块的独立输出文件（不包含总模块）。
     func selectedLocalPublishedFiles(moduleIDs: Set<UUID>) async throws -> [PublishFile] {
         let plan = PublishCoordinator.selectedPlan(

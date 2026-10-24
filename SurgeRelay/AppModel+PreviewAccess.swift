@@ -35,6 +35,14 @@ extension AppModel {
         await modulePreviewProvider.moduleArgumentInfo(for: module)
     }
 
+    func localModuleOutputSnapshot(for module: RelayModule) async -> LocalModuleOutputSnapshot {
+        let rootDirectoryPath = settings.localModuleDirectory
+        let relativePath = module.publishedRelativePath
+        return await Task.detached(priority: .utility) {
+            LocalModuleOutputSnapshot.read(relativePath: relativePath, rootDirectoryPath: rootDirectoryPath)
+        }.value
+    }
+
     func combinedPreviewContent() async throws -> String {
         try await modulePreviewProvider.combinedPreviewContent(
             combinedModuleEnabled: settings.combinedModuleEnabled

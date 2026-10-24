@@ -1,17 +1,26 @@
 import Foundation
 
 enum LocalModuleFolderScanner {
-    static func folders(in rootDirectoryPath: String) throws -> [String] {
+    static func folders(
+        in rootDirectoryPath: String,
+        excluding excludedDirectories: [URL] = [],
+        including candidateFolders: [String] = []
+    ) throws -> [String] {
         let trimmedPath = rootDirectoryPath.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedPath.isEmpty else { return [] }
 
         guard let root = LocalSourcePathResolver.canonicalDirectoryURL(for: trimmedPath) else { return [] }
+        let excludedPaths = excludedDirectories.map {
+            $0.standardizedFileURL.resolvingSymlinksInPath().standardizedFileURL.path
+        }
+        guard !isExcluded(root, paths: excludedPaths) else { return [] }
+        let resourceKeys: Set<URLResourceKey> = [.isDirectoryKey, .isPackageKey, .isSymbolicLinkKey]
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: root.path, isDirectory: &isDirectory),
               isDirectory.boolValue,
               let enumerator = FileManager.default.enumerator(
                 at: root,
-                includingPropertiesForKeys: [.isDirectoryKey, .isPackageKey],
+                includingPropertiesForKeys: Array(resourceKeys),
                 options: [.skipsHiddenFiles, .skipsPackageDescendants]
               ) else {
             return []
@@ -19,8 +28,17 @@ enum LocalModuleFolderScanner {
 
         var values = Set<String>()
         for case let url as URL in enumerator {
-            let resourceValues = try url.resourceValues(forKeys: [.isDirectoryKey, .isPackageKey])
-            guard resourceValues.isDirectory == true, resourceValues.isPackage != true else { continue }
+            guard !isExcluded(url, paths: excludedPaths) else {
+                enumerator.skipDescendants()
+                continue
+            }
+            guard let resourceValues = try? url.resourceValues(forKeys: resourceKeys),
+                  resourceValues.isDirectory == true,
+                  resourceValues.isPackage != true,
+                  resourceValues.isSymbolicLink != true else {
+                enumerator.skipDescendants()
+                continue
+            }
             guard let relativePath = LocalSourcePathResolver.relativePath(
                 forSourceURL: url.absoluteString,
                 rootDirectoryPath: root.path
@@ -28,7 +46,52 @@ enum LocalModuleFolderScanner {
             let folder = ModuleOutputFolder.normalized(relativePath)
             if !folder.isEmpty { values.insert(folder) }
         }
+        for candidate in candidateFolders {
+            let folder = ModuleOutputFolder.normalized(candidate)
+            if !folder.isEmpty,
+               isUsableFolder(folder, root: root, excludedPaths: excludedPaths) {
+                values.insert(folder)
+            }
+        }
         return values.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
+
+    static func isUsableFolder(
+        _ folder: String,
+        in rootDirectoryPath: String,
+        excluding excludedDirectories: [URL] = []
+    ) -> Bool {
+        guard let root = LocalSourcePathResolver.canonicalDirectoryURL(for: rootDirectoryPath) else { return false }
+        let excludedPaths = excludedDirectories.map {
+            $0.standardizedFileURL.resolvingSymlinksInPath().standardizedFileURL.path
+        }
+        return isUsableFolder(folder, root: root, excludedPaths: excludedPaths)
+    }
+
+    private static func isUsableFolder(_ folder: String, root: URL, excludedPaths: [String]) -> Bool {
+        let components = ModuleOutputFolder.components(folder)
+        let destination = root.appending(path: components.joined(separator: "/"), directoryHint: .isDirectory)
+        guard !isExcluded(destination, paths: excludedPaths),
+              components.allSatisfy({ !$0.hasPrefix(".") }) else { return false }
+        var directory = root
+        for index in 0...components.count {
+            if index > 0 { directory.append(path: components[index - 1], directoryHint: .isDirectory) }
+            do {
+                let attributes = try FileManager.default.attributesOfItem(atPath: directory.path)
+                guard attributes[.type] as? FileAttributeType == .typeDirectory,
+                      (try directory.resourceValues(forKeys: [.isPackageKey])).isPackage != true else { return false }
+            } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
+                return true
+            } catch {
+                return false
+            }
+        }
+        return true
+    }
+
+    private static func isExcluded(_ url: URL, paths: [String]) -> Bool {
+        let path = url.standardizedFileURL.path
+        return paths.contains { path == $0 || path.hasPrefix($0.hasSuffix("/") ? $0 : $0 + "/") }
     }
 }
 

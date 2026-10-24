@@ -119,6 +119,61 @@ final class LocalModuleScannerTests: XCTestCase {
         )
     }
 
+    func testLocalModuleFolderScannerExcludesInternalTreesAndKeepsDirectoryNamesWithExtensions() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let configuration = root.appending(path: "Surge Relay")
+        let cache = root.appending(path: "Cache")
+        let directories = [
+            "Surge Relay/Backups/settings.json", "Surge Relay/Backups/modules.json",
+            "Surge Relay/ModuleVersions/module/version", "Cache/Snapshots/module/Assets",
+            "Surge Relay Modules", "Sgmodule (#0)", "User/settings.json", "User/modules.json",
+            "User/Backups", "User/Cache", ".Hidden/Nested", "Bundle.app/Contents"
+        ]
+        for directory in directories {
+            try FileManager.default.createDirectory(at: root.appending(path: directory), withIntermediateDirectories: true)
+        }
+        try Data("{}".utf8).write(to: root.appending(path: "settings.json"))
+        try Data("{}".utf8).write(to: root.appending(path: "modules.json"))
+        try FileManager.default.createSymbolicLink(at: root.appending(path: "Linked"), withDestinationURL: root.appending(path: "User"))
+
+        let folders = try LocalModuleFolderScanner.folders(
+            in: root.path,
+            excluding: [configuration, cache],
+            including: ["settings.json", "modules.json", "Linked", "Surge Relay/Backups/settings.json"]
+        )
+
+        XCTAssertEqual(Set(folders), Set([
+            "Surge Relay Modules", "Sgmodule (#0)", "User", "User/settings.json", "User/modules.json",
+            "User/Backups", "User/Cache"
+        ]))
+    }
+
+    func testLocalModuleFolderScannerValidatesPlannedFoldersAndCanonicalExclusions() throws {
+        let base = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: base) }
+        let root = base.appending(path: "Modules")
+        let alias = base.appending(path: "Alias")
+        let configuration = root.appending(path: "Configuration")
+        try FileManager.default.createDirectory(at: configuration.appending(path: "Backups/modules.json"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: root.appending(path: "Tools"), withIntermediateDirectories: true)
+        try Data("{}".utf8).write(to: root.appending(path: "settings.json"))
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: root)
+        try FileManager.default.createSymbolicLink(at: root.appending(path: "MissingLink"), withDestinationURL: base.appending(path: "Missing"))
+
+        let folders = try LocalModuleFolderScanner.folders(
+            in: alias.path,
+            excluding: [alias.appending(path: "Configuration")],
+            including: [
+                "Future/Nested", "Tools/Next.json", "settings.json/Nested", "MissingLink/Nested",
+                "Configuration/Future", ".Hidden/Future"
+            ]
+        )
+
+        XCTAssertEqual(Set(folders), Set(["Tools", "Future/Nested", "Tools/Next.json"]))
+        XCTAssertEqual(try LocalModuleFolderScanner.folders(in: root.path, excluding: [root]), [])
+    }
+
     func testLocalModuleScannerDeduplicatesSubscriptionAndRepeatedScan() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

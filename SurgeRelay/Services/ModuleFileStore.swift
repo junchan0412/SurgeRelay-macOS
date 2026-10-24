@@ -651,6 +651,30 @@ actor ModuleFileStore {
         return try Data(contentsOf: url)
     }
 
+    func adoptLocalPublishedFile(relativePath: String, rootDirectoryPath: String, moduleID: UUID,
+                                 expectedExistingHash: String, protectedSourcePaths: [String]) throws -> URL {
+        guard !protectedSourcePaths.map(Self.normalizedRelativePath).contains(Self.normalizedRelativePath(relativePath)),
+              let root = LocalSourcePathResolver.canonicalDirectoryURL(for: rootDirectoryPath),
+              ManagedPublishedFile.requiresInlineMarker(relativePath) else {
+            throw RelayError.invalidOutput("不能接管已登记的本地源文件或无效输出路径。")
+        }
+        let destination = try exportURL(root: root, relativePath: relativePath)
+        let snapshot = try publishedFileSnapshot(at: destination)
+        let original = try Data(contentsOf: destination)
+        guard original.sha256String == expectedExistingHash else { throw PreviewContentSaveError.changed }
+        guard original.count <= 20 * 1024 * 1024, String(data: original, encoding: .utf8) != nil,
+              !ManagedPublishedFile.hasManagementHeader(original) else {
+            throw RelayError.invalidOutput("该文件不是可接管的未受管 UTF-8 模块，请重新检查文件内容与归属。")
+        }
+        let backup = storageConfigurationDirectory
+            .appending(path: "Backups/LocalOutputAdoption/\(moduleID.uuidString)/\(UUID().uuidString)", directoryHint: .isDirectory)
+            .appending(path: destination.lastPathComponent)
+        try PersistenceStore.writeProtectedData(original, to: backup, configurationDirectory: storageConfigurationDirectory)
+        try writeManagedPublishedFile(original, to: destination, relativePath: relativePath, rootDirectory: root,
+            isKnownManagedPath: true, expectedExistingHash: expectedExistingHash, expectedSnapshot: snapshot)
+        return backup
+    }
+
     func exportPublishedFiles(
         _ files: [PublishFile],
         toRootDirectory rootDirectoryPath: String,

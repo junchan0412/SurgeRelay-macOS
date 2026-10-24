@@ -52,7 +52,87 @@ final class ModuleOutputFolderTests: XCTestCase {
             githubFolders: ["GitHub"],
             storageLocation: .local
         )
-        XCTAssertEqual(localFolders, ["", "Custom", "Local"])
+        XCTAssertEqual(localFolders, ["", "Local"])
+    }
+
+    func testLocalFolderCatalogDoesNotReintroduceUnvalidatedStoredOrSelectedPaths() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let configuration = root.appending(path: "Surge Relay")
+        try FileManager.default.createDirectory(at: configuration.appending(path: "Backups/settings.json"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: root.appending(path: "User.json"), withIntermediateDirectories: true)
+        try Data("{}".utf8).write(to: root.appending(path: "modules.json"))
+        var settings = AppSettings()
+        settings.publishToLocal = true
+        settings.customModuleOutputFolders = ["modules.json", "Surge Relay/Backups/settings.json", "Future/Nested"]
+        let module = RelayModule(name: "Stored", sourceURL: "https://example.com/module.sgmodule",
+                                 outputFileName: "Stored", outputFolder: "modules.json", storageLocation: .local)
+        let folders = try LocalModuleFolderScanner.folders(
+            in: root.path,
+            excluding: [configuration],
+            including: settings.customModuleOutputFolders + [module.outputFolder]
+        )
+
+        for selected in ["modules.json", "Surge Relay/Backups/settings.json", "Future/Nested"] {
+            XCTAssertEqual(ModuleOutputFolderCatalog.options(
+                settings: settings, modules: [module], localFolders: folders,
+                githubFolders: ["Remote"], storageLocation: .local, preserving: selected
+            ), ["", "Future/Nested", "User.json"])
+        }
+        XCTAssertTrue(ModuleOutputFolderCatalog.options(
+            settings: settings, modules: [], localFolders: folders,
+            githubFolders: ["Remote"], storageLocation: .gitHub, preserving: "GitHub Only"
+        ).contains("GitHub Only"))
+    }
+
+    func testLocalFolderCreationRejectsFilesAndInternalDirectories() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let configuration = root.appending(path: "Surge Relay")
+        try FileManager.default.createDirectory(at: configuration, withIntermediateDirectories: true)
+        try Data("{}".utf8).write(to: root.appending(path: "modules.json"))
+        var settings = AppSettings()
+        settings.localModuleDirectory = root.path
+
+        for path in ["modules.json", "modules.json/Nested", "Surge Relay/Backups"] {
+            XCTAssertThrowsError(try ModuleOutputFolderCatalog.createPlan(
+                named: path, storageLocation: .local, settings: settings,
+                githubModuleOutputFolders: [], excludedLocalDirectories: [configuration]
+            ))
+        }
+        let plan = try ModuleOutputFolderCatalog.createPlan(
+            named: "User.json", storageLocation: .local, settings: settings,
+            githubModuleOutputFolders: [], excludedLocalDirectories: [configuration]
+        )
+        XCTAssertEqual(plan.folder, "User.json")
+    }
+
+    func testLocalFolderRefreshValidatesNewGitHubSelectionWithLocalPublishingDisabled() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root.appending(path: "Existing"), withIntermediateDirectories: true)
+        var settings = AppSettings()
+        settings.publishToLocal = false
+        settings.localModuleDirectory = root.path
+        let now = Date(timeIntervalSince1970: 10_000)
+        let cachedFolders = try LocalModuleFolderScanner.folders(in: root.path)
+        let plan = try ModuleOutputFolderCatalog.createPlan(
+            named: "New GitHub Folder", storageLocation: .gitHub, settings: settings, githubModuleOutputFolders: []
+        )
+
+        XCTAssertFalse(ModuleOutputFolderCatalog.shouldRefreshLocalFolders(
+            rootPath: root.path, cachedRootPath: root.path, lastRefreshedAt: now,
+            folders: cachedFolders, preserving: "Existing", now: now, force: false
+        ))
+        XCTAssertTrue(ModuleOutputFolderCatalog.shouldRefreshLocalFolders(
+            rootPath: root.path, cachedRootPath: root.path, lastRefreshedAt: now,
+            folders: cachedFolders, preserving: plan.folder, now: now, force: false
+        ))
+        let refreshedFolders = try LocalModuleFolderScanner.folders(in: root.path, including: [plan.folder])
+        XCTAssertEqual(ModuleOutputFolderCatalog.options(
+            settings: settings, modules: [], localFolders: refreshedFolders,
+            githubFolders: plan.githubModuleOutputFolders, storageLocation: .local, preserving: plan.folder
+        ), ["", "Existing", "New GitHub Folder"])
     }
 
     func testModuleOutputFolderCatalogCreatePlanBuildsLocalDirectoryAndRecordedFolders() throws {

@@ -25,7 +25,8 @@ extension AppModel {
             named: rawValue,
             storageLocation: storageLocation,
             settings: settings,
-            githubModuleOutputFolders: githubModuleOutputFolders
+            githubModuleOutputFolders: githubModuleOutputFolders,
+            excludedLocalDirectories: [configurationStorageDirectory, cacheDirectoryURL]
         )
         if let localDirectoryURL = plan.localDirectoryURL {
             try FileManager.default.createDirectory(at: localDirectoryURL, withIntermediateDirectories: true)
@@ -40,8 +41,9 @@ extension AppModel {
         return plan.folder
     }
 
-    func refreshModuleOutputFolders(force: Bool = false) async {
-        await refreshLocalModuleOutputFolders(force: force)
+    func refreshModuleOutputFolders(force: Bool = false, preserving selected: String? = nil) async {
+        await refreshLocalModuleOutputFolders(force: force, preserving: selected)
+        guard !Task.isCancelled else { return }
         let now = Date.now
         switch ModuleOutputFolderCatalog.refreshDecision(
             settings: settings,
@@ -77,24 +79,33 @@ extension AppModel {
         }
     }
 
-    private func refreshLocalModuleOutputFolders(force: Bool) async {
-        guard settings.publishToLocal else {
-            localModuleOutputFolders = [ModuleOutputFolder.root]
-            localModuleOutputFoldersRootPath = nil
-            localModuleOutputFoldersLastRefreshedAt = nil
-            return
-        }
+    private func refreshLocalModuleOutputFolders(force: Bool, preserving selected: String?) async {
         let rootPath = settings.localModuleDirectory
         let now = Date.now
-        if !force,
-           localModuleOutputFoldersRootPath == rootPath,
-           let refreshedAt = localModuleOutputFoldersLastRefreshedAt,
-           now.timeIntervalSince(refreshedAt) < ModuleOutputFolderCatalog.cacheInterval {
-            return
-        }
+        guard ModuleOutputFolderCatalog.shouldRefreshLocalFolders(
+            rootPath: rootPath,
+            cachedRootPath: localModuleOutputFoldersRootPath,
+            lastRefreshedAt: localModuleOutputFoldersLastRefreshedAt,
+            folders: localModuleOutputFolders,
+            preserving: selected,
+            now: now,
+            force: force
+        ) else { return }
+        let excludedDirectories = [configurationStorageDirectory, cacheDirectoryURL]
+        let candidateFolders = settings.customModuleOutputFolders
+            + modules.map(\.outputFolder)
+            + moduleTemplates.map(\.outputFolder)
+            + [selected].compactMap { $0 }
         let folders = await Task.detached(priority: .utility) {
-            (try? LocalModuleFolderScanner.folders(in: rootPath)) ?? []
+            (try? LocalModuleFolderScanner.folders(
+                in: rootPath,
+                excluding: excludedDirectories,
+                including: candidateFolders
+            )) ?? []
         }.value
+        guard !Task.isCancelled,
+              settings.localModuleDirectory == rootPath,
+              [configurationStorageDirectory, cacheDirectoryURL] == excludedDirectories else { return }
         localModuleOutputFolders = ModuleOutputFolder.options(from: folders)
         localModuleOutputFoldersRootPath = rootPath
         localModuleOutputFoldersLastRefreshedAt = now
