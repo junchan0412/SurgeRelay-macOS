@@ -321,7 +321,7 @@ final class AppModel {
                 try await fileStore.writeComponent(content, id: id)
             },
             materialize: { [processingWorker] content, overrides in
-                await processingWorker.materialize(content, overrides: overrides)
+                await processingWorker.configurableContent(content, overrides: overrides)
             },
             argumentInfo: { [processingWorker] content in
                 await processingWorker.argumentInfo(in: content)

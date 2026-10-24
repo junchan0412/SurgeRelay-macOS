@@ -546,6 +546,61 @@ final class ScriptHubTests: XCTestCase {
         XCTAssertTrue(result.contains("CountryCode=\"CN\"&Dispatcher=\"AutoNavi\""))
     }
 
+    func testWeatherKitQuotedCommaListAndAllSettingsSurvivePublication() throws {
+        let content = #"""
+        #!name = WeatherKit
+        #!arguments = DataSets:"airQuality,currentWeather,forecastDaily,forecastHourly,forecastNextHour,weatherAlerts",Weather.Provider:"ColorfulClouds",WeatherAlerts.Provider:"QWeatherWeb",NextHour.Provider:"ColorfulClouds",AirQuality.Current.Pollutants.Provider:"ColorfulClouds",AirQuality.Calculate.Algorithm:"EU_EAQI",API.ColorfulClouds.Token:"",API.QWeather.Host:"devapi.qweather.com",API.QWeather.Token:"",API.WAQI.Token:"",Storage:"Argument",LogLevel:"WARN"
+        #!arguments-desc = DataSets: 数据集\nWeather.Provider: 数据源
+        [Script]
+        Weather = type=http-response, script-path=https://example.com/weather.js, argument=DataSets="{{{DataSets}}}"&Weather.Provider="{{{Weather.Provider}}}"&API.ColorfulClouds.Token="{{{API.ColorfulClouds.Token}}}"
+        """#
+        let info = ModuleArgumentProcessor.info(in: content)
+        XCTAssertEqual(info.definitions.count, 12)
+        XCTAssertEqual(info.definitions.first?.defaultValue, "airQuality,currentWeather,forecastDaily,forecastHourly,forecastNextHour,weatherAlerts")
+        XCTAssertEqual(info.definitions.first(where: { $0.key == "API.ColorfulClouds.Token" })?.defaultValue, "")
+        let configured = ModuleArgumentProcessor.configurableContent(content, overrides: ["Weather.Provider": "QWeather", "DataSets": "airQuality,currentWeather", "API.ColorfulClouds.Token": "TEST=TOKEN=="])
+        XCTAssertTrue(configured.contains("#!arguments-desc = DataSets: 数据集\\nWeather.Provider: 数据源"))
+        XCTAssertTrue(configured.contains("{{{DataSets}}}"))
+        let configuredInfo = ModuleArgumentProcessor.info(in: configured)
+        XCTAssertEqual(configuredInfo.definitions.count, 12)
+        XCTAssertEqual(configuredInfo.definitions.first?.defaultValue, "airQuality,currentWeather")
+        XCTAssertEqual(configuredInfo.definitions.first(where: { $0.key == "API.ColorfulClouds.Token" })?.defaultValue, "TEST=TOKEN==")
+        let resolved = ModuleArgumentProcessor.materialize(configured, overrides: [:])
+        XCTAssertTrue(resolved.contains(#"argument=DataSets="airQuality,currentWeather"&Weather.Provider="QWeather"&API.ColorfulClouds.Token="TEST=TOKEN==""#))
+        XCTAssertFalse(resolved.contains("{{{"))
+        XCTAssertEqual(ModuleArgumentProcessor.configurableContent(content, overrides: [:]), content)
+    }
+
+    func testArgumentParsingHandlesQuotedSeparatorsEscapesAndEqualsInDefaults() {
+        let content = #"""
+        #!arguments = Token:"abc==",URL:"https://example.com/?a=1&b=2",List:'CN,US',Note:"a\"b,c",Path:"C:\\Tools",Empty:""
+        [Rule]
+        FINAL,DIRECT
+        """#
+        let values = Dictionary(uniqueKeysWithValues: ModuleArgumentProcessor.info(in: content).definitions.map { ($0.key, $0.defaultValue) })
+        XCTAssertEqual(values["Token"], "abc==")
+        XCTAssertEqual(values["URL"], "https://example.com/?a=1&b=2")
+        XCTAssertEqual(values["List"], "CN,US")
+        XCTAssertEqual(values["Note"], "a\"b,c")
+        XCTAssertEqual(values["Path"], "C:\\Tools")
+        XCTAssertEqual(values["Empty"], "")
+        let updated = ModuleArgumentProcessor.configurableContent(content, overrides: ["Note": "quoted \"word\",value", "Path": "C:\\New", "Empty": "new"])
+        let updatedValues = Dictionary(uniqueKeysWithValues: ModuleArgumentProcessor.info(in: updated).definitions.map { ($0.key, $0.defaultValue) })
+        XCTAssertEqual(updatedValues["Note"], "quoted \"word\",value")
+        XCTAssertEqual(updatedValues["Path"], "C:\\New")
+        XCTAssertEqual(updatedValues["Empty"], "new")
+    }
+
+    func testQueryStyleArgumentsKeepEncodedValuesAndNativeTemplate() {
+        let content = "#!arguments=Region=CN&Token=a%3Db%26c&URL=https%3A%2F%2Fexample.com\n#!arguments-desc=Help\n[Script]\nDemo = argument={{{Token}}}\n"
+        let configured = ModuleArgumentProcessor.configurableContent(content, overrides: ["Token": "new=token&value", "Region": "US"])
+        let info = ModuleArgumentProcessor.info(in: configured)
+        XCTAssertEqual(info.definitions.map(\.key), ["Region", "Token", "URL"])
+        XCTAssertEqual(info.definitions[1].defaultValue, "new=token&value")
+        XCTAssertTrue(configured.contains("{{{Token}}}"))
+        XCTAssertTrue(configured.contains("#!arguments-desc=Help"))
+    }
+
     func testAdvancedOptionsSummaryOnlyAppearsWhenConfigured() {
         XCTAssertNil(ScriptHubOptions().configuredSummary)
         var options = ScriptHubOptions()

@@ -172,7 +172,7 @@
       : '';
     return `<section class="form-section-view page-enter"><h3 class="section-heading">模块参数</h3><div class="group-box">
       ${argumentsList.map(argumentMarkup).join('')}
-      <div class="arguments-footer"><small>修改会立即应用</small><button class="button" data-action="reset-arguments" ${resetDisabled ? 'disabled' : ''}>恢复默认值</button></div>
+      <div class="arguments-footer"><small>设置发布默认值；在 Surge 中仍可调整参数</small><button class="button" data-action="reset-arguments" ${resetDisabled ? 'disabled' : ''}>恢复默认值</button></div>
       ${help}
     </div></section>`;
   }

@@ -16,7 +16,7 @@ extension AppModel {
     }
 
     func previewContent(_ version: ModuleVersionContent, for module: RelayModule) async -> String {
-        let content = await processingWorker.materialize(version.content, overrides: module.argumentOverrides)
+        let content = await processingWorker.configurableContent(version.content, overrides: [:])
         let named = await processingWorker.applyingModuleMetadata(
             name: module.name, category: module.category, desc: module.moduleDescription,
             iconURL: module.customIconURL, to: content

@@ -391,6 +391,35 @@ struct ModuleArgumentInfo: Hashable, Sendable {
 }
 
 enum ModuleArgumentProcessor {
+    static func configurableContent(_ content: String, overrides: [String: String]) -> String {
+        guard !overrides.isEmpty else { return content }
+        return content.components(separatedBy: "\n").map { line in
+            guard ModuleMetadataLineReader.hashBangName(in: line)?.lowercased() == "arguments",
+                  let equal = line.firstIndex(of: "=") else { return line }
+            let declaration = String(line[line.index(after: equal)...])
+            let queryStyle = usesQueryStyle(declaration)
+            let separator: Character = queryStyle ? "&" : ","
+            let assignment: Character = queryStyle ? "=" : ":"
+            let values = split(declaration, separator: separator).map { entry in
+                guard let index = entry.firstIndex(of: assignment) else { return entry }
+                let rawKey = String(entry[..<index])
+                let key = (queryStyle ? rawKey.removingPercentEncoding ?? rawKey : rawKey)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                guard let value = overrides[key] else { return entry }
+                if queryStyle {
+                    let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~"))
+                    return rawKey + "=" + (value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value)
+                }
+                let escaped = value.replacingOccurrences(of: "\\", with: "\\\\")
+                    .replacingOccurrences(of: "\"", with: "\\\"")
+                    .replacingOccurrences(of: "\r", with: "\\r")
+                    .replacingOccurrences(of: "\n", with: "\\n")
+                return rawKey + ":\"" + escaped + "\""
+            }
+            return String(line[...equal]) + values.joined(separator: String(separator))
+        }.joined(separator: "\n")
+    }
+
     static func info(in content: String) -> ModuleArgumentInfo {
         guard let value = metadataValue(named: "arguments", in: content) else {
             return ModuleArgumentInfo()
@@ -428,8 +457,8 @@ enum ModuleArgumentProcessor {
     }
 
     private static func parse(_ value: String) -> [(String, String)] {
-        if value.contains("=") {
-            return value.split(separator: "&").compactMap { pair in
+        if usesQueryStyle(value) {
+            return split(value, separator: "&").compactMap { pair in
                 let pieces = pair.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
                 guard pieces.count == 2 else { return nil }
                 let key = String(pieces[0]).removingPercentEncoding ?? String(pieces[0])
@@ -437,11 +466,48 @@ enum ModuleArgumentProcessor {
                 return normalizedPair(key, value)
             }
         }
-        return value.split(separator: ",").compactMap { pair in
+        return split(value, separator: ",").compactMap { pair in
             let pieces = pair.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
             guard pieces.count == 2 else { return nil }
             return normalizedPair(String(pieces[0]), String(pieces[1]))
         }
+    }
+
+    private static func usesQueryStyle(_ value: String) -> Bool {
+        for character in value {
+            if character == ":" { return false }
+            if character == "=" { return true }
+        }
+        return false
+    }
+
+    private static func split(_ value: String, separator: Character) -> [String] {
+        var result: [String] = []
+        var current = ""
+        var quote: Character?
+        var escaped = false
+        for character in value {
+            if escaped {
+                current.append(character)
+                escaped = false
+            } else if character == "\\" {
+                current.append(character)
+                escaped = true
+            } else if let active = quote {
+                current.append(character)
+                if character == active { quote = nil }
+            } else if character == "\"" || character == "'" {
+                current.append(character)
+                quote = character
+            } else if character == separator {
+                result.append(current)
+                current = ""
+            } else {
+                current.append(character)
+            }
+        }
+        result.append(current)
+        return result
     }
 
     private static func normalizedPair(_ key: String, _ value: String) -> (String, String)? {
@@ -452,6 +518,25 @@ enum ModuleArgumentProcessor {
            (value.hasPrefix("\"") && value.hasSuffix("\"") || value.hasPrefix("'") && value.hasSuffix("'")) {
             value.removeFirst()
             value.removeLast()
+            var decoded = ""
+            var escaped = false
+            for character in value {
+                if escaped {
+                    switch character {
+                    case "\\", "\"", "'": decoded.append(character)
+                    case "n": decoded.append("\n")
+                    case "r": decoded.append("\r")
+                    default: decoded.append("\\"); decoded.append(character)
+                    }
+                    escaped = false
+                } else if character == "\\" {
+                    escaped = true
+                } else {
+                    decoded.append(character)
+                }
+            }
+            if escaped { decoded.append("\\") }
+            value = decoded
         }
         return (key, value)
     }

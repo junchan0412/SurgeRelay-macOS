@@ -4,6 +4,68 @@ import XCTest
 
 @MainActor
 final class RelayRuntimeTests: XCTestCase {
+    func testModuleParametersRemainConfigurableThroughPreviewEditingPublishResetAndUpdate() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let context = WorkspaceContext(id: UUID(), name: "Native arguments", configurationDirectory: root.appending(path: "Config"),
+            cacheDirectory: root.appending(path: "Cache"), allowsLegacyFallback: false)
+        let model = AppModel(context: context, persistsOnInit: false)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        model.settings.localModuleDirectory = root.appending(path: "Modules").path
+        model.settings.publishToLocal = true
+        model.settings.publishToGitHub = false
+        model.settings.automaticallyPublish = false
+        model.settings.watchesLocalModuleChanges = false
+        let module = RelayModule(name: "iRingo.WeatherKit", sourceURL: "https://example.com/weather.sgmodule", sourceFormat: .surge,
+            outputFileName: "iRingo.WeatherKit.sgmodule", storageTargets: [.local, .gitHub])
+        model.modules = [module]
+        let source = #"""
+        #!name=iRingo.WeatherKit
+        #!arguments=DataSets:"airQuality,currentWeather",Weather.Provider:"ColorfulClouds",API.Token:""
+        #!arguments-desc=DataSets: 数据集\nWeather.Provider: 数据源
+        [Script]
+        Weather = type=http-response, script-path=https://example.com/weather.js, argument=DataSets="{{{DataSets}}}"&Weather.Provider="{{{Weather.Provider}}}"&Token="{{{API.Token}}}"
+        """# + "\n"
+        try await model.fileStore.writeComponent(source, id: module.id)
+        let info = await model.moduleArgumentInfo(for: module)
+        XCTAssertEqual(info.definitions.count, 3)
+        XCTAssertEqual(info.definitions[0].defaultValue, "airQuality,currentWeather")
+
+        model.setModuleArgument(moduleID: module.id, key: "Weather.Provider", value: "QWeather", defaultValue: "ColorfulClouds")
+        let outputPath = root.appending(path: "Modules/iRingo.WeatherKit.sgmodule")
+        for _ in 0..<100 {
+            if let output = try? String(contentsOf: outputPath, encoding: .utf8), output.contains("Weather.Provider:\"QWeather\"") { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let published = try String(contentsOf: outputPath, encoding: .utf8)
+        XCTAssertTrue(published.contains("Weather.Provider:\"QWeather\""))
+        XCTAssertTrue(published.contains("#!arguments-desc="))
+        XCTAssertTrue(published.contains("{{{Weather.Provider}}}"))
+        let githubFiles = try await model.publishedFiles(
+            plan: PublishCoordinator.selectedPlan(modules: model.modules, moduleIDs: [module.id], destination: .gitHub),
+            includeAssets: false, destination: .gitHub
+        )
+        let githubContent = String(decoding: try XCTUnwrap(githubFiles.first?.data), as: UTF8.self)
+        XCTAssertTrue(githubContent.contains("Weather.Provider:\"QWeather\""))
+        XCTAssertTrue(githubContent.contains("{{{Weather.Provider}}}"))
+
+        let current = try XCTUnwrap(model.modules.first)
+        let preview = try await model.previewContent(for: current)
+        XCTAssertTrue(preview.contains("#!arguments=DataSets:"))
+        XCTAssertTrue(preview.contains("Weather.Provider:\"ColorfulClouds\""))
+        XCTAssertTrue(preview.contains("{{{DataSets}}}"))
+        _ = try await model.savePreviewContent(preview + "# Edited source note\n", for: current)
+        model.resetModuleArguments(moduleID: module.id)
+        let restored = await model.refreshModuleOutputs(moduleIDs: [module.id], schedulesAutomaticPublish: false)
+        XCTAssertTrue(restored)
+        let reset = try String(contentsOf: outputPath, encoding: .utf8)
+        XCTAssertTrue(reset.contains("Weather.Provider:\"ColorfulClouds\""))
+        XCTAssertTrue(reset.contains("{{{Weather.Provider}}}"))
+        XCTAssertTrue(reset.contains("# Edited source note"))
+        try await model.flushPersistence()
+        XCTAssertTrue(PersistenceStore.loadModules(in: context.configurationDirectory, allowLegacyFallback: false)[0].argumentOverrides.isEmpty)
+    }
+
     private func pendingSaveModel(root: URL) -> AppModel {
         let context = WorkspaceContext(id: UUID(), name: "Pending saves",
             configurationDirectory: root.appending(path: "Config"), cacheDirectory: root.appending(path: "Cache"),

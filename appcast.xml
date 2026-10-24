@@ -3,6 +3,22 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>2.4.2</title>
+            <pubDate>Sun, 25 Oct 2026 02:19:30 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v2.4.2</link>
+            <sparkle:version>113</sparkle:version>
+            <sparkle:shortVersionString>2.4.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 2.4.2
+
+
+- 模块参数：修复 iRingo.WeatherKit 等带 `#!arguments` 的模块参数被发布流程移除、模板被永久替换的问题。发布输出保留参数声明、说明和 `{{{key}}}` 占位符，Relay 中设置的值作为 Surge 默认参数写入，Surge 内仍可继续调整。
+- 参数解析：支持带逗号的引号列表、空值、等号、URL、转义字符和 query-style 参数；刷新、预览、GitHub/本地发布、恢复历史和 Web 参数接口共用同一解析结果。
+- 验证：完整 Release 测试通过；新增 WeatherKit 参数数量、DataSets 列表、Token、Storage、模板保留及默认值发布回归。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v2.4.2/Surge-Relay-2.4.2.app.zip" length="12765376" type="application/zip" sparkle:edSignature="co/kS3ESoK7sp3m5IjYdj0qUyAsXVL44l1Op/keCyEAjBmothfK12ec/luFAI7azXbVXbR89Vpg0DB8L8IsRBw=="/>
+        </item>
+        <item>
             <title>2.4.1</title>
             <pubDate>Sun, 25 Oct 2026 01:22:54 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v2.4.1</link>

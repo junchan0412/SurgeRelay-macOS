@@ -211,7 +211,7 @@ struct ModuleDetailView: View {
                     argumentControl(definition)
                 }
                 HStack {
-                    Text("修改会立即应用")
+                    Text("设置发布默认值；在 Surge 中仍可调整参数")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -231,6 +231,7 @@ struct ModuleDetailView: View {
                     }
                 }
             }
+            .disabled(model.isWorking)
         }
     }
 

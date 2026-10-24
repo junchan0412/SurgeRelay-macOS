@@ -31,7 +31,7 @@ final class ModulePreviewContentProviderTests: XCTestCase {
             },
 
             materialize: { content, overrides in
-                ModuleArgumentProcessor.materialize(content, overrides: overrides)
+                ModuleArgumentProcessor.configurableContent(content, overrides: overrides)
             },
             argumentInfo: { content in
                 ModuleArgumentProcessor.info(in: content)
@@ -61,8 +61,8 @@ final class ModulePreviewContentProviderTests: XCTestCase {
         XCTAssertEqual(cachedComponent, SurgeModuleSanitizer.sanitize(sourceContent))
         XCTAssertTrue(preview.contains("#!name=Previewed"))
         XCTAssertTrue(preview.contains("#!category=#工具"))
-        XCTAssertFalse(preview.contains("#!arguments="))
-        XCTAssertTrue(preview.contains("FINAL,DIRECT"))
+        XCTAssertTrue(preview.contains("#!arguments=Mode:默认策略"))
+        XCTAssertTrue(preview.contains("FINAL,{{{Mode}}}"))
     }
 
     @MainActor

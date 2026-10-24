@@ -6,6 +6,10 @@ actor ModuleProcessingWorker {
         ModuleArgumentProcessor.materialize(content, overrides: overrides)
     }
 
+    func configurableContent(_ content: String, overrides: [String: String]) -> String {
+        ModuleArgumentProcessor.configurableContent(content, overrides: overrides)
+    }
+
     func argumentInfo(in content: String) -> ModuleArgumentInfo {
         ModuleArgumentProcessor.info(in: content)
     }

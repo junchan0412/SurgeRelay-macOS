@@ -59,7 +59,7 @@ extension AppModel {
                 try await fileStore.generatedAssetFiles(for: ids)
             },
             materialize: { [processingWorker] content, overrides in
-                await processingWorker.materialize(content, overrides: overrides)
+                await processingWorker.configurableContent(content, overrides: overrides)
             },
             applyingModuleMetadata: { [processingWorker] name, category, desc, iconURL, content in
                 await processingWorker.applyingModuleMetadata(

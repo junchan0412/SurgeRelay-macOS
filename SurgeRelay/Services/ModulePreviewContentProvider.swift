@@ -19,7 +19,7 @@ struct ModulePreviewContentProvider {
 
     func previewContent(for module: RelayModule) async throws -> String {
         let content = try await componentContent(for: module)
-        let materialized = await materialize(content, module.argumentOverrides)
+        let materialized = await materialize(content, [:])
         let metadataContent = await applyingModuleMetadata(
             module.name,
             module.category,
@@ -40,7 +40,7 @@ struct ModulePreviewContentProvider {
 
     func convertedPreviewContent(for module: RelayModule) async throws -> String {
         let content = try await convertedComponentContent(for: module)
-        return await materialize(content, module.argumentOverrides)
+        return await materialize(content, [:])
     }
 
     func componentContent(for module: RelayModule) async throws -> String {
