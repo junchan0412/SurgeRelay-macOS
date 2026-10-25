@@ -1257,7 +1257,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.allenmiao.SurgeRelayUITests;
 				SDKROOT = macosx;
 				TEST_TARGET_NAME = "Surge Relay";
@@ -1276,7 +1276,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.allenmiao.SurgeRelayUITests;
 				SDKROOT = macosx;
 				TEST_TARGET_NAME = "Surge Relay";
@@ -1318,7 +1318,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-			CURRENT_PROJECT_VERSION = 114;
+			CURRENT_PROJECT_VERSION = 115;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1331,8 +1331,8 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
-			MARKETING_VERSION = 2.4.3;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+			MARKETING_VERSION = 2.5.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1354,7 +1354,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.allenmiao.SurgeRelay;
 				PRODUCT_MODULE_NAME = SurgeRelay;
 				PRODUCT_NAME = "Surge Relay";
@@ -1374,7 +1374,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.allenmiao.SurgeRelayTests;
 				SDKROOT = macosx;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Surge Relay.app/Contents/MacOS/Surge Relay";
@@ -1416,7 +1416,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-			CURRENT_PROJECT_VERSION = 114;
+			CURRENT_PROJECT_VERSION = 115;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -1435,8 +1435,8 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
-			MARKETING_VERSION = 2.4.3;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+			MARKETING_VERSION = 2.5.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -1459,7 +1459,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.allenmiao.SurgeRelay;
 				PRODUCT_MODULE_NAME = SurgeRelay;
 				PRODUCT_NAME = "Surge Relay";
@@ -1479,7 +1479,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.allenmiao.SurgeRelayTests;
 				SDKROOT = macosx;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Surge Relay.app/Contents/MacOS/Surge Relay";
@@ -1497,7 +1497,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_APP_SANDBOX = NO;
 				SKIP_INSTALL = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				SWIFT_STRICT_CONCURRENCY = complete;
 			};
 			name = Debug;
@@ -1513,7 +1513,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_APP_SANDBOX = NO;
 				SKIP_INSTALL = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				SWIFT_STRICT_CONCURRENCY = complete;
 			};
 			name = Release;

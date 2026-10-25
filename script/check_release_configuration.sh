@@ -152,6 +152,7 @@ require_file "$SECURITY_PATH"
 
 PROJECT_VERSION="$(project_value MARKETING_VERSION)"
 PROJECT_BUILD="$(project_value CURRENT_PROJECT_VERSION)"
+MINIMUM_SYSTEM_VERSION="$(project_value MACOSX_DEPLOYMENT_TARGET)"
 [[ -n "$PROJECT_VERSION" ]] || fail "project.yml is missing MARKETING_VERSION"
 [[ -n "$PROJECT_BUILD" ]] || fail "project.yml is missing CURRENT_PROJECT_VERSION"
 
@@ -170,6 +171,10 @@ BUILD="${BUILD:-$PROJECT_BUILD}"
 
 require_contains "$XCODE_PROJECT" "MARKETING_VERSION = $PROJECT_VERSION;" "Xcode project version"
 require_contains "$XCODE_PROJECT" "CURRENT_PROJECT_VERSION = $PROJECT_BUILD;" "Xcode project build"
+[[ "$MINIMUM_SYSTEM_VERSION" == "15.0" ]] || fail "minimum supported macOS must be 15.0"
+while IFS= read -r configured_target; do
+  [[ "$configured_target" == "$MINIMUM_SYSTEM_VERSION" ]] || fail "Xcode target has incompatible deployment target $configured_target"
+done < <(awk '/MACOSX_DEPLOYMENT_TARGET =/ { gsub(/;/, "", $3); print $3 }' "$XCODE_PROJECT")
 require_contains "$INFO_PLIST" '<key>SUFeedURL</key>' "Info.plist"
 require_contains "$INFO_PLIST" '<key>SUPublicEDKey</key>' "Info.plist"
 [[ "$(plist_raw_value CFBundleShortVersionString "$INFO_PLIST")" == '$(MARKETING_VERSION)' ]] \
@@ -242,11 +247,13 @@ if [[ -f "$APPCAST_PATH" ]]; then
   APPCAST_TITLE="$(appcast_value "string(/*[local-name()='rss']/*[local-name()='channel']/*[local-name()='item'][1]/*[local-name()='title'])")"
   APPCAST_BUILD="$(appcast_value "string(/*[local-name()='rss']/*[local-name()='channel']/*[local-name()='item'][1]/*[local-name()='version'])")"
   APPCAST_SHORT="$(appcast_value "string(/*[local-name()='rss']/*[local-name()='channel']/*[local-name()='item'][1]/*[local-name()='shortVersionString'])")"
+  APPCAST_MINIMUM="$(appcast_value "string(/*[local-name()='rss']/*[local-name()='channel']/*[local-name()='item'][1]/*[local-name()='minimumSystemVersion'])")"
   APPCAST_URL="$(appcast_value "string(/*[local-name()='rss']/*[local-name()='channel']/*[local-name()='item'][1]/*[local-name()='enclosure']/@url)")"
   APPCAST_SIGNATURE="$(appcast_value "string(/*[local-name()='rss']/*[local-name()='channel']/*[local-name()='item'][1]/*[local-name()='enclosure']/@*[local-name()='edSignature'])")"
   [[ "$APPCAST_TITLE" == "$VERSION" ]] || fail "appcast latest title '$APPCAST_TITLE' does not match $VERSION"
   [[ "$APPCAST_BUILD" == "$BUILD" ]] || fail "appcast latest sparkle:version '$APPCAST_BUILD' does not match $BUILD"
   [[ "$APPCAST_SHORT" == "$VERSION" ]] || fail "appcast latest shortVersionString '$APPCAST_SHORT' does not match $VERSION"
+  [[ "$APPCAST_MINIMUM" == "$MINIMUM_SYSTEM_VERSION" ]] || fail "appcast minimum system '$APPCAST_MINIMUM' does not match $MINIMUM_SYSTEM_VERSION"
   [[ "$APPCAST_URL" == *"/v$VERSION/Surge-Relay-$VERSION.app.zip" ]] \
     || fail "appcast latest enclosure URL does not point at v$VERSION app zip"
   [[ -n "$APPCAST_SIGNATURE" ]] || fail "appcast latest enclosure is missing Sparkle EdDSA signature"

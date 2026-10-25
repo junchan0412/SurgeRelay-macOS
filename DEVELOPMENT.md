@@ -301,6 +301,8 @@ Web management list updates use `sidebarListSignature(snapshot)` from `WebResour
 
 ## Release
 
+Minimum supported OS is macOS 15.0 for the app, helper and both test targets. Keep project.yml and the checked-in Xcode project synchronized. The appcast generator derives minimumSystemVersion from MACOSX_DEPLOYMENT_TARGET; do not rewrite older appcast entries, whose binaries still require their original OS. Release verification checks LSMinimumSystemVersion, every architecture of every bundled Mach-O and the generated icns icon. A target-15 build and tests on a newer host establish build compatibility; report macOS 15 runtime coverage separately.
+
 Release builds require:
 
 - Sparkle EdDSA private key in the keychain

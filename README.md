@@ -8,6 +8,8 @@
 
 Surge Relay 面向需要长期维护大量 `.sgmodule` / `.module`、从 Loon/Quantumult X 等格式转换到 Surge、并把最终模块同步到本地 Surge 目录或 GitHub 仓库的 macOS 用户。本 fork 基于 [EEliberto/SurgeRelay-macOS](https://github.com/EEliberto/SurgeRelay-macOS) 修改，继续遵守 Apache License 2.0；转换能力基于 [Script-Hub](https://github.com/Script-Hub-Org) 的本地引擎。
 
+当前发布包支持 macOS 15.0 及更高版本。
+
 ## 🚀 快速上手
 
 1. 从 [GitHub Releases](https://github.com/junchan0412/SurgeRelay-macOS/releases) 下载最新版 `Surge-Relay-版本.app.zip`，解压后把 `Surge Relay.app` 拖入 `/Applications`。

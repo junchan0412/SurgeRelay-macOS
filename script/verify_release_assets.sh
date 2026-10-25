@@ -10,6 +10,7 @@ project_value() {
 
 VERSION="${VERSION:-$(project_value MARKETING_VERSION)}"
 BUILD="${BUILD:-$(project_value CURRENT_PROJECT_VERSION)}"
+MINIMUM_SYSTEM_VERSION="$(project_value MACOSX_DEPLOYMENT_TARGET)"
 ARTIFACT_DIR="${ARTIFACT_DIR:-}"
 APPCAST_PATH=""
 REQUIRE_SPARKLE_SIGNATURES="${REQUIRE_SPARKLE_SIGNATURES:-1}"
@@ -362,6 +363,8 @@ verify_app_bundle() {
   build="$(plist_value CFBundleVersion "$app_path/Contents/Info.plist")"
   assert_equal "$app_path CFBundleShortVersionString" "$VERSION" "$version"
   assert_equal "$app_path CFBundleVersion" "$BUILD" "$build"
+  assert_equal "$app_path minimum macOS version" "$MINIMUM_SYSTEM_VERSION" \
+    "$(plist_value LSMinimumSystemVersion "$app_path/Contents/Info.plist")"
 
   if ! verify_output="$(codesign --verify --deep --strict --verbose=2 "$app_path" 2>&1)"; then
     echo "$verify_output" >&2
@@ -378,6 +381,27 @@ verify_app_bundle() {
   archs="$(lipo -archs "$app_path/Contents/MacOS/$APP_NAME")"
   assert_contains "$app_path architectures" "arm64" " $archs "
   assert_contains "$app_path architectures" "x86_64" " $archs "
+  local code_path architecture minos
+  while IFS= read -r -d '' code_path; do
+    file -b "$code_path" | grep -q 'Mach-O' || continue
+    for architecture in $(lipo -archs "$code_path"); do
+      minos="$(otool -arch "$architecture" -l "$code_path" | awk '
+        $1 == "cmd" { build = $2 == "LC_BUILD_VERSION"; legacy = $2 == "LC_VERSION_MIN_MACOSX" }
+        build && $1 == "minos" { print $2 }
+        legacy && $1 == "version" { print $2 }
+      ')"
+      [[ -n "$minos" ]] || fail "$code_path ($architecture) has no macOS minimum version"
+      awk -v actual="$minos" -v maximum="$MINIMUM_SYSTEM_VERSION" 'BEGIN {
+        split(actual, a, "."); split(maximum, b, ".");
+        for (i = 1; i <= 3; i++) {
+          if (a[i] + 0 < b[i] + 0) exit 0;
+          if (a[i] + 0 > b[i] + 0) exit 1;
+        }
+      }' || fail "$code_path ($architecture) requires macOS $minos, above $MINIMUM_SYSTEM_VERSION"
+    done
+  done < <(find "$app_path/Contents" -type f -print0)
+  ok "verified all bundled binaries support macOS $MINIMUM_SYSTEM_VERSION"
+  require_file "$app_path/Contents/Resources/$APP_NAME.icns"
   verify_dynamic_library_linkage "$app_path"
   node "$ROOT_DIR/script/verify_web_bundle.mjs" "$app_path"
 }
@@ -462,6 +486,7 @@ verify_appcast() {
   local enclosure_signature
   local expected_signature
   local expected_length
+  local minimum_system_version
 
   [[ -n "$APPCAST_PATH" ]] || return 0
   require_file "$APPCAST_PATH"
@@ -470,6 +495,7 @@ verify_appcast() {
   title="$(xmllint --xpath "string(/*[local-name()='rss']/*[local-name()='channel']/*[local-name()='item'][1]/*[local-name()='title'])" "$APPCAST_PATH")"
   sparkle_version="$(xmllint --xpath "string(/*[local-name()='rss']/*[local-name()='channel']/*[local-name()='item'][1]/*[local-name()='version'])" "$APPCAST_PATH")"
   short_version="$(xmllint --xpath "string(/*[local-name()='rss']/*[local-name()='channel']/*[local-name()='item'][1]/*[local-name()='shortVersionString'])" "$APPCAST_PATH")"
+  minimum_system_version="$(xmllint --xpath "string(/*[local-name()='rss']/*[local-name()='channel']/*[local-name()='item'][1]/*[local-name()='minimumSystemVersion'])" "$APPCAST_PATH")"
   enclosure_url="$(xmllint --xpath "string(/*[local-name()='rss']/*[local-name()='channel']/*[local-name()='item'][1]/*[local-name()='enclosure']/@url)" "$APPCAST_PATH")"
   enclosure_length="$(xmllint --xpath "string(/*[local-name()='rss']/*[local-name()='channel']/*[local-name()='item'][1]/*[local-name()='enclosure']/@length)" "$APPCAST_PATH")"
   enclosure_signature="$(xmllint --xpath "string(/*[local-name()='rss']/*[local-name()='channel']/*[local-name()='item'][1]/*[local-name()='enclosure']/@*[local-name()='edSignature'])" "$APPCAST_PATH")"
@@ -479,6 +505,7 @@ verify_appcast() {
   assert_equal "appcast latest title" "$VERSION" "$title"
   assert_equal "appcast sparkle:version" "$BUILD" "$sparkle_version"
   assert_equal "appcast shortVersionString" "$VERSION" "$short_version"
+  assert_equal "appcast minimumSystemVersion" "$MINIMUM_SYSTEM_VERSION" "$minimum_system_version"
   assert_contains "appcast enclosure url" "/v$VERSION/Surge-Relay-$VERSION.app.zip" "$enclosure_url"
   assert_equal "appcast enclosure length" "$expected_length" "$enclosure_length"
   assert_equal "appcast enclosure edSignature" "$expected_signature" "$enclosure_signature"

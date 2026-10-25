@@ -2,15 +2,15 @@ name: Surge Relay
 options:
   bundleIdPrefix: com.allenmiao
   deploymentTarget:
-    macOS: "26.0"
+    macOS: "15.0"
   groupSortPosition: top
   generateEmptyDirectories: true
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    MACOSX_DEPLOYMENT_TARGET: "26.0"
-    CURRENT_PROJECT_VERSION: 114
-    MARKETING_VERSION: 2.4.3
+    MACOSX_DEPLOYMENT_TARGET: "15.0"
+    CURRENT_PROJECT_VERSION: 115
+    MARKETING_VERSION: 2.5.0
     CODE_SIGN_STYLE: Automatic
     ENABLE_USER_SCRIPT_SANDBOXING: YES
 packages:
@@ -21,7 +21,7 @@ targets:
   Surge Relay:
     type: application
     platform: macOS
-    deploymentTarget: "26.0"
+    deploymentTarget: "15.0"
     info:
       path: SurgeRelay/Info.plist
       properties:
@@ -64,7 +64,7 @@ targets:
   SurgeRelayScriptWorker:
     type: tool
     platform: macOS
-    deploymentTarget: "26.0"
+    deploymentTarget: "15.0"
     sources:
       - path: SurgeRelayScriptWorker
       - path: SurgeRelay/Services/ScriptHubNetworkPolicy.swift
@@ -88,7 +88,7 @@ targets:
   Surge RelayTests:
     type: bundle.unit-test
     platform: macOS
-    deploymentTarget: "26.0"
+    deploymentTarget: "15.0"
     sources:
       - path: SurgeRelayTests
     dependencies:
@@ -100,7 +100,7 @@ targets:
   SurgeRelayUITests:
     type: bundle.ui-testing
     platform: macOS
-    deploymentTarget: "26.0"
+    deploymentTarget: "15.0"
     sources:
       - path: SurgeRelayUITests
     dependencies:

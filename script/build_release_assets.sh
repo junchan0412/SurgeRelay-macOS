@@ -134,7 +134,7 @@ update_appcast() {
     echo "</link>"
     echo "            <sparkle:version>$BUILD</sparkle:version>"
     echo "            <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>"
-    echo "            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>"
+    echo "            <sparkle:minimumSystemVersion>$MINIMUM_SYSTEM_VERSION</sparkle:minimumSystemVersion>"
     echo '            <description sparkle:format="markdown"><![CDATA[# Surge Relay '"$VERSION"
     echo
     printf '%s\n' "$notes" | sed 's/]]>/]]]]><![CDATA[>/g'
@@ -154,6 +154,7 @@ update_appcast() {
 
 PROJECT_VERSION="$(project_value MARKETING_VERSION)"
 PROJECT_BUILD="$(project_value CURRENT_PROJECT_VERSION)"
+MINIMUM_SYSTEM_VERSION="$(project_value MACOSX_DEPLOYMENT_TARGET)"
 VERSION="${VERSION:-$PROJECT_VERSION}"
 BUILD="${BUILD:-$PROJECT_BUILD}"
 DERIVED_DATA="$ROOT_DIR/build/DerivedDataRelease"

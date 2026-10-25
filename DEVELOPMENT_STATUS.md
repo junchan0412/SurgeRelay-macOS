@@ -6,8 +6,8 @@
 
 | 项目 | 当前值 |
 | --- | --- |
-| 版本 | 2.4.3 (114) |
-| macOS deployment target | 26.0 |
+| 版本 | 2.5.0 (115) |
+| macOS deployment target | 15.0 |
 | Swift | 6.0，strict concurrency complete |
 
 ## 当前维护决策
@@ -46,7 +46,7 @@
 | Services / Models / Views / Utilities / App-Core | 71 / 26 / 38 / 3 / 29 |
 | 应用 Swift 行数 | 29,006 |
 | 测试 Swift 行数 | 15,446 |
-| CHANGELOG release 段落 | 114 |
+| CHANGELOG release 段落 | 115 |
 
 ## 主要维护热点
 
@@ -83,7 +83,7 @@ git diff --check
 node script/generate_project_status.mjs --check
 node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs
-VERSION=2.4.3 BUILD=114 ./script/check_release_configuration.sh
+VERSION=2.5.0 BUILD=115 ./script/check_release_configuration.sh
 
 DEVELOPER_DIR="$(xcode-select -p)" \
 xcodebuild test \
