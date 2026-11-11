@@ -3,6 +3,24 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>3.1.0</title>
+            <pubDate>Thu, 12 Nov 2026 02:42:19 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v3.1.0</link>
+            <sparkle:version>117</sparkle:version>
+            <sparkle:shortVersionString>3.1.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 3.1.0
+
+
+- 工作区迁移：在“工作区与模板”中选择新目录，完整迁移配置、凭据、草稿、历史、保存队列和缓存，保留工作区身份；活动工作区会先取消任务、等待并保存，再载入新位置。非活动工作区也可迁移，登记失败保留原数据。
+- 独立存储目录：Surge、Loon、Egern、Quantumult X、Stash 和 Shadowrocket 分别设置本地存储开关与目录，新配置默认只启用 Surge。已有本地/GitHub 开关、Surge 路径及旧输出记录保留。
+- 输出与保护：发布、同步比较、接管、扫描、来源监听和文件夹菜单按客户端目录执行；各客户端独立维护清单与恢复记录。共享目录时，清理不会删除其它客户端的当前输出和脚本资源。
+- 迁移与重启：默认工作区同步新的配置/缓存位置，兼容旧组件缓存；退休旧运行时的持久写入，避免视图退出后重建原目录。原配置与缓存目录重叠时保留旧缓存中的用户文件，并显示清理提示。
+- 界面反馈：迁移时保留选中页面、设置面板和工具表单；原生与 Web 显示各客户端目录和启用状态，目录变更会使旧发布预览失效。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v3.1.0/Surge-Relay-3.1.0.app.zip" length="13489283" type="application/zip" sparkle:edSignature="tk9UhpwaUTIKQjP/yDgqB5Phbd4HtVqm3clVYn7IhSilxogbLAqFRYLN+XpRUiFRYQpkDfkcDnun5mXmi/g5BA=="/>
+        </item>
+        <item>
             <title>3.0.0</title>
             <pubDate>Thu, 12 Nov 2026 00:02:08 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v3.0.0</link>

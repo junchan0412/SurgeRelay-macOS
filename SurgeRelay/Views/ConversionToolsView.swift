@@ -184,6 +184,8 @@ struct ConversionToolsView: View {
     private func saveResult(_ result: ConversionToolResult) {
         let panel = NSSavePanel()
         panel.nameFieldStringValue = result.fileName
+        let directory = model.settings.localModuleDirectory(for: result.outputFormat)
+        if !directory.isEmpty { panel.directoryURL = URL(filePath: directory, directoryHint: .isDirectory) }
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
             do { try Data(result.content.utf8).write(to: url, options: .atomic) }

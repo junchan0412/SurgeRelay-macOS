@@ -249,6 +249,7 @@ ui.moduleForm.elements.sourceURL.addEventListener('input', () => {
 ui.moduleForm.elements.sourceFormat.addEventListener('change', moduleEditor.updateNativeModuleState);
 ui.moduleForm.elements.outputFormat.addEventListener('change', () => {
   moduleEditor.updateNativeModuleState();
+  moduleEditor.refreshOutputFolders(state, null, Boolean(editingID));
   updateOutputPathPreview();
 });
 ui.moduleForm.elements.refreshIntervalMinutes?.addEventListener('change', moduleEditor.updateRefreshPolicy);

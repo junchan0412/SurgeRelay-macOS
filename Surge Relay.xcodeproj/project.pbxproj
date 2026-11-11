@@ -118,6 +118,7 @@
 		33C4D5E6F708192A3B4C5D6E /* GitHubPublishTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43C4D5E6F708192A3B4C5D6E /* GitHubPublishTests.swift */; };
 		3A4B5C6D7E8F901122334458 /* LocalModuleScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A4B5C6D7E8F901122334458 /* LocalModuleScannerTests.swift */; };
 		3A4B5C6D7E8F901122334456 /* LocalPublishedExportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A4B5C6D7E8F901122334456 /* LocalPublishedExportTests.swift */; };
+		ACB29A9F021B4584825CA4E3 /* ClientStorageRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F9FBD9946F544A598EAE132 /* ClientStorageRoutingTests.swift */; };
 		3E4F5A6B7C8D9E0F10213243 /* LocalPublishedFilesPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E4F5A6B7C8D9E0F10213243 /* LocalPublishedFilesPlannerTests.swift */; };
 		3E4F5A6B7C8D9E0F10213245 /* ManagedPublishedFileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E4F5A6B7C8D9E0F10213245 /* ManagedPublishedFileTests.swift */; };
 		3A4B5C6D7E8F901122334457 /* LegacyOutputCleanupPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A4B5C6D7E8F901122334457 /* LegacyOutputCleanupPlannerTests.swift */; };
@@ -348,6 +349,7 @@
 		43C4D5E6F708192A3B4C5D6E /* GitHubPublishTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubPublishTests.swift; sourceTree = "<group>"; };
 		4A4B5C6D7E8F901122334458 /* LocalModuleScannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModuleScannerTests.swift; sourceTree = "<group>"; };
 		4A4B5C6D7E8F901122334456 /* LocalPublishedExportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalPublishedExportTests.swift; sourceTree = "<group>"; };
+		5F9FBD9946F544A598EAE132 /* ClientStorageRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientStorageRoutingTests.swift; sourceTree = "<group>"; };
 		4E4F5A6B7C8D9E0F10213243 /* LocalPublishedFilesPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalPublishedFilesPlannerTests.swift; sourceTree = "<group>"; };
 		4E4F5A6B7C8D9E0F10213245 /* ManagedPublishedFileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedPublishedFileTests.swift; sourceTree = "<group>"; };
 		4A4B5C6D7E8F901122334457 /* LegacyOutputCleanupPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyOutputCleanupPlannerTests.swift; sourceTree = "<group>"; };
@@ -778,6 +780,7 @@
 				5B8A9B0C1D2E3F4051627384 /* LocalModuleImportPlannerTests.swift */,
 				4A4B5C6D7E8F901122334458 /* LocalModuleScannerTests.swift */,
 				4A4B5C6D7E8F901122334456 /* LocalPublishedExportTests.swift */,
+				5F9FBD9946F544A598EAE132 /* ClientStorageRoutingTests.swift */,
 				4E4F5A6B7C8D9E0F10213243 /* LocalPublishedFilesPlannerTests.swift */,
 				4E4F5A6B7C8D9E0F10213245 /* ManagedPublishedFileTests.swift */,
 				3F4A5B6C7D8E9F0011223344 /* ModelAndCoordinatorTests.swift */,
@@ -1029,6 +1032,7 @@
 				5A8A9B0C1D2E3F4051627384 /* LocalModuleImportPlannerTests.swift in Sources */,
 				3A4B5C6D7E8F901122334458 /* LocalModuleScannerTests.swift in Sources */,
 				3A4B5C6D7E8F901122334456 /* LocalPublishedExportTests.swift in Sources */,
+				ACB29A9F021B4584825CA4E3 /* ClientStorageRoutingTests.swift in Sources */,
 				3E4F5A6B7C8D9E0F10213243 /* LocalPublishedFilesPlannerTests.swift in Sources */,
 				3E4F5A6B7C8D9E0F10213245 /* ManagedPublishedFileTests.swift in Sources */,
 				2F4A5B6C7D8E9F0011223344 /* ModelAndCoordinatorTests.swift in Sources */,
@@ -1342,7 +1346,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-			CURRENT_PROJECT_VERSION = 116;
+			CURRENT_PROJECT_VERSION = 117;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1356,7 +1360,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-			MARKETING_VERSION = 3.0.0;
+			MARKETING_VERSION = 3.1.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1440,7 +1444,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-			CURRENT_PROJECT_VERSION = 116;
+			CURRENT_PROJECT_VERSION = 117;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -1460,7 +1464,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-			MARKETING_VERSION = 3.0.0;
+			MARKETING_VERSION = 3.1.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

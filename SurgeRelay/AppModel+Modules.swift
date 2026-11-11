@@ -22,7 +22,7 @@ extension AppModel {
             from: draft,
             modules: modules,
 
-            localModuleDirectory: settings.localModuleDirectory
+            localModuleDirectory: settings.localModuleDirectory(for: draft.outputFormat)
         )
         var module = plan.module
         module.id = id
@@ -54,7 +54,7 @@ extension AppModel {
             from: draft,
             modules: modules,
 
-            localModuleDirectory: settings.localModuleDirectory
+            localModuleDirectory: settings.localModuleDirectory(for: draft.outputFormat)
         ) else {
             return nil
         }
@@ -66,7 +66,7 @@ extension AppModel {
         var updated = plan.module
         if previous.hasLocalStorageTarget, updated.hasLocalStorageTarget,
            LocalSourcePathResolver.pathIdentity(previous.publishedRelativePath) != LocalSourcePathResolver.pathIdentity(updated.publishedRelativePath),
-           let root = LocalSourcePathResolver.canonicalDirectoryURL(for: settings.localModuleDirectory),
+           let root = LocalSourcePathResolver.canonicalDirectoryURL(for: settings.localModuleDirectory(for: previous.outputFormat)),
            let fileURL = LocalSourcePathResolver.fileURL(relativePath: previous.publishedRelativePath, rootDirectoryPath: root.path) {
             let data = try? Data(contentsOf: fileURL)
             let retirement = LocalOutputRetirement(rootDirectory: root.path, relativePath: previous.publishedRelativePath,
@@ -81,10 +81,12 @@ extension AppModel {
         registerLocalChange()
         modules[index] = updated
         if let adoptedPath = plan.adoptedLocalPublishedPath {
-            let localPlan = LocalPublishedFilesPlanner.plan(files: [], targetDirectory: settings.localModuleDirectory,
-                previousRootDirectory: settings.localPublishedRootDirectory, previousPublishedPaths: settings.localPublishedFilePaths)
-            settings.localPublishedRootDirectory = localPlan.targetDirectory
-            settings.localPublishedFilePaths = LocalPublishedFilesPlanner.mergedPaths(localPlan.knownManagedPaths, adding: [adoptedPath])
+            var storage = settings.localStorage(for: updated.outputFormat)
+            let localPlan = LocalPublishedFilesPlanner.plan(files: [], targetDirectory: storage.directory,
+                previousRootDirectory: storage.publishedRootDirectory, previousPublishedPaths: storage.publishedFilePaths)
+            storage.publishedRootDirectory = localPlan.targetDirectory
+            storage.publishedFilePaths = LocalPublishedFilesPlanner.mergedPaths(localPlan.knownManagedPaths, adding: [adoptedPath])
+            settings.setLocalStorage(storage, for: updated.outputFormat)
             saveSettings()
         }
         invalidateModuleSummaryCache()
@@ -123,9 +125,10 @@ extension AppModel {
         if let moduleID {
             guard modules.contains(where: { $0.id == moduleID }) else { throw RelayError.moduleMissing }
             refreshSource = try ModuleDraftPlanner.updatePlan(id: moduleID, from: draft, modules: modules,
-                localModuleDirectory: settings.localModuleDirectory)?.sourceChanged ?? false
+                localModuleDirectory: settings.localModuleDirectory(for: draft.outputFormat))?.sourceChanged ?? false
         } else {
-            _ = try ModuleDraftPlanner.addPlan(from: draft, modules: modules, localModuleDirectory: settings.localModuleDirectory)
+            _ = try ModuleDraftPlanner.addPlan(from: draft, modules: modules,
+                localModuleDirectory: settings.localModuleDirectory(for: draft.outputFormat))
             refreshSource = true
         }
         let item = PendingModuleSave(moduleID: moduleID, draft: draft, refreshSource: refreshSource)
@@ -241,24 +244,26 @@ extension AppModel {
         guard !isWorking else { statusMessage = PreviewContentSaveError.busy.localizedDescription; return }
         guard let index = modules.firstIndex(where: { $0.id == id }) else { return }
         let module = modules[index]
+        var storage = settings.localStorage(for: module.outputFormat)
+        let localRoot = storage.directory.isEmpty ? storage.publishedRootDirectory ?? "" : storage.directory
         beginWork(.savingPreview)
         workActivity.title = "删除模块"
         defer { endWork(.savingPreview) }
-        let protectedPaths = Set(localProtectedSourcePaths(targetDirectory: settings.localModuleDirectory)
+        let protectedPaths = Set(localProtectedSourcePaths(targetDirectory: localRoot, outputFormat: module.outputFormat)
             .map(LocalSourcePathResolver.pathIdentity))
         do {
-            if module.hasLocalStorageTarget {
+            if module.hasLocalStorageTarget, !localRoot.isEmpty {
                 switch mode {
                 case .removeFromList:
                     break
                 case .clearOutput:
                     if !protectedPaths.contains(LocalSourcePathResolver.pathIdentity(module.publishedRelativePath)) {
                         try await fileStore.removePublishedFile(relativePath: module.publishedRelativePath,
-                            rootDirectoryPath: settings.localModuleDirectory)
+                            rootDirectoryPath: localRoot)
                     }
                 case .deleteAll:
                     try await fileStore.removePublishedFileForcing(relativePath: module.publishedRelativePath,
-                        rootDirectoryPath: settings.localModuleDirectory)
+                        rootDirectoryPath: localRoot)
                 }
             }
         } catch {
@@ -267,12 +272,13 @@ extension AppModel {
             return
         }
         registerLocalChange()
-        let localPlan = LocalPublishedFilesPlanner.plan(files: [], targetDirectory: settings.localModuleDirectory,
-            previousRootDirectory: settings.localPublishedRootDirectory,
-            previousPublishedPaths: settings.localPublishedFilePaths,
+        let localPlan = LocalPublishedFilesPlanner.plan(files: [], targetDirectory: localRoot,
+            previousRootDirectory: storage.publishedRootDirectory,
+            previousPublishedPaths: storage.publishedFilePaths,
             protectedSourcePaths: Array(protectedPaths))
-        if settings.localPublishedFilePaths != localPlan.knownManagedPaths {
-            settings.localPublishedFilePaths = localPlan.knownManagedPaths
+        if !localRoot.isEmpty, storage.publishedFilePaths != localPlan.knownManagedPaths {
+            storage.publishedFilePaths = localPlan.knownManagedPaths
+            settings.setLocalStorage(storage, for: module.outputFormat)
             saveSettings()
         }
         modules.removeAll { $0.id == id }
@@ -335,7 +341,7 @@ extension AppModel {
     func refreshModuleMetadataFromCache() async {
         var changed = false
         for moduleValue in modules {
-            let localModuleDirectory = settings.localModuleDirectory
+            let localModuleDirectory = settings.localModuleDirectory(for: moduleValue.outputFormat)
             let localMetadata = await Task.detached(priority: .utility) {
                 LocalModuleMetadataReader.snapshot(
                     for: moduleValue,

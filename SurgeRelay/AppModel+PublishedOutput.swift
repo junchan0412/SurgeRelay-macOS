@@ -8,11 +8,12 @@ extension AppModel {
         let selected = modules.filter { moduleIDs?.contains($0.id) ?? true }
         var failures = 0
         if settings.publishToLocal {
-            for module in selected where module.hasLocalStorageTarget {
+            for module in selected where module.hasLocalStorageTarget && settings.isLocalPublishingEnabled(for: module.outputFormat) {
                 guard shouldContinueCurrentWork(generation: generation) else { return false }
                 do {
                     let files = try await selectedLocalPublishedFiles(moduleIDs: [module.id])
-                    try await publishSelectedLocalFiles(files)
+                    guard shouldContinueCurrentWork(generation: generation) else { return false }
+                    try await publishSelectedLocalFiles(files, outputFormat: module.outputFormat)
                     if let index = modules.firstIndex(where: { $0.id == module.id }) { modules[index].localOutputError = nil }
                 } catch {
                     if isCurrentWorkCancellation(error) { return false }
@@ -44,13 +45,24 @@ extension AppModel {
         includeAssets: Bool,
         destination: PublishDestination
     ) async throws -> [PublishFile] {
-        try await PublishFileAssembler.files(
+        let plans: [(PublishPlan, String)]
+        if destination == .local {
+            plans = ModuleOutputFormat.allCases.compactMap { format in
+                let selection = plan.standaloneModules.filter { $0.outputFormat == format && settings.isLocalPublishingEnabled(for: format) }
+                return selection.isEmpty ? nil : (PublishPlan(standaloneModules: selection), settings.localModuleDirectory(for: format))
+            }
+        } else {
+            plans = [(plan, settings.localModuleDirectory)]
+        }
+        var result: [PublishFile] = []
+        for (selection, directory) in plans {
+            result.append(contentsOf: try await PublishFileAssembler.files(
             request: PublishFileAssemblyRequest(
-                plan: plan,
+                plan: selection,
 
                 includeAssets: includeAssets,
                 destination: destination,
-                localModuleDirectory: settings.localModuleDirectory
+                localModuleDirectory: directory
             ),
             readComponent: { [fileStore] id in
                 try? await fileStore.readComponent(id: id)
@@ -74,13 +86,17 @@ extension AppModel {
                 try checkCurrentWorkCancellation()
                 try Task.checkCancellation()
             }
-        )
+        ))
+        }
+        return result
     }
 
     func writeLocalModuleOutput(moduleID: UUID) async throws {
         guard !isWorking else { throw PreviewContentSaveError.busy }
-        guard settings.publishToLocal else { throw RelayError.invalidOutput("请先开启本地发布。") }
-        let target = settings.localModuleDirectory
+        guard let module = modules.first(where: { $0.id == moduleID }) else { throw RelayError.moduleMissing }
+        let format = module.outputFormat
+        guard settings.isLocalPublishingEnabled(for: format) else { throw RelayError.invalidOutput("请先开启 \(format.title) 本地存储。") }
+        let target = settings.localModuleDirectory(for: format)
         let generation = localChangeGeneration
         beginWork(.publishing)
         workActivity.title = "写入本地文件"
@@ -89,9 +105,9 @@ extension AppModel {
         guard !files.isEmpty else { throw RelayError.noFilesToPublish }
         let issues = await Task.detached { ModuleLintPlanner.check(files: files) }.value
         try ModuleLintPlanner.throwIfBlocking(issues)
-        try checkLocalPublishContext(target: target, generation: generation)
+        try checkLocalPublishContext(target: target, generation: generation, outputFormat: format)
         try enterNonCancellableWorkPhase(statusMessage: "正在写入本地文件…")
-        try await publishSelectedLocalFiles(files)
+        try await publishSelectedLocalFiles(files, outputFormat: format)
         if let index = modules.firstIndex(where: { $0.id == moduleID }) { modules[index].localOutputError = nil }
         try persistModules()
         presentedError = nil
@@ -101,14 +117,14 @@ extension AppModel {
     func prepareLocalOutputAdoption(moduleID: UUID) async throws -> LocalOutputAdoptionReview {
         guard !isWorking else { throw PreviewContentSaveError.busy }
         guard let module = modules.first(where: { $0.id == moduleID }), module.hasRemoteUpdateSource,
-              settings.publishToLocal,
+              settings.isLocalPublishingEnabled(for: module.outputFormat),
               PublishCoordinator.shouldPublishStandalone(module, destination: .local) else {
             throw RelayError.invalidOutput("请选择需要写入本地的订阅模块。")
         }
-        let target = settings.localModuleDirectory
+        let target = settings.localModuleDirectory(for: module.outputFormat)
         let generation = localChangeGeneration
         let path = module.publishedRelativePath
-        guard !localProtectedSourcePaths(targetDirectory: target).map(LocalSourcePathResolver.pathIdentity)
+        guard !localProtectedSourcePaths(targetDirectory: target, outputFormat: module.outputFormat).map(LocalSourcePathResolver.pathIdentity)
             .contains(LocalSourcePathResolver.pathIdentity(path)) else {
             throw RelayError.invalidOutput("该路径仍是已登记的本地来源，不能接管。")
         }
@@ -127,18 +143,18 @@ extension AppModel {
         let issues = await Task.detached { ModuleLintPlanner.check(files: files) }.value
         try ModuleLintPlanner.throwIfBlocking(issues)
         let diff = await Task.detached { ModuleLineDiffPlanner.compare(local: originalText, github: outputText) }.value
-        try checkLocalPublishContext(target: target, generation: generation)
+        try checkLocalPublishContext(target: target, generation: generation, outputFormat: module.outputFormat)
         return LocalOutputAdoptionReview(moduleID: moduleID, targetDirectory: target, relativePath: path,
             expectedExistingHash: original.sha256String, generation: generation, files: files, diff: diff)
     }
 
     func confirmLocalOutputAdoption(_ review: LocalOutputAdoptionReview) async throws {
         guard !isWorking else { throw PreviewContentSaveError.busy }
-        try checkLocalPublishContext(target: review.targetDirectory, generation: review.generation)
-        guard settings.publishToLocal,
-              let module = modules.first(where: { $0.id == review.moduleID }), module.hasRemoteUpdateSource,
+        guard let module = modules.first(where: { $0.id == review.moduleID }), module.hasRemoteUpdateSource,
+              settings.isLocalPublishingEnabled(for: module.outputFormat),
               module.publishedRelativePath == review.relativePath,
               PublishCoordinator.shouldPublishStandalone(module, destination: .local) else { throw PreviewContentSaveError.changed }
+        try checkLocalPublishContext(target: review.targetDirectory, generation: review.generation, outputFormat: module.outputFormat)
         beginWork(.publishing)
         workActivity.title = "接管本地输出"
         defer { endWork(.publishing) }
@@ -147,14 +163,14 @@ extension AppModel {
                 == review.files.map({ $0.name + ":" + $0.data.sha256String }) else { throw PreviewContentSaveError.changed }
         let issues = await Task.detached { ModuleLintPlanner.check(files: current) }.value
         try ModuleLintPlanner.throwIfBlocking(issues)
-        try checkLocalPublishContext(target: review.targetDirectory, generation: review.generation)
+        try checkLocalPublishContext(target: review.targetDirectory, generation: review.generation, outputFormat: module.outputFormat)
         try enterNonCancellableWorkPhase(statusMessage: "正在备份并接管本地文件…")
         let backup = try await fileStore.adoptLocalPublishedFile(relativePath: review.relativePath,
             rootDirectoryPath: review.targetDirectory, moduleID: review.moduleID,
             expectedExistingHash: review.expectedExistingHash,
-            protectedSourcePaths: localProtectedSourcePaths(targetDirectory: review.targetDirectory))
-        try checkLocalPublishContext(target: review.targetDirectory, generation: review.generation)
-        try await publishSelectedLocalFiles(current)
+            protectedSourcePaths: localProtectedSourcePaths(targetDirectory: review.targetDirectory, outputFormat: module.outputFormat))
+        try checkLocalPublishContext(target: review.targetDirectory, generation: review.generation, outputFormat: module.outputFormat)
+        try await publishSelectedLocalFiles(current, outputFormat: module.outputFormat)
         if let index = modules.firstIndex(where: { $0.id == review.moduleID }) { modules[index].localOutputError = nil }
         try persistModules()
         presentedError = nil
@@ -179,24 +195,32 @@ extension AppModel {
     }
 
     /// 将所选本地模块写入本地发布根目录，并把这些文件合并进已发布路径清单，不删除其他已发布文件。
-    func publishSelectedLocalFiles(_ files: [PublishFile], expectedExistingHashes: [String: String] = [:]) async throws {
-        let target = settings.localModuleDirectory
+    func publishSelectedLocalFiles(_ files: [PublishFile], expectedExistingHashes: [String: String] = [:], outputFormat: ModuleOutputFormat? = nil) async throws {
+        guard let outputFormat else {
+            for (format, selection) in localPublishedFileGroups(files) {
+                let paths = Set(selection.map(\.name))
+                try await publishSelectedLocalFiles(selection, expectedExistingHashes: expectedExistingHashes.filter { paths.contains($0.key) }, outputFormat: format)
+            }
+            return
+        }
+        guard settings.isLocalPublishingEnabled(for: outputFormat) else { throw RelayError.invalidOutput("请先开启 \(outputFormat.title) 本地存储。") }
+        let target = settings.localModuleDirectory(for: outputFormat)
         let generation = localChangeGeneration
         let issues = await Task.detached { ModuleLintPlanner.check(files: files) }.value
         try ModuleLintPlanner.throwIfBlocking(issues)
-        try checkLocalPublishContext(target: target, generation: generation)
-        try await reconcileRecoveredLocalResources()
-        try checkLocalPublishContext(target: target, generation: generation)
+        try checkLocalPublishContext(target: target, generation: generation, outputFormat: outputFormat)
+        try await reconcileRecoveredLocalResources(outputFormat: outputFormat)
+        try checkLocalPublishContext(target: target, generation: generation, outputFormat: outputFormat)
         let plan = LocalPublishedFilesPlanner.plan(
             files: files,
             targetDirectory: target,
-            previousRootDirectory: settings.localPublishedRootDirectory,
-            previousPublishedPaths: settings.localPublishedFilePaths,
-            protectedSourcePaths: localProtectedSourcePaths(targetDirectory: target)
+            previousRootDirectory: settings.localStorage(for: outputFormat).publishedRootDirectory,
+            previousPublishedPaths: settings.localStorage(for: outputFormat).publishedFilePaths,
+            protectedSourcePaths: localProtectedSourcePaths(targetDirectory: target, outputFormat: outputFormat)
         )
         if expectedExistingHashes.isEmpty {
             try await repairRelocatedLocalOutputs(files: files, knownPaths: plan.knownManagedPaths,
-                target: target, generation: generation)
+                target: target, generation: generation, outputFormat: outputFormat)
         }
         do {
             let recorder = StageMetricsContext.current ?? StageMetricsRecorder()
@@ -206,35 +230,37 @@ extension AppModel {
                 try await fileStore.exportPublishedFiles(files, toRootDirectory: target,
                     removingObsoleteRelativePaths: [], knownManagedRelativePaths: plan.knownManagedPaths,
                     expectedExistingHashes: expectedExistingHashes,
-                    protectedSourcePaths: localProtectedSourcePaths(targetDirectory: target))
+                    protectedSourcePaths: localProtectedSourcePaths(targetDirectory: target, outputFormat: outputFormat))
             }
         } catch let failure as LocalPublishPartialFailure {
             try await retainPartialLocalPublish(failure.writtenPaths, target: target,
-                generation: generation, knownPaths: plan.knownManagedPaths)
+                generation: generation, knownPaths: plan.knownManagedPaths, outputFormat: outputFormat)
             throw failure
 
         }
-        try checkLocalPublishContext(target: target, generation: generation)
+        try checkLocalPublishContext(target: target, generation: generation, outputFormat: outputFormat)
         let retiredPaths = try await retireMovedLocalOutputs(files: files, knownPaths: plan.knownManagedPaths,
-            target: target, generation: generation)
+            target: target, generation: generation, outputFormat: outputFormat)
         let retired = Set(retiredPaths.map(LocalSourcePathResolver.pathIdentity))
         let mergedPaths = LocalPublishedFilesPlanner.mergedPaths(plan.knownManagedPaths, adding: plan.currentPaths)
             .filter { !retired.contains(LocalSourcePathResolver.pathIdentity($0)) }
-        settings.localPublishedRootDirectory = plan.targetDirectory
-        settings.localPublishedFilePaths = mergedPaths
+        var storage = settings.localStorage(for: outputFormat)
+        storage.publishedRootDirectory = plan.targetDirectory
+        storage.publishedFilePaths = mergedPaths
+        settings.setLocalStorage(storage, for: outputFormat)
         saveSettings()
         try await flushPersistence()
-        try checkLocalPublishContext(target: target, generation: generation)
+        try checkLocalPublishContext(target: target, generation: generation, outputFormat: outputFormat)
         try await fileStore.acknowledgePublishedResources(paths: plan.currentPaths, rootDirectoryPath: target)
     }
 
-    private func retireMovedLocalOutputs(files: [PublishFile], knownPaths: [String], target: String, generation: Int) async throws -> [String] {
+    private func retireMovedLocalOutputs(files: [PublishFile], knownPaths: [String], target: String, generation: Int, outputFormat: ModuleOutputFormat) async throws -> [String] {
         guard let root = LocalSourcePathResolver.canonicalDirectoryURL(for: target) else { return [] }
         let published = Set(files.map { LocalSourcePathResolver.pathIdentity($0.name) })
-        let protected = localProtectedSourcePaths(targetDirectory: target)
+        let protected = localProtectedSourcePaths(targetDirectory: target, outputFormat: outputFormat)
         var retired: [String] = []
         var completed: [UUID: Set<LocalOutputRetirement>] = [:]
-        for module in modules where module.hasLocalStorageTarget && published.contains(LocalSourcePathResolver.pathIdentity(module.publishedRelativePath)) {
+        for module in modules where module.hasLocalStorageTarget && module.outputFormat == outputFormat && published.contains(LocalSourcePathResolver.pathIdentity(module.publishedRelativePath)) {
             var retirements = module.pendingLocalOutputRetirements.filter { $0.rootDirectory == root.path }
             if module.hasRemoteUpdateSource {
                 for oldPath in knownPaths where !published.contains(LocalSourcePathResolver.pathIdentity(oldPath)) &&
@@ -256,11 +282,11 @@ extension AppModel {
                 }
                 guard !published.contains(identity), !protected.map(LocalSourcePathResolver.pathIdentity).contains(identity),
                       !modules.contains(where: { other in
-                          other.id != module.id && other.hasLocalStorageTarget &&
+                          other.id != module.id && other.hasLocalStorageTarget && localStorageRootMatches(other.outputFormat, target: target) &&
                             [other.publishedRelativePath, other.localStorageRelativePath].compactMap { $0 }
                                 .contains { LocalSourcePathResolver.pathIdentity($0) == identity }
                       }) else { continue }
-                try checkLocalPublishContext(target: target, generation: generation)
+                try checkLocalPublishContext(target: target, generation: generation, outputFormat: outputFormat)
                 let existing = try await fileStore.readPublishedFile(relativePath: item.relativePath, rootDirectoryPath: target)
                 if let existing {
                     guard let hash = item.contentHash, existing.sha256String == hash,
@@ -271,7 +297,7 @@ extension AppModel {
                         removingObsoleteRelativePaths: [item.relativePath], expectedExistingHashes: [item.relativePath: hash],
                         protectedSourcePaths: protected)
                 }
-                try checkLocalPublishContext(target: target, generation: generation)
+                try checkLocalPublishContext(target: target, generation: generation, outputFormat: outputFormat)
                 retired.append(item.relativePath)
                 completed[module.id, default: []].insert(item)
             }
@@ -284,11 +310,11 @@ extension AppModel {
         return retired
     }
 
-    private func repairRelocatedLocalOutputs(files: [PublishFile], knownPaths: [String], target: String, generation: Int) async throws {
+    private func repairRelocatedLocalOutputs(files: [PublishFile], knownPaths: [String], target: String, generation: Int, outputFormat: ModuleOutputFormat) async throws {
         let publishedPaths = Set(files.map { LocalSourcePathResolver.pathIdentity($0.name) })
         let known = Set(knownPaths.map(LocalSourcePathResolver.pathIdentity))
-        let protected = localProtectedSourcePaths(targetDirectory: target)
-        for module in modules where module.hasLocalStorageTarget && module.hasRemoteUpdateSource {
+        let protected = localProtectedSourcePaths(targetDirectory: target, outputFormat: outputFormat)
+        for module in modules where module.hasLocalStorageTarget && module.outputFormat == outputFormat && module.hasRemoteUpdateSource {
             let path = module.publishedRelativePath
             guard publishedPaths.contains(LocalSourcePathResolver.pathIdentity(path)),
                   let original = try await fileStore.readPublishedFile(relativePath: path, rootDirectoryPath: target),
@@ -298,7 +324,7 @@ extension AppModel {
                   LocalSourcePathResolver.pathIdentity((oldPath as NSString).lastPathComponent)
                     == LocalSourcePathResolver.pathIdentity((path as NSString).lastPathComponent),
                   !modules.contains(where: { other in
-                      other.id != module.id && other.hasLocalStorageTarget &&
+                      other.id != module.id && other.hasLocalStorageTarget && localStorageRootMatches(other.outputFormat, target: target) &&
                         [other.publishedRelativePath, other.localStorageRelativePath].compactMap { $0 }.contains {
                             LocalSourcePathResolver.pathIdentity($0) == LocalSourcePathResolver.pathIdentity(oldPath)
                         }
@@ -307,59 +333,120 @@ extension AppModel {
                   let text = String(data: original, encoding: .utf8),
                   let subscription = ModuleMetadataParser.scriptHubSubscription(in: text),
                   ModuleSourceIdentity.matches(subscription.originalURL, module.updateSourceURL) else { continue }
-            try checkLocalPublishContext(target: target, generation: generation)
+            try checkLocalPublishContext(target: target, generation: generation, outputFormat: outputFormat)
             _ = try await fileStore.adoptLocalPublishedFile(relativePath: path, rootDirectoryPath: target,
                 moduleID: module.id, expectedExistingHash: original.sha256String, protectedSourcePaths: protected)
-            try checkLocalPublishContext(target: target, generation: generation)
+            try checkLocalPublishContext(target: target, generation: generation, outputFormat: outputFormat)
         }
     }
 
-    private func retainPartialLocalPublish(_ paths: [String], target: String, generation: Int, knownPaths: [String]) async throws {
-        try checkLocalPublishContext(target: target, generation: generation)
-        settings.localPublishedRootDirectory = LocalSourcePathResolver.canonicalDirectoryURL(for: target)?.path ?? target
-        settings.localPublishedFilePaths = LocalPublishedFilesPlanner.mergedPaths(knownPaths, adding: paths)
+    private func retainPartialLocalPublish(_ paths: [String], target: String, generation: Int, knownPaths: [String], outputFormat: ModuleOutputFormat) async throws {
+        try checkLocalPublishContext(target: target, generation: generation, outputFormat: outputFormat)
+        var storage = settings.localStorage(for: outputFormat)
+        storage.publishedRootDirectory = LocalSourcePathResolver.canonicalDirectoryURL(for: target)?.path ?? target
+        storage.publishedFilePaths = LocalPublishedFilesPlanner.mergedPaths(knownPaths, adding: paths)
+        settings.setLocalStorage(storage, for: outputFormat)
         saveSettings()
         try await flushPersistence()
-        try checkLocalPublishContext(target: target, generation: generation)
+        try checkLocalPublishContext(target: target, generation: generation, outputFormat: outputFormat)
         try await fileStore.acknowledgePublishedResources(paths: paths, rootDirectoryPath: target)
     }
 
-    func reconcileRecoveredLocalResources() async throws {
-        let target = settings.localModuleDirectory
+    func reconcileRecoveredLocalResources(outputFormat: ModuleOutputFormat? = nil) async throws {
+        guard let outputFormat else {
+            for format in ModuleOutputFormat.allCases where settings.isLocalPublishingEnabled(for: format) && !settings.localModuleDirectory(for: format).isEmpty {
+                try await reconcileRecoveredLocalResources(outputFormat: format)
+            }
+            return
+        }
+        let target = settings.localModuleDirectory(for: outputFormat)
         let generation = localChangeGeneration
-        guard !target.isEmpty else { return }
+        guard settings.isLocalPublishingEnabled(for: outputFormat), !target.isEmpty else { return }
         let recovered = try await fileStore.recoverPublishedResourcePaths(rootDirectoryPath: target)
-        try checkLocalPublishContext(target: target, generation: generation)
+        try checkLocalPublishContext(target: target, generation: generation, outputFormat: outputFormat)
         guard !recovered.isEmpty else { return }
-        let plan = LocalPublishedFilesPlanner.plan(files: [], targetDirectory: target,
-            previousRootDirectory: settings.localPublishedRootDirectory, previousPublishedPaths: settings.localPublishedFilePaths,
-            protectedSourcePaths: localProtectedSourcePaths(targetDirectory: target))
-        settings.localPublishedRootDirectory = plan.targetDirectory
-        settings.localPublishedFilePaths = LocalPublishedFilesPlanner.mergedPaths(plan.knownManagedPaths, adding: recovered)
+        var acknowledged: [String] = []
+        for format in ModuleOutputFormat.allCases {
+            let paths = recovered.filter { localOutputFormat(for: $0) == format }
+            guard !paths.isEmpty else { continue }
+            var storage = settings.localStorage(for: format)
+            let recordedRoot = LocalSourcePathResolver.canonicalDirectoryURL(for: storage.publishedRootDirectory ?? "")
+            let targetRoot = LocalSourcePathResolver.canonicalDirectoryURL(for: target)
+            guard recordedRoot == targetRoot || localStorageRootMatches(format, target: target) else { continue }
+            let plan = LocalPublishedFilesPlanner.plan(files: [], targetDirectory: target,
+                previousRootDirectory: storage.publishedRootDirectory, previousPublishedPaths: storage.publishedFilePaths,
+                protectedSourcePaths: localProtectedSourcePaths(targetDirectory: target, outputFormat: format))
+            storage.publishedRootDirectory = plan.targetDirectory
+            storage.publishedFilePaths = LocalPublishedFilesPlanner.mergedPaths(plan.knownManagedPaths, adding: paths)
+            settings.setLocalStorage(storage, for: format)
+            acknowledged.append(contentsOf: paths)
+        }
         saveSettings()
         try await flushPersistence()
-        try checkLocalPublishContext(target: target, generation: generation)
-        try await fileStore.acknowledgePublishedResources(paths: recovered, rootDirectoryPath: target)
+        try checkLocalPublishContext(target: target, generation: generation, outputFormat: outputFormat)
+        try await fileStore.acknowledgePublishedResources(paths: acknowledged, rootDirectoryPath: target)
     }
 
-    private func checkLocalPublishContext(target: String, generation: Int) throws {
+    private func checkLocalPublishContext(target: String, generation: Int, outputFormat: ModuleOutputFormat) throws {
         guard workspaceIsActive, !isWorkspaceTransitioning,
-              target == settings.localModuleDirectory, generation == localChangeGeneration else {
+              settings.isLocalPublishingEnabled(for: outputFormat), target == settings.localModuleDirectory(for: outputFormat), generation == localChangeGeneration else {
             throw CancellationError()
         }
     }
 
-    func localCleanupReviewFingerprint() -> String {
-        let plan = PublishCoordinator.plan(modules: modules, destination: .local)
+    func localCleanupReviewFingerprint(outputFormat: ModuleOutputFormat = .surge) -> String {
+        let plan = PublishCoordinator.plan(modules: modules.filter { $0.outputFormat == outputFormat }, destination: .local)
         let paths = plan.standaloneModules.map { $0.id.uuidString + ":" + $0.publishedRelativePath }.sorted()
-        let protectedPaths = localProtectedSourcePaths(targetDirectory: settings.localModuleDirectory)
+        let protectedPaths = localProtectedSourcePaths(targetDirectory: settings.localModuleDirectory(for: outputFormat), outputFormat: outputFormat)
             .map { "source:" + LocalSourcePathResolver.pathIdentity($0) }
         return Data(([String(localChangeGeneration)]
             + paths + protectedPaths).joined(separator: "\n").utf8).sha256String
     }
 
-    func localProtectedSourcePaths(targetDirectory: String) -> [String] {
-        LocalPublishedFilesPlanner.protectedSourcePaths(modules: modules, targetDirectory: targetDirectory)
+    func localProtectedSourcePaths(targetDirectory: String, outputFormat: ModuleOutputFormat? = nil) -> [String] {
+        let sourcePaths = modules.compactMap { LocalSourcePathResolver.storageRelativePath(for: $0, rootDirectoryPath: targetDirectory) }
+        let matching = modules.filter { localStorageRootMatches($0.outputFormat, target: targetDirectory) }
+        var protected = sourcePaths + LocalPublishedFilesPlanner.protectedSourcePaths(modules: matching, targetDirectory: targetDirectory)
+        if let outputFormat {
+            let root = LocalSourcePathResolver.canonicalDirectoryURL(for: targetDirectory)
+            let siblings = modules.filter { module in
+                module.hasLocalStorageTarget && module.outputFormat != outputFormat &&
+                    (localStorageRootMatches(module.outputFormat, target: targetDirectory) ||
+                     LocalSourcePathResolver.canonicalDirectoryURL(for: settings.localStorage(for: module.outputFormat).publishedRootDirectory ?? "") == root)
+            }
+            protected.append(contentsOf: siblings.map(\.publishedRelativePath))
+            let ids = Set(siblings.map(\.id))
+            let tracked = ModuleOutputFormat.allCases.flatMap { format -> [String] in
+                let storage = settings.localStorage(for: format)
+                return LocalSourcePathResolver.canonicalDirectoryURL(for: storage.publishedRootDirectory ?? "") == root ? storage.publishedFilePaths : []
+            }
+            protected.append(contentsOf: tracked.filter { path in
+                let components = path.split(separator: "/")
+                return components.count > 2 && components[0] == "assets" &&
+                    UUID(uuidString: String(components[1])).map { ids.contains($0) } == true
+            })
+        }
+        return Array(Set(protected)).sorted()
+    }
+
+    func localPublishedFileGroups(_ files: [PublishFile]) -> [(ModuleOutputFormat, [PublishFile])] {
+        ModuleOutputFormat.allCases.compactMap { format in
+            let selection = files.filter { localOutputFormat(for: $0.name) == format }
+            return selection.isEmpty ? nil : (format, selection)
+        }
+    }
+
+    func localOutputFormat(for relativePath: String) -> ModuleOutputFormat {
+        if let module = modules.first(where: { $0.publishedRelativePath == relativePath }) { return module.outputFormat }
+        let components = relativePath.split(separator: "/")
+        if components.count > 2, components[0] == "assets", let id = UUID(uuidString: String(components[1])),
+           let module = modules.first(where: { $0.id == id }) { return module.outputFormat }
+        return .surge
+    }
+
+    private func localStorageRootMatches(_ format: ModuleOutputFormat, target: String) -> Bool {
+        LocalSourcePathResolver.canonicalDirectoryURL(for: settings.localModuleDirectory(for: format))
+            == LocalSourcePathResolver.canonicalDirectoryURL(for: target)
     }
 
     private func legacyOutputCleanupDirectories() -> [String] {

@@ -2,6 +2,54 @@ import XCTest
 @testable import SurgeRelay
 
 final class AppSettingsTests: XCTestCase {
+    func testNewSettingsEnableOnlySurgeLocalStorage() throws {
+        for settings in [AppSettings(), try JSONDecoder().decode(AppSettings.self, from: Data("{}".utf8))] {
+            XCTAssertTrue(settings.publishToLocal)
+            XCTAssertFalse(settings.publishToGitHub)
+            for format in ModuleOutputFormat.allCases {
+                XCTAssertEqual(settings.isLocalPublishingEnabled(for: format), format == .surge)
+            }
+        }
+        if AppRuntimeOptions.isUIQAMode {
+            XCTAssertTrue(AppSettings.defaultLocalModuleRootDirectory.hasPrefix(AppRuntimeOptions.uiQADirectory.path))
+        }
+    }
+
+    func testEachClientRetainsIndependentDirectoryAndManagedManifest() throws {
+        var settings = AppSettings()
+        for format in ModuleOutputFormat.allCases {
+            settings.setLocalStorage(ClientLocalStorage(isEnabled: format != .egern,
+                directory: "/Output/\(format.rawValue)", publishedRootDirectory: "/Previous/\(format.rawValue)",
+                publishedFilePaths: ["\(format.rawValue).\(format.fileExtension)"]), for: format)
+        }
+        let restored = try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(settings))
+        for format in ModuleOutputFormat.allCases {
+            XCTAssertEqual(restored.localStorage(for: format), settings.localStorage(for: format))
+            XCTAssertEqual(restored.localModuleDirectory(for: format), "/Output/\(format.rawValue)")
+        }
+        XCTAssertEqual(restored.localModuleDirectory, "/Output/surge")
+        XCTAssertEqual(restored.localPublishedFilePaths, ["surge.sgmodule"])
+        XCTAssertFalse(restored.isLocalPublishingEnabled(for: .egern))
+    }
+
+    func testLegacyMixedClientManifestIsSeparatedWithoutEnablingNewClients() throws {
+        let surge = RelayModule(name: "Surge", sourceURL: "https://example.com/surge.sgmodule", outputFileName: "Surge")
+        let loon = RelayModule(name: "Loon", sourceURL: "https://example.com/loon.plugin", outputFormat: .loon, outputFileName: "Loon")
+        let asset = "assets/\(loon.id.uuidString.lowercased())/script.js"
+        var settings = try JSONDecoder().decode(AppSettings.self, from: Data(#"{"publishToLocal":true,"publishToGitHub":true,"localModuleDirectory":"/Legacy","localPublishedRootDirectory":"/Legacy"}"#.utf8))
+        settings.localPublishedFilePaths = [surge.publishedRelativePath, loon.publishedRelativePath, asset, "Old-Combined.sgmodule"]
+        settings.separateLegacyLocalPublishedFiles(modules: [surge, loon])
+        XCTAssertEqual(settings.localPublishedFilePaths, [surge.publishedRelativePath, "Old-Combined.sgmodule"])
+        let storedLoon = settings.localStorage(for: .loon)
+        XCTAssertFalse(storedLoon.isEnabled)
+        XCTAssertTrue(storedLoon.directory.isEmpty)
+        XCTAssertEqual(storedLoon.publishedRootDirectory, "/Legacy")
+        XCTAssertEqual(storedLoon.publishedFilePaths, [loon.publishedRelativePath, asset])
+        XCTAssertTrue(settings.publishToGitHub)
+        let restored = try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(settings))
+        XCTAssertEqual(restored.localStorage(for: .loon), storedLoon)
+    }
+
     func testExplicitlyDisabledPublishTargetsRemainDisabled() throws {
         for mode in ["local", "gitHub"] {
             let json = """
@@ -26,8 +74,8 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertFalse(github.publishToLocal)
         XCTAssertTrue(github.publishToGitHub)
         let defaultSettings = try JSONDecoder().decode(AppSettings.self, from: Data("{}".utf8))
-        XCTAssertFalse(defaultSettings.publishToLocal)
-        XCTAssertTrue(defaultSettings.publishToGitHub)
+        XCTAssertTrue(defaultSettings.publishToLocal)
+        XCTAssertFalse(defaultSettings.publishToGitHub)
     }
 
     func testSettingsDecodeWithoutSyncedTokenOrRepositoryVisibility() throws {

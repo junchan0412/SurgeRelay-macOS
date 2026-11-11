@@ -403,4 +403,30 @@ const outputFailure = { id: 'output-failed', name: 'Local output', state: 'curre
 assert.equal(logic.isFailedModule(outputFailure), true);
 assert.equal(logic.failedModuleCount([outputFailure]), 1);
 assert.match(markup.workspaceMarkup({ modules: [outputFailure], activity: {}, moduleEditor: {} }), /Target is occupied/);
+const localClientModules = [
+  { id: 'surge-one', name: 'Surge one', state: 'current', outputFormat: 'surge', storageTargets: ['local'] },
+  { id: 'loon-one', name: 'Loon one', state: 'current', outputFormat: 'loon', storageTargets: ['local'] },
+  { id: 'loon-two', name: 'Loon two', state: 'current', outputFormat: 'loon', storageTargets: ['local', 'gitHub'] },
+  { id: 'loon-remote', name: 'Loon remote', state: 'current', outputFormat: 'loon', storageTargets: ['gitHub'] }
+];
+const loonDestination = markup.workspaceMarkup({ modules: localClientModules, activity: {},
+  moduleEditor: { publishToLocal: true, publishToGitHub: false },
+  workspace: { localDirectory: '/legacy-surge', localDirectoriesByClient: { loon: '/Loon & Rules' } } });
+assert.match(loonDestination, /Loon 本地目录/);
+assert.match(loonDestination, /\/Loon &amp; Rules/);
+assert.match(loonDestination, /2 个模块存放在本地/);
+assert.doesNotMatch(loonDestination, /legacy-surge|Surge 本地目录/);
+const sharedDestinations = markup.workspaceMarkup({ modules: localClientModules, activity: {},
+  moduleEditor: { publishToLocal: true }, workspace: { localDirectoriesByClient: { surge: '/Shared', loon: '/Shared' } } });
+assert.match(sharedDestinations, /Surge 本地目录.*1 个模块存放在本地/s);
+assert.match(sharedDestinations, /Loon 本地目录.*2 个模块存放在本地/s);
+assert.equal((sharedDestinations.match(/title="\/Shared"/g) || []).length, 2);
+const noLocalClients = markup.workspaceMarkup({ modules: [], activity: {},
+  moduleEditor: { publishToLocal: true, publishToGitHub: false },
+  workspace: { localDirectory: '/unused-surge', localDirectoriesByClient: {} } });
+assert.match(noLocalClients, /没有启用的客户端/);
+assert.doesNotMatch(noLocalClients, /unused-surge|已开启/);
+const legacyDestination = markup.workspaceMarkup({ modules: [], activity: {}, moduleEditor: { publishToLocal: true },
+  workspace: { localDirectory: '/Legacy' } });
+assert.match(legacyDestination, /title="\/Legacy"/);
 assert.match(markup.moduleRowMarkup(outputFailure), /state-failed/);

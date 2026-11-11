@@ -828,6 +828,7 @@ final class RelayRuntimeTests: XCTestCase {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let model = isolatedModel()
+        model.settings.publishToLocal = true
         model.settings.localModuleDirectory = root.path
         model.settings.localPublishedRootDirectory = root.appending(path: "old-root").path
         model.settings.localPublishedFilePaths = ["Old.sgmodule"]

@@ -306,7 +306,7 @@ private struct ModuleSidebarContextMenu: View {
     }
 
     private func revealModuleInFinder(_ module: RelayModule) {
-        let root = model.settings.localModuleDirectory
+        let root = model.settings.localModuleDirectory(for: module.outputFormat)
         guard !root.isEmpty else { return }
         let rootURL = URL(fileURLWithPath: root, isDirectory: true)
         let fileURL = rootURL.appendingPathComponent(module.publishedRelativePath)

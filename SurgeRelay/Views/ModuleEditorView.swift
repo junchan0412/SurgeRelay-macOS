@@ -83,8 +83,8 @@ struct ModuleEditorView: View {
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             }
             .scrollIndicators(.visible)
-            .task(id: draft.storageTargets) {
-                await model.refreshModuleOutputFolders(preserving: draft.outputFolder)
+            .task(id: [draft.outputFormat.rawValue] + draft.storageTargets.map(\.rawValue).sorted()) {
+                await model.refreshModuleOutputFolders(preserving: draft.outputFolder, outputFormat: draft.outputFormat)
             }
             .onChange(of: draft.sourceURL) { _, newValue in
                 autofillName(from: newValue)
@@ -142,7 +142,7 @@ struct ModuleEditorView: View {
         ModuleDraftRelationshipPlanner.presentation(
             draft: draft,
             existingModule: module,
-            publishToLocal: model.settings.publishToLocal,
+            publishToLocal: model.settings.isLocalPublishingEnabled(for: draft.outputFormat),
             publishToGitHub: model.settings.publishToGitHub
         )
     }
@@ -195,7 +195,8 @@ struct ModuleEditorView: View {
             relationshipIsWarning: draftRelationship.isWarning,
             folders: model.moduleOutputFolderOptions(
                 storageLocation: draft.storageTargets.contains(.local) ? .local : .gitHub,
-                preserving: draft.outputFolder
+                preserving: draft.outputFolder,
+                outputFormat: draft.outputFormat
             ),
             onCreateFolder: presentNewFolderDialog
         )
@@ -301,7 +302,8 @@ struct ModuleEditorView: View {
         do {
             let folder = try model.createModuleOutputFolder(
                 named: newFolderName,
-                storageLocation: draft.storageTargets.contains(.local) ? .local : .gitHub
+                storageLocation: draft.storageTargets.contains(.local) ? .local : .gitHub,
+                outputFormat: draft.outputFormat
             )
             draft.outputFolder = folder
         } catch {

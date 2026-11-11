@@ -202,6 +202,10 @@
   }
 
   function outputPathNotice(path, context = {}) {
+    if (['local', 'both'].includes(context.storageLocation) && context.publishToLocal !== false && context.clientLocalPublishingEnabled === false) {
+      const github = context.storageLocation === 'both' && context.publishToGitHub === false ? 'GitHub 发布也尚未开启。' : '';
+      return { message: `${context.localClientTitle || '该客户端'} 本地存储尚未开启，请在发布设置中启用并选择目录。${github}`, warning: true };
+    }
     if (context.storageLocation === 'both') {
       const disabled = [];
       if (context.publishToLocal === false) disabled.push('本地');

@@ -64,11 +64,12 @@ extension AppModel {
         } else { presentedError = error.localizedDescription }
     }
 
-    func selectedPublishTarget(_ destination: PublishDestination) -> String {
-        switch destination {
-        case .local: settings.localModuleDirectory
-        case .gitHub: PublishCoordinator.repositoryKey(settings.github)
-        }
+    func selectedPublishTarget(_ destination: PublishDestination, moduleIDs: Set<UUID>? = nil) -> String {
+        guard destination == .local else { return PublishCoordinator.repositoryKey(settings.github) }
+        let selected = modules.filter { (moduleIDs?.contains($0.id) ?? true) && $0.hasLocalStorageTarget && settings.isLocalPublishingEnabled(for: $0.outputFormat) }
+        let formats = ModuleOutputFormat.allCases.filter { format in selected.contains { $0.outputFormat == format } }
+        if formats.isEmpty || formats == [.surge] { return settings.localModuleDirectory }
+        return formats.map { "\($0.title)：\(settings.localModuleDirectory(for: $0))" }.joined(separator: "；")
     }
 
     func runSelectedPublish(
@@ -101,17 +102,19 @@ extension AppModel {
                     throw RelayError.invalidOutput("部分模块已移除，请重新选择发布模块。")
                 }
                 guard attempt.results.first(where: { $0.destination == destination })?.target
-                        == self.selectedPublishTarget(destination) else {
+                        == self.selectedPublishTarget(destination, moduleIDs: attempt.moduleIDs) else {
                     throw RelayError.invalidOutput("发布目录或仓库已变更，请重新选择模块发布。")
                 }
                 switch destination {
                 case .local:
-                    guard self.settings.publishToLocal, !self.settings.localModuleDirectory.isEmpty else {
-                        throw RelayError.invalidOutput("本地发布未开启或目录未配置。")
-                    }
+                    guard self.settings.publishToLocal else { throw RelayError.invalidOutput("本地发布未开启。") }
+                    let generation = self.localChangeGeneration
                     let files: [PublishFile]
                     if let prepared = reviewed?.files[.local] { files = prepared }
                     else { files = try await self.selectedLocalPublishedFiles(moduleIDs: attempt.moduleIDs) }
+                    guard generation == self.localChangeGeneration,
+                          attempt.results.first(where: { $0.destination == .local })?.target
+                            == self.selectedPublishTarget(.local, moduleIDs: attempt.moduleIDs) else { throw PreviewContentSaveError.changed }
                     guard !files.isEmpty else { throw RelayError.noFilesToPublish }
                     try self.enterNonCancellableWorkPhase(statusMessage: "正在写入所选本地模块…")
                     try await self.publishSelectedLocalFiles(files, expectedExistingHashes: reviewed?.localHashes ?? [:])
@@ -178,28 +181,32 @@ extension AppModel {
         beginWork(.confirmingPublish)
         defer { endWork(.confirmingPublish) }
         do {
-            guard let currentRoot = LocalSourcePathResolver.canonicalDirectoryURL(for: settings.localModuleDirectory)?.path,
-                  settings.publishToLocal,
-                  currentRoot == LocalSourcePathResolver.canonicalDirectoryURL(for: preview.targetDescription)?.path,
+            let format = preview.localOutputFormat ?? .surge
+            guard settings.isLocalPublishingEnabled(for: format),
+                  LocalSourcePathResolver.canonicalDirectoryURL(for: settings.localModuleDirectory(for: format))
+                    == LocalSourcePathResolver.canonicalDirectoryURL(for: preview.targetDescription),
+                  let currentRoot = LocalSourcePathResolver.canonicalDirectoryURL(for: settings.localModuleDirectory(for: format))?.path,
                   let expected = preview.localExpectedHashes,
-                  preview.localReviewFingerprint == localCleanupReviewFingerprint(),
+                  preview.localReviewFingerprint == localCleanupReviewFingerprint(outputFormat: format),
                   Set(expected.keys) == Set(preview.deletedFiles) else { throw PreviewContentSaveError.changed }
             for (path, hash) in expected {
                 let data = try await fileStore.readPublishedFile(relativePath: path, rootDirectoryPath: currentRoot)
                 guard (data?.sha256String ?? "<missing>") == hash else { throw PreviewContentSaveError.changed }
             }
             let plan = LocalPublishedFilesPlanner.confirmedCleanupPlan(preview: preview,
-                previousRootDirectory: settings.localPublishedRootDirectory,
-                previousPublishedPaths: settings.localPublishedFilePaths,
-                protectedSourcePaths: localProtectedSourcePaths(targetDirectory: currentRoot))
+                previousRootDirectory: settings.localStorage(for: format).publishedRootDirectory,
+                previousPublishedPaths: settings.localStorage(for: format).publishedFilePaths,
+                protectedSourcePaths: localProtectedSourcePaths(targetDirectory: currentRoot, outputFormat: format))
             guard Set(plan.obsoleteRelativePaths) == Set(preview.deletedFiles) else { throw PreviewContentSaveError.changed }
             try enterNonCancellableWorkPhase(statusMessage: "正在清理确认过的本地旧文件…")
             _ = try await fileStore.exportPublishedFiles([], toRootDirectory: plan.targetDirectory,
                 removingObsoleteRelativePaths: plan.obsoleteRelativePaths,
                 knownManagedRelativePaths: plan.knownManagedRelativePaths, expectedExistingHashes: expected,
-                protectedSourcePaths: localProtectedSourcePaths(targetDirectory: currentRoot))
-            settings.localPublishedRootDirectory = plan.persistedRootDirectory
-            settings.localPublishedFilePaths = plan.persistedFilePaths
+                protectedSourcePaths: localProtectedSourcePaths(targetDirectory: currentRoot, outputFormat: format))
+            var storage = settings.localStorage(for: format)
+            storage.publishedRootDirectory = plan.persistedRootDirectory
+            storage.publishedFilePaths = plan.persistedFilePaths
+            settings.setLocalStorage(storage, for: format)
             pendingPublishPreview = nil
             saveSettings()
             try await flushPersistence()

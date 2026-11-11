@@ -23,14 +23,15 @@ extension AppModel {
             ids = attempt.moduleIDs
             destinations = attempt.retryDestinations
             for result in attempt.results where result.canRetry {
-                guard result.target == selectedPublishTarget(result.destination) else { throw PreviewContentSaveError.changed }
+                guard result.target == selectedPublishTarget(result.destination, moduleIDs: ids) else { throw PreviewContentSaveError.changed }
             }
         } else if scope == "githubAll" {
             destinations = [.gitHub]
         } else {
             guard !ids.isEmpty, ids.isSubset(of: Set(modules.map(\.id))) else { throw WebAPIError.moduleNotFound }
-            destinations = Set(PublishDestination.allCases.filter {
-                PublishCoordinator.selectedPlan(modules: modules, moduleIDs: ids, destination: $0).hasPublishableModuleSelection
+            destinations = Set(PublishDestination.allCases.filter { destination in
+                let candidates = destination == .local ? modules.filter { settings.isLocalPublishingEnabled(for: $0.outputFormat) } : modules
+                return PublishCoordinator.selectedPlan(modules: candidates, moduleIDs: ids, destination: destination).hasPublishableModuleSelection
             })
         }
         guard !destinations.isEmpty else { throw RelayError.noFilesToPublish }
@@ -41,7 +42,7 @@ extension AppModel {
         var head: String?
         for destination in PublishDestination.allCases where destinations.contains(destination) {
             try checkCurrentWorkCancellation()
-            try validateWebPublishTarget(destination)
+            try validateWebPublishTarget(destination, moduleIDs: ids)
             let prepared = try await webPublishFiles(scope: scope, moduleIDs: ids, destination: destination)
             guard !prepared.files.isEmpty else { throw RelayError.noFilesToPublish }
             files[destination] = prepared.files
@@ -56,18 +57,23 @@ extension AppModel {
                     targetDescription: GitHubPublishPlanner.targetDescription(settings: settings.github),
                     activeFiles: prepared.files.map(\.name), changedFiles: report.publishedFiles, deletedFiles: report.deletedFiles))
             } else {
-                var changed: [String] = []
-                for file in prepared.files {
-                    let data = try await fileStore.readPublishedFile(relativePath: file.name, rootDirectoryPath: settings.localModuleDirectory)
-                    localHashes[file.name] = data?.sha256String ?? "<missing>"
-                    if data.map(ModuleSyncPlanner.normalizedPublishedData) != file.data { changed.append(file.name) }
+                for (format, selection) in localPublishedFileGroups(prepared.files) {
+                    let root = settings.localModuleDirectory(for: format)
+                    var changed: [String] = []
+                    for file in selection {
+                        let data = try await fileStore.readPublishedFile(relativePath: file.name, rootDirectoryPath: root)
+                        localHashes[file.name] = data?.sha256String ?? "<missing>"
+                        if data.map(ModuleSyncPlanner.normalizedPublishedData) != file.data { changed.append(file.name) }
+                    }
+                    previews.append(PublishPreview(destination: .local, targetDescription: root,
+                        activeFiles: selection.map(\.name), changedFiles: changed, deletedFiles: [], localOutputFormat: format))
                 }
-                previews.append(PublishPreview(destination: .local, targetDescription: settings.localModuleDirectory,
-                    activeFiles: prepared.files.map(\.name), changedFiles: changed, deletedFiles: []))
             }
         }
         for index in previews.indices {
-            let output = files[previews[index].destination] ?? []
+            let output = (files[previews[index].destination] ?? []).filter { file in
+                previews[index].destination != .local || settings.localModuleDirectory(for: localOutputFormat(for: file.name)) == previews[index].targetDescription
+            }
             previews[index].issues = await Task.detached { ModuleLintPlanner.check(files: output) }.value
         }
         guard Self.samePublishConfiguration(settings, originalSettings), localChangeGeneration == generation else { throw PreviewContentSaveError.changed }
@@ -86,7 +92,7 @@ extension AppModel {
         do {
             guard Self.samePublishConfiguration(settings, ticket.settings), localChangeGeneration == ticket.generation else { throw PreviewContentSaveError.changed }
             for destination in ticket.files.keys {
-                try validateWebPublishTarget(destination)
+                try validateWebPublishTarget(destination, moduleIDs: ticket.moduleIDs)
                 let current = try await webPublishFiles(scope: ticket.scope, moduleIDs: ticket.moduleIDs, destination: destination)
                 guard Self.publishFingerprint(current.files) == Self.publishFingerprint(ticket.files[destination] ?? []),
                       current.pathPlan == (destination == .gitHub ? ticket.pathPlan : nil) else {
@@ -100,7 +106,7 @@ extension AppModel {
                 guard report.baseCommitSHA == expectedHead else { throw PreviewContentSaveError.changed }
             }
             for (path, expectedHash) in ticket.localHashes {
-                let data = try await fileStore.readPublishedFile(relativePath: path, rootDirectoryPath: settings.localModuleDirectory)
+                let data = try await fileStore.readPublishedFile(relativePath: path, rootDirectoryPath: settings.localModuleDirectory(for: localOutputFormat(for: path)))
                 guard (data?.sha256String ?? "<missing>") == expectedHash else { throw PreviewContentSaveError.changed }
             }
             guard Self.samePublishConfiguration(settings, ticket.settings), localChangeGeneration == ticket.generation else { throw PreviewContentSaveError.changed }
@@ -119,7 +125,7 @@ extension AppModel {
                 attempt = previous
             } else {
                 attempt = SelectedPublishAttempt(moduleIDs: ticket.moduleIDs, results: PublishDestination.allCases.compactMap {
-                    ticket.files[$0] == nil ? nil : PublishTargetResult(destination: $0, target: selectedPublishTarget($0))
+                    ticket.files[$0] == nil ? nil : PublishTargetResult(destination: $0, target: selectedPublishTarget($0, moduleIDs: ticket.moduleIDs))
                 })
             }
             endWork(.confirmingPublish)
@@ -131,11 +137,13 @@ extension AppModel {
         }
     }
 
-    private func validateWebPublishTarget(_ destination: PublishDestination) throws {
+    private func validateWebPublishTarget(_ destination: PublishDestination, moduleIDs: Set<UUID>) throws {
         switch destination {
         case .local:
-            guard settings.publishToLocal, !settings.localModuleDirectory.isEmpty else {
-                throw RelayError.invalidOutput("本地发布未开启或目录未配置，请先在原生设置中配置。")
+            let selected = modules.filter { moduleIDs.contains($0.id) && $0.hasLocalStorageTarget && settings.isLocalPublishingEnabled(for: $0.outputFormat) }
+            guard settings.publishToLocal, !selected.isEmpty else { throw RelayError.noFilesToPublish }
+            for module in selected where settings.localModuleDirectory(for: module.outputFormat).isEmpty {
+                throw RelayError.invalidOutput("\(module.outputFormat.title) 本地目录未配置，请先在原生设置中配置。")
             }
         case .gitHub:
             guard settings.publishToGitHub, settings.github.isConfigured else {
@@ -158,7 +166,7 @@ extension AppModel {
 
     static func samePublishConfiguration(_ lhs: AppSettings, _ rhs: AppSettings) -> Bool {
         lhs.publishToLocal == rhs.publishToLocal && lhs.publishToGitHub == rhs.publishToGitHub &&
-        lhs.localModuleDirectory == rhs.localModuleDirectory && lhs.github == rhs.github &&
+        lhs.localStorageByClient == rhs.localStorageByClient && lhs.localModuleDirectory == rhs.localModuleDirectory && lhs.github == rhs.github &&
         lhs.localPublishedRootDirectory == rhs.localPublishedRootDirectory && lhs.localPublishedFilePaths == rhs.localPublishedFilePaths &&
         lhs.githubPublishedRepositoryKey == rhs.githubPublishedRepositoryKey && lhs.githubPublishedFilePaths == rhs.githubPublishedFilePaths
     }

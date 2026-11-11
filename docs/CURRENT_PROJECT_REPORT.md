@@ -2,11 +2,11 @@
 
 检查与更新时间：2026-11-12（Asia/Shanghai）
 
-本报告依据当前代码、工程配置、Git 记录和本地检查描述项目状态。发布基线为 `v3.0.0`（build 116），包含多客户端工作台、转换工具、保存队列维护和目录整理。版本与规模由 [自动状态页](../DEVELOPMENT_STATUS.md) 提供，历史材料经 [文档导航](README.md) 进入归档。
+本报告依据当前代码、工程配置、Git 记录和本地检查描述项目状态。发布基线为 `v3.1.0`（build 117），包含完整工作区迁移、客户端独立存储目录、多客户端工作台和转换工具。版本与规模由 [自动状态页](../DEVELOPMENT_STATUS.md) 提供，历史材料经 [文档导航](README.md) 进入归档。
 
 ## 当前状态
 
-- `project.yml`、已登记的 Xcode 工程、最新 appcast 条目和本地 tag 一致：**3.0.0（build 116）**，主应用、helper 和两个测试目标均为 **macOS 15.0**。
+- `project.yml`、已登记的 Xcode 工程、最新 appcast 条目和本地 tag 一致：**3.1.0（build 117）**，主应用、helper 和两个测试目标均为 **macOS 15.0**。
 - 当前架构是 SwiftUI + AppKit 原生工作台、内置 Script-Hub helper、Web 管理台和本地/GitHub 双目标发布，提供模块、规则集与独立脚本三个转换入口。
 - 模块输入支持 Surge、Loon、Quantumult X，输出支持 Surge、Loon、Egern、Quantumult X、Stash 和 Shadowrocket。每个模块独立拥有来源、输出客户端、参数、缓存、历史、输出路径和存放目标，同一来源可按客户端维护多个版本。
 - 转换工具接受粘贴文本、远程地址或本地文件，按客户端生成规则 `.list` 或脚本 `.js`，支持复制、保存/下载、取消与工作区草稿隔离。
@@ -15,8 +15,22 @@
 - 更新流水线与 Script-Hub helper 最多 4 路并发；Web 已实现 activity 分流、后台快照构造、条件写入和生命周期保护。
 - 发布继续使用固定自签名证书与 Sparkle 2 EdDSA；凭据使用配置目录内 AES-256-GCM 加密文件。网络与文件访问边界见 [SECURITY.md](../SECURITY.md) 和 [发布策略](RELEASE_HARDENING.md)。
 - PR 与 `main` push 已配置 Swift/Web 回归 workflow，复用 release preflight、自动状态页和隔离 fixture；单元回归使用临时 QA 配置、Release 和 ad-hoc 签名，保存 xcresult、日志及执行/跳过摘要。
+- 每客户端独立设置本地目录和启用状态，新配置只开启 Surge；发布、扫描、同步、清理、恢复和目录菜单使用对应客户端根目录。
+- 工作区可整体迁移配置与缓存，保存身份、凭据、草稿、历史、队列和当前工具表单；成功登记后载入新位置，失败保留原数据。
 
 源码中的 XCTest 方法数是静态规模指标，不等于本次通过的测试数。当前主要成本集中在文件事务、长文本编辑、模块详情与元数据解析，应按真实问题选择优化对象。
+
+## 3.1.0 工作区与存储
+
+| 能力 | 完成结果 |
+| --- | --- |
+| 迁移工作区 | 活动及非活动工作区可迁至选定位置的 `Configuration`、`Cache`；活动任务取消、等待和落盘后迁移，登记失败回滚目标数据 |
+| 重启定位 | 配置与缓存路径一起登记；默认工作区同步两项选择，旧组件缓存进入新缓存，退休旧持久 writer 防止视图退出后重建原位置 |
+| 独立客户端目录 | 六客户端各自启用、选目录及维护清单；新配置仅Surge启用，旧显式发布开关保留，旧混合清单按模块/资源归属拆分 |
+| 共享目录 | 发布预览携带客户端身份，清理保护其它客户端当前输出与资源，目录变更不转移旧覆盖权限 |
+| 界面 | 工作区页面提供迁移按钮及两项路径；原生/Web展示客户端目录，编辑器文件夹和工具保存位置跟随所选客户端 |
+
+当原配置目录与缓存目录重叠或旧缓存包含登记/其它工作区时，迁移仍完成，旧缓存中的用户文件留在原处并显示清理提示。各客户端发布目录保持原设置，不随工作区数据迁移改变。
 
 ## 多客户端与转换工具
 
@@ -66,17 +80,20 @@
 | 2026-10-25 的 2.5.0 发布记录，[CHANGELOG](../CHANGELOG.md) | 592 项 Release 测试通过、2 项可选测试跳过；macOS 15 目标 Debug 构建通过 | 历史构建/回归记录；运行宿主为 macOS 27.2 |
 | 2026-11-11 `./script/run_swift_qa.sh build/qa-local/swift-validated-20261111` | 596 项 Release 测试通过、2 项可选性能测试跳过；App/helper 与测试目标构建通过 | 隔离 QA 配置、Swift 6 完整并发检查、保存队列撤回/备份恢复、Web 队列接口与既有文件/参数回归；日志、xcresult 和摘要在指定结果目录 |
 | 2026-11-11 `./script/run_swift_qa.sh build/qa-tools/final` | 650 项 Release 测试通过、2 项可选性能测试跳过 | 多客户端模型/模板/路径、工具API、取消与保存队列联动、缓存/历史类型恢复、源文本识别、脚本资源与HTTP状态语义；App/helper构建通过 |
+| 2026-11-12 `./script/run_swift_qa.sh build/qa-storage/final` | 668 项 Release 测试通过、2 项可选性能测试跳过 | 工作区成功/失败/重启/旧writer/legacy/自重叠迁移及UI状态保留；独立目录、共享根清理、manifest、扫描和Web客户端映射 |
+| 本次隔离原生UI验收 | 工作区迁移和独立Loon目录保存通过 | 实际按钮完成迁移，登记的配置/缓存路径生效；Surge目录不受Loon目录改变影响，新配置其它五客户端关闭 |
 | 本次 `script/test_script_hub_matrix.py` | 24 项实际pin模块转换通过 | 三种显式来源和共享规则自动来源 × 六客户端；检查拒绝、重定向、脚本引用、MITM和适用规则，产物在 `build/qa-multiclient/automatic-matrix` |
 | 本次 `script/test_script_hub_tools.py` | 38 项实际pin工具转换通过 | 四种规则来源 × 六客户端、QX/common脚本、反向QX适配和HTTP错误响应；严格原生API替身检查HTTP方法、状态码、存储、通知和完成回调，产物在 `build/qa-tools/verified-matrix` |
-| 本次 `VERSION=3.0.0 BUILD=116 ./script/check_release_configuration.sh` | 通过 | 版本、部署目标、Sparkle/appcast、entitlements、Web 资源、发布脚本、workflow 和 Swift 工程登记 |
+| 本次 `VERSION=3.1.0 BUILD=117 ./script/check_release_configuration.sh` | 通过 | 版本、部署目标、Sparkle/appcast、entitlements、Web 资源、发布脚本、workflow 和 Swift 工程登记 |
 | preflight 内的 Web 检查 | 19 个分拆脚本、aggregate 和 DOM harness 通过 | 客户端选择、工具参数/输出/取消、工作区/输入代际和既有 Web 行为；19 是脚本数 |
 | 本次 `python3 -B script/test_native_qa_fixture.py` | 2 个测试通过 | 隔离原生 QA fixture 的生成与清理行为 |
 | 2026-11-01 目录整理检查 | 语法、自动状态一致性、diff whitespace、120 个相对链接与 74 文件归档完整性通过 | 历史目录整理记录；历史绝对路径另作说明 |
 | 2026-11-12 3.0.0 发布资产 | arm64/x86_64 通用 App、zip/pkg payload、固定证书、Sparkle签名及appcast验证通过 | 构建目标macOS 15.0；zip/pkg均使用独立QA配置启动，未执行真实安装 |
+| 本次3.1.0发布资产 | arm64/x86_64通用App、固定证书、zip/pkg隔离启动与appcast验证通过 | 两架构及helper部署目标macOS 15.0；实际OS宿主为macOS 27.3 |
 
 可选跳过项为原生编辑器组件矩阵和 5,000 模块 Web 服务负载基准，需分别设置对应采集环境变量。常规回归不执行性能采集。
 
-本次维护机为 macOS 27.3（26C5035r），Xcode 27.2（27B52）。验证使用隔离 QA 工作区和 macOS 15 部署目标；正式通用发布资产已构建并通过zip/pkg隔离启动检查；原生 UI automation、真实浏览器性能采样和客户端导入运行不属于本次发布验证。macOS 15 实机/虚拟机运行验收仍无记录。
+本次维护机为 macOS 27.3（26C5035r），Xcode 27.2（27B52）。验证使用隔离 QA 工作区和 macOS 15 部署目标；正式通用发布资产已构建并通过zip/pkg隔离启动检查；原生设置控件已在隔离QA工作区完成迁移与目录保存交互；真实浏览器性能采样和客户端导入运行不属于本次发布验证。macOS 15 实机/虚拟机运行验收仍无记录。
 
 ## 当前风险与限制
 

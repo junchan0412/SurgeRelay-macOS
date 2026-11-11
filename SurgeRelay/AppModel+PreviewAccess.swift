@@ -32,7 +32,7 @@ extension AppModel {
     }
 
     func localModuleOutputSnapshot(for module: RelayModule) async -> LocalModuleOutputSnapshot {
-        let rootDirectoryPath = settings.localModuleDirectory
+        let rootDirectoryPath = settings.localModuleDirectory(for: module.outputFormat)
         let relativePath = module.publishedRelativePath
         return await Task.detached(priority: .utility) {
             LocalModuleOutputSnapshot.read(relativePath: relativePath, rootDirectoryPath: rootDirectoryPath)

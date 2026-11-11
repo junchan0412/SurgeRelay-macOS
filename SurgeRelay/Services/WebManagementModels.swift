@@ -18,6 +18,7 @@ struct WebWorkspacePayload: Encodable, Sendable {
     var id: String? = nil
     var name: String? = nil
     var isLegacyDefault = false
+    var localDirectoriesByClient: [String: String] = [:]
 }
 
 struct WebModuleProjectionCache {
@@ -32,6 +33,8 @@ struct WebModuleEditorPayload: Encodable, Sendable {
     let githubOutputFolders: [String]
     let publishToLocal: Bool
     let publishToGitHub: Bool
+    var localOutputFoldersByClient: [String: [String]] = [:]
+    var localPublishingByClient: [String: Bool] = [:]
 }
 
 struct WebModulePayload: Encodable, Sendable {

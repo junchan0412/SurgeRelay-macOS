@@ -19,10 +19,8 @@ extension AppModel {
             stopLocalSourceWatching()
             return
         }
-        let paths = LocalSourceSyncPlanner.watchedDirectories(
-            modules: modules,
-            localModuleDirectory: settings.localModuleDirectory
-        )
+        let roots = ModuleOutputFormat.allCases.filter { settings.isLocalPublishingEnabled(for: $0) }.map { settings.localModuleDirectory(for: $0) }
+        let paths = LocalSourceSyncPlanner.watchedDirectories(modules: modules, localModuleDirectories: roots)
         guard !paths.isEmpty else {
             stopLocalSourceWatching()
             return

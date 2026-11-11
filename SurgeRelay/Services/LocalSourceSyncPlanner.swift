@@ -42,10 +42,14 @@ enum LocalSourceSyncPlanner {
         modules: [RelayModule],
         localModuleDirectory: String
     ) -> [String] {
+        watchedDirectories(modules: modules, localModuleDirectories: [localModuleDirectory])
+    }
+
+    static func watchedDirectories(modules: [RelayModule], localModuleDirectories: [String]) -> [String] {
         var candidates: [String] = []
-        let root = localModuleDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !root.isEmpty {
-            candidates.append(URL(filePath: root, directoryHint: .isDirectory).standardizedFileURL.path)
+        for path in localModuleDirectories {
+            let root = path.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !root.isEmpty { candidates.append(URL(filePath: root, directoryHint: .isDirectory).standardizedFileURL.path) }
         }
         for source in sourceFiles(in: modules) {
             candidates.append(source.url.deletingLastPathComponent().standardizedFileURL.path)

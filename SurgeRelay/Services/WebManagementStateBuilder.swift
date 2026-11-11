@@ -8,14 +8,23 @@ enum WebManagementStateBuilder {
                 localOutputFolders: ModuleOutputFolderCatalog.options(settings: settings, modules: snapshot.modules,
                     localFolders: snapshot.localFolders, githubFolders: snapshot.githubFolders, storageLocation: .local),
                 githubOutputFolders: ModuleOutputFolderCatalog.options(settings: settings, modules: snapshot.modules,
-                    localFolders: snapshot.localFolders, githubFolders: snapshot.githubFolders, storageLocation: .gitHub)),
+                    localFolders: snapshot.localFolders, githubFolders: snapshot.githubFolders, storageLocation: .gitHub),
+                localFoldersByClient: Dictionary(uniqueKeysWithValues: ModuleOutputFormat.allCases.map { format in
+                    (format, ModuleOutputFolderCatalog.options(settings: settings, modules: snapshot.modules,
+                        localFolders: snapshot.localFoldersByClient[format] ?? (format == .surge ? snapshot.localFolders : [""]),
+                        githubFolders: snapshot.githubFolders, storageLocation: .local, outputFormat: format))
+                })),
             modules: modules,
             activity: activity, runtimeID: snapshot.runtimeID, revision: snapshot.revision,
             workspace: WebWorkspacePayload(localDirectory: settings.localModuleDirectory,
                 githubRepository: settings.github.isConfigured ? "\(settings.github.owner)/\(settings.github.repository)" : "",
                 githubBranch: settings.github.branch, historyCount: snapshot.historyCount,
                 recentHistory: snapshot.recentHistory, id: snapshot.workspaceID,
-                name: snapshot.workspaceName, isLegacyDefault: snapshot.isLegacyWorkspace))
+                name: snapshot.workspaceName, isLegacyDefault: snapshot.isLegacyWorkspace,
+                localDirectoriesByClient: Dictionary(uniqueKeysWithValues: ModuleOutputFormat.allCases
+                    .filter { settings.isLocalPublishingEnabled(for: $0) }.map {
+                        ($0.rawValue, settings.localModuleDirectory(for: $0))
+                    })))
     }
 
     static func moduleProjection(snapshot: WebCoreSnapshot) throws -> [WebModulePayload] {
@@ -45,7 +54,8 @@ enum WebManagementStateBuilder {
     static func moduleEditorPayload(
         settings: AppSettings,
         localOutputFolders: [String],
-        githubOutputFolders: [String]
+        githubOutputFolders: [String],
+        localFoldersByClient: [ModuleOutputFormat: [String]] = [:]
     ) -> WebModuleEditorPayload {
         WebModuleEditorPayload(
             defaultStorageLocation: ModuleStorageLocation.preferredDefault(
@@ -54,7 +64,13 @@ enum WebManagementStateBuilder {
             localOutputFolders: localOutputFolders,
             githubOutputFolders: githubOutputFolders,
             publishToLocal: settings.publishToLocal,
-            publishToGitHub: settings.publishToGitHub
+            publishToGitHub: settings.publishToGitHub,
+            localOutputFoldersByClient: Dictionary(uniqueKeysWithValues: ModuleOutputFormat.allCases.map {
+                ($0.rawValue, localFoldersByClient[$0] ?? ($0 == .surge ? localOutputFolders : [""]))
+            }),
+            localPublishingByClient: Dictionary(uniqueKeysWithValues: ModuleOutputFormat.allCases.map {
+                ($0.rawValue, settings.isLocalPublishingEnabled(for: $0))
+            })
         )
     }
 

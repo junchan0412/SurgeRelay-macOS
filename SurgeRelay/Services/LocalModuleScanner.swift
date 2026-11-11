@@ -181,7 +181,7 @@ struct LocalModuleScanCandidate: Identifiable, Hashable, Sendable {
     var rootDirectoryPath: String? = nil
     var outputFormat: ModuleOutputFormat = .surge
 
-    var id: String { relativePath }
+    var id: String { outputFormat == .surge ? relativePath : outputFormat.rawValue + ":" + relativePath }
 
     var initialSource: ModuleInitialSource {
         ModuleInitialSource.resolved(
@@ -229,9 +229,21 @@ enum LocalModuleScanner {
         }
     }
 
+    private static func accepts(_ fileURL: URL, outputFormat: ModuleOutputFormat) -> Bool {
+        let suffix = fileURL.pathExtension.lowercased()
+        if outputFormat.usesSurgeSyntax { return ["sgmodule", "module"].contains(suffix) }
+        switch outputFormat {
+        case .loon: return ["plugin", "lpx"].contains(suffix)
+        case .quantumultX: return suffix == "conf"
+        case .stash: return suffix == "stoverride"
+        default: return false
+        }
+    }
+
     static func snapshotForImport(
         _ candidate: LocalModuleScanCandidate,
-        rootDirectoryPath: String
+        rootDirectoryPath: String,
+        outputFormat expectedOutputFormat: ModuleOutputFormat? = nil
     ) throws -> LocalModuleImportSourceSnapshot {
         if let scannedRoot = candidate.rootDirectoryPath,
            LocalSourcePathResolver.canonicalDirectoryURL(for: scannedRoot) !=
@@ -259,12 +271,14 @@ enum LocalModuleScanner {
         }
         var refreshed = candidate
         let subscription = ModuleMetadataParser.scriptHubSubscription(in: content)
-        guard let outputFormat = outputFormat(for: fileURL, subscription: subscription) else {
+        guard let inferred = outputFormat(for: fileURL, subscription: subscription),
+              expectedOutputFormat == nil || accepts(fileURL, outputFormat: expectedOutputFormat!) else {
             throw RelayError.invalidOutput("Stash 文件缺少可识别的 Script-Hub 订阅来源，请重新扫描")
         }
         refreshed.relativePath = relativePath
         refreshed.localStorageRelativePath = relativePath
         refreshed.sourceURL = subscription?.originalURL ?? fileURL.absoluteString
+        let outputFormat = expectedOutputFormat ?? inferred
         refreshed.sourceFormat = subscription?.sourceFormat ?? ModuleSourceFormat.definitiveFormat(for: fileURL)
             ?? (outputFormat == .quantumultX ? .quantumultX : .automatic)
         refreshed.outputFormat = outputFormat
@@ -289,7 +303,8 @@ enum LocalModuleScanner {
     static func report(
         in rootDirectoryPath: String,
         existingModules: [RelayModule],
-        publishedFilePaths: [String]
+        publishedFilePaths: [String],
+        outputFormat expectedOutputFormat: ModuleOutputFormat? = nil
     ) throws -> LocalModuleScanReport {
         let trimmedPath = rootDirectoryPath.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedPath.isEmpty else {
@@ -401,13 +416,14 @@ enum LocalModuleScanner {
                 continue
             }
             let subscription = ModuleMetadataParser.scriptHubSubscription(in: content)
-            guard let outputFormat = outputFormat(for: standardizedURL, subscription: subscription) else {
+            guard let inferred = outputFormat(for: standardizedURL, subscription: subscription) else {
                 skipped.append(LocalModuleScanSkippedFile(
                     relativePath: normalizedRelativePath,
                     reason: "Stash 文件缺少可识别的 Script-Hub 订阅来源"
                 ))
                 continue
             }
+            let outputFormat = expectedOutputFormat ?? inferred
             let sourceURL = subscription?.originalURL ?? standardizedURL.absoluteString
             let sourceKey = outputFormat.rawValue + ":" + ModuleSourceIdentity.canonicalValue(for: sourceURL)
             guard existingSources.insert(sourceKey).inserted else {

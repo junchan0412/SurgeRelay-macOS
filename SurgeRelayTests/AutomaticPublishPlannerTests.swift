@@ -54,6 +54,7 @@ final class AutomaticPublishPlannerTests: XCTestCase {
 
     func testAutomaticPublishPlannerBuildsContextFromSettings() {
         var settings = AppSettings()
+        settings.publishToGitHub = true
 
         XCTAssertEqual(
             AutomaticPublishPlanner.context(settings: settings, tokenIsAvailable: true),

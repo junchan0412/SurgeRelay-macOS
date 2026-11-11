@@ -180,9 +180,9 @@ struct WorkspaceOverviewView: View {
                 WorkspaceDestinationCard(
                     title: "本地目录", symbol: "externaldrive",
                     enabled: model.settings.publishToLocal,
-                    configured: !model.settings.localModuleDirectory.isEmpty,
-                    detail: model.settings.localModuleDirectory.isEmpty ? "选择 Surge 模块目录" : model.settings.localModuleDirectory,
-                    caption: "\(model.modules.lazy.filter(\.hasLocalStorageTarget).count) 个模块存放在本地",
+                    configured: localStorageFormats.contains { !model.settings.localModuleDirectory(for: $0).isEmpty },
+                    detail: localStorageFormats.isEmpty ? "开启客户端本地存储" : localStorageFormats.map(\.title).joined(separator: " · "),
+                    caption: "\(localStorageFormats.count) 个客户端 · \(model.modules.lazy.filter(\.hasLocalStorageTarget).count) 个本地模块",
                     action: openPublishingSettings
                 )
                 WorkspaceDestinationCard(
@@ -197,6 +197,10 @@ struct WorkspaceOverviewView: View {
                 )
             }
         }
+    }
+
+    private var localStorageFormats: [ModuleOutputFormat] {
+        ModuleOutputFormat.allCases.filter { model.settings.isLocalPublishingEnabled(for: $0) }
     }
 
     private var recentActivity: some View {

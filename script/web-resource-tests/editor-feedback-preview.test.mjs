@@ -398,6 +398,26 @@ const dualState = { moduleEditor: { localOutputFolders: ['', 'Local'], githubOut
 editorController.populateModuleForm({ name: 'Dual Name', storageLocation: 'local', storageTargets: ['gitHub', 'local'] }, { state: dualState });
 assert.equal(editorFormElements.storageLocation.value, 'both', 'editing dual-target modules retains both destinations');
 assert.deepEqual(Array.from(editorController.outputFoldersForStorage(dualState, 'both')), ['', 'Local', 'Remote']);
+const clientState = {
+  moduleEditor: {
+    publishToLocal: true, publishToGitHub: true,
+    localOutputFolders: ['', 'Surge legacy'],
+    localOutputFoldersByClient: { surge: ['', 'Surge only'], loon: ['', 'Loon only'] },
+    localPublishingByClient: { surge: true, loon: false },
+    githubOutputFolders: ['', 'Remote']
+  }
+};
+assert.deepEqual(Array.from(editorController.outputFoldersForStorage(clientState, 'local', 'surge')), ['', 'Surge only']);
+assert.deepEqual(Array.from(editorController.outputFoldersForStorage(clientState, 'local', 'loon')), ['', 'Loon only']);
+assert.deepEqual(Array.from(editorController.outputFoldersForStorage(clientState, 'both', 'loon')), ['', 'Loon only', 'Remote']);
+assert.deepEqual(Array.from(editorController.outputFoldersForStorage(clientState, 'local', 'stash')), []);
+editorController.populateModuleForm({ name: 'Loon client', storageTargets: ['local'], outputFormat: 'loon' }, { state: clientState });
+assert.match(editorFormElements.outputFolder.innerHTML, /Loon only/);
+assert.doesNotMatch(editorFormElements.outputFolder.innerHTML, /Surge only|Surge legacy/);
+const clientNotice = editorController.updateOutputPathPreview({ state: clientState }).notice;
+assert.match(clientNotice.message, /Loon 本地存储尚未开启/);
+assert.equal(clientNotice.warning, true);
+editorController.populateModuleForm({ name: 'Dual Name', storageLocation: 'local', storageTargets: ['gitHub', 'local'] }, { state: dualState });
 let dualPayload = logic.moduleEditorPayload(editorController.collectModuleFields());
 assert.deepEqual(Array.from(dualPayload.storageTargets), ['local', 'gitHub']);
 assert.equal(dualPayload.storageLocation, 'local', 'legacy location stays a valid API enum');

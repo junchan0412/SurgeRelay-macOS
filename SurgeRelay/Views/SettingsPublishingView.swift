@@ -3,20 +3,21 @@ import SwiftUI
 
 struct SettingsPublishingView: View {
     @Environment(AppModel.self) private var model
-    @State private var localRootDiagnostics: LocalModuleRootDiagnosticSnapshot?
+    @State private var localRootDiagnostics: [ModuleOutputFormat: LocalModuleRootDiagnosticSnapshot] = [:]
 
     var body: some View {
         SettingsForm {
             storageLocationSection
+            if model.settings.publishToLocal {
+                ForEach(ModuleOutputFormat.allCases) { format in
+                    clientStorageSection(format)
+                }
+            }
+            githubStorageSection
             cloudflareWorkerSection
         }
         .disabled(model.isWorking)
-        .task {
-            refreshLocalRootDiagnostics()
-        }
-        .onChange(of: model.settings.localModuleDirectory) { _, _ in
-            refreshLocalRootDiagnostics()
-        }
+        .task(id: localDiagnosticInputs) { await refreshLocalRootDiagnostics() }
     }
 
     private var storageLocationSection: some View {
@@ -25,34 +26,52 @@ struct SettingsPublishingView: View {
                 get: { model.settings.publishToLocal },
                 set: { model.setPublishToLocal($0) }
             ))
+            .accessibilityIdentifier("settings.local-publishing")
+            Text("启用的客户端使用各自的根目录，模块可选择根目录下的文件夹。默认只启用 Surge。")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    private func clientStorageSection(_ format: ModuleOutputFormat) -> some View {
+        let storage = model.settings.localStorage(for: format)
+        return SettingsSection(format.title) {
+            SettingsToggleRow("启用本地存储", icon: "folder", isOn: Binding(
+                get: { model.settings.localStorage(for: format).isEnabled },
+                set: { model.setClientLocalStorageEnabled($0, for: format) }
+            ))
+            .accessibilityIdentifier("settings.local-storage.\(format.rawValue)")
+            if storage.isEnabled {
+                SettingsControlRow("存储目录", icon: "folder") {
+                    if storage.directory.isEmpty {
+                        HStack(spacing: 10) {
+                            Text("请选择目录").font(.callout).foregroundStyle(.secondary)
+                            Button("选择…") { chooseLocalModuleDirectory(for: format) }
+                        }
+                    } else {
+                        SettingsPathSelectionControl(path: storage.directory) { chooseLocalModuleDirectory(for: format) }
+                    }
+                }
+                .accessibilityIdentifier("settings.local-directory.\(format.rawValue)")
+                if !storage.directory.isEmpty {
+                    if let diagnostics = localRootDiagnostics[format] {
+                        DisclosureGroup("目录检查") { localRootDiagnosticContent(diagnostics).padding(.top, 8) }
+                    } else {
+                        HStack(spacing: 8) {
+                            ProgressView().controlSize(.small)
+                            Text("正在检查目录…").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var githubStorageSection: some View {
+        SettingsSection("GitHub 发布") {
             SettingsToggleRow("发布到 GitHub", icon: "cloud", isOn: Binding(
                 get: { model.settings.publishToGitHub },
                 set: { model.setPublishToGitHub($0) }
             ))
-
-            if model.settings.publishToLocal {
-                SettingsControlRow("本地根目录", icon: "folder") {
-                    SettingsPathSelectionControl(
-                        path: model.settings.localModuleDirectory,
-                        chooseAction: chooseLocalModuleDirectory
-                    )
-                }
-                SettingsInfoRow("文件规则", icon: "folder.badge.gearshape") {
-                    Text("每个模块分别保存，可选择根目录下的文件夹。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                if let diagnostics = localRootDiagnostics {
-                    localRootDiagnosticContent(diagnostics)
-                } else {
-                    HStack(spacing: 8) {
-                        ProgressView().controlSize(.small)
-                        Text("正在检查本地模块根目录…")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
 
             if model.settings.publishToGitHub {
                 SettingsTextFieldRow("所有者", icon: "person", text: githubBinding(\.owner), prompt: "GitHub 用户或组织")
@@ -92,25 +111,43 @@ struct SettingsPublishingView: View {
         }
     }
 
-    private func chooseLocalModuleDirectory() {
+    private func chooseLocalModuleDirectory(for format: ModuleOutputFormat) {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
-        panel.directoryURL = URL(filePath: model.settings.localModuleDirectory, directoryHint: .isDirectory)
+        let path = model.settings.localStorage(for: format).directory
+        if !path.isEmpty { panel.directoryURL = URL(filePath: path, directoryHint: .isDirectory) }
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        model.setLocalModuleDirectory(url.path)
+        model.setClientLocalModuleDirectory(url.path, for: format)
     }
 
-    private func refreshLocalRootDiagnostics() {
-        Task { @MainActor in
-            let path = model.settings.localModuleDirectory
-            let snapshot = await Task.detached(priority: .utility) {
-                LocalModuleRootDiagnosticSnapshot.current(path: path)
-            }.value
-            localRootDiagnostics = snapshot
+    private var localDiagnosticInputs: [String] {
+        [String(model.settings.publishToLocal)] + ModuleOutputFormat.allCases.map { format in
+            let storage = model.settings.localStorage(for: format)
+            return "\(format.rawValue):\(storage.isEnabled):\(storage.directory)"
         }
+    }
+
+    private func refreshLocalRootDiagnostics() async {
+        let inputs = localDiagnosticInputs
+        let paths = ModuleOutputFormat.allCases.compactMap { format -> (ModuleOutputFormat, String)? in
+            let storage = model.settings.localStorage(for: format)
+            return model.settings.publishToLocal && storage.isEnabled && !storage.directory.isEmpty ? (format, storage.directory) : nil
+        }
+        localRootDiagnostics = [:]
+        let worker = Task.detached(priority: .utility) {
+            var result: [ModuleOutputFormat: LocalModuleRootDiagnosticSnapshot] = [:]
+            for (format, path) in paths {
+                guard !Task.isCancelled else { break }
+                result[format] = LocalModuleRootDiagnosticSnapshot.current(path: path)
+            }
+            return result
+        }
+        let result = await withTaskCancellationHandler { await worker.value } onCancel: { worker.cancel() }
+        guard !Task.isCancelled, inputs == localDiagnosticInputs else { return }
+        localRootDiagnostics = result
     }
 
     private func localRootDiagnosticContent(_ diagnostics: LocalModuleRootDiagnosticSnapshot) -> some View {
@@ -137,7 +174,7 @@ struct SettingsPublishingView: View {
             }
             HStack(spacing: 8) {
                 Button("重新检查", systemImage: "arrow.clockwise") {
-                    refreshLocalRootDiagnostics()
+                    Task { await refreshLocalRootDiagnostics() }
                 }
                 Button("在 Finder 中显示", systemImage: "folder") {
                     NSWorkspace.shared.open(URL(filePath: diagnostics.path, directoryHint: .isDirectory))

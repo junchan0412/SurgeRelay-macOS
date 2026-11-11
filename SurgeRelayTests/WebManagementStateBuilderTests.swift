@@ -2,6 +2,22 @@ import XCTest
 @testable import SurgeRelay
 
 final class WebManagementStateBuilderTests: XCTestCase {
+    func testClientFolderMapsAndEnabledStatesDoNotShareSurgeDefaults() {
+        var settings = AppSettings()
+        settings.setLocalStorage(ClientLocalStorage(isEnabled: true, directory: "/Loon"), for: .loon)
+        settings.setLocalStorage(ClientLocalStorage(isEnabled: false, directory: "/Egern"), for: .egern)
+        let payload = WebManagementStateBuilder.moduleEditorPayload(settings: settings,
+            localOutputFolders: ["", "SurgeFolder"], githubOutputFolders: ["", "Remote"],
+            localFoldersByClient: [.loon: ["", "LoonFolder"], .egern: [""]])
+        XCTAssertEqual(payload.localOutputFoldersByClient["surge"], ["", "SurgeFolder"])
+        XCTAssertEqual(payload.localOutputFoldersByClient["loon"], ["", "LoonFolder"])
+        XCTAssertEqual(payload.localOutputFoldersByClient["stash"], [""])
+        XCTAssertEqual(payload.localPublishingByClient["surge"], true)
+        XCTAssertEqual(payload.localPublishingByClient["loon"], true)
+        XCTAssertEqual(payload.localPublishingByClient["egern"], false)
+        XCTAssertEqual(payload.localPublishingByClient["stash"], false)
+    }
+
     func testOutputClientPayloadAndMutationKeepSourceAndOutputIndependent() throws {
         for outputFormat in ModuleOutputFormat.allCases {
             var module = RelayModule(name: "Multi-client", sourceURL: "https://example.com/source.plugin", outputFileName: "Multi-client")

@@ -14,13 +14,14 @@ struct LocalPublishedFilePlan: Equatable, Sendable {
         "已写入本地模块，等待确认清理 \(stalePaths.count) 个旧文件"
     }
 
-    func cleanupPreview() -> PublishPreview {
+    func cleanupPreview(outputFormat: ModuleOutputFormat = .surge) -> PublishPreview {
         PublishPreview(
             destination: .local,
             targetDescription: targetDirectory,
             activeFiles: currentPaths,
             changedFiles: [],
-            deletedFiles: stalePaths
+            deletedFiles: stalePaths,
+            localOutputFormat: outputFormat
         )
     }
 }
@@ -66,10 +67,10 @@ enum LocalPublishedFilesPlanner {
         )
     }
 
-    static func completion(afterExporting plan: LocalPublishedFilePlan) -> LocalPublishedFileCompletion {
+    static func completion(afterExporting plan: LocalPublishedFilePlan, outputFormat: ModuleOutputFormat = .surge) -> LocalPublishedFileCompletion {
         if plan.requiresCleanupConfirmation {
             return .requiresCleanup(
-                preview: plan.cleanupPreview(),
+                preview: plan.cleanupPreview(outputFormat: outputFormat),
                 statusMessage: plan.cleanupStatusMessage
             )
         }

@@ -29,13 +29,14 @@ enum ModuleOutputFolderCatalog {
         localFolders: [String],
         githubFolders: [String],
         storageLocation: ModuleStorageLocation? = nil,
-        preserving selected: String? = nil
+        preserving selected: String? = nil,
+        outputFormat: ModuleOutputFormat = .surge
     ) -> [String] {
         if storageLocation == .local {
             return ModuleOutputFolder.options(from: localFolders)
         }
         var configuredFolders: [String] = []
-        if settings.publishToLocal, storageLocation == nil || storageLocation == .local {
+        if settings.isLocalPublishingEnabled(for: outputFormat), storageLocation == nil || storageLocation == .local {
             configuredFolders.append(contentsOf: localFolders)
         }
         if settings.publishToGitHub, storageLocation == nil || storageLocation == .gitHub {
@@ -69,7 +70,8 @@ enum ModuleOutputFolderCatalog {
         storageLocation: ModuleStorageLocation,
         settings: AppSettings,
         githubModuleOutputFolders: [String],
-        excludedLocalDirectories: [URL] = []
+        excludedLocalDirectories: [URL] = [],
+        outputFormat: ModuleOutputFormat = .surge
     ) throws -> ModuleOutputFolderCreatePlan {
         let folder = ModuleOutputFolder.normalized(rawValue)
         guard !folder.isEmpty else {
@@ -78,7 +80,8 @@ enum ModuleOutputFolderCatalog {
 
         let localDirectoryURL: URL?
         if storageLocation == .local {
-            let rootPath = settings.localModuleDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard settings.isLocalPublishingEnabled(for: outputFormat) else { throw RelayError.invalidOutput("请先开启 \(outputFormat.title) 本地存储。") }
+            let rootPath = settings.localModuleDirectory(for: outputFormat).trimmingCharacters(in: .whitespacesAndNewlines)
             guard !rootPath.isEmpty else {
                 throw RelayError.invalidOutput("请先设置本地模块根目录。")
             }

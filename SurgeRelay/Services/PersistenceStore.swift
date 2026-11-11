@@ -3,7 +3,9 @@ import Foundation
 enum PersistenceStore {
     private static let directoryLock = NSLock()
     nonisolated(unsafe) private static var qaConfigurationDirectory: URL?
+    nonisolated(unsafe) private static var qaCacheDirectory: URL?
     private static let configurationDirectoryKey = "SurgeRelay.configurationDirectory.v1"
+    private static let cacheDirectoryKey = "SurgeRelay.cacheDirectory.v1"
     private static let legacySettingsKey = "SurgeRelay.settings.v1"
     private static let legacyUpstreamKey = "SurgeRelay.upstream.v1"
     private static let configurationFileNames = [
@@ -47,11 +49,21 @@ enum PersistenceStore {
 
     static var cacheDirectoryURL: URL {
         let directory = AppRuntimeOptions.isUIQAMode
-            ? AppRuntimeOptions.uiQADirectory.appending(path: "Cache", directoryHint: .isDirectory)
-            : FileManager.default.homeDirectoryForCurrentUser
-                .appending(path: "Library/Application Support/Surge Relay/Cache", directoryHint: .isDirectory)
+            ? directoryLock.withLock { qaCacheDirectory }
+                ?? AppRuntimeOptions.uiQADirectory.appending(path: "Cache", directoryHint: .isDirectory)
+            : UserDefaults.standard.string(forKey: cacheDirectoryKey).map { URL(filePath: $0, directoryHint: .isDirectory) }
+                ?? FileManager.default.homeDirectoryForCurrentUser
+                    .appending(path: "Library/Application Support/Surge Relay/Cache", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
+    }
+
+    static func selectCacheDirectory(_ directory: URL) {
+        if AppRuntimeOptions.isUIQAMode {
+            directoryLock.withLock { qaCacheDirectory = directory }
+        } else {
+            UserDefaults.standard.set(directory.path, forKey: cacheDirectoryKey)
+        }
     }
 
     static var registryURL: URL {
@@ -425,6 +437,7 @@ final class ConfigurationPersistenceWriter: @unchecked Sendable {
     private var directory: URL
     private var failures: [String: String] = [:]
     private var retries: [String: @Sendable () throws -> Void] = [:]
+    private var isRetired = false
 
     init(directory: URL, writeData: @escaping WriteData = { data, url in
         try PersistenceStore.writeProtectedData(data, to: url, configurationDirectory: url.deletingLastPathComponent())
@@ -435,6 +448,7 @@ final class ConfigurationPersistenceWriter: @unchecked Sendable {
 
     func enqueue<Value: Encodable & Sendable>(_ value: Value, fileName: String) {
         queue.async { [self] in
+            guard !isRetired else { return }
             let operation: @Sendable () throws -> Void = { [weak self] in
                 guard let self else { return }
                 let encoder = JSONEncoder()
@@ -449,8 +463,20 @@ final class ConfigurationPersistenceWriter: @unchecked Sendable {
     func flush() async throws {
         try await withCheckedThrowingContinuation { continuation in
             queue.async { [self] in
+                guard !isRetired else { continuation.resume(); return }
                 do { try retryFailedWrites(); continuation.resume() }
                 catch { continuation.resume(throwing: error) }
+            }
+        }
+    }
+
+    func retire() async {
+        await withCheckedContinuation { continuation in
+            queue.async { [self] in
+                isRetired = true
+                retries.removeAll()
+                failures.removeAll()
+                continuation.resume()
             }
         }
     }

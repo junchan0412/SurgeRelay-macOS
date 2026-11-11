@@ -85,7 +85,7 @@ struct ModulePreviewPane: View {
                 ScrollView(CodeTextView.usesPlainTextMode(text) ? [.horizontal, .vertical] : .vertical) {
                     ModuleCodeTextView(
                         text: $text,
-                        isEditable: !isLoading,
+                        isEditable: !isLoading && !model.isWorkspaceTransitioning,
                         modules: [currentModule],
                         selectedModuleID: module.id,
                         controller: editor,
@@ -417,7 +417,7 @@ struct ModuleTextEditorView: View {
                 ScrollView(CodeTextView.usesPlainTextMode(text) ? [.horizontal, .vertical] : .vertical) {
                     ModuleCodeTextView(
                         text: $text,
-                        isEditable: !isLoading,
+                        isEditable: !isLoading && !model.isWorkspaceTransitioning,
                         modules: [currentModule],
                         selectedModuleID: module.id,
                         controller: editor,

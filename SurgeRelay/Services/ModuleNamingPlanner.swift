@@ -117,24 +117,26 @@ enum ModuleNamingPlanner {
 
     static func normalizedModuleNaming(
         _ modules: [RelayModule],
-        localModuleDirectory: String
+        localModuleDirectory: String,
+        localModuleDirectories: [ModuleOutputFormat: String] = [:]
     ) -> [RelayModule] {
         let normalizedModules = modules.map { value in
             var module = value
+            let localRoot = localModuleDirectories[module.outputFormat] ?? localModuleDirectory
             module.outputFolder = ModuleOutputFolder.normalized(module.outputFolder)
             if module.hasLocalStorageTarget {
                 let hadLocalPath = module.localStorageRelativePath != nil
                 if module.localStorageRelativePath == nil {
                     module.localStorageRelativePath = LocalSourcePathResolver.relativePath(
                         forSourceURL: module.sourceURL,
-                        rootDirectoryPath: localModuleDirectory
+                        rootDirectoryPath: localRoot
                     ) ?? module.publishedRelativePath
                 }
                 module.preservesOutputFileName = true
                 let currentOutputPath = module.publishedRelativePath
                 let localSourcePath = LocalSourcePathResolver.relativePath(
                     forSourceURL: module.sourceURL,
-                    rootDirectoryPath: localModuleDirectory
+                    rootDirectoryPath: localRoot
                 )
                 let localPath = module.localStorageRelativePath
                 let shouldRestorePhysicalPath = localPath.map {

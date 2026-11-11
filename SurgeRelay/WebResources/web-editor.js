@@ -142,11 +142,13 @@
       select.value = selected || '';
     }
 
-    function outputFoldersForStorage(state, storageLocation) {
+    function outputFoldersForStorage(state, storageLocation, outputFormat = formElements().outputFormat?.value || 'surge') {
       const editor = state?.moduleEditor || {};
-      if (storageLocation === 'both') return [...new Set([...(editor.localOutputFolders || []), ...(editor.githubOutputFolders || [])])];
+      const localFolders = editor.localOutputFoldersByClient
+        ? (editor.localOutputFoldersByClient[outputFormat] || []) : (editor.localOutputFolders || []);
+      if (storageLocation === 'both') return [...new Set([...localFolders, ...(editor.githubOutputFolders || [])])];
       return storageLocation === 'local'
-        ? (editor.localOutputFolders || [])
+        ? localFolders
         : (editor.githubOutputFolders || []);
     }
 
@@ -259,6 +261,8 @@
         editingID: context.editingID,
         storageLocation: form.storageLocation?.value || 'gitHub',
         publishToLocal: context.state?.moduleEditor?.publishToLocal,
+        clientLocalPublishingEnabled: context.state?.moduleEditor?.localPublishingByClient?.[form.outputFormat?.value || 'surge'],
+        localClientTitle: options.outputFormats?.find(item => item.id === (form.outputFormat?.value || 'surge'))?.title,
         publishToGitHub: context.state?.moduleEditor?.publishToGitHub
       });
       if (ui.outputPathNote) {

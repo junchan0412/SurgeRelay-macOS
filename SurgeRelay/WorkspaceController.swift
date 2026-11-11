@@ -96,7 +96,92 @@ final class WorkspaceController {
         }
     }
 
+    func migrateWorkspace(id: UUID, to destinationRoot: URL) async throws {
+        guard !isSwitching else { throw PreviewContentSaveError.busy }
+        guard let source = registry.workspaces.first(where: { $0.id == id }) else {
+            throw RelayError.invalidOutput("工作区不存在。")
+        }
+        let movesActiveWorkspace = activeModel.workspaceID == id
+        guard !activeModel.workActivity.isActive || activeModel.workActivity.canCancel else {
+            throw RelayError.invalidOutput("当前任务不可取消，暂时不能迁移工作区。")
+        }
+        isSwitching = true
+        defer { isSwitching = false }
+        let old = activeModel
+        do {
+            let store = store
+            try await Task.detached(priority: .utility) { try store.validate(source) }.value
+            for model in retiredModels.values where model.workspaceID == id {
+                await model.flushPreviewDrafts()
+                try await model.flushPersistence()
+                if let problem = model.previewDraftPersistenceError { throw RelayError.invalidOutput(problem) }
+            }
+            if movesActiveWorkspace {
+                try await old.prepareForWorkspaceSwitch()
+            } else if source.isLegacyDefault,
+                      !FileManager.default.fileExists(atPath: source.configurationDirectory.appending(path: "modules.json").path) ||
+                        !FileManager.default.fileExists(atPath: source.configurationDirectory.appending(path: "settings.json").path) {
+                let materialized = AppModel(context: source.context, persistsOnInit: false)
+                try await materialized.prepareForWorkspaceSwitch()
+                materialized.finishWorkspaceRetirement()
+            }
+            let selectedModuleID = old.selectedModuleID
+            let settingsPage = old.settingsPage
+            let presentsSettings = old.presentsSettings
+            let toolDraft = old.conversionToolDraft
+            let toolResult = old.nativeToolResult
+            let toolError = old.nativeToolError
+            let current = registry
+            let next = try await Task.detached(priority: .utility) {
+                try store.migrateWorkspace(id: id, to: destinationRoot, registry: current)
+            }.value
+            guard let destination = next.workspaces.first(where: { $0.id == id }) else { return }
+            if source.isLegacyDefault {
+                PersistenceStore.selectConfigurationDirectory(destination.configurationDirectory)
+                PersistenceStore.selectCacheDirectory(destination.cacheDirectory)
+            }
+            registry = next
+            for model in retiredModels.values where model.workspaceID == id { await model.configurationWriter.retire() }
+            if movesActiveWorkspace {
+                await old.configurationWriter.retire()
+                let nextModel = AppModel(context: destination.context, persistsOnInit: false)
+                nextModel.selectedModuleID = selectedModuleID
+                nextModel.settingsPage = settingsPage
+                nextModel.presentsSettings = presentsSettings
+                nextModel.conversionToolDraft = toolDraft
+                nextModel.nativeToolResult = toolResult
+                nextModel.nativeToolError = toolError
+                old.finishWorkspaceRetirement()
+                retiredModels[old.runtimeID] = old
+                activeModel = nextModel
+                attachRelocationCallbacks()
+                if startsServices { nextModel.start(performLaunchRefresh: false) }
+                nextModel.statusMessage = "已迁移“\(destination.name)”的配置、草稿、历史和缓存"
+            }
+            retiredModels = retiredModels.filter { $0.value.workspaceID != id }
+            do {
+                let notice = try await Task.detached(priority: .utility) {
+                    try store.removeMigratedWorkspaceData(from: source, to: destination, registry: next)
+                }.value
+                errorMessage = notice
+                if movesActiveWorkspace, let notice { activeModel.statusMessage = notice }
+            } catch {
+                errorMessage = "工作区已迁移到新目录；部分旧数据尚未清理：\(error.localizedDescription)"
+                if movesActiveWorkspace { activeModel.statusMessage = errorMessage! }
+            }
+        } catch {
+            if movesActiveWorkspace, old.isWorkspaceTransitioning { old.resumeAfterWorkspaceSwitchFailure() }
+            throw error
+        }
+    }
+
     func finishViewRetirement(_ model: AppModel) async {
+        if let workspace = registry.workspaces.first(where: { $0.id == model.workspaceID }),
+           workspace.configurationDirectory.standardizedFileURL.resolvingSymlinksInPath() != model.configurationStorageDirectory.standardizedFileURL.resolvingSymlinksInPath() ||
+            workspace.cacheDirectory.standardizedFileURL.resolvingSymlinksInPath() != model.cacheDirectoryURL.standardizedFileURL.resolvingSymlinksInPath() {
+            retiredModels.removeValue(forKey: model.runtimeID)
+            return
+        }
         await model.flushPreviewDrafts()
         try? await model.flushPersistence()
         if model.previewDraftPersistenceError == nil, model.persistenceError == nil {
@@ -105,6 +190,7 @@ final class WorkspaceController {
     }
 
     func flushAllWorkspaces() async throws {
+        while isSwitching { try await Task.sleep(for: .milliseconds(20)) }
         let models = [activeModel] + Array(retiredModels.values)
         for model in models {
             await model.configurationMigrationTask?.value
@@ -123,6 +209,7 @@ final class WorkspaceController {
         }
         activeModel.configurationRelocationValidation = { [weak self] directory in
             guard let self else { return }
+            guard !isSwitching else { throw PreviewContentSaveError.busy }
             try store.validateRelocation(id: id, to: directory, registry: registry)
         }
         activeModel.configurationRelocationFinished = { [weak self] directory in

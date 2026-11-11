@@ -98,15 +98,52 @@ extension AppModel {
     }
 
     func setLocalModuleDirectory(_ path: String) {
+        setClientLocalModuleDirectory(path, for: .surge)
+    }
+
+    func setClientLocalModuleDirectory(_ path: String, for format: ModuleOutputFormat) {
         guard !isWorking else { statusMessage = PreviewContentSaveError.busy.localizedDescription; return }
-        settings.localModuleDirectory = path
-        localModuleOutputFolders = [ModuleOutputFolder.root]
-        localModuleOutputFoldersRootPath = nil
-        localModuleOutputFoldersLastRefreshedAt = nil
+        var storage = settings.localStorage(for: format)
+        let directory = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard storage.directory != directory else { return }
+        registerLocalChange()
+        storage.directory = directory
+        settings.setLocalStorage(storage, for: format)
+        for index in modules.indices where modules[index].outputFormat == format { modules[index].localOutputError = nil }
+        enqueueConfiguration(modules, fileName: "modules.json")
+        localModuleOutputFoldersByClient[format] = [ModuleOutputFolder.root]
+        localModuleOutputFoldersRootPaths.removeValue(forKey: format)
+        localModuleOutputFoldersLastRefreshes.removeValue(forKey: format)
+        if format == .surge {
+            localModuleOutputFolders = [ModuleOutputFolder.root]
+            localModuleOutputFoldersRootPath = nil
+            localModuleOutputFoldersLastRefreshedAt = nil
+        }
         saveSettings()
         refreshLocalSourceWatching()
-        Task { await refreshModuleOutputFolders(force: true) }
-        if settings.publishToLocal { Task { await refreshModuleOutputs() } }
+        Task { await refreshModuleOutputFolders(force: true, outputFormat: format) }
+        if settings.isLocalPublishingEnabled(for: format) {
+            let ids = Set(modules.filter { $0.outputFormat == format }.map(\.id))
+            Task { await refreshModuleOutputs(moduleIDs: ids) }
+        }
+    }
+
+    func setClientLocalStorageEnabled(_ enabled: Bool, for format: ModuleOutputFormat) {
+        guard !isWorking else { statusMessage = PreviewContentSaveError.busy.localizedDescription; return }
+        var storage = settings.localStorage(for: format)
+        guard storage.isEnabled != enabled else { return }
+        registerLocalChange()
+        storage.isEnabled = enabled
+        settings.setLocalStorage(storage, for: format)
+        for index in modules.indices where modules[index].outputFormat == format { modules[index].localOutputError = nil }
+        enqueueConfiguration(modules, fileName: "modules.json")
+        if enabled { settings.publishToLocal = true }
+        saveSettings()
+        refreshLocalSourceWatching()
+        statusMessage = enabled ? "已开启 \(format.title) 本地存储" : "已关闭 \(format.title) 本地存储"
+        if enabled { Task { await refreshModuleOutputFolders(outputFormat: format) } }
+        let ids = Set(modules.filter { $0.outputFormat == format }.map(\.id))
+        Task { await refreshModuleOutputs(moduleIDs: ids) }
     }
 
     func setPublishToLocal(_ enabled: Bool) {
@@ -116,6 +153,7 @@ extension AppModel {
             statusMessage = "至少需要保留一个发布目标"
             return
         }
+        registerLocalChange()
         settings.publishToLocal = enabled
         saveSettings()
         statusMessage = enabled ? "已开启本地发布" : "已关闭本地发布"

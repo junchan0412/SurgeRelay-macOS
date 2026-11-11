@@ -107,6 +107,7 @@ extension AppModel {
                     return await WebManagementAPI.response(for: request, model: self)
                 }
             )
+            Task { await refreshModuleOutputFolders() }
         } catch {
             webServerState = .failed(error.localizedDescription)
         }

@@ -63,6 +63,9 @@ final class LocalModuleScannerTests: XCTestCase {
         let model = AppModel(context: context, persistsOnInit: false)
         defer { model.persistenceFeedbackTask?.cancel() }
         model.settings.localModuleDirectory = directory.path
+        for (_, format, _) in files {
+            model.settings.setLocalStorage(ClientLocalStorage(isEnabled: true, directory: directory.path), for: format)
+        }
         model.settings.publishToLocal = false
         model.settings.publishToGitHub = false
         model.settings.watchesLocalModuleChanges = false

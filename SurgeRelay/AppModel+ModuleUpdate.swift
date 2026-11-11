@@ -235,13 +235,13 @@ extension AppModel {
     }
 
     private func moduleSyncScope(for module: RelayModule) -> String {
-        let root = URL(filePath: settings.localModuleDirectory, directoryHint: .isDirectory).standardizedFileURL.path
+        let root = URL(filePath: settings.localModuleDirectory(for: module.outputFormat), directoryHint: .isDirectory).standardizedFileURL.path
         return Data([root, PublishCoordinator.repositoryKey(settings.github), module.publishedRelativePath].joined(separator: "\n").utf8).sha256String
     }
 
     private func moduleSyncConflict(for module: inout RelayModule) async throws -> ModuleSyncConflictMetadata? {
         guard module.hasLocalStorageTarget, module.hasGitHubStorageTarget,
-              settings.publishToGitHub, settings.github.isConfigured, !githubToken.isEmpty else { return nil }
+              settings.isLocalPublishingEnabled(for: module.outputFormat), settings.publishToGitHub, settings.github.isConfigured, !githubToken.isEmpty else { return nil }
         guard let snapshot = try await readModuleSyncComparison(for: module, includesDiff: false, allowsMissing: true) else { return nil }
         if snapshot.metadata.comparisonState == .same {
             module.syncBaseHash = snapshot.metadata.localHash
@@ -290,13 +290,13 @@ extension AppModel {
         allowsMissing: Bool = false
     ) async throws -> ModuleSyncComparison? {
         guard module.hasLocalStorageTarget, module.hasGitHubStorageTarget,
-              settings.publishToLocal, settings.publishToGitHub, settings.github.isConfigured, !githubToken.isEmpty else {
+              settings.isLocalPublishingEnabled(for: module.outputFormat), settings.publishToGitHub, settings.github.isConfigured, !githubToken.isEmpty else {
             if allowsMissing { return nil }
             throw RelayError.invalidOutput("请先开启并配置模块的本地与 GitHub 双目标。")
         }
         let scope = moduleSyncScope(for: module)
         let path = module.publishedRelativePath
-        let localRoot = settings.localModuleDirectory
+        let localRoot = settings.localModuleDirectory(for: module.outputFormat)
         let githubSettings = settings.github
         let token = githubToken
         guard let local = try await fileStore.readPublishedFile(relativePath: path, rootDirectoryPath: localRoot),
@@ -364,9 +364,10 @@ extension AppModel {
             case .githubWins:
                 _ = try await fileStore.exportPublishedFiles(
                     [PublishFile(name: module.publishedRelativePath, data: winner)],
-                    toRootDirectory: settings.localModuleDirectory,
-                    knownManagedRelativePaths: settings.localPublishedFilePaths,
-                    expectedExistingHashes: [module.publishedRelativePath: current.localFileHash]
+                    toRootDirectory: settings.localModuleDirectory(for: module.outputFormat),
+                    knownManagedRelativePaths: settings.localStorage(for: module.outputFormat).publishedFilePaths,
+                    expectedExistingHashes: [module.publishedRelativePath: current.localFileHash],
+                    protectedSourcePaths: localProtectedSourcePaths(targetDirectory: settings.localModuleDirectory(for: module.outputFormat), outputFormat: module.outputFormat)
                 )
             }
             guard let verified = try await readModuleSyncComparison(for: module, includesDiff: false),

@@ -118,6 +118,26 @@ enum GitHubRepositoryValidator {
     }
 }
 
+struct ClientLocalStorage: Codable, Equatable, Sendable {
+    var isEnabled = false
+    var directory = ""
+    var publishedRootDirectory: String?
+    var publishedFilePaths: [String] = []
+
+    private enum CodingKeys: String, CodingKey { case isEnabled, directory, publishedRootDirectory, publishedFilePaths }
+}
+
+extension ClientLocalStorage {
+    init(from decoder: Decoder) throws {
+        self.init()
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        isEnabled = try values.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? false
+        directory = try values.decodeIfPresent(String.self, forKey: .directory) ?? ""
+        publishedRootDirectory = try values.decodeIfPresent(String.self, forKey: .publishedRootDirectory)
+        publishedFilePaths = try values.decodeIfPresent([String].self, forKey: .publishedFilePaths) ?? []
+    }
+}
+
 struct AppSettings: Codable, Equatable, Sendable {
     // Kept only to find and remove files created by early development builds.
     var outputDirectory: String = AppSettings.defaultOutputDirectory
@@ -135,12 +155,13 @@ struct AppSettings: Codable, Equatable, Sendable {
     var launchAtLogin = false
     var github = GitHubSettings()
     var githubToken = ""
-    var storageMode: StorageMode = .gitHub
-    var publishToLocal = false
-    var publishToGitHub = true
+    var storageMode: StorageMode = .local
+    var publishToLocal = true
+    var publishToGitHub = false
     var localModuleDirectory: String = AppSettings.defaultLocalModuleRootDirectory
     var localPublishedRootDirectory: String?
     var localPublishedFilePaths: [String] = []
+    var localStorageByClient: [String: ClientLocalStorage] = [:]
     var githubPublishedRepositoryKey: String?
     var githubPublishedFilePaths: [String] = []
     var customModuleOutputFolders: [String] = []
@@ -170,12 +191,13 @@ struct AppSettings: Codable, Equatable, Sendable {
         launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
         github = try container.decodeIfPresent(GitHubSettings.self, forKey: .github) ?? GitHubSettings()
         githubToken = try container.decodeIfPresent(String.self, forKey: .githubToken) ?? ""
-        storageMode = try container.decodeIfPresent(StorageMode.self, forKey: .storageMode) ?? .gitHub
+        storageMode = try container.decodeIfPresent(StorageMode.self, forKey: .storageMode) ?? .local
         publishToLocal = try container.decodeIfPresent(Bool.self, forKey: .publishToLocal) ?? (storageMode == .local)
         publishToGitHub = try container.decodeIfPresent(Bool.self, forKey: .publishToGitHub) ?? (storageMode == .gitHub)
         localModuleDirectory = try container.decodeIfPresent(String.self, forKey: .localModuleDirectory) ?? Self.defaultLocalModuleRootDirectory
         localPublishedRootDirectory = try container.decodeIfPresent(String.self, forKey: .localPublishedRootDirectory)
         localPublishedFilePaths = try container.decodeIfPresent([String].self, forKey: .localPublishedFilePaths) ?? []
+        localStorageByClient = try container.decodeIfPresent([String: ClientLocalStorage].self, forKey: .localStorageByClient) ?? [:]
         githubPublishedRepositoryKey = try container.decodeIfPresent(String.self, forKey: .githubPublishedRepositoryKey)
         githubPublishedFilePaths = try container.decodeIfPresent([String].self, forKey: .githubPublishedFilePaths) ?? []
         customModuleOutputFolders = try container.decodeIfPresent([String].self, forKey: .customModuleOutputFolders) ?? []
@@ -187,18 +209,69 @@ struct AppSettings: Codable, Equatable, Sendable {
 
     private enum LegacyKeys: String, CodingKey { case combinedModuleFileName }
 
+    func localStorage(for format: ModuleOutputFormat) -> ClientLocalStorage {
+        if format == .surge {
+            return ClientLocalStorage(isEnabled: localStorageByClient[format.rawValue]?.isEnabled ?? true,
+                directory: localModuleDirectory, publishedRootDirectory: localPublishedRootDirectory,
+                publishedFilePaths: localPublishedFilePaths)
+        }
+        return localStorageByClient[format.rawValue] ?? ClientLocalStorage()
+    }
+
+    mutating func setLocalStorage(_ storage: ClientLocalStorage, for format: ModuleOutputFormat) {
+        if format == .surge {
+            localModuleDirectory = storage.directory
+            localPublishedRootDirectory = storage.publishedRootDirectory
+            localPublishedFilePaths = storage.publishedFilePaths
+            localStorageByClient[format.rawValue] = ClientLocalStorage(isEnabled: storage.isEnabled)
+        } else {
+            localStorageByClient[format.rawValue] = storage
+        }
+    }
+
+    func localModuleDirectory(for format: ModuleOutputFormat) -> String {
+        localStorage(for: format).directory
+    }
+
+    func isLocalPublishingEnabled(for format: ModuleOutputFormat) -> Bool {
+        publishToLocal && localStorage(for: format).isEnabled
+    }
+
+    mutating func separateLegacyLocalPublishedFiles(modules: [RelayModule]) {
+        guard localStorageByClient.isEmpty, !localPublishedFilePaths.isEmpty else { return }
+        var pathsByClient: [ModuleOutputFormat: [String]] = [:]
+        for path in localPublishedFilePaths {
+            let identity = LocalSourcePathResolver.pathIdentity(path)
+            let parts = path.split(separator: "/")
+            let assetID = parts.count > 2 && parts[0] == "assets" ? UUID(uuidString: String(parts[1])) : nil
+            let owner = modules.first {
+                LocalSourcePathResolver.pathIdentity($0.publishedRelativePath) == identity || $0.id == assetID
+            }
+            pathsByClient[owner?.outputFormat ?? .surge, default: []].append(path)
+        }
+        let previousRoot = localPublishedRootDirectory
+        localPublishedFilePaths = pathsByClient[.surge] ?? []
+        for (format, paths) in pathsByClient where format != .surge {
+            localStorageByClient[format.rawValue] = ClientLocalStorage(isEnabled: false,
+                publishedRootDirectory: previousRoot, publishedFilePaths: paths)
+        }
+        localStorageByClient[ModuleOutputFormat.surge.rawValue] = ClientLocalStorage(isEnabled: true)
+    }
+
     static var defaultOutputDirectory: String {
         defaultConfigurationDirectory
     }
 
     static var defaultConfigurationDirectory: String {
-        FileManager.default.homeDirectoryForCurrentUser
+        if AppRuntimeOptions.isUIQAMode { return AppRuntimeOptions.uiQADirectory.appending(path: "Configuration").path }
+        return FileManager.default.homeDirectoryForCurrentUser
             .appending(path: "Library/Mobile Documents/iCloud~com~nssurge~inc/Documents/Surge Relay", directoryHint: .isDirectory)
             .path
     }
 
     static var defaultLocalModuleRootDirectory: String {
-        FileManager.default.homeDirectoryForCurrentUser
+        if AppRuntimeOptions.isUIQAMode { return AppRuntimeOptions.uiQADirectory.appending(path: "Modules").path }
+        return FileManager.default.homeDirectoryForCurrentUser
             .appending(path: "Library/Mobile Documents/iCloud~com~nssurge~inc", directoryHint: .isDirectory)
             .path
     }

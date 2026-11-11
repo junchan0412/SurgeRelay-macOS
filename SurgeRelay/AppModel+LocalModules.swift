@@ -9,18 +9,32 @@ extension AppModel {
         beginWork(.scanningLocalModules)
         defer { endWork(.scanningLocalModules) }
         statusMessage = LocalModuleImportPlanner.scanStartedStatus
-        let rootDirectoryPath = settings.localModuleDirectory
-        let existingModules = modules
-        let publishedFilePaths = LocalSourcePathResolver.canonicalDirectoryURL(for: settings.localPublishedRootDirectory ?? "") ==
-            LocalSourcePathResolver.canonicalDirectoryURL(for: rootDirectoryPath)
-            ? settings.localPublishedFilePaths : []
-        let report = try await Task.detached(priority: .userInitiated) {
-            try LocalModuleScanner.report(
-                in: rootDirectoryPath,
-                existingModules: existingModules,
-                publishedFilePaths: publishedFilePaths
-            )
-        }.value
+        let configured = ModuleOutputFormat.allCases.filter { settings.localStorage(for: $0).isEnabled && !settings.localModuleDirectory(for: $0).isEmpty }
+        guard !configured.isEmpty else { throw RelayError.invalidOutput("请先启用并设置客户端的本地存储目录。") }
+        var candidates: [LocalModuleScanCandidate] = []
+        var skipped: [LocalModuleScanSkippedFile] = []
+        let originalSettings = settings
+        for format in configured {
+            let rootDirectoryPath = settings.localModuleDirectory(for: format)
+            let existingModules = localModulesSharingRoot(rootDirectoryPath)
+            let storage = settings.localStorage(for: format)
+            let publishedFilePaths = LocalSourcePathResolver.canonicalDirectoryURL(for: storage.publishedRootDirectory ?? "")
+                == LocalSourcePathResolver.canonicalDirectoryURL(for: rootDirectoryPath) ? storage.publishedFilePaths : []
+            do {
+                let report = try await Task.detached(priority: .userInitiated) {
+                    try LocalModuleScanner.report(in: rootDirectoryPath, existingModules: existingModules,
+                        publishedFilePaths: publishedFilePaths, outputFormat: format)
+                }.value
+                candidates.append(contentsOf: report.candidates)
+                skipped.append(contentsOf: report.skippedFiles.map { file in
+                    LocalModuleScanSkippedFile(relativePath: format.title + " · " + file.relativePath, reason: file.reason)
+                })
+            } catch {
+                skipped.append(LocalModuleScanSkippedFile(relativePath: format.title + " 目录", reason: error.localizedDescription))
+            }
+            guard settings == originalSettings, shouldContinueCurrentWork() else { return LocalModuleScanReport(candidates: [], skippedFiles: []) }
+        }
+        let report = LocalModuleScanReport(candidates: candidates, skippedFiles: skipped)
         guard shouldContinueCurrentWork() else {
             return LocalModuleScanReport(candidates: [], skippedFiles: [])
         }
@@ -40,20 +54,25 @@ extension AppModel {
         registerLocalChange()
         presentedError = nil
         statusMessage = "正在从本地文件导入模块…"
-        let rootDirectoryPath = settings.localModuleDirectory
         var imported: [RelayModule] = []
         var failures: [String] = []
 
         for candidate in candidates {
             guard shouldContinueCurrentWork() else { return }
             do {
+                let format = candidate.outputFormat
+                guard settings.localStorage(for: format).isEnabled else { throw RelayError.invalidOutput("\(format.title) 本地存储已关闭。") }
+                let rootDirectoryPath = settings.localModuleDirectory(for: format)
                 let snapshot = try await Task.detached(priority: .userInitiated) {
-                    try LocalModuleScanner.snapshotForImport(candidate, rootDirectoryPath: rootDirectoryPath)
+                    try LocalModuleScanner.snapshotForImport(candidate, rootDirectoryPath: rootDirectoryPath, outputFormat: format)
                 }.value
                 guard shouldContinueCurrentWork() else { return }
                 let importPlan = LocalModuleImportPlanner.plan(
                     candidates: [snapshot.candidate],
-                    existingModules: modules + imported,
+                    existingModules: localModulesSharingRoot(rootDirectoryPath) + imported.filter {
+                        LocalSourcePathResolver.canonicalDirectoryURL(for: settings.localModuleDirectory(for: $0.outputFormat))
+                            == LocalSourcePathResolver.canonicalDirectoryURL(for: rootDirectoryPath)
+                    },
 
                     localModuleDirectory: rootDirectoryPath
                 )
@@ -67,7 +86,8 @@ extension AppModel {
                 let subscribedContent = ModuleMetadataParser.applyingScriptHubSubscription(module.scriptHubSubscription, to: namedContent)
                 try await scriptHubClient.validate(subscribedContent, outputFormat: module.outputFormat)
                 let result = ConversionResult(content: subscribedContent, requestURL: snapshot.fileURL, outputFormat: module.outputFormat)
-                guard shouldContinueCurrentWork() else { return }
+                guard settings.localStorage(for: format).isEnabled, settings.localModuleDirectory(for: format) == rootDirectoryPath,
+                      shouldContinueCurrentWork() else { return }
                 try await fileStore.commitConversion(result, id: module.id)
                 let fingerprint = await processingWorker.contentFingerprint(
                     of: result.content,
@@ -110,4 +130,12 @@ extension AppModel {
             presentedError = failureDetails
         }
     }
+    private func localModulesSharingRoot(_ target: String) -> [RelayModule] {
+        let root = LocalSourcePathResolver.canonicalDirectoryURL(for: target)
+        return modules.filter { module in
+            LocalSourcePathResolver.canonicalDirectoryURL(for: settings.localModuleDirectory(for: module.outputFormat)) == root ||
+                LocalSourcePathResolver.storageRelativePath(for: module, rootDirectoryPath: target) != nil
+        }
+    }
+
 }

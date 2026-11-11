@@ -266,7 +266,7 @@ struct ModuleDetailView: View {
                             await refreshLocalOutput()
                         }
                     }
-                    .disabled(model.isWorking || !model.settings.publishToLocal)
+                    .disabled(model.isWorking || !model.settings.isLocalPublishingEnabled(for: module.outputFormat))
                     .accessibilityIdentifier("module-detail.write-local-file")
                 }
                 if let output = currentLocalOutput, output.state == .present,
@@ -275,15 +275,15 @@ struct ModuleDetailView: View {
                            systemImage: "doc.badge.arrow.up") {
                         Task { await prepareLocalOutputAdoption() }
                     }
-                    .disabled(model.isWorking || isPreparingLocalAdoption || !model.settings.publishToLocal)
+                    .disabled(model.isWorking || isPreparingLocalAdoption || !model.settings.isLocalPublishingEnabled(for: module.outputFormat))
                     .accessibilityIdentifier("module-detail.adopt-local-file")
                 }
                 if let localOutputError {
                     Text(localOutputError).font(.caption)
                         .foregroundStyle(Design.Palette.error).textSelection(.enabled)
                 }
-                if !model.settings.publishToLocal {
-                    Text("本地发布未开启，请在设置中开启后写入。")
+                if !model.settings.isLocalPublishingEnabled(for: module.outputFormat) {
+                    Text("\(module.outputFormat.title) 本地存储未开启，请在发布设置中开启后写入。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -353,7 +353,7 @@ struct ModuleDetailView: View {
     }
 
     private var localPublishedPath: String {
-        let root = model.settings.localModuleDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
+        let root = model.settings.localModuleDirectory(for: module.outputFormat).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !root.isEmpty else { return "" }
         return URL(filePath: root, directoryHint: .isDirectory)
             .appending(path: module.publishedRelativePath)

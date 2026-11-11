@@ -6,7 +6,7 @@
 
 | 项目 | 当前值 |
 | --- | --- |
-| 版本 | 3.0.0 (116) |
+| 版本 | 3.1.0 (117) |
 | macOS deployment target | 15.0 |
 | Swift | 6.0，strict concurrency complete |
 
@@ -22,6 +22,8 @@
 
 - 集中管理远程、本地与 Script-Hub 转换模块，并区分 storageTargets 与 initialSource（storageLocation 保留旧单目标兼容）。
 - 来源、输出客户端与存放目标独立：支持 Surge、Loon、Egern、Quantumult X、Stash、Shadowrocket 输出，同一来源可维护不同客户端版本。
+- 六客户端分别启用并设置本地目录，新配置仅Surge开启；目录菜单、扫描、同步与发布清单按客户端隔离，共享根目录互相保护当前输出。
+- 工作区可迁移配置与缓存，保持身份、凭据、草稿、历史和工具表单；失败回滚目标，重启使用新登记，旧writer退出后不重建原路径。
 - 原生/Web转换工具支持规则集、域名集、剩余规则与独立脚本，输入可为文本、远程地址或本地文件，结果可复制、保存/下载。
 - 本地与 GitHub 发布可并存；每个模块独立选择本地、GitHub 或双目标，更新或编辑仅刷新自身输出；所选发布记录逐目标结果并支持只重试未完成目标。
 - 支持本地模块扫描、转换预览、文本覆盖、冲突处理、发布预览、受管文件清理和自动发布。
@@ -47,12 +49,12 @@
 | 指标 | 数量 |
 | --- | --- |
 | 应用 Swift 文件 | 172 |
-| Swift 测试文件（unit / UI） | 53 / 1 |
-| 源码中的 XCTest 方法 | 656 |
+| Swift 测试文件（unit / UI） | 54 / 1 |
+| 源码中的 XCTest 方法 | 674 |
 | Services / Models / Views / Utilities / App-Core | 73 / 27 / 39 / 3 / 30 |
-| 应用 Swift 行数 | 30,447 |
-| 测试 Swift 行数 | 16,817 |
-| CHANGELOG release 段落 | 116 |
+| 应用 Swift 行数 | 31,094 |
+| 测试 Swift 行数 | 17,373 |
+| CHANGELOG release 段落 | 117 |
 
 ## 主要维护热点
 
@@ -65,8 +67,8 @@
 | SurgeRelay/Views/ModuleDetailView.swift | 702 |
 | SurgeRelay/Utilities/ModuleMetadataParser.swift | 689 |
 | SurgeRelay/Views/ModulePreviewViews.swift | 587 |
-| SurgeRelay/Services/PersistenceStore.swift | 498 |
-| SurgeRelay/AppModel+Modules.swift | 489 |
+| SurgeRelay/Services/PersistenceStore.swift | 524 |
+| SurgeRelay/AppModel+Modules.swift | 495 |
 | SurgeRelay/Models/RelayModule.swift | 486 |
 | SurgeRelay/Views/NativeQAPerformanceRecorder.swift | 482 |
 | SurgeRelay/Views/ModuleCodeEditorController.swift | 472 |
@@ -89,7 +91,7 @@ git diff --check
 node script/generate_project_status.mjs --check
 node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs
-VERSION=3.0.0 BUILD=116 ./script/check_release_configuration.sh
+VERSION=3.1.0 BUILD=117 ./script/check_release_configuration.sh
 
 ./script/run_swift_qa.sh
 

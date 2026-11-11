@@ -582,6 +582,23 @@ for (const [outputFormat, extension] of [['loon', 'plugin'], ['egern', 'sgmodule
 }
 form.outputFormat.value = 'surge';
 form.outputFormat.dispatch('change');
+vm.runInContext("state.moduleEditor.localOutputFoldersByClient={surge:['','Surge Folder'],loon:['','Loon Folder']}; state.moduleEditor.localPublishingByClient={surge:true,loon:false}", context);
+form.storageLocation.value = 'local';
+form.outputFormat.value = 'surge';
+form.outputFolder.value = 'Surge Folder';
+form.outputFormat.dispatch('change');
+assert.match(form.outputFolder.innerHTML, /Surge Folder/);
+form.outputFormat.value = 'loon';
+form.outputFormat.dispatch('change');
+assert.match(form.outputFolder.innerHTML, /Loon Folder/);
+assert.doesNotMatch(form.outputFolder.innerHTML, /Surge Folder/);
+assert.equal(form.outputFolder.value, '', 'changing clients clears an unavailable new-editor folder');
+assert.match(document.querySelector('#output-path-note').textContent, /Loon 本地存储尚未开启/);
+vm.runInContext("delete state.moduleEditor.localOutputFoldersByClient; delete state.moduleEditor.localPublishingByClient", context);
+form.storageLocation.value = 'both';
+form.outputFormat.value = 'surge';
+form.outputFolder.value = 'Local';
+form.outputFormat.dispatch('change');
 const originalSourceURL = form.sourceURL.value;
 form.sourceFormat.value = 'automatic';
 form.sourceURL.value = 'https://example.com/resource';

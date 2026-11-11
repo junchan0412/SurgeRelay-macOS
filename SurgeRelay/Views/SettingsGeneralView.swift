@@ -45,6 +45,13 @@ struct SettingsGeneralView: View {
                     .buttonStyle(.borderless)
                 }
             }
+            SettingsInfoRow("工作区迁移", icon: "arrow.right.doc.on.clipboard") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("配置目录只移动配置内容。完整工作区迁移包含缓存，可在“工作区与模板”中操作。")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Button("前往工作区…") { model.settingsPage = .workspaces }
+                }
+            }
             SettingsControlRow("软件更新", icon: "arrow.down.circle") {
                 Button("检查更新", systemImage: "arrow.clockwise") {
                     model.presentsUpdateChecker = true

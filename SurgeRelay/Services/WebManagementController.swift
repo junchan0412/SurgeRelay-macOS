@@ -58,6 +58,7 @@ struct WebCoreSnapshot: Sendable {
     let activity: WebActivitySnapshot
     let settings: AppSettings
     let localFolders: [String]
+    let localFoldersByClient: [ModuleOutputFormat: [String]]
     let githubFolders: [String]
     let historyCount: Int
     let recentHistory: [UpdateHistoryEntry]
@@ -149,7 +150,8 @@ final class WebManagementSnapshotSource {
 
     private static func captureCore(model: AppModel, revision: UInt64, activity: WebActivitySnapshot) -> WebCoreSnapshot {
         WebCoreSnapshot(modules: model.modules, moduleRevision: model.moduleRevision, activity: activity, settings: model.settings,
-            localFolders: model.localModuleOutputFolders, githubFolders: model.githubModuleOutputFolders,
+            localFolders: model.localModuleOutputFolders, localFoldersByClient: model.localModuleOutputFoldersByClient,
+            githubFolders: model.githubModuleOutputFolders,
             historyCount: model.updateHistory.count,
             recentHistory: model.updateHistory.prefix(4).map { entry in var summary = entry; summary.stageMetrics = nil; return summary },
             workspaceID: model.workspaceID.uuidString, workspaceName: model.workspaceName,

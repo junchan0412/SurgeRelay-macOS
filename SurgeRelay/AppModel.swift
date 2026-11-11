@@ -80,6 +80,7 @@ final class AppModel {
     var nativeToolResult: ConversionToolResult?
     var nativeToolError: String?
     var localModuleOutputFolders: [String] = [ModuleOutputFolder.root]
+    var localModuleOutputFoldersByClient: [ModuleOutputFormat: [String]] = [:]
     var githubModuleOutputFolders: [String] = [ModuleOutputFolder.root]
     var selectedPublishAttempt: SelectedPublishAttempt?
     var pendingSelectedPublishLintReview: SelectedPublishLintReview?
@@ -127,6 +128,8 @@ final class AppModel {
     @ObservationIgnored var githubModuleOutputFoldersConfiguration: GitHubSettings?
     @ObservationIgnored var localModuleOutputFoldersRootPath: String?
     @ObservationIgnored var localModuleOutputFoldersLastRefreshedAt: Date?
+    @ObservationIgnored var localModuleOutputFoldersRootPaths: [ModuleOutputFormat: String] = [:]
+    @ObservationIgnored var localModuleOutputFoldersLastRefreshes: [ModuleOutputFormat: Date] = [:]
     @ObservationIgnored static let automaticPublishDelaySeconds = 30
     @ObservationIgnored var cachedModuleSummary: ModuleCollectionSummary?
     @ObservationIgnored var cachedWebProjection: WebModuleProjectionCache?
@@ -184,8 +187,12 @@ final class AppModel {
                 return module
             },
 
-            localModuleDirectory: loadedSettings.localModuleDirectory
+            localModuleDirectory: loadedSettings.localModuleDirectory,
+            localModuleDirectories: Dictionary(uniqueKeysWithValues: ModuleOutputFormat.allCases.map {
+                ($0, loadedSettings.localModuleDirectory(for: $0))
+            })
         )
+        loadedSettings.separateLegacyLocalPublishedFiles(modules: loadedModules)
         let legacyGitHubToken = loadedSettings.githubToken.trimmingCharacters(in: .whitespacesAndNewlines)
         modules = loadedModules
         settings = loadedSettings

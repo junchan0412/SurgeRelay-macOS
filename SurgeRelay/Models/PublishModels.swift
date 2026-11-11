@@ -53,6 +53,7 @@ struct PublishPreview: Identifiable, Equatable, Encodable, Sendable {
     var reviewToken: UUID? = nil
     var localExpectedHashes: [String: String]? = nil
     var localReviewFingerprint: String? = nil
+    var localOutputFormat: ModuleOutputFormat? = nil
 
     var changedFileCount: Int {
         changedFiles.count + deletedFiles.count
