@@ -24,12 +24,12 @@ enum ModuleOutputFolder {
     static func relativePath(
         fileName: String,
         folder: String,
-        preservesExistingFileName: Bool = false
+        preservesExistingFileName: Bool = false,
+        outputFormat: ModuleOutputFormat = .surge
     ) -> String {
         let normalizedFolder = normalized(folder)
-        let normalizedFileName = preservesExistingFileName
-            ? FilenameSanitizer.existingSgmoduleName(from: fileName)
-            : FilenameSanitizer.sgmoduleName(from: fileName)
+        let normalizedFileName = FilenameSanitizer.outputFileName(from: fileName, format: outputFormat,
+            preservesExistingFileName: preservesExistingFileName)
         return [normalizedFolder, normalizedFileName].filter { !$0.isEmpty }.joined(separator: "/")
     }
 

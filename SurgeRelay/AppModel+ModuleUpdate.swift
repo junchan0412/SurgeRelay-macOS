@@ -62,8 +62,9 @@ extension AppModel {
                 return outcome()
             }
             let sourceURL = URL(string: module.updateSourceURL)
-            let nativeModule = sourceURL.map { module.sourceFormat.isNativeSurgeModule(for: $0) } ?? false
-            let engineChanged = !nativeModule && module.conversionEngineRevision != upstreamState.revision
+            let nativeModule = sourceURL.map { module.outputFormat.isNativeOutput(for: $0, sourceFormat: module.sourceFormat) } ?? false
+            let engineChanged = (!nativeModule && module.conversionEngineRevision != upstreamState.revision) ||
+                (module.lastConvertedOutputFormat != nil && module.lastConvertedOutputFormat != module.outputFormat)
             if hasCache || nativeModule {
                 do {
                     setWorkStage(sourceURL?.isFileURL == true ? .cache : .download, moduleID: module.id, moduleName: module.name)
@@ -113,7 +114,7 @@ extension AppModel {
                 module: module,
                 hasCache: hasCache,
                 updateGeneration: updateGeneration,
-                sourceData: nativeModule ? revisionSnapshot?.data : nil
+                sourceData: revisionSnapshot?.data
             )
             guard shouldContinueCurrentWork(generation: updateGeneration) else { return nil }
             guard let currentIndex = modules.firstIndex(where: { $0.id == module.id }),
@@ -122,8 +123,10 @@ extension AppModel {
                 return nil
             }
             setWorkStage(.cache, moduleID: module.id, moduleName: module.name)
+            let changesClient = module.lastConvertedOutputFormat != nil && module.lastConvertedOutputFormat != module.outputFormat
             let prepared = try await metrics.measure(.cache, reason: "准备有效缓存") {
-                try await fileStore.prepareConversion(result, id: module.id)
+                if changesClient { return (converted: result.content, effective: result.content, hasOverride: false) }
+                return try await fileStore.prepareConversion(result, id: module.id)
             }
             let effectiveContent = prepared.effective
             guard shouldContinueCurrentWork(generation: updateGeneration) else { return nil }
@@ -133,6 +136,10 @@ extension AppModel {
                 return nil
             }
             module = modules[latestIndex]
+            if changesClient {
+                module.overrideBaseHash = nil
+                module.hasOverrideConflict = false
+            }
             let convertedContent = prepared.converted
             let detectedIcon = await metrics.measure(.conversion, reason: "元数据整理") {
                 await processingWorker.iconURL(in: effectiveContent, relativeTo: module.updateSourceURL)
@@ -154,7 +161,8 @@ extension AppModel {
             )
             let cacheBytes = Int64(result.content.utf8.count + result.assets.reduce(0) { $0 + $1.data.count })
             try await metrics.measure(.cache, reason: prepared.hasOverride ? "提交缓存，保留手动覆盖" : "提交缓存", bytes: { _ in (nil, cacheBytes) }) {
-                try await fileStore.commitConversion(result, id: module.id)
+                try await fileStore.commitConversion(result, id: module.id, retiringOverride: changesClient,
+                    previousOutputFormat: module.lastConvertedOutputFormat ?? module.outputFormat)
             }
             guard shouldContinueCurrentWork(generation: updateGeneration) else { return nil }
             module = metadataPlan.module

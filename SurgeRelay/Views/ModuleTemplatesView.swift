@@ -24,7 +24,7 @@ struct ModuleTemplatesView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(template.name).fontWeight(.medium)
-                            Text(template.sourceFormat.title + (template.category.isEmpty ? "" : " · " + template.category))
+                            Text(template.sourceFormat.title + " → " + template.outputFormat.title + (template.category.isEmpty ? "" : " · " + template.category))
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()

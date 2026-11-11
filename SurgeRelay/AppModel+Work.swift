@@ -41,6 +41,7 @@ extension AppModel {
         foregroundWorkTask?.cancel()
         moduleUpdateTask?.cancel()
         updatePreparationTask?.cancel()
+        conversionToolTask?.cancel()
         localSourceSyncTask?.cancel()
         automaticUpdateTask?.cancel()
         if workActivity.kind == .automaticPublishing {

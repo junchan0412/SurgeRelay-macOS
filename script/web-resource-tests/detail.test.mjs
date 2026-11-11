@@ -13,6 +13,43 @@ function createDOMStub() {
   };
 }
 
+{
+  const queue = { innerHTML: '' };
+  const ui = createDOMStub();
+  ui.detail.querySelector = selector => selector === '#pending-module-saves' ? queue : null;
+  let finishHistory;
+  let historyRequests = 0;
+  const state = {
+    modules: [], workspace: {},
+    activity: { pendingModuleSaves: [
+      { id: 'first', name: '<First>', isActive: true },
+      { id: 'second', name: 'Second', errorMessage: '目标写入失败' }
+    ] }
+  };
+  const { controller, setState } = createController({ state, selectedID: 'activity', inject: {
+    ui, api: () => { historyRequests += 1; return new Promise(resolve => { finishHistory = resolve; }); }
+  } });
+  controller.setTab('preview');
+  controller.renderDetail(false);
+  assert.match(ui.detail.innerHTML, /id="pending-module-saves"/);
+  assert.match(ui.detail.innerHTML, /&lt;First&gt;/);
+  assert.ok(ui.detail.innerHTML.indexOf('&lt;First&gt;') < ui.detail.innerHTML.indexOf('Second'), 'queue retains submission order');
+  assert.match(ui.detail.innerHTML, /data-save-id="first" disabled/);
+  assert.match(ui.detail.innerHTML, /data-action="retry-module-save" data-save-id="second"/);
+  const updated = { ...state, activity: { pendingModuleSaves: [{ id: 'second', name: 'Second', isActive: true }] } };
+  setState(updated);
+  controller.patchLiveDetail(state, updated);
+  assert.match(queue.innerHTML, /正在保存/);
+  assert.doesNotMatch(queue.innerHTML, /First|重试/);
+  assert.equal(historyRequests, 1, 'queue-only state updates do not reload history');
+  setState({ ...updated, activity: { pendingModuleSaves: [] } });
+  controller.patchPendingModuleSaves();
+  assert.match(queue.innerHTML, /没有待保存的配置/);
+  finishHistory([]);
+  await Promise.resolve();
+  assert.match(ui.detail.innerHTML, /没有待保存的配置/, 'late history response uses the current queue');
+}
+
 function createController(overrides = {}) {
   let state = overrides.state || null;
   let selectedID = overrides.selectedID ?? null;

@@ -9,6 +9,7 @@ const ui = {
   list: document.querySelector('#module-list'),
   overview: document.querySelector('#overview-button'),
   history: document.querySelector('#history-button'),
+  tools: document.querySelector('#tools-button'),
   connection: document.querySelector('#connection-status'),
   detail: document.querySelector('#detail-content'),
   search: document.querySelector('#search-input'),
@@ -31,6 +32,7 @@ const ui = {
   latestUpdate: document.querySelector('#latest-update'),
   moduleDialog: document.querySelector('#module-dialog'),
   moduleDialogMessage: document.querySelector('#module-dialog-message'),
+  moduleDialogBusy: document.querySelector('#module-dialog-busy'),
   moduleForm: document.querySelector('#module-form'),
   iconURLPreview: document.querySelector('#icon-url-preview'),
   outputPathPreview: document.querySelector('#output-path-preview'),
@@ -89,6 +91,8 @@ const webFeedback = window.SurgeRelayWebFeedback;
 if (!webFeedback) throw new Error('web-feedback.js must load before app.js');
 
 const webPreview = window.SurgeRelayWebPreview;
+const webTools = window.SurgeRelayWebTools;
+if (!webTools) throw new Error('web-tools.js must load before app.js');
 if (!webPreview) throw new Error('web-preview.js must load before app.js');
 
 const webDetail = window.SurgeRelayWebDetail;
@@ -109,6 +113,7 @@ let latestReceivedRuntimeID = null;
 let receivedStateRevision = -1;
 let appliedActivityRevision = -1;
 const retiredRuntimeIDs = new Set();
+const pendingModuleSaveActions = new Set();
 let hasAppliedState = false;
 let workspaceQueue = Promise.resolve();
 let stateApplySequence = 0;
@@ -149,6 +154,10 @@ const previewController = webPreview.createWorkspacePreviewController({
   askConfirmation,
   showToast
 });
+const toolsController = webTools.createToolsController({
+  ui, api: (...args) => api(...args), copyText,
+  document, getState: () => state, getSelectedID: () => selectedID
+});
 const publishingController = webDetail.createPublishingController({
   ui, api: (...args) => api(...args), markup: webMarkup,
   openDialog, closeDialog, askConfirmation, showToast,
@@ -164,11 +173,13 @@ const detailController = webDetail.createDetailController({
   markup: webMarkup,
   logic: webLogic,
   previewController,
+  toolsController,
   api: (...args) => api(...args),
   document,
   formatDate,
   getState: () => state,
   getSelectedID: () => selectedID,
+  getPendingModuleSaveIDs: () => pendingModuleSaveActions,
   normalizeSelection: () => { normalizeSelection(); }
 });
 const renderDetail = (animate = true) => detailController.renderDetail(animate);
@@ -221,6 +232,7 @@ ui.refresh.addEventListener('click', updateAll);
 ui.cancelActivity.addEventListener('click', cancelCurrentWork);
 ui.overview?.addEventListener('click', () => selectItem('overview'));
 ui.history?.addEventListener('click', () => selectItem('activity'));
+ui.tools?.addEventListener('click', () => selectItem('tools'));
 ui.back.addEventListener('click', navigateBackToList);
 ui.advancedMaster.addEventListener('click', () => moduleEditor.animateAdvancedResize(ui.advancedMaster.getAttribute('aria-expanded') !== 'true'));
 ui.advancedOptions.addEventListener('click', event => {
@@ -235,6 +247,10 @@ ui.moduleForm.elements.sourceURL.addEventListener('input', () => {
   moduleEditor.scheduleNameLookup({ api, updateOutputPathPreview });
 });
 ui.moduleForm.elements.sourceFormat.addEventListener('change', moduleEditor.updateNativeModuleState);
+ui.moduleForm.elements.outputFormat.addEventListener('change', () => {
+  moduleEditor.updateNativeModuleState();
+  updateOutputPathPreview();
+});
 ui.moduleForm.elements.refreshIntervalMinutes?.addEventListener('change', moduleEditor.updateRefreshPolicy);
 ui.moduleForm.elements.name.addEventListener('input', event => {
   moduleEditor.handleNameInput(event.target.value);
@@ -338,6 +354,7 @@ function applyState(next, initial = false, renderCurrentDetail = false) {
   const changesWorkspace = hasAppliedState && (incomingID !== previousID || runtimeID !== currentRuntimeID);
   if (changesWorkspace) {
     workspaceSwitching = true; workspaceEpoch += 1; mobileListScrollY = 0;
+    pendingModuleSaveActions.clear();
     detailController.resetWorkspace(); publishingController.resetWorkspace(); sidebarController.resetWorkspace();
     resolveConfirmation(false);
     ui.moduleDialog.close?.(); ui.saveModule.disabled = false; moduleEditor.resetNameLookup('', false);
@@ -351,6 +368,7 @@ function applyState(next, initial = false, renderCurrentDetail = false) {
     const workspaceChangedByID = (next.workspace?.id || 'legacy-origin') !== (currentWorkspace?.id || 'legacy-origin');
     const switchedFromDisplayed = hasAppliedState && (workspaceChangedByID || runtimeID !== currentRuntimeID);
     await previewController.switchWorkspace(next.workspace, runtimeID);
+    toolsController.switchWorkspace(next.workspace, runtimeID);
     if (sequence !== stateApplySequence) return false;
     if (runtimeID === currentRuntimeID && revision != null && revision < appliedActivityRevision && state) {
       next = { ...next, activity: state.activity };
@@ -373,6 +391,7 @@ function applyState(next, initial = false, renderCurrentDetail = false) {
     const previous = state;
     const previousSelectedID = selectedID;
     state = next;
+    moduleEditor.updateBusyState(state.activity);
     if (initial) {
       const initialSelection = webState.resolveInitialSelection(next, {
         requestedModuleID: webState.moduleIDFromLocation(location),
@@ -411,6 +430,9 @@ function applyActivity(activity, context = {}) {
   const previousWorking = Boolean(state.activity?.isWorking);
   state = { ...state, activity };
   activityController.render();
+  moduleEditor.updateBusyState(activity);
+  detailController.patchPendingModuleSaves();
+  toolsController.patchStatus();
   // When a bulk update finishes, refresh module rows/details once.
   if (previousWorking && !activity.isWorking && context.source !== 'sse') {
     loadState(false, true);
@@ -462,6 +484,30 @@ async function handleDetailClick(event) {
   if (!action) return;
   const module = state.modules.find(item => item.id === selectedID);
   switch (action) {
+  case 'retry-module-save':
+  case 'cancel-module-save': {
+    const saveID = source.dataset.saveId;
+    if (source.disabled || pendingModuleSaveActions.has(saveID)) break;
+    const epoch = workspaceEpoch;
+    pendingModuleSaveActions.add(saveID);
+    source.disabled = true;
+    detailController.patchPendingModuleSaves();
+    try {
+      const operation = action === 'retry-module-save' ? 'retry' : 'cancel';
+      const result = await api(`/api/module-saves/${saveID}/${operation}`, { method: 'POST' });
+      if (epoch !== workspaceEpoch) break;
+      showToast(result.message);
+      await loadState(false, false);
+    } catch (error) { if (epoch === workspaceEpoch) showToast(error.message, true); }
+    finally {
+      if (epoch === workspaceEpoch) {
+        pendingModuleSaveActions.delete(saveID);
+        detailController.patchPendingModuleSaves();
+        source.disabled = false;
+      }
+    }
+    break;
+  }
   case 'version-history': if (module) await publishingController.openVersions(module); break;
   case 'publish-selected': publishingController.openSelected(module?.id || null); break;
   case 'publish-github': await publishingController.openGitHub(); break;
@@ -526,7 +572,7 @@ async function handleDetailChange(event) {
 
 function selectItem(id, pushHistory = true) {
   if (!state) return;
-  if (!['overview', 'activity'].includes(id) && !state.modules.some(module => module.id === id)) id = fallbackSelection();
+  if (!['overview', 'activity', 'tools'].includes(id) && !state.modules.some(module => module.id === id)) id = fallbackSelection();
   if (!id) { showModuleList(pushHistory); return; }
   const cameFromList = mobileLayout.matches && !ui.body.classList.contains('has-selection');
   if (cameFromList) mobileListScrollY = window.scrollY;
@@ -637,7 +683,8 @@ async function saveModule(event) {
     await loadState(false, true);
   } catch (error) {
     if (epoch !== workspaceEpoch) return;
-    ui.moduleDialogMessage.textContent = error.message;
+    ui.moduleDialogMessage.textContent = [409, 412].includes(error.status)
+      ? `${error.message} 当前修改仍保留在编辑器中。` : error.message;
     ui.moduleDialogMessage.hidden = false;
   }
   finally { if (epoch === workspaceEpoch) ui.saveModule.disabled = false; }

@@ -3,6 +3,111 @@ import XCTest
 @testable import SurgeRelay
 
 final class ModuleVersionHistoryTests: XCTestCase {
+    func testIdenticalSurgeAndLoonTextRetainsSeparateVersionFormats() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = ModuleFileStore(cacheDirectory: root.appending(path: "Cache"), configurationDirectory: root.appending(path: "Config"))
+        let id = UUID()
+        let content = "[Rule]\nFINAL,DIRECT\n"
+        let source = URL(string: "https://example.org/Rules.plugin")!
+        try await store.commitConversion(ConversionResult(content: content, requestURL: source, outputFormat: .surge), id: id)
+        let firstValue = try await store.recordCurrentVersion(id: id, reason: .current, outputFormat: .loon)
+        let first = try XCTUnwrap(firstValue)
+        XCTAssertEqual(first.outputFormat, .surge, "Snapshot metadata takes precedence over a fallback")
+        try await store.commitConversion(ConversionResult(content: content, requestURL: source, outputFormat: .loon), id: id)
+        let secondValue = try await store.recordCurrentVersion(id: id, reason: .current)
+        let second = try XCTUnwrap(secondValue)
+        XCTAssertEqual(second.outputFormat, .loon)
+        XCTAssertEqual(first.fingerprint, second.fingerprint)
+        XCTAssertNotEqual(first.id, second.id)
+        let versions = try await store.moduleVersions(id: id)
+        XCTAssertEqual(Set(versions.compactMap(\.outputFormat)), [.surge, .loon])
+        let restored = try await store.restoreModuleVersion(id: id, versionID: first.id, expectedFingerprint: second.fingerprint)
+        let storedFormat = try await store.convertedOutputFormat(id: id)
+        XCTAssertEqual(restored.record.outputFormat, .surge)
+        XCTAssertEqual(storedFormat, .surge)
+        let legacyID = UUID()
+        try await store.writeComponent(content, id: legacyID)
+        let legacyDefault = try await store.currentVersionContent(id: legacyID)
+        XCTAssertEqual(legacyDefault?.record.outputFormat, .surge)
+        let legacyFallback = try await store.recordCurrentVersion(id: legacyID, reason: .current, outputFormat: .loon)
+        XCTAssertEqual(legacyFallback?.outputFormat, .loon)
+    }
+
+    func testInterruptedRestoreRecoversFormatTogetherWithText() async throws {
+        for phase in [ModuleRestorePhase.prepared, .overrideInstalled, .snapshotInstalled, .metadataPending, .committed, .finalized] {
+            let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let cache = root.appending(path: "Cache")
+            let config = root.appending(path: "Config")
+            let id = UUID()
+            let source = URL(string: "https://example.org/Demo.plugin")!
+            let stash = "name: Stash\nhttp:\n  mitm:\n    - example.org\n"
+            let loon = "#!name=Loon\n[MITM]\nhostname = example.org\n"
+            let store = ModuleFileStore(cacheDirectory: cache, configurationDirectory: config)
+            try await store.commitConversion(ConversionResult(content: stash, requestURL: source, outputFormat: .stash), id: id)
+            let savedValue = try await store.recordCurrentVersion(id: id, reason: .current)
+            let saved = try XCTUnwrap(savedValue)
+            try await store.commitConversion(ConversionResult(content: loon, requestURL: source, outputFormat: .loon), id: id)
+            let currentValue = try await store.currentVersionContent(id: id)
+            let current = try XCTUnwrap(currentValue)
+            let interrupted = ModuleFileStore(cacheDirectory: cache, configurationDirectory: config, restoreInterruption: {
+                if $0 == phase { throw VersionRestoreCrash.interrupted }
+            })
+            do { _ = try await interrupted.restoreModuleVersion(id: id, versionID: saved.id, expectedFingerprint: current.record.fingerprint) }
+            catch {}
+            let reopened = ModuleFileStore(cacheDirectory: cache, configurationDirectory: config)
+            let recovered = try await reopened.readComponent(id: id)
+            let format = try await reopened.convertedOutputFormat(id: id)
+            let committed = phase == .committed || phase == .finalized
+            XCTAssertEqual(recovered, committed ? stash : loon, phase.rawValue)
+            XCTAssertEqual(format, committed ? .stash : .loon, phase.rawValue)
+            let state = try await reopened.currentVersionState(id: id)
+            XCTAssertEqual(state.content?.record.outputFormat, format)
+        }
+    }
+
+    func testLegacyRestoreBundleWithoutFormatMetadataStillRecovers() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cache = root.appending(path: "Cache")
+        let config = root.appending(path: "Config")
+        let id = UUID()
+        let store = ModuleFileStore(cacheDirectory: cache, configurationDirectory: config)
+        try await store.commitConversion(conversion("old", id: id), id: id)
+        let savedValue = try await store.recordCurrentVersion(id: id, reason: .current)
+        let saved = try XCTUnwrap(savedValue)
+        let versionURL = config.appending(path: "ModuleVersions/\(id.uuidString.lowercased())/\(saved.id.uuidString.lowercased())/Version.json")
+        var versionRecord = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: versionURL)) as? [String: Any])
+        versionRecord.removeValue(forKey: "outputFormat")
+        try JSONSerialization.data(withJSONObject: versionRecord).write(to: versionURL)
+        let legacyVersion = try await store.readModuleVersion(id: id, versionID: saved.id)
+        XCTAssertNil(legacyVersion.record.outputFormat)
+        try await store.commitConversion(conversion("new", id: id), id: id)
+        let current = try await store.currentVersionState(id: id)
+        let interrupted = ModuleFileStore(cacheDirectory: cache, configurationDirectory: config, restoreInterruption: {
+            if $0 == .prepared { throw VersionRestoreCrash.interrupted }
+        })
+        do { _ = try await interrupted.restoreModuleVersion(id: id, versionID: saved.id, expectedFingerprint: current.fingerprint) }
+        catch {}
+        let transactions = config.appending(path: "RestoreTransactions/\(id.uuidString.lowercased())")
+        let transaction = try XCTUnwrap(FileManager.default.contentsOfDirectory(at: transactions, includingPropertiesForKeys: nil).first)
+        for name in ["Old", "New"] {
+            let bundle = transaction.appending(path: name)
+            let url = bundle.appending(path: "Bundle.json")
+            var identity = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+            identity.removeValue(forKey: "outputFormat")
+            try JSONSerialization.data(withJSONObject: identity).write(to: url)
+            try FileManager.default.removeItem(at: bundle.appending(path: "OutputFormat.json"))
+        }
+        try FileManager.default.removeItem(at: cache.appending(path: "Snapshots/\(id.uuidString.lowercased())/OutputFormat.json"))
+        let reopened = ModuleFileStore(cacheDirectory: cache, configurationDirectory: config)
+        let recovered = try await reopened.readComponent(id: id)
+        XCTAssertTrue(recovered.contains("new.example"))
+        let state = try await reopened.currentVersionState(id: id)
+        XCTAssertEqual(state.content?.record.outputFormat, .surge)
+    }
+
     func testConversionArchivesPreviousTextAndAssetsBeforeReplacement() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

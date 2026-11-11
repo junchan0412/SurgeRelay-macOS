@@ -1,5 +1,7 @@
 # 分阶段指标受控基准（2026-10-02）
 
+> 历史基线：结果仅对应当时的 fixture/build，当前验收与计划见 [当前项目报告](../CURRENT_PROJECT_REPORT.md)。
+
 本次测量使用真实本机 HTTP、生产代码中的 SurgeModuleSanitizer、实际独立 JSC helper 进程、atomic 缓存和本地发布文件写入。它是隔离的阶段测试，不是公网 Script-Hub、完整 AppModel/UI 或 GitHub 发布的端到端性能结果。helper 执行固定字符串转换脚本，输入以字面量传入；没有放宽 HTTP bridge 的私网限制，也没有访问外网。
 
 ## 环境与口径
@@ -33,8 +35,8 @@
 
 分阶段 p95、CPU、字节、helper 执行次数保存在原始 JSON：
 
-- [metrics on](stage-metrics-on-2026-10-02.json)
-- [metrics off](stage-metrics-off-2026-10-02.json)
+- [metrics on](../archive/performance-raw-2026-10/stage-metrics-on-2026-10-02.json)
+- [metrics off](../archive/performance-raw-2026-10/stage-metrics-off-2026-10-02.json)
 
 原生处理/缓存命中主要是本机请求与文件操作；helper 格包含进程启动、IPC 和真实 JSC 执行。不同路径的倍数不能当作真实 Script-Hub 转换的加速或减速结论。真实公网下载与真实 GitHub 发布仍需可控公网 fixture、专用仓库和单独授权测量。
 

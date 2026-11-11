@@ -131,7 +131,7 @@ enum LocalModuleMetadataReader {
                 relativePath: relativePath,
                 rootDirectoryPath: trimmedRoot
               ),
-              candidate.pathExtension.lowercased() == "sgmodule" else {
+              LocalModuleScanner.supportedFileExtensions.contains(candidate.pathExtension.lowercased()) else {
             return nil
         }
         if FileManager.default.fileExists(atPath: candidate.path) { return candidate }
@@ -146,7 +146,7 @@ enum LocalModuleMetadataReader {
         }
         let expectedIdentity = fileNameIdentity(candidate.lastPathComponent)
         let matches = siblings.filter { url in
-            url.pathExtension.lowercased() == "sgmodule"
+            url.pathExtension.lowercased() == candidate.pathExtension.lowercased()
                 && fileNameIdentity(url.lastPathComponent) == expectedIdentity
                 && (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
         }
@@ -179,6 +179,7 @@ struct LocalModuleScanCandidate: Identifiable, Hashable, Sendable {
     var scriptHubSubscription: ScriptHubSubscriptionInfo?
     var sourceContentHash: String?
     var rootDirectoryPath: String? = nil
+    var outputFormat: ModuleOutputFormat = .surge
 
     var id: String { relativePath }
 
@@ -191,7 +192,7 @@ struct LocalModuleScanCandidate: Identifiable, Hashable, Sendable {
     }
 
     var relationshipSummary: String {
-        "\(ModuleStorageLocation.local.title) · \(initialSource.title)"
+        "\(ModuleStorageLocation.local.title) · \(initialSource.title) · \(outputFormat.title)"
     }
 }
 
@@ -211,9 +212,23 @@ struct LocalModuleImportSourceSnapshot: Sendable {
     var candidate: LocalModuleScanCandidate
     var fileURL: URL
     var data: Data
+    var content: String
 }
 
 enum LocalModuleScanner {
+    static let supportedFileExtensions: Set<String> = ["sgmodule", "module", "plugin", "lpx", "conf", "stoverride"]
+
+    private static func outputFormat(for fileURL: URL, subscription: ScriptHubSubscriptionInfo?) -> ModuleOutputFormat? {
+        switch fileURL.pathExtension.lowercased() {
+        case "sgmodule", "module":
+            return subscription?.target == "shadowrocket-module" ? .shadowrocket : .surge
+        case "plugin", "lpx": return .loon
+        case "conf": return .quantumultX
+        case "stoverride": return subscription == nil ? nil : .stash
+        default: return nil
+        }
+    }
+
     static func snapshotForImport(
         _ candidate: LocalModuleScanCandidate,
         rootDirectoryPath: String
@@ -226,7 +241,7 @@ enum LocalModuleScanner {
         guard let fileURL = LocalSourcePathResolver.fileURL(
             relativePath: candidate.localStorageRelativePath,
             rootDirectoryPath: rootDirectoryPath
-        ), fileURL.pathExtension.lowercased() == "sgmodule",
+        ), supportedFileExtensions.contains(fileURL.pathExtension.lowercased()),
               (try? fileURL.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true,
               let relativePath = LocalSourcePathResolver.relativePath(
                 forSourceURL: fileURL.absoluteString,
@@ -244,14 +259,19 @@ enum LocalModuleScanner {
         }
         var refreshed = candidate
         let subscription = ModuleMetadataParser.scriptHubSubscription(in: content)
+        guard let outputFormat = outputFormat(for: fileURL, subscription: subscription) else {
+            throw RelayError.invalidOutput("Stash 文件缺少可识别的 Script-Hub 订阅来源，请重新扫描")
+        }
         refreshed.relativePath = relativePath
         refreshed.localStorageRelativePath = relativePath
         refreshed.sourceURL = subscription?.originalURL ?? fileURL.absoluteString
-        refreshed.sourceFormat = subscription?.sourceFormat ?? .surge
+        refreshed.sourceFormat = subscription?.sourceFormat ?? ModuleSourceFormat.definitiveFormat(for: fileURL)
+            ?? (outputFormat == .quantumultX ? .quantumultX : .automatic)
+        refreshed.outputFormat = outputFormat
         refreshed.scriptHubSubscription = subscription
         refreshed.scriptHubOptions = subscription?.options ?? ScriptHubOptions()
         refreshed.sourceContentHash = subscription == nil ? data.sha256String : nil
-        return LocalModuleImportSourceSnapshot(candidate: refreshed, fileURL: fileURL, data: data)
+        return LocalModuleImportSourceSnapshot(candidate: refreshed, fileURL: fileURL, data: data, content: content)
     }
 
     static func candidates(
@@ -285,7 +305,8 @@ enum LocalModuleScanner {
         }
 
         var existingSources = Set(existingModules.flatMap {
-            [$0.updateSourceURL, $0.sourceURL].map(ModuleSourceIdentity.canonicalValue)
+            let output = $0.outputFormat.rawValue
+            return [$0.updateSourceURL, $0.sourceURL].map { output + ":" + ModuleSourceIdentity.canonicalValue(for: $0) }
         })
         var existingPaths = Set(existingModules.map { LocalSourcePathResolver.pathIdentity($0.publishedRelativePath) })
         existingPaths.formUnion(existingModules.compactMap { $0.localStorageRelativePath }.map(LocalSourcePathResolver.pathIdentity))
@@ -310,7 +331,7 @@ enum LocalModuleScanner {
         }
         for fileURL in fileURLs {
             let standardizedURL = fileURL.standardizedFileURL.resolvingSymlinksInPath().standardizedFileURL
-            guard standardizedURL.pathExtension.lowercased() == "sgmodule",
+            guard supportedFileExtensions.contains(standardizedURL.pathExtension.lowercased()),
                   (try? standardizedURL.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else {
                 continue
             }
@@ -380,8 +401,15 @@ enum LocalModuleScanner {
                 continue
             }
             let subscription = ModuleMetadataParser.scriptHubSubscription(in: content)
+            guard let outputFormat = outputFormat(for: standardizedURL, subscription: subscription) else {
+                skipped.append(LocalModuleScanSkippedFile(
+                    relativePath: normalizedRelativePath,
+                    reason: "Stash 文件缺少可识别的 Script-Hub 订阅来源"
+                ))
+                continue
+            }
             let sourceURL = subscription?.originalURL ?? standardizedURL.absoluteString
-            let sourceKey = ModuleSourceIdentity.canonicalValue(for: sourceURL)
+            let sourceKey = outputFormat.rawValue + ":" + ModuleSourceIdentity.canonicalValue(for: sourceURL)
             guard existingSources.insert(sourceKey).inserted else {
                 skipped.append(LocalModuleScanSkippedFile(
                     relativePath: normalizedRelativePath,
@@ -392,9 +420,10 @@ enum LocalModuleScanner {
             let components = normalizedRelativePath.split(separator: "/").map(String.init)
             let outputFileName = components.last ?? standardizedURL.lastPathComponent
             let outputFolder = components.dropLast().joined(separator: "/")
-            let fallbackName = FilenameSanitizer.baseName(from: outputFileName)
+            let fallbackName = FilenameSanitizer.baseName(from: (outputFileName as NSString).deletingPathExtension)
                 .replacingOccurrences(of: "-", with: " ")
-            let sourceFormat = subscription?.sourceFormat ?? .surge
+            let sourceFormat = subscription?.sourceFormat ?? ModuleSourceFormat.definitiveFormat(for: standardizedURL)
+                ?? (outputFormat == .quantumultX ? .quantumultX : .automatic)
             let sourceContentHash = subscription == nil ? data.sha256String : nil
             values.append(LocalModuleScanCandidate(
                 relativePath: normalizedRelativePath,
@@ -402,13 +431,14 @@ enum LocalModuleScanner {
                 sourceURL: sourceURL,
                 sourceFormat: sourceFormat,
                 name: ModuleMetadataParser.displayName(in: content) ?? fallbackName,
-                outputFileName: FilenameSanitizer.existingSgmoduleName(from: outputFileName),
+                outputFileName: outputFileName,
                 category: ModuleMetadataParser.category(in: content) ?? subscription?.category ?? "",
                 outputFolder: ModuleOutputFolder.normalized(outputFolder),
                 scriptHubOptions: subscription?.options ?? ScriptHubOptions(),
                 scriptHubSubscription: subscription,
                 sourceContentHash: sourceContentHash,
-                rootDirectoryPath: root.path
+                rootDirectoryPath: root.path,
+                outputFormat: outputFormat
             ))
         }
 

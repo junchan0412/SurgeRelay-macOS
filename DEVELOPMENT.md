@@ -3,14 +3,17 @@
 This document records the project conventions needed to maintain this fork.
 For the current version, capability summary, code metrics, optimization order, and release checklist, see the generated `DEVELOPMENT_STATUS.md`. Refresh it with `node script/generate_project_status.mjs`; do not edit it manually. Git/upstream snapshots belong in `docs/UPSTREAM_SYNC.md` so the generated file remains reproducible after commits and tag checkouts.
 
-## 2.0 Architecture
+## Current Architecture
 
-The 2.0 refactor and reproducible validation are described in `docs/RELAY_2_0.md`.
+Current assessment, cleanup records and future acceptance criteria are in [docs/CURRENT_PROJECT_REPORT.md](docs/CURRENT_PROJECT_REPORT.md); the documentation index is [docs/README.md](docs/README.md). The original 2.0 refactor and its historical validation are archived in `docs/archive/legacy-audits-2026-10/RELAY_2_0.md`; current behavior is defined by the code and this guide.
 
 - `ModuleUpdatePipeline` bounds concurrency to four and restores source order. `AppModel+Updates` owns admission, cancellable preparation, aggregation and persistence; `AppModel+ModuleUpdate` owns one module's refresh. Keep cancellation and generation checks before cache/model commits.
 - `EmbeddedScriptHubEngine` schedules at most four bundled `SurgeRelayScriptWorker` processes. Keep the 90-second deadline, cancellation/kill cleanup, raw-file size limits and worker-only JavaScript execution. The worker target must remain embedded in Contents/Helpers and signed before the parent app during release.
-- `BoundedHTTPClient` reuses URLSession connections, limits bytes before appending, and propagates cancellation. Native conversion accepts the bytes already read by `SourceRevisionService`.
-- `ModuleFileStore.commitConversion` stages `Content.cache` and `Assets` together and atomically replaces `Cache/Snapshots/<module-id>`. Legacy component/asset caches remain readable; manual overrides stay outside the snapshot. Normalize enumerated URLs before deriving relative paths on macOS (`/var` and `/private/var`).
+- `BoundedHTTPClient` reuses URLSession connections, limits bytes before appending, and propagates cancellation. Conversion reuses bytes read by `SourceRevisionService`; the helper receives local/pasted input through `source.txt` bound to the original URL.
+- `ModuleOutputFormat` is independent of source format and storage targets. Each module produces one client output; source identity is unique per output client. Preserve default Surge decoding for legacy modules, drafts and templates.
+- `ModuleFileStore.commitConversion` stages `Content.cache`, `OutputFormat.json` and `Assets` together and atomically replaces `Cache/Snapshots/<module-id>`. Keep cache storage format-neutral; sanitize only Surge-family content in the format-aware conversion/preview path. Legacy component/asset caches remain readable; manual overrides stay outside the snapshot. A client change archives old overrides and retires them only after new output commits. Normalize enumerated URLs before deriving relative paths on macOS (`/var` and `/private/var`).
+- `ConversionToolService` owns standalone rule/script conversion and actual Script-Hub query contracts. `AppModel+ConversionTools` owns work admission, required engine preparation, cancellation and workspace retirement; results do not register modules or publish files. Native/Web tools keep drafts and ignore results from old input generations. Rule y releases commented rules; script conversion does not expose rule x/y filters.
+- `ModuleVersionRecord.outputFormat` and restore bundles retain actual output format. Deduplicate history using the existing content/assets fingerprint plus direct format comparison; preserve existing content fingerprint values. Internal snapshot-format reads must not re-enter restore recovery.
 - Module summaries invalidate on `moduleRevision`; `WebModuleProjectionCache` also accounts for settings. The progress endpoint builds activity only. Asset fingerprints must remain byte-compatible with existing SHA-256 values.
 - `WorkspaceOverviewView`, `ActivityHistoryView`, `ModuleSidebarStatusCard` and `SettingsPage` define the new workspace. Keep list filtering/grouping off the main actor and keep editors lazy. Native preview drafts are debounced to preview-drafts.json off the main actor, retained across selection and app restarts, and flushed before ordinary app termination. Restored drafts must compare their saved-text baseline before overwriting current content.
 - Web navigation supports `overview`, `activity` and module IDs. `web-state.js` owns connection timers and lifecycle; `web-preview.js` owns drafts and response generations. Hidden mobile panes must be inert.
@@ -63,7 +66,7 @@ Keep these two axes separate:
 
 Resolve `#SUBSCRIBED` metadata from converted content, never from a user override. When it is present and valid, classify the module as subscribed and use `originalURL` for updates. When it is absent, classify an HTTP/HTTPS source as a remote source and only classify a local file as self-authored; do not label a remote update address as self-authored. A local file can restore a remote `originalURL` while still being managed as a local module. For local modules, preserve `localStorageRelativePath` whenever it is known. For a `file://` source, this is the source location and may differ from an explicitly chosen output path; preserve that choice across restarts. For a remote/subscribed local module it is the physical output location.
 
-Treat local physical module metadata as authoritative for initial-source discovery and repair. Once a valid `#SUBSCRIBED originalURL` has been discovered, a later upstream/cache payload without that marker must not erase it: native upstream modules commonly omit the Script-Hub wrapper comment. Clear persisted subscription metadata only when the user changes the registered source. When `localStorageRelativePath` conflicts with a persisted GitHub storage value, the local path wins; when the exact path is missing, metadata recovery may uniquely match a sibling `.sgmodule` after normalizing spaces and hyphens, then persist the real relative path.
+Treat local physical module metadata as authoritative for initial-source discovery and repair. Once a valid `#SUBSCRIBED originalURL` has been discovered, a later upstream/cache payload without that marker must not erase it: native upstream modules commonly omit the Script-Hub wrapper comment. Clear persisted subscription metadata when the user changes the registered source or conversion target. When `localStorageRelativePath` conflicts with a persisted GitHub storage value, the local path wins; when the exact path is missing, metadata recovery may uniquely match a sibling of the same extension after normalizing spaces and hyphens, then persist the real relative path. Scan `.sgmodule/.module`, `.plugin/.lpx`, `.conf` and subscribed `.stoverride` without downloading or publishing during import.
 
 Every registered module is an independent output; legacy `publishesStandalone` and aggregate membership flags are ignored when decoding and are no longer encoded. Sidebar groups and relationship labels must respect `storageTargets` (local, GitHub, or both) and must not reintroduce a derived “remote module” category.
 
@@ -104,7 +107,7 @@ Diagnostic report assembly belongs in `DiagnosticReportBuilder`. AppModel should
 
 Preview content reads belong in `ModulePreviewContentProvider`. Keep cache lookup, local Surge source fallback, argument materialization, and metadata application there. Preview edit state planning belongs in `ModulePreviewEditPlanner`: no-change detection, override base-hash refresh, conflict clearing, and save/restore/accept status text should stay there so AppModel only performs file writes, persistence, and output rebuilds.
 
-Native module-editor submissions use the workspace-owned pending-module-saves.json queue. Freeze the draft at submission, persist before dismissing the editor, and drain serially after active work and startup finish. Retain failures for retry, preserve stable IDs for replayed additions, and keep direct/Web mutation admission checks intact. Workspace retirement stops the worker and preserves pending intents in the old workspace.
+Native module-editor submissions use the workspace-owned pending-module-saves.json queue. Freeze the draft at submission, persist before dismissing the editor, and drain serially after active work and startup finish. A failed submission must remove its intent from memory and replace the writer's retry snapshot. Retain execution failures for retry, preserve stable IDs for replayed additions, and require user retry or cancellation for intents recovered from historical backups. Keep direct/Web mutation admission checks intact. Workspace retirement stops the worker and preserves pending intents in the old workspace. Web activity snapshots expose the ordered queue without rebuilding module projections; retry/cancel routes use the current workspace header and reject the active item.
 
 Module moves persist root-scoped old-path/hash retirements on the owning module. Write the new module and its assets first, then delete only unchanged, correctly marked retired files. Never use the full selected-publish stale list as a move cleanup list. Keep failed retirements for retry and protect registered source paths and other module owners. Default editor names come from source metadata, including local sources and unwrapped subscriptions; preserve manual edits and await lookup on immediate submission.
 
@@ -225,6 +228,14 @@ SURGE_RELAY_RUN_UI_QA=1 ./script/build_and_run.sh --verify
 ```
 
 UI QA 模式使用临时配置与本地模块目录，并暂停启动期和编辑后的自动更新。UI tests 使用 `/private/tmp/SurgeRelayUIQA/` 下的独立目录，runner 的测试专用 entitlement 仅允许写入这个目录，避免被测应用无法读取 runner 私有容器内的数据。测试按 runner 同级路径启动新构建产物并核对实际 bundle 路径。
+
+PR 与 `main` push 由 `.github/workflows/qa.yml` 的 `Swift and Web regression` 检查执行 release preflight（含 Web 和自动状态页）、隔离 fixture 与 Swift 单元回归。分支保护可将该检查设为 required status check。单元回归使用临时 QA 配置、Release 与 ad-hoc 签名，保留日志、xcresult、执行数和跳过原因，无需发布私钥。本地执行同一入口：
+
+```bash
+./script/run_swift_qa.sh
+```
+
+默认结果目录为已忽略的 `build/qa-swift/run.*`，CI artifact 保留 14 天。
 
 原生设置、模块编辑与详情 smoke test 使用独立 scheme，避免系统 UI automation 权限影响日常单元测试：
 

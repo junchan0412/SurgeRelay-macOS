@@ -46,7 +46,7 @@ enum ManagedPublishedFile {
     }
 
     static func requiresInlineMarker(_ relativePath: String) -> Bool {
-        ["sgmodule", "module"].contains((relativePath as NSString).pathExtension.lowercased())
+        ["sgmodule", "module", "plugin", "conf", "stoverride"].contains((relativePath as NSString).pathExtension.lowercased())
     }
 
     static func isManaged(_ data: Data, relativePath: String) -> Bool {

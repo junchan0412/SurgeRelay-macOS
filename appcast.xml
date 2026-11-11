@@ -3,6 +3,27 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>3.0.0</title>
+            <pubDate>Thu, 12 Nov 2026 00:02:08 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v3.0.0</link>
+            <sparkle:version>116</sparkle:version>
+            <sparkle:shortVersionString>3.0.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 3.0.0
+
+
+- 多客户端工作台：支持 Surge、Loon、Egern、Quantumult X、Stash 和 Shadowrocket 输出。来源、输出客户端与本地/GitHub 存放分别管理，同一来源可维护不同客户端版本；原生/Web 编辑器、详情、预览、模板与输出文件名同步支持客户端选择。
+- 转换工具：新增原生/Web 规则集和独立脚本转换，支持粘贴文本、HTTP/HTTPS 地址及本地文件，提供参数、复制、保存/下载和取消。规则支持 QX、Surge/Loon、Clash payload、域名和 IPv4/IPv6 CIDR；QX 输出带策略的纯过滤列表，Stash 输出 YAML payload。
+- 脚本兼容：QX 脚本与通用客户端脚本支持相应转换，保留标准 HTTP 方法、status/statusCode、存储和完成回调；脚本资源请求失败与 helper HTTP 错误会阻止无效内容发布。不支持的 QX 配置项给出明确错误。
+- 缓存与恢复：缓存快照、历史及恢复事务保留实际输出格式；切换客户端后重新生成输出，旧手动覆盖先归档、新输出提交成功后移出当前缓存。保持 YAML/QX 文本与脚本资源完整，兼容旧配置、模板和恢复记录。
+- 保存与导入：失败提交撤回，历史备份恢复的保存请求需核对后重试；Web 展示保存队列并支持重试/取消，忙碌时保留草稿。本地扫描扩展到多格式，保留合法文件名并从当前磁盘字节建立缓存。
+- 回归与发布：新增 PR/main push 的隔离 Swift/Web 回归、实际 Script-Hub 模块矩阵与规则/脚本工具矩阵。650 项 Release 测试通过，2 项可选性能测试跳过；24 项模块转换与 38 项工具转换矩阵通过。
+
+已知范围：Egern采用Script-Hub当前的Surge兼容模块；原始Stash覆写需订阅来源才能重新登记。最低系统仍为macOS 15.0，实际客户端导入与macOS 15运行验收需单独执行。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v3.0.0/Surge-Relay-3.0.0.app.zip" length="13219915" type="application/zip" sparkle:edSignature="acvfv/OZKS9NtkxEquw1Sm1jUYY0mNrWvUwY4Vl24LE28XnsWw8xI6Yj/gt8TCA/lJrlR/42Vta2nhFma5p2Dg=="/>
+        </item>
+        <item>
             <title>2.5.0</title>
             <pubDate>Sun, 25 Oct 2026 18:41:31 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v2.5.0</link>

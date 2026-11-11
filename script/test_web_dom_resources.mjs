@@ -15,6 +15,7 @@ const stateSource = readFileSync(new URL('SurgeRelay/WebResources/web-state.js',
 const editorSource = readFileSync(new URL('SurgeRelay/WebResources/web-editor.js', root), 'utf8');
 const feedbackSource = readFileSync(new URL('SurgeRelay/WebResources/web-feedback.js', root), 'utf8');
 const previewSource = readFileSync(new URL('SurgeRelay/WebResources/web-preview.js', root), 'utf8');
+const toolsSource = readFileSync(new URL('SurgeRelay/WebResources/web-tools.js', root), 'utf8');
 const detailSource = readFileSync(new URL('SurgeRelay/WebResources/web-detail.js', root), 'utf8');
 const appSource = readFileSync(new URL('SurgeRelay/WebResources/app.js', root), 'utf8');
 
@@ -22,16 +23,16 @@ const requiredIDs = [
   'module-list', 'detail-content', 'search-input', 'clear-search', 'search-status',
   'filter-row', 'failure-filter', 'add-button', 'refresh-button', 'mobile-back', 'mobile-title', 'workspace-name', 'mobile-workspace-name', 'activity-status',
   'activity-stages', 'activity-percent', 'progress-track', 'progress-fill', 'activity-cancel', 'latest-update',
-  'module-dialog', 'module-dialog-message', 'module-form', 'icon-url-preview',
+  'module-dialog', 'module-dialog-message', 'module-dialog-busy', 'module-form', 'icon-url-preview',
   'output-path-preview', 'output-path-note', 'dialog-title', 'save-module-button',
   'advanced-master', 'advanced-master-content', 'advanced-options', 'native-module-note',
-  'confirm-dialog', 'confirm-title', 'confirm-message', 'confirm-cancel', 'confirm-accept',
+  'confirm-dialog', 'confirm-title', 'confirm-message', 'confirm-cancel', 'confirm-accept', 'tools-button',
   'operation-dialog', 'operation-title', 'operation-content', 'operation-close', 'custom-refresh-row', 'toast'
 ];
 
 const requiredFormNames = [
   'name', 'category', 'iconURL', 'storageLocation', 'outputFolder', 'outputFileName',
-  'sourceURL', 'sourceFormat', 'refreshIntervalMinutes', 'customRefreshIntervalMinutes'
+  'sourceURL', 'sourceFormat', 'outputFormat', 'refreshIntervalMinutes', 'customRefreshIntervalMinutes'
 ];
 
 for (const id of requiredIDs) {
@@ -228,6 +229,7 @@ class FakeDocument {
       field.checked = name === 'publishesStandalone';
       if (name === 'storageLocation') field.value = 'gitHub';
       if (name === 'sourceFormat') field.value = 'automatic';
+      if (name === 'outputFormat') field.value = 'surge';
       form.elements[name] = field;
       if (checkboxFieldNames.has(name)) {
         this.switchRows.set(name, new FakeElement(this, { tagName: 'label' }));
@@ -259,7 +261,7 @@ class FakeDocument {
   }
 }
 
-const selectFieldNames = new Set(['storageLocation', 'outputFolder', 'sourceFormat', 'refreshIntervalMinutes']);
+const selectFieldNames = new Set(['storageLocation', 'outputFolder', 'sourceFormat', 'outputFormat', 'refreshIntervalMinutes']);
 const checkboxFieldNames = new Set(['isEnabled', 'publishesStandalone']);
 
 function elementTagName(id) {
@@ -395,10 +397,10 @@ function fakeState() {
   };
 }
 
-function fakeJSONResponse(value) {
+function fakeJSONResponse(value, status = 200) {
   return {
-    ok: true,
-    status: 200,
+    ok: status >= 200 && status < 300,
+    status,
     headers: { get: name => name.toLowerCase() === 'content-type' ? 'application/json' : '' },
     json: async () => value,
     text: async () => JSON.stringify(value)
@@ -424,6 +426,9 @@ const document = new FakeDocument();
 const capturedRequests = [];
 const copiedHistory = [];
 let finishWorkspaceRequest;
+let moduleSaveStatus;
+let deferQueueAction = false;
+let finishQueueAction;
 const context = vm.createContext({
   console,
   document,
@@ -444,8 +449,11 @@ const context = vm.createContext({
   clearInterval: () => {},
   fetch: async (path, options = {}) => {
     capturedRequests.push({ path: String(path), options });
+    if (path === '/api/modules' && moduleSaveStatus) return fakeJSONResponse({ error: '当前无法保存' }, moduleSaveStatus);
+    if (String(path).startsWith('/api/module-saves/') && deferQueueAction) return new Promise(resolve => { finishQueueAction = () => resolve(fakeJSONResponse({ message: '旧队列操作完成' })); });
     if (path === '/api/slow-write') return new Promise(resolve => { finishWorkspaceRequest = () => resolve(fakeJSONResponse({ message: 'old result' })); });
     if (path === '/api/state') return fakeJSONResponse(fakeState());
+    if (path === '/api/tools/convert') return fakeJSONResponse({ fileName: 'Converted.list', content: 'DOMAIN-SUFFIX,example.com', outputFormat: 'surge', kind: 'ruleSet' });
     if (String(path).endsWith('/arguments')) return fakeJSONResponse({ arguments: [], help: null });
     if (path === '/api/session') return fakeJSONResponse({ message: 'ok' });
     return fakeJSONResponse({ message: 'ok' });
@@ -474,6 +482,7 @@ vm.runInContext(stateSource, context, { filename: 'web-state.js' });
 vm.runInContext(editorSource, context, { filename: 'web-editor.js' });
 vm.runInContext(feedbackSource, context, { filename: 'web-feedback.js' });
 vm.runInContext(previewSource, context, { filename: 'web-preview.js' });
+vm.runInContext(toolsSource, context, { filename: 'web-tools.js' });
 vm.runInContext(detailSource, context, { filename: 'web-detail.js' });
 vm.runInContext(appSource, context, { filename: 'app.js' });
 
@@ -497,6 +506,14 @@ assert.equal(failureFilter.getAttribute('aria-pressed'), 'true', 'failure filter
 assert.match(list.innerHTML, /Block HTTPDNS/, 'failure filter should keep failed modules visible');
 assert.doesNotMatch(list.innerHTML, /Clean Module/, 'failure filter should hide non-failed modules');
 assert.match(detail.innerHTML, /模块工作台/, 'desktop opens the workspace overview');
+document.querySelector('#tools-button').dispatch('click');
+assert.equal(vm.runInContext('selectedID', context), 'tools');
+assert.match(detail.innerHTML, /id="conversion-tool-form"/, 'tools navigation mounts its conversion form');
+await vm.runInContext("toolsController.handleInput({target:{closest:()=>({dataset:{toolField:'sourceText'},type:'text',value:'DOMAIN-SUFFIX,example.com'})}}); toolsController.convert()", context);
+const toolRequest = capturedRequests.find(request => request.path === '/api/tools/convert');
+assert.equal(JSON.parse(toolRequest.options.body).kind, 'ruleSet');
+assert.equal(JSON.parse(toolRequest.options.body).sourceText, 'DOMAIN-SUFFIX,example.com');
+assert.equal(vm.runInContext('toolsController.result.fileName', context), 'Converted.list');
 vm.runInContext("selectItem('module-1', false)", context);
 assert.match(detail.innerHTML, /管理关系/, 'selecting a module opens its detail');
 assert.ok(
@@ -557,6 +574,24 @@ form.storageLocation.dispatch('change');
 assert.match(form.outputFolder.innerHTML, /Local/);
 assert.match(form.outputFolder.innerHTML, /Ads\/Video/);
 assert.equal(document.querySelector('#output-path-preview').textContent, 'Local/YouTube Ads.sgmodule');
+
+for (const [outputFormat, extension] of [['loon', 'plugin'], ['egern', 'sgmodule'], ['quantumultX', 'conf'], ['shadowrocket', 'sgmodule'], ['stash', 'stoverride']]) {
+  form.outputFormat.value = outputFormat;
+  form.outputFormat.dispatch('change');
+  assert.equal(document.querySelector('#output-path-preview').textContent, `Local/YouTube Ads.${extension}`, 'output selection updates the displayed publication path');
+}
+form.outputFormat.value = 'surge';
+form.outputFormat.dispatch('change');
+const originalSourceURL = form.sourceURL.value;
+form.sourceFormat.value = 'automatic';
+form.sourceURL.value = 'https://example.com/resource';
+form.outputFormat.value = 'quantumultX';
+form.outputFormat.dispatch('change');
+assert.equal(document.querySelector('#native-module-note').hidden, true, 'unknown automatic sources do not hide conversion controls');
+assert.equal(document.querySelector('#advanced-options').hidden, false);
+form.sourceURL.value = originalSourceURL;
+form.outputFormat.value = 'surge';
+form.outputFormat.dispatch('change');
 form.refreshIntervalMinutes.value = 'custom';
 form.refreshIntervalMinutes.dispatch('change');
 assert.equal(document.querySelector('#custom-refresh-row').hidden, false);
@@ -574,6 +609,7 @@ assert.deepEqual(JSON.parse(saveRequest.options.body), {
   name: 'YouTube Ads',
   sourceURL: 'https://example.com/plugin.lpx',
   sourceFormat: 'quantumultX',
+  outputFormat: 'surge',
   storageLocation: 'local',
   storageTargets: ['local', 'gitHub'],
   category: 'Ads',
@@ -582,6 +618,46 @@ assert.deepEqual(JSON.parse(saveRequest.options.body), {
   outputFileName: 'YouTube Ads.sgmodule',
   scriptHubOptions: JSON.parse(JSON.stringify(context.SurgeRelayWebOptions.scriptHubDefaults))
 });
+
+vm.runInContext("state.activity={...state.activity,isWorking:true,title:'正在发布'}; openEditor()", context);
+form.name.value = 'Busy draft';
+form.sourceURL.value = 'https://example.com/busy.sgmodule';
+const busyNote = document.querySelector('#module-dialog-busy');
+assert.equal(busyNote.hidden, false);
+assert.match(busyNote.textContent, /当前修改尚未保存.*任务结束/);
+for (const status of [409, 412]) {
+  moduleSaveStatus = status;
+  await vm.runInContext('saveModule({preventDefault(){}})', context);
+  assert.equal(document.querySelector('#module-dialog').open, true, `${status} keeps the editor open`);
+  assert.equal(form.name.value, 'Busy draft', `${status} preserves the submitted draft`);
+  assert.equal(form.sourceURL.value, 'https://example.com/busy.sgmodule');
+  assert.match(document.querySelector('#module-dialog-message').textContent, /当前修改仍保留在编辑器中/);
+  assert.equal(document.querySelector('#save-module-button').disabled, false);
+}
+moduleSaveStatus = null;
+vm.runInContext("applyActivity({...state.activity,isWorking:false}, {source:'sse'})", context);
+assert.equal(busyNote.hidden, true, 'completion removes the busy notice without resetting fields');
+assert.equal(form.name.value, 'Busy draft');
+
+const pendingQueue = document.register(new FakeElement(document, { id: 'pending-module-saves' }));
+vm.runInContext("state.activity.pendingModuleSaves=[{id:'first-save',name:'First save',isActive:true},{id:'second-save',name:'Second save',errorMessage:'目标目录不可用',isActive:false}]; selectItem('activity',false); detailController.patchPendingModuleSaves()", context);
+assert.match(detail.innerHTML, /id="pending-module-saves"/, 'activity page mounts the pending queue');
+assert.match(pendingQueue.innerHTML, /First save.*Second save/s);
+const requestsBeforeQueueUpdate = capturedRequests.length;
+vm.runInContext("applyActivity({...state.activity,pendingModuleSaves:[{id:'second-save',name:'Second save',isActive:true}]}, {source:'sse'})", context);
+assert.match(pendingQueue.innerHTML, /正在保存/);
+assert.doesNotMatch(pendingQueue.innerHTML, /First save|重试/);
+assert.equal(capturedRequests.length, requestsBeforeQueueUpdate, 'queue progress is rendered directly from activity events');
+vm.runInContext("applyActivity({...state.activity,pendingModuleSaves:[]}, {source:'sse'})", context);
+assert.match(pendingQueue.innerHTML, /没有待保存的配置/);
+for (const operation of ['retry', 'cancel']) {
+  await vm.runInContext(`handleDetailClick({target:{closest:()=>({dataset:{action:'${operation}-module-save',saveId:'second-save'},disabled:false})}})`, context);
+  const request = capturedRequests.find(item => item.path === `/api/module-saves/second-save/${operation}`);
+  assert.equal(request.options.method, 'POST');
+}
+const queueActionCount = capturedRequests.filter(request => request.path.startsWith('/api/module-saves/')).length;
+await vm.runInContext("handleDetailClick({target:{closest:()=>({dataset:{action:'cancel-module-save',saveId:'active-save'},disabled:true})}})", context);
+assert.equal(capturedRequests.filter(request => request.path.startsWith('/api/module-saves/')).length, queueActionCount, 'active queue items cannot be cancelled from the UI');
 
 const updateCount = () => capturedRequests.filter(request => request.path === '/api/modules/module-1/update').length;
 vm.runInContext("selectedID = 'module-1'; state.modules[0].serverRetryAfter = new Date(Date.now() + 60000).toISOString()", context);
@@ -599,9 +675,19 @@ await vm.runInContext('api("/api/source/name", {method:"POST", json:{url:"https:
 assert.equal(capturedRequests.at(-1).options.headers.get('X-Relay-Workspace'), null);
 const oldRequest = vm.runInContext('api("/api/slow-write", {method:"POST"})', context);
 assert.equal(capturedRequests.at(-1).options.headers.get('X-Relay-Workspace'), 'A', 'request header captures its originating workspace');
+deferQueueAction = true;
+const oldQueueAction = vm.runInContext("handleDetailClick({target:{closest:()=>({dataset:{action:'retry-module-save',saveId:'old-save'},disabled:false})}})", context);
+await flushAsync();
+assert.equal(capturedRequests.at(-1).options.headers.get('X-Relay-Workspace'), 'A', 'queue actions capture their originating workspace');
 context.workspaceState = { ...fakeState(), workspace: { id: 'B', name: 'Workspace B', isLegacyDefault: false } };
 vm.runInContext("selectedID='module-1'; editingID='module-1'; ui.search.value='old filter'; detailController.setTab('preview')", context);
 await vm.runInContext('applyState(workspaceState, false, true)', context);
+const requestsAfterWorkspaceSwitch = capturedRequests.length;
+finishQueueAction();
+await oldQueueAction;
+deferQueueAction = false;
+assert.equal(capturedRequests.length, requestsAfterWorkspaceSwitch, 'old queue responses do not refresh the new workspace');
+assert.doesNotMatch(document.querySelector('#toast').textContent, /旧队列操作完成/);
 finishWorkspaceRequest();
 await assert.rejects(oldRequest, /旧请求结果已忽略/);
 assert.equal(vm.runInContext('selectedID', context), 'overview');
@@ -691,6 +777,44 @@ context.activityPollResponse = Promise.resolve({ isWorking: true, progress: .7 }
 vm.runInContext('activityPollCallback()', context); await flushAsync();
 assert.equal(vm.runInContext('state.activity.progress', context), .7, 'legacy flat activity without metadata still uses request-generation compatibility');
 vm.runInContext('revisionPoller.close()', context);
+
+context.queueReplayState = {
+  ...fakeState(), workspace: { id: 'B', name: 'Workspace B' }, runtimeID: 'runtime-2', revision: 100,
+  activity: { ...fakeState().activity, pendingModuleSaves: [
+    { id: 'same-save', name: 'Retry target', errorMessage: '目录不可用' },
+    { id: 'other-save', name: 'Other save' }
+  ] }
+};
+await vm.runInContext('applyState(queueReplayState, false, true)', context);
+vm.runInContext("selectItem('activity',false); detailController.patchPendingModuleSaves()", context);
+deferQueueAction = true;
+const sameSaveAction = "handleDetailClick({target:{closest:()=>({dataset:{action:'retry-module-save',saveId:'same-save'},disabled:false})}})";
+const firstPendingAction = vm.runInContext(sameSaveAction, context);
+await flushAsync();
+const finishFirstPendingAction = finishQueueAction;
+const requestsDuringFirstAction = capturedRequests.length;
+vm.runInContext("applyActivity({...state.activity,pendingModuleSaves:[...state.activity.pendingModuleSaves.slice(0,1),{id:'other-save',name:'Other save',isActive:true}]},{source:'sse',workspaceID:'B',runtimeID:'runtime-2',revision:101})", context);
+assert.match(pendingQueue.innerHTML, /data-action="retry-module-save" data-save-id="same-save" disabled/);
+assert.match(pendingQueue.innerHTML, /data-action="cancel-module-save" data-save-id="same-save" disabled/);
+await vm.runInContext(sameSaveAction, context);
+assert.equal(capturedRequests.length, requestsDuringFirstAction, 'SSE-replaced buttons cannot submit the same pending action twice');
+
+context.queueReplayState = { ...context.queueReplayState, workspace: { id: 'C', name: 'Workspace C' }, runtimeID: 'runtime-3', revision: 1 };
+await vm.runInContext('applyState(queueReplayState, false, true)', context);
+vm.runInContext("selectItem('activity',false); detailController.patchPendingModuleSaves()", context);
+assert.doesNotMatch(pendingQueue.innerHTML, /data-save-id="same-save" disabled/, 'workspace switch clears the old request state');
+const secondPendingAction = vm.runInContext(sameSaveAction, context);
+await flushAsync();
+const finishSecondPendingAction = finishQueueAction;
+finishFirstPendingAction();
+await firstPendingAction;
+assert.equal(vm.runInContext("pendingModuleSaveActions.has('same-save')", context), true, 'old workspace completion cannot unlock a new request for the same ID');
+assert.match(pendingQueue.innerHTML, /data-action="retry-module-save" data-save-id="same-save" disabled/);
+finishSecondPendingAction();
+await secondPendingAction;
+deferQueueAction = false;
+assert.equal(vm.runInContext("pendingModuleSaveActions.has('same-save')", context), false);
+assert.doesNotMatch(pendingQueue.innerHTML, /data-save-id="same-save" disabled/, 'action completion restores the current buttons');
 console.log('Web DOM resource tests passed');
 
 async function flushAsync() {

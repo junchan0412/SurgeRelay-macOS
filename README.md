@@ -1,12 +1,12 @@
 # Surge Relay for macOS
 
-> 集中管理、转换、编辑并发布 Surge 模块，把零散的 Loon / Quantumult X / Surge 源同步到本地 Surge 目录或 GitHub 仓库。
+> Script-Hub 多客户端转换工作台：管理、转换、编辑和发布模块，独立转换规则集与脚本，服务 Surge、Loon、Egern、Quantumult X、Stash 和 Shadowrocket。
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![Release](https://img.shields.io/github/v/release/junchan0412/SurgeRelay-macOS?label=最新版本)](https://github.com/junchan0412/SurgeRelay-macOS/releases)
 [![Platform](https://img.shields.io/badge/Platform-macOS-lightgrey)]()
 
-Surge Relay 面向需要长期维护大量 `.sgmodule` / `.module`、从 Loon/Quantumult X 等格式转换到 Surge、并把最终模块同步到本地 Surge 目录或 GitHub 仓库的 macOS 用户。本 fork 基于 [EEliberto/SurgeRelay-macOS](https://github.com/EEliberto/SurgeRelay-macOS) 修改，继续遵守 Apache License 2.0；转换能力基于 [Script-Hub](https://github.com/Script-Hub-Org) 的本地引擎。
+Surge Relay 将 [Script-Hub](https://github.com/Script-Hub-Org/Script-Hub) 的模块、规则集和脚本转换放进 macOS 原生与 Web 工作台。每个模块独立选择输出客户端，并同步到用户选择的本地目录或 GitHub 仓库；同一来源可维护多个客户端版本。本 fork 基于 [EEliberto/SurgeRelay-macOS](https://github.com/EEliberto/SurgeRelay-macOS) 修改，继续遵守 Apache License 2.0。
 
 当前发布包支持 macOS 15.0 及更高版本。
 
@@ -17,8 +17,9 @@ Surge Relay 面向需要长期维护大量 `.sgmodule` / `.module`、从 Loon/Qu
    ```bash
    xattr -dr com.apple.quarantine "/Applications/Surge Relay.app"
    ```
-3. 在设置中开启“发布到本地”并选择 Surge 模块根目录（如 iCloud Surge 目录），或开启“发布到 GitHub”并配置仓库与 Token。
-4. 添加模块、扫描本地 `.sgmodule`，或使用“多选 / 发布所选”按模块存放位置发布。
+3. 在设置中开启“发布到本地”并选择输出根目录，或开启“发布到 GitHub”并配置仓库与 Token。
+4. 添加模块并选择输出客户端；可扫描本地文件，或使用“多选 / 发布所选”按模块存放位置发布。
+5. 在“转换工具”粘贴规则或脚本，选择客户端后转换、复制或保存文件。
 
 > 后续更新推荐在 App 内使用“查看更新…”，通过 Sparkle 2 自动拉取并校验签名，无需再次执行 `xattr`。
 
@@ -28,7 +29,8 @@ Surge Relay 面向需要长期维护大量 `.sgmodule` / `.module`、从 Loon/Qu
 - 活动记录可搜索模块名、结果、提交编号与发布文件名，支持展开文件变更和拷贝完整记录；侧栏直接显示筛选条件并可一键重置。
 - 更新流水线最多同时处理 4 个模块，每个模块分别管理缓存与输出；来源检查与原生转换复用下载结果，内容和脚本资源以完整快照提交。
 - macOS 与 Web 内容页支持持久草稿与恢复；遇到服务器版本变化时可比较后再保存。
-- 内置 Script-Hub 本地引擎，转换 Quantumult X、Loon、Surge 模块；远程 Surge 模块直接抓取并自动写入 `#SUBSCRIBED` 标记。
+- 模块来源支持 Quantumult X、Loon、Surge，输出支持 Surge、Loon、Egern、Quantumult X、Stash、Shadowrocket；未知自动来源按实际文本识别，原生格式保留内容。
+- 转换工具接受文本、HTTP/HTTPS 地址或本地文件，支持规则集、域名集、非域名剩余规则和独立脚本转换。
 - 模块“存放位置”与“初始来源”分离建模：本地 / GitHub 存放，订阅 / 远程 / 自写来源，避免混淆。
 - 本地与 GitHub 发布可同时开启，每个独立模块可以选择本地、GitHub 或同时存放于两个目标。
 - 侧边栏多维度筛选（更新状态、来源、存放位置、状态）+ 排序，筛选与搜索叠加。
@@ -56,7 +58,7 @@ Surge Relay 面向需要长期维护大量 `.sgmodule` / `.module`、从 Loon/Qu
 
 ## <a name="capabilities"></a>当前能力
 
-- 2.0 重构说明、性能基准与验证边界见 [Surge Relay 2.0](./docs/RELAY_2_0.md)。
+- 项目现状、验证范围和未来计划见 [当前项目报告](./docs/CURRENT_PROJECT_REPORT.md)，开发文档入口见 [文档导航](./docs/README.md)。
 - 管理远程 HTTP/HTTPS 模块和本地 `file://` Surge 模块。
 - 使用内置 Script-Hub 引擎转换 Quantumult X、Loon 和 Surge 模块。
 - `.sgmodule` 与 `.module` 都按 Surge 模块识别，远程 Surge 模块直接抓取并自动写入 `#SUBSCRIBED` 标记，便于 Script-Hub 解析更新。
@@ -151,19 +153,48 @@ GitHub 发布需要配置 owner、repository、branch、目录和 Token。模块
 
 新增模块的默认显示名称优先读取来源内容的 `#!name`（支持本地文件、远程地址与订阅原始地址），用户手动填写的名称不会被自动覆盖；来源未提供名称或读取失败时才使用文件名。
 
-每个模块拥有自己的来源、缓存、参数、版本历史和输出文件，可选择本地、GitHub 或双目标存放。更新或编辑一个模块只刷新它自己的本地输出；一个模块的文件冲突不会阻止其他模块写出。输出问题在对应模块的“本地文件”区域和“需要处理”筛选中显示，可比较差异、备份原文件后接管更新。
+每个模块拥有自己的来源、输出客户端、缓存、参数、版本历史和输出文件，可选择本地、GitHub 或双目标存放。同一来源可按客户端分别添加，文件名冲突会自动编号。更新或编辑一个模块只刷新它自己的本地输出；一个模块的文件冲突不会阻止其他模块写出。输出问题在对应模块的“本地文件”区域和“需要处理”筛选中显示，可比较差异、备份原文件后接管更新。
+
+| 输出客户端 | 模块扩展 | 输出内容 |
+| --- | --- | --- |
+| Surge | `.sgmodule` | Surge 模块 |
+| Egern | `.sgmodule` | Script-Hub 的 Surge 兼容模块 |
+| Loon | `.plugin` | Loon 插件 |
+| Quantumult X | `.conf` | 重写、过滤、MITM 和任务配置 |
+| Stash | `.stoverride` | YAML 覆写与脚本提供者 |
+| Shadowrocket | `.sgmodule` | Shadowrocket 模块 |
+
+本地扫描保留合法的 `.module` 和 `.lpx` 文件名。Stash 产物带有可识别的 `#SUBSCRIBED` 来源时可以重新登记。切换输出客户端后需更新模块生成新缓存；旧格式手动覆盖保留在历史中，新输出提交成功后移出当前覆盖。历史记录携带客户端格式，恢复时核对类型。
 
 对于 iRingo.WeatherKit 等参数模块，发布文件保留 `#!arguments`、`#!arguments-desc` 和脚本中的 `{{{key}}}` 模板。Relay 中修改参数会更新发布默认值；用户仍可在 Surge 中继续调整，带逗号、空值、URL 和 token 的参数会按原格式保留。
 
 旧配置中的总模块开关、参与合并和独立发布标记会被忽略，所有现有模块保留原 ID、来源、文件名和存放目标并分别管理。旧版生成的汇总文件不会被当作新输出生成；旧文件清理仍遵守受管文件和确认规则。
 
-在模块编辑器中，后台更新或发布进行时仍可提交保存。点击“加入待处理队列”会记录当前编辑内容，按工作区持久保存，并在当前任务结束后依次执行。侧栏可查看保存队列，重试失败项目或取消等待项；重启后会继续处理未完成的保存。
+在原生模块编辑器中，后台更新或发布进行时仍可提交保存。点击“加入待处理队列”会记录当前编辑内容，按工作区持久保存，并在当前任务结束后依次执行。侧栏可查看保存队列，重试失败项目或取消等待项；重启后会继续处理未完成的保存。提交写盘失败会撤回此次请求并保留编辑器草稿；从历史备份恢复的保存项需要核对后重试或取消。
+
+## 转换工具
+
+原生与 Web 工作台均提供“转换工具”。输入地址或粘贴内容，选择输出客户端，再复制或保存结果；转换过程支持取消。工具保留当前工作区的表单，输入或工作区变化后旧响应不会覆盖新结果。
+
+规则集可读取 Surge/Loon、QX、Clash `payload`、纯域名及 IPv4/IPv6 CIDR，六客户端均输出 `.list`；Stash 文件内容为 `payload:` YAML，QX 文件为带策略的纯过滤列表。QX 需要指定 `REJECT`、`DIRECT` 或已有策略名称。Surge/Egern/Stash 还可输出域名集和非域名剩余规则。“释放注释关键字”会启用匹配的注释规则，“删除关键字”移除匹配项，多项使用 `+` 分隔。
+
+独立脚本输出 `.js`。QX 原生脚本可保留，QX 转其它客户端使用 Script-Hub 的共同 API 兼容脚本；通用 Surge/Loon 脚本转 QX 使用本地适配。高级选项提供请求 Header、兼容性处理、前置代码和转换前后处理代码。转换工具的结果直接保存为文件；长期维护的模块继续使用独立模块的更新、历史和发布流程。
+
+## 转换范围与已知限制
+
+- 3.0.0 提供多客户端模块、规则集和独立脚本工作台。
+- Egern 使用当前 Script-Hub 的 Surge 兼容模块，不生成 Egern 专有 YAML 配置。
+- 无订阅来源的原始 Stash 覆写尚不能作为模块转换输入；规则工具支持 Clash/Stash 规则 `payload`。
+- QX 不支持的配置段、规则或脚本特性会返回明确错误。跨格式 QX 模块中的脚本需要配置可公开访问的 GitHub/Worker 地址托管生成资源。
+- 当前证据覆盖固定 Script-Hub 引擎、文件事务、API 与界面行为；各客户端实际导入运行和 macOS 15 系统验收需单独执行。
 
 ## Web 管理
 
 启用 Web 管理后，App 会在本机启动一个管理服务。默认仅监听本机地址；如果允许局域网访问，建议只在可信网络内使用。
 
 按 ⌘ / Ctrl + K 或在非输入区域按 `/` 可聚焦模块搜索；列表支持方向键、Home / End，实时更新会保留焦点。内容页支持 ⌘ / Ctrl + S 写入，并显示载入、未保存、写入中和读取失败重试状态。保存或恢复期间继续输入的内容会保留为草稿。
+
+“活动记录”显示当前工作区的原生待保存队列、提交顺序和等待/执行/失败状态，可重试失败项或取消等待项。Web 模块配置在任务进行时提示忙碌并保留草稿，任务结束后可再次保存。
 
 Web 管理使用访问令牌建立 `HttpOnly` 会话 cookie，普通 API 和事件流禁用缓存，并对写操作做同源 `Origin` 或 `Referer` 校验。命令行或自动化客户端可以使用 `Authorization: Bearer <token>`；浏览器页面建立会话后不再把原始 token 写入 `sessionStorage`。访问令牌不会出现在诊断报告中。你可以在设置中查看 Web 服务状态、访问范围和令牌存储状态。
 
@@ -253,14 +284,10 @@ node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs
 ./script/check_release_configuration.sh
 
-DEVELOPER_DIR="$(xcode-select -p)" \
-xcodebuild build-for-testing \
-  -project "Surge Relay.xcodeproj" \
-  -scheme "Surge Relay" \
-  -destination "platform=macOS,arch=arm64" \
-  -derivedDataPath build/DerivedDataTest \
-  -skipPackagePluginValidation
+./script/run_swift_qa.sh
 ```
+
+PR 与 `main` push 使用同一隔离回归入口；日志、xcresult 和执行/跳过摘要保存在 `build/qa-swift/run.*`。
 
 ## 发布
 
@@ -303,7 +330,7 @@ EXPECTED_CODESIGN_AUTHORITY="Surge Relay Self-Signed Code Signing" \
   --tag vX.Y.Z
 ```
 
-当前版本、仓库状态、能力、代码规模、优化顺序和发布核对入口见自动生成的 [DEVELOPMENT_STATUS.md](./DEVELOPMENT_STATUS.md)。不要手工编辑该文件；使用 `node script/generate_project_status.mjs` 刷新，或使用 `node script/generate_project_status.mjs --check` 检查是否过期。
+当前版本、能力、代码规模和发布核对入口见自动生成的 [DEVELOPMENT_STATUS.md](./DEVELOPMENT_STATUS.md)，现状判断与后续计划见 [当前项目报告](./docs/CURRENT_PROJECT_REPORT.md)，Git/upstream 审查快照见 [上游同步边界](./docs/UPSTREAM_SYNC.md)。不要手工编辑自动状态页；使用 `node script/generate_project_status.mjs` 刷新，或使用 `node script/generate_project_status.mjs --check` 检查是否过期。
 
 ## 工作区、模板与恢复
 

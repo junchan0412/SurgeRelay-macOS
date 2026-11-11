@@ -10,6 +10,17 @@
     return `<div class="empty-state"><div><span class="symbol" data-symbol="${escapeAttribute(icon)}"></span><div>${escapeHTML(message)}</div></div></div>`;
   }
 
+  function pendingModuleSavesMarkup(activity = {}, context = {}) {
+    const items = activity.pendingModuleSaves || [];
+    const rows = items.map((item, index) => {
+      const actionPending = context.pendingIDs?.has(item.id);
+      const status = item.isActive ? '正在保存' : item.errorMessage ? '保存失败' : '等待保存';
+      const retry = item.errorMessage && !item.isActive ? `<button class="button" data-action="retry-module-save" data-save-id="${escapeAttribute(item.id)}" ${actionPending ? 'disabled' : ''}>重试</button>` : '';
+      return `<div class="history-item"><span class="history-marker ${item.errorMessage ? 'error' : 'neutral'}">${index + 1}</span><div class="history-copy"><div class="history-title"><strong>${escapeHTML(item.name)}</strong><span class="status-label ${item.errorMessage ? 'error' : 'neutral'}">${status}</span></div>${item.errorMessage ? `<p>${escapeHTML(item.errorMessage)}</p>` : ''}<div class="operation-buttons">${retry}<button class="button" data-action="cancel-module-save" data-save-id="${escapeAttribute(item.id)}" ${item.isActive || actionPending ? 'disabled' : ''}>取消</button></div></div></div>`;
+    }).join('');
+    return `<div class="workspace-section-heading"><h2>待保存配置</h2><span>${items.length} 项</span></div><div class="workspace-panel">${rows || '<div class="workspace-empty">没有待保存的配置</div>'}</div>`;
+  }
+
   function moduleRowMarkup(module, context = {}) {
     const selected = context.selectedID === module.id;
     const icon = module.iconURL
@@ -81,7 +92,7 @@
   function moduleDetailMarkup(module, context = {}) {
     const selectedTab = context.selectedTab || 'info';
     if (selectedTab === 'preview') {
-      return detailToolbar(selectedTab, true) + previewShell(module.publishedRelativePath || module.outputFileName, true);
+      return detailToolbar(selectedTab, true) + previewShell(`${module.outputFormatTitle || 'Surge'} · ${module.publishedRelativePath || module.outputFileName}`, true);
     }
     const advanced = module.advancedSummary ? `<section class="form-section-view"><h3 class="section-heading">高级设置</h3><div class="group-box"><div class="detail-row"><div class="detail-label"><span class="symbol" data-symbol="slider.horizontal.3"></span><span>已应用</span></div><div class="detail-value advanced-summary">${escapeHTML(module.advancedSummary)}</div></div></div></section>` : '';
     const publishedTitle = module.publishedURL?.includes('workers.dev') ? 'Cloudflare' : 'GitHub';
@@ -123,6 +134,7 @@
     <section class="form-section-view"><h3 class="section-heading">管理关系</h3><div class="group-box">
       ${updateSourceRow || initialSourceRow}
       ${detailRow('doc.on.doc', '输出路径', outputPath || '未开启独立发布', false, outputPath || null)}
+      ${detailRow('arrow.triangle.2.circlepath', '输出客户端', module.outputFormatTitle || 'Surge')}
       ${detailRow('clock', '上次更新', formatDate(module.lastUpdatedAt, '从未更新'))}
       ${detailRow('clock.arrow.circlepath', '刷新策略', logic.refreshIntervalTitle(module.refreshIntervalMinutes))}
       ${detailRow('clock', '下次重试', formatDate(module.nextRetryAt, '未安排'))}
@@ -149,7 +161,7 @@
       ${sourceHashRow}
       ${sourceETagRow}
       ${sourceLastModifiedRow}
-      ${detailRow('gearshape', '转换引擎', module.conversionEngineRevision ? module.conversionEngineRevision.slice(0, 12) : '原生 Surge 模块', false, module.conversionEngineRevision || null)}
+      ${detailRow('gearshape', '转换引擎', module.conversionEngineRevision ? module.conversionEngineRevision.slice(0, 12) : '原生格式', false, module.conversionEngineRevision || null)}
       </details>
     </div></section>
     <div id="arguments-section"></div>${published}${advanced}</div>`;
@@ -237,7 +249,7 @@
     return `<div class="workspace-heading"><div class="eyebrow">SURGE RELAY</div><div class="workspace-heading-line"><div><h1>模块工作台</h1><p>从来源更新到稳定发布，每一步都在这里。</p></div><button class="button primary" data-action="add-module"><span class="symbol" data-symbol="plus"></span>添加模块</button></div></div>
       <section class="workspace-metrics" aria-label="模块概况">${metric('模块总数', modules.length)}${metric('可更新', snapshot.activity?.updateableModuleCount ?? modules.length)}${metric('本地模块', localCount)}${metric('需要处理', attention.length, 'show-attention', attention.length ? 'warning' : '')}</section>
       <section class="workspace-section"><div class="workspace-section-heading"><h2>运行状态</h2>${attention.length ? '<button class="text-button" data-action="show-attention">查看全部</button>' : ''}</div><div class="workspace-panel">${!modules.length ? onboarding : attention.length ? issueRows : normal}</div></section>
-      <section class="workspace-section"><div class="workspace-section-heading"><h2>发布去向</h2><span>在 Mac App 的设置中管理</span></div><div class="operation-buttons"><button class="button" data-action="publish-selected">发布所选模块</button><button class="button" data-action="publish-github" ${targets.publishToGitHub ? '' : 'disabled'}>预览发布到 GitHub</button><button class="button" data-action="publish-results">上次发布结果</button></div><div class="destination-grid">${target('本地目录', 'externaldrive', targets.publishToLocal, workspace.localDirectory || '选择 Surge 模块目录', `${modules.filter(m => (m.storageTargets || [m.storageLocation]).includes('local')).length} 个模块存放在本地`)}${target('GitHub', 'network', targets.publishToGitHub, workspace.githubRepository || '连接仓库以分发模块', workspace.githubBranch ? `分支 ${workspace.githubBranch}` : '配置仓库后可自动发布更新')}</div></section>
+      <section class="workspace-section"><div class="workspace-section-heading"><h2>发布去向</h2><span>在 Mac App 的设置中管理</span></div><div class="operation-buttons"><button class="button" data-action="publish-selected">发布所选模块</button><button class="button" data-action="publish-github" ${targets.publishToGitHub ? '' : 'disabled'}>预览发布到 GitHub</button><button class="button" data-action="publish-results">上次发布结果</button></div><div class="destination-grid">${target('本地目录', 'externaldrive', targets.publishToLocal, workspace.localDirectory || '选择本地输出目录', `${modules.filter(m => (m.storageTargets || [m.storageLocation]).includes('local')).length} 个模块存放在本地`)}${target('GitHub', 'network', targets.publishToGitHub, workspace.githubRepository || '连接仓库以分发模块', workspace.githubBranch ? `分支 ${workspace.githubBranch}` : '配置仓库后可自动发布更新')}</div></section>
       <section class="workspace-section"><div class="workspace-section-heading"><h2>最近活动</h2><button class="text-button" data-action="show-activity">全部记录<span class="symbol" data-symbol="chevron.right"></span></button></div><div class="workspace-panel">${historyMarkup(workspace.recentHistory || [])}</div></section>`;
   }
 
@@ -286,6 +298,7 @@
   }
 
   global.SurgeRelayWebMarkup = {
+    pendingModuleSavesMarkup,
     publicationSelectionMarkup, publicationPreviewMarkup, publicationResultMarkup, synchronizationMarkup, versionHistoryMarkup, versionComparisonMarkup,
     emptyStateMarkup,
     workspaceMarkup,

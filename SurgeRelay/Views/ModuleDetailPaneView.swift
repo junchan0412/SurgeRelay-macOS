@@ -50,6 +50,8 @@ struct ModuleDetailPaneView: View {
         Group {
             if model.selectedModuleID == AppModel.activitySelectionID {
                 ActivityHistoryView()
+            } else if model.selectedModuleID == AppModel.conversionToolsSelectionID {
+                ConversionToolsView()
             } else if let kind = selectionKind {
                 detailContent(for: kind)
                     .id(kindID(kind))

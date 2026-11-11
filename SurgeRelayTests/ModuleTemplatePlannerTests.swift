@@ -3,6 +3,17 @@ import XCTest
 @testable import SurgeRelay
 
 final class ModuleTemplatePlannerTests: XCTestCase {
+    func testTemplatesPersistClientAndRestoreLegacySurgeDefault() throws {
+        let module = RelayModule(name: "Stash", sourceURL: "https://example.com/source.plugin", outputFormat: .stash, outputFileName: "Stash")
+        let template = try ModuleTemplatePlanner.template(from: module, name: "Stash preset")
+        let restored = try JSONDecoder().decode(ModuleTemplate.self, from: JSONEncoder().encode(template))
+        XCTAssertEqual(restored.outputFormat, .stash)
+        XCTAssertEqual(ModuleTemplatePlanner.draft(from: restored).outputFormat, .stash)
+        var legacy = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(template)) as? [String: Any])
+        legacy.removeValue(forKey: "outputFormat")
+        XCTAssertEqual(try JSONDecoder().decode(ModuleTemplate.self, from: JSONSerialization.data(withJSONObject: legacy)).outputFormat, .surge)
+    }
+
     func testTemplateCopiesPresetsWithoutSourceHeadersArgumentsOrScriptCredentials() throws {
         var options = ScriptHubOptions()
         options.convertAllScripts = true

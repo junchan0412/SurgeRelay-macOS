@@ -33,7 +33,8 @@ enum LocalModuleImportPlanner {
             }.map(LocalSourcePathResolver.pathIdentity))
         }
         var unavailableSources = Set(existingModules.flatMap {
-            [$0.updateSourceURL, $0.sourceURL].map(ModuleSourceIdentity.canonicalValue)
+            let output = $0.outputFormat.rawValue
+            return [$0.updateSourceURL, $0.sourceURL].map { output + ":" + ModuleSourceIdentity.canonicalValue(for: $0) }
         })
 
         for candidate in candidates {
@@ -56,7 +57,7 @@ enum LocalModuleImportPlanner {
             guard !components.isEmpty,
                   components.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }),
                   let fileName = components.last,
-                  fileName.lowercased().hasSuffix(".sgmodule") else {
+                  LocalModuleScanner.supportedFileExtensions.contains((String(fileName) as NSString).pathExtension.lowercased()) else {
                 failures.append("\(candidate.relativePath)：本地模块路径无效")
                 continue
             }
@@ -65,7 +66,8 @@ enum LocalModuleImportPlanner {
             let outputPath = ModuleOutputFolder.relativePath(
                 fileName: outputFileName,
                 folder: outputFolder,
-                preservesExistingFileName: true
+                preservesExistingFileName: true,
+                outputFormat: candidate.outputFormat
             )
             let pathKey = LocalSourcePathResolver.pathIdentity(candidate.localStorageRelativePath)
             guard LocalSourcePathResolver.pathIdentity(outputPath) == pathKey else {
@@ -91,7 +93,7 @@ enum LocalModuleImportPlanner {
                 failures.append("\(candidate.relativePath)：本地模块路径已纳入管理或与其他模块冲突，请重新扫描")
                 continue
             }
-            let sourceKey = ModuleSourceIdentity.canonicalValue(for: source)
+            let sourceKey = candidate.outputFormat.rawValue + ":" + ModuleSourceIdentity.canonicalValue(for: source)
             guard !unavailableSources.contains(sourceKey) else {
                 failures.append("\(candidate.relativePath)：来源文件已纳入管理，请重新扫描")
                 continue
@@ -103,6 +105,7 @@ enum LocalModuleImportPlanner {
                 name: name,
                 sourceURL: source,
                 sourceFormat: candidate.sourceFormat,
+                outputFormat: candidate.outputFormat,
                 outputFileName: outputFileName,
                 category: candidate.category,
                 outputFolder: outputFolder,
@@ -156,6 +159,7 @@ enum LocalModuleImportPlanner {
             source: module.updateSourceURL
         )
         module.contentHash = contentHash
+        module.lastConvertedOutputFormat = module.outputFormat
         module.lastUpdatedAt = importedAt
         module.state = .current
         module.lastError = nil

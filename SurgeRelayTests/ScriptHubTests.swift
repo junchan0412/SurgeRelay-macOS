@@ -4,6 +4,306 @@ import XCTest
 @testable import SurgeRelay
 
 final class ScriptHubTests: XCTestCase {
+    func testConversionTargetsUseUpstreamNamesAndClientExtensions() async throws {
+        for format in ModuleOutputFormat.allCases {
+            let module = RelayModule(name: "Output", sourceURL: "https://example.com/source.plugin",
+                sourceFormat: .loon, outputFormat: format, outputFileName: "Output")
+            let url = try await ScriptHubClient().conversionURL(module: module, baseURL: "http://script.hub")
+            let target = format == .quantumultX ? "surge-module" : format.scriptHubTarget
+            let ext = format == .quantumultX ? "sgmodule" : format.fileExtension
+            XCTAssertTrue(url.absoluteString.contains("/_end_/Output.\(ext)?"), format.title)
+            XCTAssertTrue(url.absoluteString.contains("target=\(target)"), format.title)
+        }
+    }
+
+    func testNativeLoonAndQuantumultXKeepTheirOwnSyntax() async throws {
+        let contents: [(ModuleSourceFormat, ModuleOutputFormat, String)] = [
+            (.loon, .loon, "[Rewrite]\n^https://example.com - reject\n[MITM]\nhostname = example.com\n"),
+            (.quantumultX, .quantumultX, "^https://example.com url reject-dict\nhostname = example.com\n")
+        ]
+        for (source, output, text) in contents {
+            let module = RelayModule(name: "Native", sourceURL: "https://example.com/native.conf",
+                sourceFormat: source, outputFormat: output, outputFileName: "Native")
+            let result = try await ScriptHubClient().convert(module: module, sourceData: Data(text.utf8))
+            XCTAssertTrue(result.content.contains(text), output.title)
+            XCTAssertEqual(result.requestURL.absoluteString, module.updateSourceURL)
+            XCTAssertTrue(result.assets.isEmpty)
+        }
+    }
+
+    func testAutomaticUnknownAddressDetectsSurgeContentBeforeQuantumultXConversion() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let engine = EngineStore(cacheDirectory: root)
+        let parser = """
+        if (!$request.url.includes('type=surge-module')) throw new Error('Expected detected Surge input');
+        const address = $request.url.split('/_start_/')[1].split('/_end_/')[0];
+        $httpClient.get(address, function(error, response, body) { $done({body: error || body}); });
+        """
+        try await engine.save(scripts: ["Rewrite-Parser.js": Data(parser.utf8), "script-converter.js": Data("$done({body:'unused'});".utf8)])
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GitHubMockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        GitHubMockURLProtocol.reset()
+        defer { GitHubMockURLProtocol.reset() }
+        GitHubMockURLProtocol.handler = { request in
+            XCTAssertEqual(request.url?.absoluteString, "https://example.com/demo.js")
+            return (200, Data("$done({body: 'updated'});".utf8))
+        }
+        var github = GitHubSettings()
+        github.owner = "owner"
+        github.repository = "repo"
+        github.repositoryIsPrivate = false
+        let module = RelayModule(name: "Detected", sourceURL: "https://example.com/module", sourceFormat: .automatic,
+            outputFormat: .quantumultX, outputFileName: "Detected")
+        let source = """
+        #!name=Source
+        #!desc=Source description
+        [URL Rewrite]
+        ^https://example.com/ads - reject
+        [Script]
+        demo = type=http-response, pattern=^https://example.com/data, script-path=https://example.com/demo.js, requires-body=true
+        [MITM]
+        hostname = %APPEND% example.com
+        """
+        let client = ScriptHubClient(engineStore: engine, session: session)
+        let unknownURL = try await client.conversionURL(module: module, baseURL: "http://script.hub")
+        XCTAssertTrue(unknownURL.absoluteString.contains("type=all-module"))
+        let result = try await client.convert(module: module, github: github, sourceData: Data(source.utf8))
+        XCTAssertTrue(result.requestURL.absoluteString.contains("type=surge-module"))
+        XCTAssertTrue(result.content.contains("[rewrite_local]"))
+        XCTAssertFalse(result.content.contains("[Script]"))
+        XCTAssertTrue(result.content.contains("^https://example.com/data url script-response-body https://"))
+        XCTAssertEqual(result.assets.count, 1)
+        XCTAssertEqual(ModuleMetadataParser.scriptHubSubscription(in: result.content)?.sourceType, "surge-module")
+        XCTAssertEqual(result.outputFormat, .quantumultX)
+    }
+
+    func testAutomaticLocalQuantumultXContentUsesNativePathWithoutEngine() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let file = root.appending(path: "Demo.conf")
+        let source = "[rewrite_local]\n^https://example.com/ads url reject\n[mitm]\nhostname = example.com\n"
+        try Data(source.utf8).write(to: file)
+        let module = RelayModule(name: "QX Native", sourceURL: file.absoluteString, sourceFormat: .automatic,
+            outputFormat: .quantumultX, outputFileName: "QX Native")
+        let client = ScriptHubClient(engineStore: EngineStore(cacheDirectory: root.appending(path: "EmptyEngine")))
+        let result = try await client.convert(module: module)
+        XCTAssertEqual(result.requestURL, file)
+        XCTAssertTrue(result.content.contains(source))
+        XCTAssertTrue(result.assets.isEmpty)
+        XCTAssertEqual(result.outputFormat, .quantumultX)
+    }
+
+    func testWorkerReusesLargeLocalSourceBytesWithoutURLPayloadOrNetworkRead() async throws {
+        let sourceURL = URL(filePath: "/tmp/relay-injected-source.plugin")
+        let content = String(repeating: "长文本规则\n", count: 20_000)
+        let result = try await EmbeddedScriptHubEngine().convert(
+            script: "$httpClient.get('file:///tmp/relay-injected-source.plugin', function(error, response, body) { $done({body: error || body}); });",
+            requestURL: try XCTUnwrap(URL(string: "http://script.hub/file/_start_/file:///tmp/relay-injected-source.plugin/_end_/Local.plugin?type=loon-plugin&target=loon-plugin")),
+            sourceData: Data(content.utf8), sourceURL: sourceURL)
+        XCTAssertEqual(result, content)
+    }
+
+    func testWorkerReturnsUpstreamUnsupportedItemsAsConversionFailure() async throws {
+        do {
+            _ = try await EmbeddedScriptHubEngine().convert(
+                script: "$notification.post('Script Hub', 'Compatibility', 'stash不支持以下内容:\\nunsupported item'); $done({body:'http:\\n  mitm: []'});",
+                requestURL: try XCTUnwrap(URL(string: "https://example.com/source")))
+            XCTFail("Unsupported active configuration must not be reported as a complete conversion")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("不支持以下内容"))
+            XCTAssertTrue(error.localizedDescription.contains("unsupported item"))
+        }
+    }
+
+    func testWorkerReturnsFailedNestedAndFlatHTTPResponsesAsErrors() async throws {
+        let engine = EmbeddedScriptHubEngine()
+        for payload in [
+            "{response:{status:500,body:'Missing source script'}}",
+            "{status:503,body:'Missing source script'}",
+            "{response:{status:'HTTP/1.1 500 Internal Server Error',body:'Missing source script'}}",
+            "{status:'HTTP/1.1 503 Service Unavailable',body:'Missing source script'}"
+        ] {
+            do {
+                _ = try await engine.convert(script: "$done(\(payload));",
+                    requestURL: try XCTUnwrap(URL(string: "https://example.com/script.js")))
+                XCTFail("An unsuccessful converter response must not become a script output")
+            } catch {
+                XCTAssertTrue(error.localizedDescription.contains("HTTP 50"))
+                XCTAssertTrue(error.localizedDescription.contains("Missing source script"))
+            }
+        }
+    }
+
+    func testWorkerPreservesSuccessfulJavaScriptContainingFailureSymbol() async throws {
+        let output = try await EmbeddedScriptHubEngine().convert(
+            script: "$done({response:{status:200,body:\"console.log('❌ Script Hub 兼容层捕获到原脚本未处理的错误');\"}});",
+            requestURL: try XCTUnwrap(URL(string: "https://example.com/script.js")))
+        XCTAssertEqual(output, "console.log('❌ Script Hub 兼容层捕获到原脚本未处理的错误');")
+    }
+
+    func testQuantumultXOutputMapsRulesRedirectsAndMITM() throws {
+        let result = try QuantumultXOutputConverter.convert("""
+        #!name=Shared
+        [Rule]
+        DOMAIN,example.com,DIRECT
+        IP-CIDR6,::1/128,REJECT,no-resolve
+        [URL Rewrite]
+        ^https://example.com/old https://example.com/new 302
+        ^https://example.com/ads - reject
+        [MITM]
+        hostname = %APPEND% example.com, api.example.com
+        """)
+        XCTAssertTrue(result.content.contains("[filter_local]\nhost, example.com, direct\nip6-cidr, ::1/128, reject"))
+        XCTAssertTrue(result.content.contains("^https://example.com/old url 302 https://example.com/new"))
+        XCTAssertTrue(result.content.contains("^https://example.com/ads url reject"))
+        XCTAssertTrue(result.content.contains("[mitm]\nhostname = example.com, api.example.com"))
+        XCTAssertTrue(result.scripts.isEmpty)
+    }
+
+    func testQuantumultXScriptAdapterPreservesArgumentHTTPCallbacksAndSyntheticResponse() throws {
+        let context = try XCTUnwrap(JSContext())
+        context.evaluateScript("""
+        var captured;
+        var $done = value => { captured = value; };
+        var $prefs = {valueForKey: key => 'saved', setValueForKey: () => true};
+        var $notify = function() {};
+        var $task = {fetch: request => Promise.resolve({statusCode: 200, headers: {'X-Test': 'yes'}, body: 'downloaded'})};
+        """)
+        let script = try QuantumultXOutputConverter.adaptingScript("""
+        $httpClient.get('https://example.com/data', function(error, response, body) {
+          $done({response:{status: 201, headers: response.headers, body: $argument + '|' + $persistentStore.read('key') + '|' + body}});
+        });
+        """, argument: "name=Example, mode=on")
+        context.evaluateScript(script)
+        context.evaluateScript("void 0")
+        XCTAssertNil(context.exception, context.exception?.toString() ?? "")
+        XCTAssertEqual(context.objectForKeyedSubscript("captured")?.forProperty("status")?.toString(), "HTTP/1.1 201")
+        XCTAssertEqual(context.objectForKeyedSubscript("captured")?.forProperty("body")?.toString(), "name=Example, mode=on|saved|downloaded")
+    }
+
+    func testConvertedQuantumultXHTTPKeepsNativeStatusAndRoutesGETPUTDELETE() throws {
+        let context = try XCTUnwrap(JSContext())
+        context.evaluateScript("""
+        var captured;
+        var calls = [];
+        var $done = value => { captured=value; };
+        var $httpClient = {};
+        for (const method of ['get', 'post', 'put', 'delete']) {
+          $httpClient[method] = (request, callback) => {
+            calls.push(method);
+            callback(null, {status: 200, headers: {'X-Test': method}}, method + ' body');
+          };
+        }
+        """)
+        let converted = """
+        var $task = {fetch: request => new Promise(resolve => {
+          const send = request.method === 'POST' ? $httpClient.post : $httpClient.get;
+          send(request, (error, response, data) => { response.body=data; resolve(response); });
+        })};
+        Promise.all(['GET', 'PUT', 'DELETE'].map(method => $task.fetch({url:'https://example.com', method}).then(response => ({method, status:response.status, statusCode:response.statusCode, body:response.body})))).then(results => $done({body:JSON.stringify(results)}));
+        """
+        let adapted = QuantumultXOutputConverter.adaptingConvertedQuantumultXScript(converted)
+        XCTAssertEqual(QuantumultXOutputConverter.adaptingConvertedQuantumultXScript(adapted), adapted)
+        context.evaluateScript(adapted)
+        context.evaluateScript("void 0")
+        XCTAssertNil(context.exception, context.exception?.toString() ?? "")
+        let body = try XCTUnwrap(context.objectForKeyedSubscript("captured")?.forProperty("body")?.toString())
+        let replies = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(body.utf8)) as? [[String: Any]])
+        XCTAssertEqual(context.objectForKeyedSubscript("calls")?.toArray() as? [String], ["get", "put", "delete"])
+        XCTAssertEqual(replies.compactMap { $0["statusCode"] as? Int }, [200, 200, 200])
+        XCTAssertEqual(replies.compactMap { $0["status"] as? Int }, [200, 200, 200])
+        XCTAssertEqual(replies.compactMap { $0["body"] as? String }, ["get body", "put body", "delete body"])
+    }
+
+    func testQuantumultXHeaderBodyAndMapLocalScriptsKeepReplacementValues() throws {
+        let result = try QuantumultXOutputConverter.convert("""
+        [Header Rewrite]
+        http-request ^https://example.com header-replace 'X-Test' 'new value'
+        [Body Rewrite]
+        http-response ^https://example.com 'old value' 'new value'
+        [Map Local]
+        ^https://example.com/mock data-type=text data="{\\"result\\":1}" status-code=201 header="Content-Type:application/json"
+        [Script]
+        demo = type=http-response, pattern=^https://example.com/script, script-path=https://example.com/demo.js, requires-body=true, argument="name=Example, mode=on"
+        """)
+        XCTAssertEqual(result.scripts.count, 4)
+        guard case .remote(_, let argument) = result.scripts[3].content else { return XCTFail("Expected a remote script") }
+        XCTAssertEqual(argument, "name=Example, mode=on")
+        for (index, expected) in [(0, "new value"), (1, "new value"), (2, "{\"result\":1}")] {
+            let context = try XCTUnwrap(JSContext())
+            context.evaluateScript("var captured; var $done = value => { captured=value; }; var $request={headers:{'x-test':'old'}}; var $response={body:'old value'};")
+            guard case .inline(let script) = result.scripts[index].content else { return XCTFail("Expected an inline rewrite script") }
+            context.evaluateScript(script)
+            XCTAssertNil(context.exception, context.exception?.toString() ?? "")
+            let result = context.objectForKeyedSubscript("captured")
+            XCTAssertEqual(index == 0 ? result?.forProperty("headers")?.forProperty("x-test")?.toString() : result?.forProperty("body")?.toString(), expected)
+            if index == 2 { XCTAssertEqual(result?.forProperty("status")?.toString(), "HTTP/1.1 201") }
+        }
+    }
+
+    func testQuantumultXRejectsUnsupportedConfigurationInsteadOfDroppingIt() {
+        for content in ["[Proxy]\nExample = direct", "[Rule]\nAND,((DOMAIN,a.example),(DEST-PORT,443)),DIRECT", "[General]\nforce-http-engine-hosts = example.com"] {
+            XCTAssertThrowsError(try QuantumultXOutputConverter.convert(content)) {
+                XCTAssertTrue($0.localizedDescription.contains("Quantumult X 转换不支持第 2 行"))
+            }
+        }
+    }
+
+    func testStashConversionMaterializesQuotedProviderURLsWithoutChangingYAML() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let engine = EngineStore(cacheDirectory: root)
+        let provider = "http://script.hub/convert/_start_/https://example.com/demo.js/_end_/demo.js?type=qx-script&target=stash-script"
+        let parser = "$done({body: 'http:\\n  script:\\n    - name: Demo\\n      match: ^https://example.com\\n      type: response\\nscript-providers:\\n  Demo:\\n    url: \"\(provider)\"\\n    interval: 86400\\n'});"
+        try await engine.save(scripts: ["Rewrite-Parser.js": Data(parser.utf8), "script-converter.js": Data("$done({body:'$done({body: \"converted\"});'});".utf8)])
+        var github = GitHubSettings()
+        github.owner = "owner"
+        github.repository = "repo"
+        github.repositoryIsPrivate = false
+        let module = RelayModule(name: "Stash", sourceURL: "https://example.com/source.plugin", sourceFormat: .loon,
+            outputFormat: .stash, outputFileName: "Stash")
+        let result = try await ScriptHubClient(engineStore: engine).convert(module: module, github: github)
+        XCTAssertEqual(result.assets.count, 1)
+        XCTAssertTrue(result.content.contains("http:\n  script:\n    - name: Demo"))
+        XCTAssertTrue(result.content.contains("script-providers:\n  Demo:\n    url: \"https://"))
+        XCTAssertFalse(result.content.contains("http://script.hub/convert/"))
+        let asset = String(decoding: result.assets[0].data, as: UTF8.self)
+        XCTAssertTrue(asset.contains("$done({body: \"converted\"});"))
+        XCTAssertTrue(asset.contains("function relayQuantumultXHTTP(nativeHTTPClient)"))
+    }
+
+    func testQuantumultXScriptDownloadRejectsHTTPFailureBeforeProducingOutput() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let engine = EngineStore(cacheDirectory: root)
+        let parser = "$done({body:'[Script]\\ndemo = type=http-response, pattern=^https://example.com, script-path=https://example.com/missing.js, requires-body=true'});"
+        try await engine.save(scripts: ["Rewrite-Parser.js": Data(parser.utf8), "script-converter.js": Data("$done({body:'unused'});".utf8)])
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GitHubMockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        GitHubMockURLProtocol.reset()
+        defer { GitHubMockURLProtocol.reset() }
+        GitHubMockURLProtocol.handler = { _ in (404, Data("Missing script".utf8)) }
+        var github = GitHubSettings()
+        github.owner = "owner"
+        github.repository = "repo"
+        github.repositoryIsPrivate = false
+        let module = RelayModule(name: "QX", sourceURL: "https://example.com/source.plugin", sourceFormat: .loon,
+            outputFormat: .quantumultX, outputFileName: "QX")
+        do {
+            _ = try await ScriptHubClient(engineStore: engine, session: session).convert(module: module, github: github)
+            XCTFail("A 404 response must not become a published JavaScript asset")
+        } catch let resourceError as ScriptHubResourceError {
+            XCTAssertEqual(resourceError.resourceURL.absoluteString, "https://example.com/missing.js")
+            guard let error = resourceError.underlying as? RelayError,
+                  case .httpFailure(let status, _) = error else { return XCTFail("Expected the script HTTP failure") }
+            XCTAssertEqual(status, 404)
+        }
+    }
+
     func testNativeSurgeModuleBypassesConverterEvenWhenFormatIsMislabeled() async throws {
         let module = RelayModule(
             name: "Block HTTPDNS",

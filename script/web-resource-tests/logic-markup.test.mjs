@@ -66,6 +66,31 @@ assert.equal(logic.isNativeSurgeSource('automatic', 'https://example.com/demo.sg
 assert.equal(logic.isNativeSurgeSource('automatic', 'https://example.com/surge/modules/demo.conf'), true);
 assert.equal(logic.isNativeSurgeSource('automatic', 'https://example.com/plugin.lpx'), false);
 
+for (const [outputFormat, extension] of [['surge', 'sgmodule'], ['loon', 'plugin'], ['egern', 'sgmodule'], ['quantumultX', 'conf'], ['shadowrocket', 'sgmodule'], ['stash', 'stoverride']]) {
+  assert.equal(logic.publishedRelativePathForDraft({ name: 'Demo', outputFileName: 'Demo.sgmodule', outputFormat }), `Demo.${extension}`);
+  assert.equal(logic.moduleEditorPayload({ outputFormat }).outputFormat, outputFormat);
+}
+assert.equal(logic.isNativeModuleSource('loon', 'https://example.com/demo.plugin', 'loon'), true);
+assert.equal(logic.isNativeModuleSource('loon', 'https://example.com/demo.plugin', 'quantumultX'), false);
+assert.equal(logic.isNativeModuleSource('surge', 'https://example.com/demo.plugin', 'surge'), false, 'definitive source extension wins');
+assert.equal(logic.isNativeModuleSource('automatic', 'https://example.com/demo.sgmodule?token=1', 'egern'), true);
+assert.equal(logic.isNativeModuleSource('automatic', 'https://example.com/demo.conf', 'quantumultX'), false, 'automatic source has no definitive client signal');
+assert.equal(logic.isNativeModuleSource('automatic', 'https://example.com/resource', 'quantumultX'), false);
+assert.equal(logic.isNativeModuleSource('quantumultX', 'https://example.com/demo.conf', 'quantumultX'), true);
+assert.equal(logic.isNativeModuleSource('automatic', 'https://example.com/QuantumultX/demo.conf', 'quantumultX'), true);
+assert.equal(logic.isNativeModuleSource('surge', 'https://example.com/demo.sgmodule', 'stash'), false);
+assert.equal(logic.normalizedOutputFileName({ outputFileName: 'Demo.yaml', outputFormat: 'stash' }), 'Demo.stoverride');
+for (const outputFormat of ['surge', 'egern', 'shadowrocket']) {
+  assert.equal(logic.normalizedOutputFileName({ outputFileName: 'My Module.module', storageLocation: 'local', outputFormat }), 'My Module.module');
+}
+assert.equal(logic.normalizedOutputFileName({ outputFileName: 'My Plugin.lpx', storageLocation: 'local', outputFormat: 'loon' }), 'My Plugin.lpx');
+assert.equal(logic.normalizedOutputFileName({ outputFileName: 'My Plugin.lpx', sourceURL: 'file:///tmp/My%20Plugin.lpx', storageLocation: 'gitHub', outputFormat: 'loon' }), 'My Plugin.lpx');
+for (const outputFileName of ['My Module.module', 'My Plugin.lpx']) {
+  assert.equal(logic.normalizedOutputFileName({ outputFileName, storageLocation: 'local', outputFormat: 'quantumultX' }), `${outputFileName.split('.')[0]}.conf`);
+}
+assert.notEqual(logic.moduleListSignature({ id: 'same', outputFormat: 'surge' }), logic.moduleListSignature({ id: 'same', outputFormat: 'egern' }));
+assert.match(logic.moduleSearchText({ name: 'Demo', outputFormatTitle: 'Stash' }), /stash/);
+
 assert.deepEqual(
   JSON.parse(JSON.stringify(logic.moduleEditorPayload({
     name: '  Demo  ',
@@ -85,6 +110,7 @@ assert.deepEqual(
     name: 'Demo',
     sourceURL: 'https://example.com/demo.sgmodule',
     sourceFormat: 'surge',
+    outputFormat: 'surge',
     storageLocation: 'local',
     storageTargets: ['local'],
     category: 'Ads',

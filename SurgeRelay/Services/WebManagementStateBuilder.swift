@@ -38,7 +38,8 @@ enum WebManagementStateBuilder {
             automaticPublishScheduledAt: snapshot.automaticPublishScheduledAt,
             automaticPublishRunsAt: snapshot.automaticPublishRunsAt,
             latestGitHubPublish: GitHubPublishSnapshot.latest(in: snapshot.history, settings: snapshot.githubSettings),
-            error: snapshot.error, cancellationRequested: snapshot.cancellationRequested)
+            error: snapshot.error, cancellationRequested: snapshot.cancellationRequested,
+            pendingModuleSaves: snapshot.pendingModuleSaves)
     }
 
     static func moduleEditorPayload(
@@ -70,6 +71,8 @@ enum WebManagementStateBuilder {
             updateSourceURL: module.updateSourceURL,
             sourceFormat: module.sourceFormat.rawValue,
             sourceFormatTitle: module.sourceFormatDisplayTitle,
+            outputFormat: module.outputFormat.rawValue,
+            outputFormatTitle: module.outputFormat.title,
             initialSourceTitle: module.initialSource.title,
             initialSourceIcon: module.initialSource.systemImage,
             outputFileName: module.outputFileName,
@@ -132,7 +135,8 @@ enum WebManagementStateBuilder {
         automaticPublishRunsAt: Date?,
         latestGitHubPublish: GitHubPublishSnapshot?,
         error: String?,
-        cancellationRequested: Bool
+        cancellationRequested: Bool,
+        pendingModuleSaves: [WebPendingModuleSavePayload] = []
     ) -> WebActivityPayload {
         WebActivityPayload(
             isWorking: isWorking,
@@ -154,7 +158,8 @@ enum WebManagementStateBuilder {
             automaticPublishRunsAt: automaticPublishRunsAt,
             latestGitHubPublish: latestGitHubPublish,
             error: error,
-            activeStages: workActivity.activeStages
+            activeStages: workActivity.activeStages,
+            pendingModuleSaves: pendingModuleSaves
         )
     }
 

@@ -130,6 +130,56 @@ enum ModuleSourceFormat: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
+enum ModuleOutputFormat: String, Codable, CaseIterable, Identifiable, Sendable {
+    case surge
+    case loon
+    case quantumultX
+    case egern
+    case stash
+    case shadowrocket
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .surge: "Surge"
+        case .loon: "Loon"
+        case .quantumultX: "Quantumult X"
+        case .egern: "Egern"
+        case .stash: "Stash"
+        case .shadowrocket: "Shadowrocket"
+        }
+    }
+
+    var scriptHubTarget: String {
+        switch self {
+        case .surge, .egern: "surge-module"
+        case .loon: "loon-plugin"
+        case .quantumultX: "qx-rewrite"
+        case .stash: "stash-stoverride"
+        case .shadowrocket: "shadowrocket-module"
+        }
+    }
+
+    var fileExtension: String {
+        switch self {
+        case .surge, .egern, .shadowrocket: "sgmodule"
+        case .loon: "plugin"
+        case .quantumultX: "conf"
+        case .stash: "stoverride"
+        }
+    }
+
+    var usesSurgeSyntax: Bool { self == .surge || self == .egern || self == .shadowrocket }
+
+    func isNativeOutput(for sourceURL: URL, sourceFormat: ModuleSourceFormat) -> Bool {
+        if sourceFormat == .automatic, ModuleSourceFormat.inferredFormat(for: sourceURL) == nil { return false }
+        let source = ModuleSourceFormat.definitiveFormat(for: sourceURL) ?? sourceFormat.resolvedFormat(for: sourceURL)
+        if usesSurgeSyntax { return source == .surge }
+        return (self == .loon && source == .loon) || (self == .quantumultX && source == .quantumultX)
+    }
+}
+
 enum ModuleStorageLocation: String, Codable, CaseIterable, Identifiable, Sendable {
     case local
     case gitHub
@@ -235,7 +285,7 @@ enum ModuleInitialSource: Equatable, Sendable {
             }
             let resolved = subscription.sourceFormat
                 ?? detectedSourceFormat
-                ?? sourceFormat.resolvedFormat(for: url)
+                ?? (sourceFormat == .automatic ? Self.inferredSourceFormat(for: url) : sourceFormat)
             return .subscribed(resolved)
         }
         guard let url = URL(string: sourceURL) else { return .invalid }
@@ -244,8 +294,12 @@ enum ModuleInitialSource: Equatable, Sendable {
               url.host?.isEmpty == false else {
             return .invalid
         }
-        let resolved = detectedSourceFormat ?? sourceFormat.resolvedFormat(for: url)
+        let resolved = detectedSourceFormat ?? (sourceFormat == .automatic ? Self.inferredSourceFormat(for: url) : sourceFormat)
         return .remote(resolved)
+    }
+
+    private static func inferredSourceFormat(for url: URL) -> ModuleSourceFormat {
+        ModuleSourceFormat.inferredFormat(for: url) ?? .automatic
     }
 }
 

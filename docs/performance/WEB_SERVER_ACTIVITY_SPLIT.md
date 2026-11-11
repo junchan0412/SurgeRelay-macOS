@@ -1,5 +1,7 @@
 # Web activity 分流与后台编码复测（2026-10-02）
 
+> 历史基线：结果仅对应当时的 fixture/build，当前验收与计划见 [当前项目报告](../CURRENT_PROJECT_REPORT.md)。
+
 后续已完成完整 DTO 后台构造，当前实现及最新数据见 [后台快照复测](WEB_SERVER_BACKGROUND_SNAPSHOT.md)。本文保留为分流阶段的历史对照。
 
 ## 实现边界
@@ -60,8 +62,8 @@ stop 的连接结束观测约 25–27 ms，包含测试端 25 ms 检查周期，
 
 ## 结果文件
 
-- [分流原始数据](web-server-load-split-5000-2026-10-02.json)
-- [分流构建、源码与二进制 SHA-256](web-server-load-split-build-release-tmp-2026-10-02.json)
+- [分流原始数据](../archive/performance-raw-2026-10/web-server-load-split-5000-2026-10-02.json)
+- [分流构建、源码与二进制 SHA-256](../archive/performance-raw-2026-10/web-server-load-split-build-release-tmp-2026-10-02.json)
 - [原协议基线报告](WEB_SERVER_LOAD_BASELINE.md)
 - 正式结果 bundle：`/tmp/SurgeRelay-web-load-split-2026-10-02.xcresult`
 - 定向回归 bundle：`/tmp/SurgeRelay-web-split-regression-2026-10-02.xcresult`

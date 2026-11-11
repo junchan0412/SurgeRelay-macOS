@@ -80,7 +80,9 @@ enum ScriptHubJavaScriptRuntime {
     static func execute(
         script: String,
         scriptConverterScript: String?,
-        requestURL: URL
+        requestURL: URL,
+        sourceData: Data? = nil,
+        sourceURL: URL? = nil
     ) throws -> String {
         guard let context = JSContext() else {
             throw RelayError.invalidOutput("无法创建 JavaScriptCore 运行环境。")
@@ -89,6 +91,7 @@ enum ScriptHubJavaScriptRuntime {
         var output: String?
         var exceptionMessage: String?
         var sourceRetryAfter: SourceRetryAfterError?
+        var unsupportedContent: String?
         context.exceptionHandler = { _, exception in
             exceptionMessage = exception?.toString()
         }
@@ -100,6 +103,15 @@ enum ScriptHubJavaScriptRuntime {
                 return
             }
             do {
+                let requestedSource = requestValue.isString ? requestValue.toString() : requestValue.forProperty("url")?.toString()
+                if method == "GET", let sourceURL, requestedSource == sourceURL.absoluteString, let sourceData {
+                    guard let body = String(data: sourceData, encoding: .utf8) else {
+                        throw RelayError.invalidOutput("来源不是有效的 UTF-8 配置文本。")
+                    }
+                    callback.call(withArguments: [NSNull(),
+                        ["status": 200, "statusCode": 200, "headers": ["Content-Type": "text/plain; charset=UTF-8"]], body])
+                    return
+                }
                 let request = try ScriptHubNetworkPolicy.makeRequest(method: method, value: requestValue)
                 if request.url?.host == "script.hub",
                    request.url?.path.contains("/convert/_start_/") == true,
@@ -141,14 +153,31 @@ enum ScriptHubJavaScriptRuntime {
         let writeBlock: WriteBlock = { _, _ in true }
         context.setObject(writeBlock, forKeyedSubscript: "__relayWrite" as NSString)
 
+        typealias NotifyBlock = @convention(block) (String, String, String) -> Void
+        let notifyBlock: NotifyBlock = { _, _, message in
+            if message.contains("不支持以下内容:") { unsupportedContent = message }
+        }
+        context.setObject(notifyBlock, forKeyedSubscript: "__relayNotify" as NSString)
+
         typealias DoneBlock = @convention(block) (JSValue) -> Void
         let doneBlock: DoneBlock = { value in
             let response = value.forProperty("response")
+            let payload: JSValue
             if let response, !response.isUndefined, !response.isNull {
-                output = response.forProperty("body")?.toString()
+                payload = response
             } else {
-                output = value.forProperty("body")?.toString()
+                payload = value
             }
+            let body = payload.forProperty("body")?.toString()
+            if let status = payload.forProperty("status"), !status.isUndefined, !status.isNull {
+                let code = status.isNumber ? Int(status.toInt32())
+                    : status.toString()?.split(separator: " ").compactMap { Int($0) }.first
+                if let code, code >= 400 {
+                    exceptionMessage = "HTTP \(code)：\(String((body ?? "").prefix(4_000)))"
+                    return
+                }
+            }
+            output = body
         }
         context.setObject(doneBlock, forKeyedSubscript: "__relayDone" as NSString)
 
@@ -167,7 +196,7 @@ enum ScriptHubJavaScriptRuntime {
               read: function(key) { return __relayRead(key); },
               write: function(value, key) { return __relayWrite(value, key); }
             };
-            var $notification = {post: function() {}};
+            var $notification = {post: function(title, subtitle, message) { __relayNotify(title || '', subtitle || '', message || ''); }};
             var $done = function(value) { __relayDone(value || {}); };
             var setTimeout = function() { return 0; };
             var clearTimeout = function() {};
@@ -183,6 +212,7 @@ enum ScriptHubJavaScriptRuntime {
         }
 
         if let sourceRetryAfter { throw sourceRetryAfter }
+        if let unsupportedContent { throw RelayError.invalidOutput(String(unsupportedContent.prefix(4_000))) }
         if let exceptionMessage {
             throw RelayError.invalidOutput("Script-Hub 执行异常：\(exceptionMessage)")
         }

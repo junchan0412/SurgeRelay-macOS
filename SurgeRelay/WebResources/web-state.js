@@ -8,7 +8,7 @@
   function resolveInitialSelection(snapshot, options = {}) {
     const requested = options.requestedModuleID || '';
     const isMobile = Boolean(options.isMobile);
-    const requestedExists = requested === 'overview' || requested === 'activity' ? true
+    const requestedExists = ['overview', 'activity', 'tools'].includes(requested) ? true
       : Boolean(requested && snapshot?.modules?.some(module => module.id === requested));
 
     if (requestedExists) {
@@ -26,7 +26,7 @@
     const before = selectedID;
     let next = selectedID;
 
-    if (next && !['overview', 'activity'].includes(next) && !snapshot?.modules?.some(module => module.id === next)) {
+    if (next && !['overview', 'activity', 'tools'].includes(next) && !snapshot?.modules?.some(module => module.id === next)) {
       next = fallbackSelection(snapshot, isMobile);
     }
     if (!next && !isMobile) {

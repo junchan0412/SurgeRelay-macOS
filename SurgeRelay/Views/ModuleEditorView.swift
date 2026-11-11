@@ -13,11 +13,11 @@ struct ModuleEditorView: View {
     @State private var showsNewFolderDialog = false
     @State private var newFolderName = ""
 
-    private var isNativeSurgeModule: Bool {
+    private var isNativeModule: Bool {
         guard let url = URL(string: draft.sourceURL), !draft.sourceURL.isEmpty else {
-            return draft.sourceFormat == .surge
+            return false
         }
-        return draft.sourceFormat.isNativeSurgeModule(for: url)
+        return draft.outputFormat.isNativeOutput(for: url, sourceFormat: draft.sourceFormat)
     }
 
     private var customIconPreviewURL: URL? {
@@ -40,7 +40,7 @@ struct ModuleEditorView: View {
         if customIconInputIsInvalid {
             return "请输入完整的 HTTP/HTTPS 图标地址。"
         }
-        return "留空时保留来源里的 #!icon；填写后会在输出中重写 #!icon，来源缺失或不匹配时自动补齐。"
+        return "留空时保留来源图标；填写后用于模块显示，并按输出客户端支持的格式写入产物。"
     }
 
     init(module: RelayModule?, defaultStorageLocation: ModuleStorageLocation = .gitHub, initialDraft: ModuleDraft? = nil) {
@@ -132,7 +132,7 @@ struct ModuleEditorView: View {
     }
 
     private var editorPreviewSubtitle: String {
-        var parts = [draftRelationship.storageTitle, draftRelationship.initialSource.title]
+        var parts = [draft.outputFormat.title, draftRelationship.storageTitle, draftRelationship.initialSource.title]
         let category = draft.category.trimmingCharacters(in: .whitespacesAndNewlines)
         if !category.isEmpty { parts.append(category) }
         return parts.joined(separator: " · ")
@@ -214,6 +214,7 @@ struct ModuleEditorView: View {
     private var publishingSection: some View {
         ModuleEditorPublishingSection(
             outputFileName: $draft.outputFileName,
+            outputFormat: $draft.outputFormat,
 
             publishedRelativePath: previewPublishedRelativePath,
             outputPathNotice: outputPathNotice
@@ -256,7 +257,7 @@ struct ModuleEditorView: View {
         ModuleEditorConversionSection(
             isAdvancedExpanded: $isAdvancedExpanded,
             scriptHubOptions: $draft.scriptHubOptions,
-            isNativeSurgeModule: isNativeSurgeModule
+            isNativeModule: isNativeModule
         )
     }
 

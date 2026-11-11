@@ -25,6 +25,7 @@
   <script src="/web-editor.js?v=220" defer></script>
   <script src="/web-feedback.js?v=220" defer></script>
   <script src="/web-preview.js?v=220" defer></script>
+  <script src="/web-tools.js?v=220" defer></script>
   <script src="/web-detail.js?v=220" defer></script>
   <script src="/app.js?v=220" defer></script>
 </head>
@@ -44,6 +45,7 @@
         <nav class="workspace-navigation" aria-label="工作空间">
           <button id="overview-button" class="workspace-nav-item" type="button"><span class="symbol" data-symbol="sidebar.left"></span><span>工作台</span></button>
           <button id="history-button" class="workspace-nav-item" type="button"><span class="symbol" data-symbol="clock"></span><span>活动记录</span></button>
+          <button id="tools-button" class="workspace-nav-item" type="button"><span class="symbol" data-symbol="refresh"></span><span>转换工具</span></button>
         </nav>
         <div class="search-field" role="search"><span class="symbol" data-symbol="magnifyingglass" aria-hidden="true"></span><input id="search-input" type="search" placeholder="搜索模块" aria-label="搜索模块" aria-controls="module-list" aria-describedby="search-status" aria-keyshortcuts="Meta+k Control+k /" autocomplete="off"><kbd class="search-shortcut" aria-hidden="true">/</kbd><button id="clear-search" class="clear-search" type="button" aria-label="清除搜索" title="清除搜索（Esc）" hidden><span class="symbol" data-symbol="xmark"></span></button></div>
         <span id="search-status" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></span>
@@ -85,14 +87,16 @@
         <button class="icon-button close-module-dialog" type="button" aria-label="关闭" title="关闭"><span class="symbol" data-symbol="xmark"></span></button>
       </div>
       <div class="form-content">
+        <p id="module-dialog-busy" class="dialog-message neutral" role="status" hidden></p>
         <section class="editor-section">
           <h3>基本信息</h3>
           <div class="editor-group">
             <label class="form-row"><span>显示名称</span><input name="name" type="text" required placeholder="例如：YouTube 去广告"></label>
-            <label class="form-row"><span>模块标签</span><input name="category" type="text" placeholder="Surge category"></label>
-            <label class="form-row"><span>图标 URL</span><span class="field-with-note"><span class="icon-url-control"><span class="module-icon icon-url-preview placeholder" id="icon-url-preview"><span class="symbol" data-symbol="shippingbox"></span></span><input name="iconURL" type="url" placeholder="https://example.com/icon.png"></span><small class="field-note">留空时使用来源图标；填写后会重写输出中的 #!icon，支持完整 HTTP/HTTPS 地址。</small></span></label>
+            <label class="form-row"><span>模块标签</span><input name="category" type="text" placeholder="例如：广告过滤"></label>
+            <label class="form-row"><span>图标 URL</span><span class="field-with-note"><span class="icon-url-control"><span class="module-icon icon-url-preview placeholder" id="icon-url-preview"><span class="symbol" data-symbol="shippingbox"></span></span><input name="iconURL" type="url" placeholder="https://example.com/icon.png"></span><small class="field-note">留空时使用来源图标；填写后用于模块显示，并按输出客户端支持的格式写入产物。</small></span></label>
             <label class="form-row"><span>模块存放</span><select name="storageLocation"><option value="gitHub">GitHub 模块</option><option value="local">本地模块</option><option value="both">本地与 GitHub</option></select></label>
             <label class="form-row"><span>存放文件夹</span><select name="outputFolder"><option value="">根目录</option></select></label>
+            <label class="form-row"><span>输出客户端</span><select name="outputFormat"><option value="surge">Surge</option><option value="loon">Loon</option><option value="egern">Egern</option><option value="quantumultX">Quantumult X</option><option value="shadowrocket">Shadowrocket</option><option value="stash">Stash</option></select></label>
             <label class="form-row"><span>输出文件名</span><input name="outputFileName" type="text" placeholder="留空时根据显示名称生成"></label>
             <div class="form-row output-path-row"><span>输出路径</span><span class="output-path-value"><span><code id="output-path-preview">Untitled.sgmodule</code><small id="output-path-note" class="field-note output-path-note" hidden></small></span><button class="button output-path-copy" type="button" data-action="copy-output-path"><span class="symbol" data-symbol="copy"></span>拷贝</button></span></div>
           </div>
@@ -117,7 +121,7 @@
             <button class="advanced-master" id="advanced-master" type="button" aria-expanded="false"><span class="symbol" data-symbol="chevron.right"></span><strong>高级</strong></button>
             <div class="advanced-master-content" id="advanced-master-content" aria-hidden="true">
               <div class="advanced-master-inner">
-                <div class="native-module-note" id="native-module-note" hidden><span class="symbol" data-symbol="arrow.triangle.2.circlepath"></span><span>该地址是 Surge 模块，将直接生成独立输出，不经过 Script‑Hub；高级转换选项不会应用。</span></div>
+                <div class="native-module-note" id="native-module-note" hidden><span class="symbol" data-symbol="arrow.triangle.2.circlepath"></span><span>来源与输出客户端兼容，将保留原生格式生成独立输出；高级转换选项不会应用。</span></div>
                 <div id="advanced-options"></div>
               </div>
             </div>

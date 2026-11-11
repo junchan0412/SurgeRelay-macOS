@@ -126,7 +126,7 @@ struct SettingsPublishingView: View {
             }
             SettingsCopyableInfoRow(
                 "目录内容",
-                value: "\(diagnostics.folderCount) 个文件夹 · \(diagnostics.moduleFileCount) 个 .sgmodule",
+                value: "\(diagnostics.folderCount) 个文件夹 · \(diagnostics.moduleFileCount) 个模块文件",
                 icon: "shippingbox"
             )
             if let error = diagnostics.error {

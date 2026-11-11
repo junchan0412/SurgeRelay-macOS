@@ -1,6 +1,6 @@
 import Foundation
 
-/// Script-Hub 重写转换器支持的 Surge 目标参数。
+/// Script-Hub 重写转换参数。
 /// 字段名刻意贴近上游参数，便于随 Script-Hub 更新时核对兼容性。
 struct ScriptHubOptions: Codable, Hashable, Sendable {
     var scriptConversionKeywords = ""

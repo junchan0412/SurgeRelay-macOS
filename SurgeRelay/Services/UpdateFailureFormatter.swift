@@ -29,6 +29,7 @@ enum UpdateFailureFormatter {
     }
 
     static func isActionableNetworkFailure(_ error: any Error) -> Bool {
+        if error is ScriptHubResourceError { return true }
         if let relayError = error as? RelayError,
            case .httpFailure = relayError {
             return true

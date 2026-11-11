@@ -3,6 +3,18 @@ import XCTest
 @testable import SurgeRelay
 
 final class UpdateFailureTests: XCTestCase {
+    func testScriptResourceFailureDoesNotBlameOriginalSourceOrExposeResourceCredentials() {
+        let module = RelayModule(name: "Source", sourceURL: "https://original.example/module.sgmodule", outputFileName: "Source")
+        let resource = URL(string: "https://user:password@scripts.example/missing.js?token=private#fragment")!
+        let error = ScriptHubResourceError(resourceURL: resource, underlying: RelayError.httpFailure(status: 404, message: "missing"))
+        let message = UpdateFailurePlanner.detailedMessage(for: error, module: module)
+        XCTAssertTrue(message.contains("脚本资源获取失败：https://scripts.example/missing.js"))
+        XCTAssertTrue(message.contains("404"))
+        for value in ["original.example", "password", "private", "fragment"] { XCTAssertFalse(message.contains(value)) }
+        XCTAssertFalse(UpdateFailurePlanner.shouldCheckUpdateSourceAfterConversionFailure(error, module: module, existingSourceCheckFailure: nil))
+        XCTAssertTrue(UpdateRetryPolicy.shouldRetryTransientFailure(error))
+    }
+
     func testUpdateFailureFormatterExplainsOriginalHTTPFailure() {
         let sourceURL = "https://raw.githubusercontent.com/example/repo/main/Missing.sgmodule?token=secret"
         let message = UpdateFailureFormatter.detailedMessage(

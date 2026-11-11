@@ -2,6 +2,15 @@ import XCTest
 @testable import SurgeRelay
 
 final class ModuleSearchIndexTests: XCTestCase {
+    func testClientChangeInvalidatesSearchMetadataWithTheSameFileExtension() {
+        let original = RelayModule(name: "Shared", sourceURL: "https://example.org/Shared.plugin", outputFileName: "Shared")
+        var changed = original
+        changed.outputFormat = .egern
+        XCTAssertNotEqual(ModuleSearchIndex.metadataCacheKey(for: original), ModuleSearchIndex.metadataCacheKey(for: changed))
+        XCTAssertNotEqual(ModuleSearchIndex.contentCacheKey(for: original), ModuleSearchIndex.contentCacheKey(for: changed))
+        XCTAssertTrue(ModuleSearchIndex.metadataText(for: changed).contains("egern"))
+    }
+
     func testModuleSearchIndexIncludesDisplayedMetadata() {
         let module = RelayModule(
             name: "Video Enhancer",

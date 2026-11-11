@@ -17,6 +17,7 @@ struct ScriptHubSubscriptionInfo: Codable, Hashable, Sendable {
             return definitive
         }
         switch sourceType?.lowercased() {
+        case "all-module": return .automatic
         case "qx-rewrite": return .quantumultX
         case "loon-plugin": return .loon
         case "surge-module": return .surge
@@ -65,37 +66,37 @@ enum ModuleMetadataParser {
             return nil
         }
         let source = sourceURL.absoluteString.components(separatedBy: "#").first ?? sourceURL.absoluteString
-        let fileName = FilenameSanitizer.baseName(from: module.outputFileName)
+        let fileName = URL(fileURLWithPath: module.outputFileName).deletingPathExtension().lastPathComponent
             .addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? "module"
-        let type = module.sourceFormat.scriptHubType(for: sourceURL)
+        let type = module.sourceFormat == .automatic && ModuleSourceFormat.definitiveFormat(for: sourceURL) == nil
+            ? "all-module" : module.sourceFormat.scriptHubType(for: sourceURL)
         var components = URLComponents()
         components.queryItems = [
             URLQueryItem(name: "type", value: type),
-            URLQueryItem(name: "target", value: "surge-module")
+            URLQueryItem(name: "target", value: module.outputFormat.scriptHubTarget)
         ] + module.scriptHubOptions.queryItems()
         guard let query = components.percentEncodedQuery,
-              let subscriptionURL = URL(string: "http://script.hub/file/_start_/\(source)/_end_/\(fileName).sgmodule?\(query)") else {
+              let subscriptionURL = URL(string: "http://script.hub/file/_start_/\(source)/_end_/\(fileName).\(module.outputFormat.fileExtension)?\(query)") else {
             return nil
         }
-        let baseName = FilenameSanitizer.baseName(from: module.outputFileName)
+        let baseName = URL(fileURLWithPath: module.outputFileName).deletingPathExtension().lastPathComponent
         return ScriptHubSubscriptionInfo(
             subscriptionURL: subscriptionURL.absoluteString,
             originalURL: sourceURL.absoluteString,
             outputName: baseName.isEmpty ? module.outputFileName : baseName,
             sourceType: type,
-            target: "surge-module",
+            target: module.outputFormat.scriptHubTarget,
             category: module.category.isEmpty ? nil : module.category,
             options: module.scriptHubOptions
         )
     }
 
     static func iconURL(in content: String, relativeTo source: String? = nil) -> URL? {
-        guard let rawValue = ModuleMetadataLineReader.hashBangValue(named: "icon", in: content) else {
+        guard let rawValue = ModuleMetadataLineReader.headerValue(named: "icon", in: content) else {
             return nil
         }
         let value = rawValue
             .trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
         guard !value.isEmpty else { return nil }
 
         let baseURL = source.flatMap(URL.init(string:))
@@ -108,22 +109,20 @@ enum ModuleMetadataParser {
     /// used by Surge `.sgmodule` and Loon plugins. Returns nil when absent
     /// (e.g. most Quantumult X rewrite `.conf` files have no name field).
     static func displayName(in content: String) -> String? {
-        guard let rawValue = ModuleMetadataLineReader.hashBangValue(named: "name", in: content) else {
+        guard let rawValue = ModuleMetadataLineReader.headerValue(named: "name", in: content) else {
             return nil
         }
         let value = rawValue
             .trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
         return value.isEmpty ? nil : value
     }
 
     static func category(in content: String) -> String? {
-        guard let rawValue = ModuleMetadataLineReader.hashBangValue(named: "category", in: content) else {
+        guard let rawValue = ModuleMetadataLineReader.headerValue(named: "category", in: content) else {
             return nil
         }
         let value = rawValue
             .trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
         return value.isEmpty ? nil : value
     }
 
@@ -210,9 +209,46 @@ enum ModuleMetadataParser {
         category: String,
         desc: String = "",
         iconURL: String? = nil,
-        to content: String
+        to content: String,
+        outputFormat: ModuleOutputFormat = .surge
     ) -> String {
-        applyingIcon(
+        if outputFormat == .stash {
+            var values = [("name", name.trimmingCharacters(in: .whitespacesAndNewlines))]
+            for (key, value) in [("category", category), ("desc", desc), ("icon", iconURL ?? "")] {
+                let value = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !value.isEmpty { values.append((key, value)) }
+            }
+            var lines = content.components(separatedBy: "\n")
+            for (key, value) in values {
+                let quoted = String(data: try! JSONEncoder().encode(value), encoding: .utf8)!
+                let replacement = "\(key): \(quoted)"
+                if let index = lines.firstIndex(where: { $0.hasPrefix("\(key):") }) {
+                    var end = index + 1
+                    while end < lines.count, lines[end].isEmpty || lines[end].hasPrefix(" ") || lines[end].hasPrefix("\t") {
+                        end += 1
+                    }
+                    lines.replaceSubrange(index..<end, with: [replacement])
+                } else {
+                    lines.insert(replacement, at: 0)
+                }
+            }
+            return lines.joined(separator: "\n")
+        }
+        if outputFormat == .loon {
+            var result = applyingIcon(iconURL, to: applyingDescription(desc, to: applyingDisplayName(name, to: content)))
+            let value = category.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !value.isEmpty {
+                let tag = "#!tag=\(value)"
+                let lines = result.components(separatedBy: "\n")
+                if lines.contains(where: { $0.hasPrefix("#!tag=") }) {
+                    result = lines.map { $0.hasPrefix("#!tag=") ? tag : $0 }.joined(separator: "\n")
+                } else {
+                    result = insertingHeaderLine(tag, into: result)
+                }
+            }
+            return result
+        }
+        return applyingIcon(
             iconURL,
             to: applyingDescription(desc, to: applyingCategory(category, to: applyingDisplayName(name, to: content)))
         )
@@ -430,13 +466,17 @@ enum ModuleArgumentProcessor {
         return ModuleArgumentInfo(definitions: definitions, helpText: help?.isEmpty == false ? help : nil)
     }
 
-    static func materialize(_ content: String, overrides: [String: String]) -> String {
+    static func materialize(_ content: String, overrides: [String: String], preservingWhitespace: Bool = false) -> String {
         let info = info(in: content)
         var resolved = content.replacingOccurrences(of: "\r\n", with: "\n")
         for definition in info.definitions {
             let value = overrides[definition.key] ?? definition.defaultValue
             resolved = resolved.replacingOccurrences(of: "%\(definition.key)%", with: value)
             resolved = resolved.replacingOccurrences(of: "{{{\(definition.key)}}}", with: value)
+        }
+
+        if preservingWhitespace {
+            return resolved.components(separatedBy: "\n").filter { !isArgumentMetadata($0) }.joined(separator: "\n")
         }
 
         var output: [String] = []
@@ -555,6 +595,53 @@ enum ModuleArgumentProcessor {
 }
 
 private enum ModuleMetadataLineReader {
+    static func headerValue(named name: String, in content: String) -> String? {
+        var value: String?
+        var literal: [String]?
+        content.enumerateLines { line, stop in
+            if literal != nil {
+                if line.hasPrefix("  ") {
+                    literal?.append(String(line.dropFirst(2)))
+                    return
+                }
+                if line.isEmpty {
+                    literal?.append("")
+                    return
+                }
+                value = literal?.joined(separator: "\n")
+                stop = true
+                return
+            }
+            if let parsed = parseHashBangLine(line) {
+                let isTag = name == "category" && parsed.name.caseInsensitiveCompare("tag") == .orderedSame
+                guard isTag || parsed.name.caseInsensitiveCompare(name) == .orderedSame else { return }
+                let raw = parsed.value
+                if raw.count >= 2, (raw.hasPrefix("\"") && raw.hasSuffix("\"") || raw.hasPrefix("'") && raw.hasSuffix("'")) {
+                    value = String(raw.dropFirst().dropLast())
+                } else {
+                    value = raw
+                }
+                stop = name != "category" || isTag
+                return
+            }
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty || trimmed.hasPrefix("#") || trimmed.hasPrefix(";") || trimmed.hasPrefix("//") { return }
+            if line.first?.isWhitespace == true { return }
+            guard let colon = line.firstIndex(of: ":") else { stop = true; return }
+            let key = String(line[..<colon])
+            if ["http", "rules", "script-providers", "cron", "tiles"].contains(key) { stop = true; return }
+            guard key == name else { return }
+            let scalar = line[line.index(after: colon)...].trimmingCharacters(in: .whitespacesAndNewlines)
+            if scalar == "|-" {
+                literal = []
+            } else {
+                value = try? JSONDecoder().decode(String.self, from: Data(scalar.utf8))
+                stop = true
+            }
+        }
+        return literal?.joined(separator: "\n") ?? value
+    }
+
     static func hashBangValue(named name: String, in content: String) -> String? {
         for line in content.split(whereSeparator: { $0.isNewline }) {
             let parsed = parseHashBangLine(String(line))

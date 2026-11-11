@@ -99,7 +99,7 @@
 
     function updateNativeModuleState() {
       const form = formElements();
-      const native = logic.isNativeSurgeSource(form.sourceFormat?.value, form.sourceURL?.value);
+      const native = logic.isNativeModuleSource(form.sourceFormat?.value, form.sourceURL?.value, form.outputFormat?.value || 'surge');
       if (ui.nativeNote) ui.nativeNote.hidden = !native;
       if (ui.advancedOptions) ui.advancedOptions.hidden = native;
       return native;
@@ -175,6 +175,7 @@
         ui.moduleDialogMessage.hidden = true;
         ui.moduleDialogMessage.textContent = '';
       }
+      updateBusyState(context.state?.activity);
       if (ui.dialogTitle) ui.dialogTitle.textContent = isEditing ? '编辑模块' : '添加模块';
       if (ui.saveModule) ui.saveModule.textContent = isEditing ? '保存' : '添加';
       if (form.name) form.name.value = module?.name || '';
@@ -185,6 +186,7 @@
       if (form.outputFileName) form.outputFileName.value = module?.outputFileName || '';
       if (form.sourceURL) form.sourceURL.value = module?.sourceURL || '';
       if (form.sourceFormat) form.sourceFormat.value = module?.sourceFormat || 'automatic';
+      if (form.outputFormat) form.outputFormat.value = module?.outputFormat || 'surge';
       if (form.refreshIntervalMinutes) {
         const minutes = module?.refreshIntervalMinutes;
         const valid = Number.isInteger(minutes) && minutes >= 0 && minutes <= 10080;
@@ -213,6 +215,13 @@
       };
     }
 
+    function updateBusyState(activity = {}) {
+      if (!ui.moduleDialogBusy) return;
+      ui.moduleDialogBusy.hidden = !activity.isWorking;
+      ui.moduleDialogBusy.textContent = activity.isWorking
+        ? `${activity.title || '当前任务正在运行'}；当前修改尚未保存，请在任务结束后再提交。` : '';
+    }
+
     function collectModuleFields() {
       const form = formElements();
       const interval = form.refreshIntervalMinutes?.value;
@@ -222,6 +231,7 @@
         name: form.name?.value || '',
         sourceURL: form.sourceURL?.value || '',
         sourceFormat: form.sourceFormat?.value || 'automatic',
+        outputFormat: form.outputFormat?.value || 'surge',
         storageLocation: form.storageLocation?.value || 'gitHub',
         storageTargets: form.storageLocation?.value === 'both' ? ['local', 'gitHub'] : [form.storageLocation?.value || 'gitHub'],
         category: form.category?.value || '',
@@ -240,7 +250,8 @@
         sourceURL: form.sourceURL?.value,
         storageLocation: form.storageLocation?.value || 'gitHub',
         outputFolder: form.outputFolder?.value,
-        outputFileName: form.outputFileName?.value
+        outputFileName: form.outputFileName?.value,
+        outputFormat: form.outputFormat?.value || 'surge'
       });
       ui.outputPathPreview.textContent = path;
       const notice = logic.outputPathNotice(path, {
@@ -338,6 +349,7 @@
       outputFoldersForStorage,
       refreshOutputFolders,
       populateModuleForm,
+      updateBusyState,
       updateRefreshPolicy,
       collectModuleFields,
       updateOutputPathPreview,

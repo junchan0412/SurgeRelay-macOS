@@ -1,0 +1,79 @@
+name: QA
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qa-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regression:
+    name: Swift and Web regression
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        # actions/checkout@v4.3.1
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Record build environment
+        run: |
+          mkdir -p build/qa
+          { sw_vers; xcodebuild -version; node --version; python3 --version; } | tee build/qa/environment.log
+
+      - name: Check release configuration and Web resources
+        run: ./script/check_release_configuration.sh 2>&1 | tee build/qa/preflight.log
+
+      - name: Check isolated native QA fixture
+        run: python3 -B script/test_native_qa_fixture.py 2>&1 | tee build/qa/fixture.log
+
+      - name: Run Swift unit regression
+        run: ./script/run_swift_qa.sh build/qa/swift
+
+      - name: Check Script-Hub client matrix
+        run: |
+          python3 -B script/test_script_hub_matrix.py \
+            --worker "build/qa-swift/DerivedData/Build/Products/Release/Surge Relay.app/Contents/Helpers/SurgeRelayScriptWorker" \
+            --output-directory build/qa/multiclient
+
+      - name: Check rule and script tools
+        run: |
+          python3 -B script/test_script_hub_tools.py \
+            --worker "build/qa-swift/DerivedData/Build/Products/Release/Surge Relay.app/Contents/Helpers/SurgeRelayScriptWorker" \
+            --output-directory build/qa/tools
+
+      - name: Publish test summary
+        if: always()
+        run: |
+          if [[ -f build/qa/swift/summary.md ]]; then
+            cat build/qa/swift/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload QA results
+        if: always()
+        # actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: qa-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            build/qa/**/*.log
+            build/qa/swift/*.json
+            build/qa/swift/summary.md
+            build/qa/swift/Tests.xcresult
+            build/qa/multiclient/matrix-result.json
+            build/qa/multiclient/*.sgmodule
+            build/qa/multiclient/*.plugin
+            build/qa/multiclient/*.conf
+            build/qa/multiclient/*.stoverride
+            build/qa/tools/matrix-result.json
+            build/qa/tools/*.js
+            build/qa/tools/*.list
+            build/qa/tools/*.response.json
+          retention-days: 14

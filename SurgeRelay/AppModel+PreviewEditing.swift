@@ -18,7 +18,7 @@ extension AppModel {
         }
         let namedContent = await processingWorker.applyingModuleMetadata(
             name: module.name, category: module.category, desc: module.moduleDescription,
-            iconURL: module.customIconURL, to: content
+            iconURL: module.customIconURL, to: content, outputFormat: module.outputFormat
         )
         try checkPreviewMutationContext(module, generation: generation)
         let currentContent = try? await modulePreviewProvider.componentContent(for: module)
@@ -37,7 +37,8 @@ extension AppModel {
             module: module, namedContent: namedContent, currentContent: currentContent,
             convertedContent: convertedContent, automaticallyPublish: settings.automaticallyPublish
         )
-        _ = try await fileStore.recordCurrentVersion(id: module.id, reason: .beforeEdit)
+        _ = try await fileStore.recordCurrentVersion(id: module.id, reason: .beforeEdit,
+            outputFormat: module.lastConvertedOutputFormat ?? module.outputFormat)
         try checkPreviewMutationContext(module, generation: generation)
         try await fileStore.writeComponentOverride(plan.overrideContent, id: module.id)
         try checkPreviewMutationContext(module, generation: generation)
@@ -67,7 +68,8 @@ extension AppModel {
         let generation = localChangeGeneration
         _ = try await modulePreviewProvider.convertedComponentContent(for: module)
         try checkPreviewMutationContext(module, generation: generation)
-        _ = try await fileStore.recordCurrentVersion(id: module.id, reason: .beforeRestore)
+        _ = try await fileStore.recordCurrentVersion(id: module.id, reason: .beforeRestore,
+            outputFormat: module.lastConvertedOutputFormat ?? module.outputFormat)
         try checkPreviewMutationContext(module, generation: generation)
         try await fileStore.removeComponentOverride(id: module.id)
         try checkPreviewMutationContext(module, generation: generation)

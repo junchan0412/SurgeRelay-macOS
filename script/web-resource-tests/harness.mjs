@@ -15,6 +15,7 @@ export const stateSource = readFileSync(new URL('SurgeRelay/WebResources/web-sta
 export const editorSource = readFileSync(new URL('SurgeRelay/WebResources/web-editor.js', root), 'utf8');
 export const feedbackSource = readFileSync(new URL('SurgeRelay/WebResources/web-feedback.js', root), 'utf8');
 export const previewSource = readFileSync(new URL('SurgeRelay/WebResources/web-preview.js', root), 'utf8');
+export const toolsSource = readFileSync(new URL('SurgeRelay/WebResources/web-tools.js', root), 'utf8');
 export const detailSource = readFileSync(new URL('SurgeRelay/WebResources/web-detail.js', root), 'utf8');
 export const appSource = readFileSync(new URL('SurgeRelay/WebResources/app.js', root), 'utf8');
 export const indexHTML = readFileSync(new URL('SurgeRelay/WebResources/index.html', root), 'utf8');
@@ -31,6 +32,7 @@ vm.runInContext(stateSource, context, { filename: 'web-state.js' });
 vm.runInContext(editorSource, context, { filename: 'web-editor.js' });
 vm.runInContext(feedbackSource, context, { filename: 'web-feedback.js' });
 vm.runInContext(previewSource, context, { filename: 'web-preview.js' });
+vm.runInContext(toolsSource, context, { filename: 'web-tools.js' });
 vm.runInContext(detailSource, context, { filename: 'web-detail.js' });
 
 export const logic = context.SurgeRelayWebLogic;
@@ -44,6 +46,7 @@ export const stateHelpers = context.SurgeRelayWebState;
 export const editorHelpers = context.SurgeRelayWebEditor;
 export const feedbackHelpers = context.SurgeRelayWebFeedback;
 export const previewHelpers = context.SurgeRelayWebPreview;
+export const toolsHelpers = context.SurgeRelayWebTools;
 export const detailHelpers = context.SurgeRelayWebDetail;
 
 assert.ok(logic, 'web logic should install a global testable API');

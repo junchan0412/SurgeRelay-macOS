@@ -3,6 +3,64 @@ import XCTest
 @testable import SurgeRelay
 
 final class ModuleDraftPlannerTests: XCTestCase {
+    func testSourceCanHaveIndependentClientOutputsAndStillRejectsSameClientDuplicate() throws {
+        var draft = ModuleDraft()
+        draft.name = "Example"
+        draft.sourceURL = "https://example.com/source.plugin"
+        var modules: [RelayModule] = []
+        for format in ModuleOutputFormat.allCases {
+            draft.outputFormat = format
+            let plan = try ModuleDraftPlanner.addPlan(from: draft, modules: modules, localModuleDirectory: "/tmp/Clients")
+            XCTAssertEqual(plan.module.outputFormat, format)
+            XCTAssertEqual((plan.module.outputFileName as NSString).pathExtension, format.fileExtension)
+            XCTAssertFalse(modules.contains { $0.publishedRelativePath == plan.module.publishedRelativePath })
+            modules.append(plan.module)
+        }
+        XCTAssertEqual(modules.count, 6)
+        draft.outputFormat = .loon
+        XCTAssertThrowsError(try ModuleDraftPlanner.addPlan(from: draft, modules: modules, localModuleDirectory: "/tmp/Clients")) {
+            guard let error = $0 as? RelayError, case .duplicateSourceURL = error else { return XCTFail("Expected duplicate source for the same client") }
+        }
+    }
+
+    func testClientChangeRequiresNewConversionAndPreservesSourceDeadline() throws {
+        let deadline = Date.now.addingTimeInterval(600)
+        let module = RelayModule(name: "Example", sourceURL: "https://example.com/source.plugin", outputFileName: "Example",
+            contentHash: "cached", serverRetryAfter: deadline, serverRetrySourceURL: "https://example.com/source.plugin", state: .current)
+        var draft = ModuleDraft(module: module)
+        draft.outputFormat = .loon
+        let plan = try XCTUnwrap(ModuleDraftPlanner.updatePlan(id: module.id, from: draft, modules: [module], localModuleDirectory: "/tmp/Clients"))
+        XCTAssertTrue(plan.sourceChanged)
+        XCTAssertEqual(plan.module.outputFileName, "Example.plugin")
+        XCTAssertEqual(plan.module.outputFormat, .loon)
+        XCTAssertEqual(plan.module.lastConvertedOutputFormat, .surge)
+        XCTAssertEqual(plan.module.state, .never)
+        XCTAssertEqual(plan.module.serverRetryAfter, deadline)
+    }
+
+    func testOldModulesAndQueuedDraftsDefaultToSurgeAfterDecoding() throws {
+        let module = RelayModule(name: "Legacy", sourceURL: "https://example.com/source.plugin", outputFileName: "Legacy")
+        var moduleJSON = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(module)) as? [String: Any])
+        moduleJSON.removeValue(forKey: "outputFormat")
+        moduleJSON.removeValue(forKey: "lastConvertedOutputFormat")
+        let restored = try JSONDecoder().decode(RelayModule.self, from: JSONSerialization.data(withJSONObject: moduleJSON))
+        XCTAssertEqual(restored.outputFormat, .surge)
+        XCTAssertEqual(restored.lastConvertedOutputFormat, .surge)
+        XCTAssertEqual(restored.outputFileName, "Legacy.sgmodule")
+        let unconverted = RelayModule(name: "New Loon", sourceURL: "file:///tmp/New.plugin", outputFormat: .loon, outputFileName: "New")
+        let reopened = try JSONDecoder().decode(RelayModule.self, from: JSONEncoder().encode(unconverted))
+        XCTAssertEqual(reopened.outputFormat, .loon)
+        XCTAssertNil(reopened.lastConvertedOutputFormat)
+        let pending = PendingModuleSave(moduleID: module.id, draft: ModuleDraft(module: module))
+        var pendingJSON = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(pending)) as? [String: Any])
+        var draftJSON = try XCTUnwrap(pendingJSON["draft"] as? [String: Any])
+        draftJSON.removeValue(forKey: "outputFormat")
+        pendingJSON["draft"] = draftJSON
+        let restoredPending = try JSONDecoder().decode(PendingModuleSave.self, from: JSONSerialization.data(withJSONObject: pendingJSON))
+        XCTAssertEqual(restoredPending.draft.outputFormat, .surge)
+        XCTAssertEqual(restoredPending.id, pending.id)
+    }
+
     func testChangingOutputTargetClearsOnlyTheOldLocalOutputError() throws {
         let module = RelayModule(name: "Move", sourceURL: "https://example.com/source.sgmodule", outputFileName: "Move",
             storageLocation: .local, localOutputError: "Old target is occupied")
@@ -60,7 +118,7 @@ final class ModuleDraftPlannerTests: XCTestCase {
         XCTAssertNil(plan.module.scriptHubSubscription)
         XCTAssertNil(plan.module.initialSourceURL)
         XCTAssertEqual(plan.module.updateSourceURL, draft.sourceURL)
-        XCTAssertEqual(plan.module.initialSource, .remote(.quantumultX))
+        XCTAssertEqual(plan.module.initialSource, .remote(.automatic))
     }
 
     func testModuleDraftRelationshipPlannerUsesSubscriptionMetadataAndWarnsForDisabledDestination() throws {

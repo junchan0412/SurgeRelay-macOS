@@ -1,4 +1,12 @@
 (function installSurgeRelayWebOptions(global) {
+  const outputFormats = [
+    { id: 'surge', title: 'Surge', fileExtension: 'sgmodule' },
+    { id: 'loon', title: 'Loon', fileExtension: 'plugin' },
+    { id: 'egern', title: 'Egern', fileExtension: 'sgmodule' },
+    { id: 'quantumultX', title: 'Quantumult X', fileExtension: 'conf' },
+    { id: 'shadowrocket', title: 'Shadowrocket', fileExtension: 'sgmodule' },
+    { id: 'stash', title: 'Stash', fileExtension: 'stoverride' }
+  ];
   function textField(key, label, prompt = '', help = '', multiline = false) {
     return { type: multiline ? 'textarea' : 'text', key, label, prompt, help };
   }
@@ -104,6 +112,7 @@
   ];
 
   global.SurgeRelayWebOptions = {
+    outputFormats,
     scriptHubDefaults,
     advancedGroups
   };

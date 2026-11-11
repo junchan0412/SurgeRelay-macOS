@@ -25,7 +25,10 @@ extension AppModel {
                 previousUpstreamRevision: upstreamState.upstreamRevision,
                 previousScriptHashes: upstreamState.scriptHashes
             )
-            let missing = !(await engineStore.hasScript(named: "Rewrite-Parser.js"))
+            var missing = false
+            for name in result.scripts.keys {
+                if !(await engineStore.hasScript(named: name)) { missing = true; break }
+            }
             if result.changed || missing {
                 try await engineStore.save(scripts: result.scripts)
                 upstreamState.lastUpdatedAt = .now

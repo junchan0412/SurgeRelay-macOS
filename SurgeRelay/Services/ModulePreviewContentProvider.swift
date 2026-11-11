@@ -20,13 +20,14 @@ struct ModulePreviewContentProvider {
     func previewContent(for module: RelayModule) async throws -> String {
         let content = try await componentContent(for: module)
         let materialized = await materialize(content, [:])
-        let metadataContent = await applyingModuleMetadata(
-            module.name,
-            module.category,
-            module.moduleDescription,
-            module.customIconURL,
-            materialized
-        )
+        let metadataContent: String
+        if module.outputFormat.usesSurgeSyntax {
+            metadataContent = await applyingModuleMetadata(module.name, module.category, module.moduleDescription,
+                module.customIconURL, materialized)
+        } else {
+            metadataContent = ModuleMetadataParser.applyingModuleMetadata(name: module.name, category: module.category,
+                desc: module.moduleDescription, iconURL: module.customIconURL, to: materialized, outputFormat: module.outputFormat)
+        }
         let subscription = ModuleMetadataParser.scriptHubSubscription(for: module)
         return ModuleMetadataParser.applyingScriptHubSubscription(subscription, to: metadataContent)
     }
@@ -44,9 +45,12 @@ struct ModulePreviewContentProvider {
     }
 
     func componentContent(for module: RelayModule) async throws -> String {
+        if let cachedFormat = module.lastConvertedOutputFormat, cachedFormat != module.outputFormat {
+            throw RelayError.invalidOutput("输出客户端已改变，请先更新模块生成 \(module.outputFormat.title) 输出。")
+        }
         if await hasComponent(module.id) {
             do {
-                if let content = try await usableContent(from: { try await readComponent(module.id) }) {
+                if let content = try await usableContent(from: { try await readComponent(module.id) }, outputFormat: module.outputFormat) {
                     return content
                 }
             } catch {
@@ -54,7 +58,7 @@ struct ModulePreviewContentProvider {
                 // the converted cache or the original local Surge file.
             }
             do {
-                if let content = try await usableContent(from: { try await readConvertedComponent(module.id) }) {
+                if let content = try await usableContent(from: { try await readConvertedComponent(module.id) }, outputFormat: module.outputFormat) {
                     return content
                 }
             } catch {
@@ -69,8 +73,11 @@ struct ModulePreviewContentProvider {
     }
 
     func convertedComponentContent(for module: RelayModule) async throws -> String {
+        if let cachedFormat = module.lastConvertedOutputFormat, cachedFormat != module.outputFormat {
+            throw RelayError.invalidOutput("输出客户端已改变，请先更新模块生成 \(module.outputFormat.title) 输出。")
+        }
         do {
-            if let content = try await usableContent(from: { try await readConvertedComponent(module.id) }) {
+            if let content = try await usableContent(from: { try await readConvertedComponent(module.id) }, outputFormat: module.outputFormat) {
                 return content
             }
         } catch {
@@ -80,20 +87,21 @@ struct ModulePreviewContentProvider {
     }
 
     private func usableContent(
-        from reader: () async throws -> String
+        from reader: () async throws -> String,
+        outputFormat: ModuleOutputFormat
     ) async throws -> String? {
         let content = try await reader()
         guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return nil
         }
-        return content
+        return outputFormat.usesSurgeSyntax ? SurgeModuleSanitizer.sanitize(content) : content
     }
 
     private func recoverLocalSourceContent(for module: RelayModule) async throws -> String {
         guard let sourceURL = URL(string: module.sourceURL), sourceURL.isFileURL else {
             throw RelayError.invalidOutput("模块尚无转换缓存，请先更新该模块。")
         }
-        guard module.sourceFormat.isNativeSurgeModule(for: sourceURL) else {
+        guard module.outputFormat.isNativeOutput(for: sourceURL, sourceFormat: module.sourceFormat) else {
             throw RelayError.invalidOutput("本地来源尚无转换缓存，请先更新该模块。")
         }
         do {
@@ -101,7 +109,7 @@ struct ModulePreviewContentProvider {
             guard let content = String(data: data, encoding: .utf8) else {
                 throw RelayError.invalidOutput("原始本地模块不是有效的 UTF-8 文本。")
             }
-            let sanitized = SurgeModuleSanitizer.sanitize(content)
+            let sanitized = module.outputFormat.usesSurgeSyntax ? SurgeModuleSanitizer.sanitize(content) : content
             try? await writeComponent(sanitized, module.id)
             return sanitized
         } catch let error as RelayError {

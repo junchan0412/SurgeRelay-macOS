@@ -19,7 +19,7 @@
   function moduleListSignature(module) {
     return JSON.stringify([
       module.id, module.name, module.sourceURL, module.initialSourceURL, module.updateSourceURL,
-      module.sourceFormatTitle, module.category, module.outputFileName, module.outputFolder, module.publishedRelativePath,
+      module.sourceFormatTitle, module.outputFormat, module.outputFormatTitle, module.category, module.outputFileName, module.outputFolder, module.publishedRelativePath,
       module.storageLocation, module.storageLocationTitle, module.storageLocationDetail, module.initialSourceTitle,
       module.storageTargets, module.hasOverrideConflict, module.hasSyncConflict, module.syncConflictLocalUpdatedAt, module.syncConflictGitHubUpdatedAt,
       module.relationshipSummary, module.localStorageRelativePath,
@@ -39,7 +39,7 @@
   function metadataRowPresenceChanged(previousModule, nextModule) {
     if (!previousModule || !nextModule) return false;
     const fields = ['name', 'sourceURL', 'initialSourceURL', 'updateSourceURL', 'outputFileName', 'publishedRelativePath',
-      'category', 'outputFolder', 'iconURL', 'customIconURL', 'advancedSummary', 'hasOverrideConflict',
+      'outputFormat', 'outputFormatTitle', 'category', 'outputFolder', 'iconURL', 'customIconURL', 'advancedSummary', 'hasOverrideConflict',
       'localOutputError', 'hasSyncConflict', 'syncConflictLocalUpdatedAt', 'syncConflictGitHubUpdatedAt', 'refreshIntervalMinutes', 'nextRetryAt', 'serverRetryAfter', 'consecutiveFailureCount'];
     return fields.some(key => previousModule[key] !== nextModule[key]) ||
       Boolean(previousModule.contentHash) !== Boolean(nextModule.contentHash) ||
@@ -59,6 +59,7 @@
       ? [`更新失败：${failureSummary(module.lastError)}`]
       : [module.relationshipSummary || module.sourceFormatTitle || '模块'];
     if (module.category) parts.push(module.category);
+    if (module.outputFormatTitle) parts.push(module.outputFormatTitle);
     if (module.outputFolder) parts.push(folderTitle(module.outputFolder));
     return [...new Set(parts)].join(' · ');
   }
@@ -77,6 +78,7 @@
       module.initialSourceURL,
       module.updateSourceURL,
       module.sourceFormatTitle,
+      module.outputFormatTitle,
       module.initialSourceTitle,
       module.storageLocationTitle,
       module.storageLocationDetail,
@@ -239,6 +241,22 @@
       (format === 'automatic' && (normalizedURL.endsWith('.sgmodule') || normalizedURL.includes('/surge/')));
   }
 
+  function isNativeModuleSource(sourceFormat, sourceURL, outputFormat = 'surge') {
+    let format = String(sourceFormat || 'automatic');
+    let path = '';
+    try { path = new URL(String(sourceURL || '').trim()).pathname.toLowerCase(); } catch (_) { return false; }
+    if (/\.(sgmodule|module)$/.test(path)) format = 'surge';
+    else if (/\.(plugin|lpx)$/.test(path)) format = 'loon';
+    else if (format === 'automatic') {
+      if (path.includes('/loon/')) format = 'loon';
+      else if (/\/(surge|sgmodule)\//.test(path)) format = 'surge';
+      else if (/\/(quantumultx|quantumult-x|qx)\//.test(path)) format = 'quantumultX';
+      else return false;
+    }
+    return format === 'surge' ? ['surge', 'egern', 'shadowrocket'].includes(outputFormat)
+      : format === outputFormat;
+  }
+
   function validateModuleEditorFields(fields = {}) {
     if (fields.refreshIntervalMinutes != null && (!Number.isInteger(fields.refreshIntervalMinutes) || fields.refreshIntervalMinutes < 0 || fields.refreshIntervalMinutes > 10080)) {
       return { field: 'customRefreshIntervalMinutes', message: '刷新间隔必须为 1–10080 的整数分钟；仅手动刷新请选择对应选项。' };
@@ -260,6 +278,7 @@
       name: String(fields.name || '').trim(),
       sourceURL: String(fields.sourceURL || '').trim(),
       sourceFormat: String(fields.sourceFormat || 'automatic'),
+      outputFormat: String(fields.outputFormat || 'surge'),
       storageLocation: fields.storageLocation === 'both' ? 'local' : String(fields.storageLocation || 'gitHub'),
       storageTargets: fields.storageTargets || (fields.storageLocation === 'both' ? ['local', 'gitHub'] : [String(fields.storageLocation || 'gitHub')]),
       category: String(fields.category || '').trim(),
@@ -275,9 +294,12 @@
     const explicit = String(draft.outputFileName || '').trim();
     const displayName = String(draft.name || '').trim();
     const preferred = explicit || displayName || suggestedNameFromSource(sourceURL);
-    return isFileSource(sourceURL) || (draft.storageLocation === 'local' || draft.storageLocation === 'both' || draft.storageTargets?.includes('local'))
-      ? existingSgmoduleName(preferred)
-      : sgmoduleName(preferred);
+    const preservesName = isFileSource(sourceURL) || (draft.storageLocation === 'local' || draft.storageLocation === 'both' || draft.storageTargets?.includes('local'));
+    const base = preservesName ? existingFileBaseName(preferred) : baseName(preferred);
+    const format = global.SurgeRelayWebOptions.outputFormats.find(item => item.id === (draft.outputFormat || 'surge'));
+    const existingExtension = preferred.match(/\.(module|lpx)$/i)?.[1].toLowerCase();
+    const preservesExtension = preservesName && ((['surge', 'egern', 'shadowrocket'].includes(format?.id) && existingExtension === 'module') || (format?.id === 'loon' && existingExtension === 'lpx'));
+    return `${base || 'Untitled'}.${preservesExtension ? existingExtension : format?.fileExtension || 'sgmodule'}`;
   }
 
   function suggestedNameFromSource(sourceURL) {
@@ -317,7 +339,7 @@
   function baseName(value) {
     return String(value || '')
       .trim()
-      .replace(/\.sgmodule$/i, '')
+      .replace(/\.(sgmodule|module|plugin|lpx|conf|stoverride|yaml|yml)$/i, '')
       .replace(/[\/\\:*?"<>|]+/g, '-')
       .replace(/\s+/g, '-')
       .replace(/^[.\-\s]+|[.\-\s]+$/g, '');
@@ -326,7 +348,7 @@
   function existingFileBaseName(value) {
     const fileName = String(value || '').trim().replaceAll('\\', '/').split('/').pop() || '';
     return fileName
-      .replace(/\.sgmodule$/i, '')
+      .replace(/\.(sgmodule|module|plugin|lpx|conf|stoverride|yaml|yml)$/i, '')
       .replace(/[:*?"<>|]+/g, '-')
       .replace(/^[.\s]+|[.\s]+$/g, '');
   }
@@ -352,6 +374,7 @@
     outputPathNotice,
     isValidHTTPURL,
     isNativeSurgeSource,
+    isNativeModuleSource,
     validateModuleEditorFields,
     moduleEditorPayload,
     normalizedOutputFileName,

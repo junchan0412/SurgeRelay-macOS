@@ -16,12 +16,15 @@ extension AppModel {
     }
 
     func previewContent(_ version: ModuleVersionContent, for module: RelayModule) async -> String {
+        let outputFormat = version.record.outputFormat ?? .surge
         let content = await processingWorker.configurableContent(version.content, overrides: [:])
         let named = await processingWorker.applyingModuleMetadata(
             name: module.name, category: module.category, desc: module.moduleDescription,
-            iconURL: module.customIconURL, to: content
+            iconURL: module.customIconURL, to: content, outputFormat: outputFormat
         )
-        return ModuleMetadataParser.applyingScriptHubSubscription(ModuleMetadataParser.scriptHubSubscription(for: module), to: named)
+        var historicalModule = module
+        historicalModule.outputFormat = outputFormat
+        return ModuleMetadataParser.applyingScriptHubSubscription(ModuleMetadataParser.scriptHubSubscription(for: historicalModule), to: named)
     }
 
     func moduleArgumentInfo(for module: RelayModule) async -> ModuleArgumentInfo {

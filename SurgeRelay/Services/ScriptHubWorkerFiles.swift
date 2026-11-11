@@ -4,6 +4,7 @@ struct ScriptHubWorkerRequest: Codable {
     let requestURL: URL
     let hasConverter: Bool
     var capturesMetrics: Bool? = nil
+    var sourceURL: URL? = nil
 }
 
 struct ScriptHubWorkerResponse: Codable {
@@ -20,6 +21,7 @@ enum ScriptHubWorkerFiles {
     static let requestName = "request.json"
     static let scriptName = "parser.js"
     static let converterName = "converter.js"
+    static let sourceName = "source.txt"
     static let outputName = "output.txt"
     static let responseName = "response.json"
 

@@ -17,6 +17,7 @@ const editorFormElements = {
   name: { value: 'Demo Module' },
   sourceURL: { value: 'https://example.com/source.sgmodule' },
   sourceFormat: { value: 'automatic' },
+  outputFormat: { value: 'surge' },
   storageLocation: { value: 'local' },
   outputFolder: { value: 'Folder' },
   outputFileName: { value: '' },

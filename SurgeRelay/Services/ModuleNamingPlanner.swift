@@ -17,7 +17,8 @@ enum ModuleNamingPlanner {
         source: String,
         outputFileName: String,
         outputFolder: String,
-        localModuleDirectory: String
+        localModuleDirectory: String,
+        outputFormat: ModuleOutputFormat = .surge
     ) throws -> String? {
         guard storageLocation == .local else { return nil }
         let rootPath = localModuleDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -33,7 +34,8 @@ enum ModuleNamingPlanner {
         return ModuleOutputFolder.relativePath(
             fileName: outputFileName,
             folder: outputFolder,
-            preservesExistingFileName: true
+            preservesExistingFileName: true,
+            outputFormat: outputFormat
         )
     }
 
@@ -41,7 +43,7 @@ enum ModuleNamingPlanner {
         // detectedSourceFormat is only meaningful for automatic recognition UI.
         // Explicit mislabels are repaired into sourceFormat itself.
         guard format == .automatic, let url = URL(string: source) else { return nil }
-        return format.resolvedFormat(for: url)
+        return ModuleSourceFormat.inferredFormat(for: url)
     }
 
     static func uniqueOutputFileName(
@@ -59,7 +61,8 @@ enum ModuleNamingPlanner {
         let relativePath = ModuleOutputFolder.relativePath(
             fileName: normalized,
             folder: folder,
-            preservesExistingFileName: draft.storageLocation == .local || preservesExistingFileName
+            preservesExistingFileName: draft.storageLocation == .local || preservesExistingFileName,
+            outputFormat: draft.outputFormat
         )
         guard unavailable.contains(LocalSourcePathResolver.pathIdentity(relativePath)) else { return normalized }
 
@@ -67,7 +70,8 @@ enum ModuleNamingPlanner {
             preferredFileName: normalized,
             folder: folder,
             unavailable: unavailable,
-            preservesExistingFileName: draft.storageLocation == .local || preservesExistingFileName
+            preservesExistingFileName: draft.storageLocation == .local || preservesExistingFileName,
+            outputFormat: draft.outputFormat
         )
     }
 
@@ -75,28 +79,32 @@ enum ModuleNamingPlanner {
         preferredFileName: String,
         folder: String,
         unavailable: Set<String>,
-        preservesExistingFileName: Bool = false
+        preservesExistingFileName: Bool = false,
+        outputFormat: ModuleOutputFormat = .surge
     ) -> String {
         let unavailable = Set(unavailable.map(LocalSourcePathResolver.pathIdentity))
-        let normalized = preservesExistingFileName
-            ? FilenameSanitizer.existingSgmoduleName(from: preferredFileName)
-            : FilenameSanitizer.sgmoduleName(from: preferredFileName)
+        let normalized = FilenameSanitizer.outputFileName(from: preferredFileName, format: outputFormat,
+            preservesExistingFileName: preservesExistingFileName)
         var relativePath = ModuleOutputFolder.relativePath(
             fileName: normalized,
             folder: folder,
-            preservesExistingFileName: preservesExistingFileName
+            preservesExistingFileName: preservesExistingFileName,
+            outputFormat: outputFormat
         )
         guard unavailable.contains(LocalSourcePathResolver.pathIdentity(relativePath)) else { return normalized }
 
+        let stem = (normalized as NSString).deletingPathExtension
+        let fileExtension = (normalized as NSString).pathExtension
         let base = preservesExistingFileName
-            ? FilenameSanitizer.existingFileBaseName(from: normalized)
-            : FilenameSanitizer.baseName(from: normalized)
+            ? FilenameSanitizer.existingFileBaseName(from: stem)
+            : FilenameSanitizer.baseName(from: stem)
         var suffix = 2
         repeat {
             relativePath = ModuleOutputFolder.relativePath(
-                fileName: "\(base)-\(suffix).sgmodule",
+                fileName: "\(base)-\(suffix).\(fileExtension)",
                 folder: folder,
-                preservesExistingFileName: preservesExistingFileName
+                preservesExistingFileName: preservesExistingFileName,
+                outputFormat: outputFormat
             )
             if unavailable.contains(LocalSourcePathResolver.pathIdentity(relativePath)) {
                 suffix += 1
@@ -104,7 +112,7 @@ enum ModuleNamingPlanner {
                 break
             }
         } while true
-        return "\(base)-\(suffix).sgmodule"
+        return "\(base)-\(suffix).\(fileExtension)"
     }
 
     static func normalizedModuleNaming(
@@ -136,7 +144,8 @@ enum ModuleNamingPlanner {
                 if shouldRestorePhysicalPath,
                    let components = localPath?.split(separator: "/"),
                    let fileName = components.last {
-                    module.outputFileName = FilenameSanitizer.existingSgmoduleName(from: String(fileName))
+                    module.outputFileName = FilenameSanitizer.outputFileName(from: String(fileName), format: module.outputFormat,
+                        preservesExistingFileName: true)
                     module.outputFolder = components.dropLast().joined(separator: "/")
                 }
             }
@@ -151,14 +160,14 @@ enum ModuleNamingPlanner {
             let preservesExistingFileName = module.preservesOutputFileName ||
                 URL(string: module.sourceURL)?.isFileURL == true
             let preferredValue = module.outputFileName.isEmpty ? module.name : module.outputFileName
-            let preferred = preservesExistingFileName
-                ? FilenameSanitizer.existingSgmoduleName(from: preferredValue)
-                : FilenameSanitizer.sgmoduleName(from: preferredValue)
+            let preferred = FilenameSanitizer.outputFileName(from: preferredValue, format: module.outputFormat,
+                preservesExistingFileName: preservesExistingFileName)
             let candidate = uniqueOutputFileName(
                 preferredFileName: preferred,
                 folder: module.outputFolder,
                 unavailable: used,
-                preservesExistingFileName: preservesExistingFileName
+                preservesExistingFileName: preservesExistingFileName,
+                outputFormat: module.outputFormat
             )
             module.outputFileName = candidate
             used.insert(LocalSourcePathResolver.pathIdentity(module.publishedRelativePath))

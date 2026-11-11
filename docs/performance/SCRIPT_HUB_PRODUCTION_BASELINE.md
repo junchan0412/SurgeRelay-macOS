@@ -1,5 +1,7 @@
 # 生产 Script-Hub 脚本受控九格（2026-10-03）
 
+> 历史基线：结果仅对应当时的 fixture/build，当前验收与计划见 [当前项目报告](../CURRENT_PROJECT_REPORT.md)。
+
 这是对先前固定 helper transform 基准的补充：实际执行缓存中的生产 `Rewrite-Parser.js` 与 `script-converter.js`，使用 QX/Loon 代表输入。8 模块×1轮 smoke 的 off/on 均通过，再顺序执行 24 模块×5轮正式 off/on，每格另有1轮预热、最多4个并发作业。没有修改产品代码、网络策略或真实工作区。
 
 ## 输入与隔离边界
@@ -9,7 +11,7 @@
 - native：原生 Surge规则输入51,411字节。
 - helper路径与mixed路径交替使用两种输入；mixed保持50% native / 50% helper。缓存hit不启动helper，缓存正文为原harness的有效Surge fixture；该格不代表再次执行生产parser。
 - 来源正文由driver经过真实loopback HTTP获取，随后测试prelude仅允许该精确来源URL，将已下载字节交给生产parser；生产JS原始字节原样拼接执行。**生产helper网络bridge在本测试中被替代，私网阻断没有放宽；不是联网端到端、ScriptHubClient脚本资产物化或完整AppModel更新验收。**
-- 两份脚本来自已有ScriptHubEngine缓存，仅记录脚本内容与hash，不读取或复制私人配置。上游commit未独立确认，版本身份以manifest中的完整SHA-256为准。原JS快照当时位于 `/tmp/surge-relay-production-script-fixture/`，该临时目录已按用户要求于2026-10-03清理；manifest、产物及原始结果保留在本报告目录。重新测量须重新准备脚本并核对manifest中的相同hash。
+- 两份脚本来自已有ScriptHubEngine缓存，仅记录脚本内容与hash，不读取或复制私人配置。上游commit未独立确认，版本身份以manifest中的完整SHA-256为准。原JS快照当时位于 `/tmp/surge-relay-production-script-fixture/`，该临时目录已按用户要求于2026-10-03清理；manifest、产物及原始结果保留在 [归档目录](../archive/performance-raw-2026-10/script-hub-production-2026-10-03/)。重新测量须重新准备脚本并核对manifest中的相同hash。
 
 ## 正式结果
 
@@ -33,9 +35,9 @@ CPU计数包含driver与已回收helper、采样开销；RSS是每100ms采样的
 
 ## 证据与复现
 
-- [正式 off](script-hub-production-2026-10-03/off.json)、[正式 on](script-hub-production-2026-10-03/on.json)
-- [来源、脚本/二进制/源码/产物哈希](script-hub-production-2026-10-03/manifest.json)
-- [QX代表产物](script-hub-production-2026-10-03/validated-qx-0.sgmodule)、[Loon代表产物](script-hub-production-2026-10-03/validated-loon-2.sgmodule)
-- [harness源码](script-hub-production-2026-10-03/benchmark_production_scripts.swift)、[运行脚本](script-hub-production-2026-10-03/run.sh)
+- [正式 off](../archive/performance-raw-2026-10/script-hub-production-2026-10-03/off.json)、[正式 on](../archive/performance-raw-2026-10/script-hub-production-2026-10-03/on.json)
+- [来源、脚本/二进制/源码/产物哈希](../archive/performance-raw-2026-10/script-hub-production-2026-10-03/manifest.json)
+- [QX代表产物](../archive/performance-raw-2026-10/script-hub-production-2026-10-03/validated-qx-0.sgmodule)、[Loon代表产物](../archive/performance-raw-2026-10/script-hub-production-2026-10-03/validated-loon-2.sgmodule)
+- [harness源码](../archive/performance-raw-2026-10/script-hub-production-2026-10-03/benchmark_production_scripts.swift)、[运行脚本](../archive/performance-raw-2026-10/script-hub-production-2026-10-03/run.sh)
 
-本次临时目录为 `/tmp/surge-relay-production-script-fixture`（已清理，见[清理记录](development-cleanup-2026-10-03.json)）。复现前需要重新准备该目录内同hash生产脚本及fixture，先执行 `zsh run.sh 8 1`，再用同一编译产物分别运行 `benchmark worker off.json 24 5 off` 与 `benchmark worker on.json 24 5 on`。运行前停止其他编译、UI与性能采样；源码/脚本变化后不能复用本次结果。
+本次临时目录为 `/tmp/surge-relay-production-script-fixture`（已清理，见[清理记录](../archive/performance-raw-2026-10/development-cleanup-2026-10-03.json)）。从仓库根目录复现前，需要重新准备该目录内同hash生产脚本及fixture，先执行 `zsh docs/archive/performance-raw-2026-10/script-hub-production-2026-10-03/run.sh 8 1`，再用同一编译产物分别运行 `benchmark worker off.json 24 5 off` 与 `benchmark worker on.json 24 5 on`。运行前停止其他编译、UI与性能采样；源码/脚本变化后不能复用本次结果。

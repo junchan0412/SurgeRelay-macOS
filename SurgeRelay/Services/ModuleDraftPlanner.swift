@@ -97,7 +97,7 @@ enum ModuleDraftRelationshipPlanner {
         case (.gitHub, .subscribed):
             "订阅模块：从 originalURL 更新，转换结果发布到 GitHub 模块目录。"
         case (_, .invalid):
-            "来源地址格式无效；请填写 HTTP、HTTPS 或本地 Surge 模块地址。"
+            "来源地址格式无效；请填写 HTTP、HTTPS 或本地配置文件地址。"
         }
     }
 
@@ -123,7 +123,7 @@ enum ModuleDraftPlanner {
             modules: modules,
             localModuleDirectory: localModuleDirectory
         )
-        guard !hasRegisteredSource(normalizedDraft.source, modules: modules,
+        guard !hasRegisteredSource(normalizedDraft.source, modules: modules.filter { $0.outputFormat == draft.outputFormat },
                        localModuleDirectory: localModuleDirectory) else {
             throw RelayError.duplicateSourceURL
         }
@@ -131,6 +131,7 @@ enum ModuleDraftPlanner {
             name: normalizedDraft.name,
             sourceURL: normalizedDraft.source,
             sourceFormat: draft.sourceFormat,
+            outputFormat: draft.outputFormat,
             outputFileName: normalizedDraft.outputFileName,
             category: normalizedDraft.category,
             moduleDescription: normalizedDraft.moduleDescription,
@@ -167,7 +168,7 @@ enum ModuleDraftPlanner {
             localModuleDirectory: localModuleDirectory,
             excluding: id
         )
-        guard !hasRegisteredSource(normalizedDraft.source, modules: modules.filter { $0.id != id },
+        guard !hasRegisteredSource(normalizedDraft.source, modules: modules.filter { $0.id != id && $0.outputFormat == draft.outputFormat },
                        localModuleDirectory: localModuleDirectory) else {
             throw RelayError.duplicateSourceURL
         }
@@ -176,6 +177,7 @@ enum ModuleDraftPlanner {
             current.name != normalizedDraft.name ||
             current.sourceURL != normalizedDraft.source ||
             current.sourceFormat != draft.sourceFormat ||
+            current.outputFormat != draft.outputFormat ||
             current.outputFileName != normalizedDraft.outputFileName ||
             current.category != normalizedDraft.category ||
             current.moduleDescription != normalizedDraft.moduleDescription ||
@@ -198,13 +200,18 @@ enum ModuleDraftPlanner {
 
         let sourceChanged = current.sourceURL != normalizedDraft.source ||
             current.sourceFormat != draft.sourceFormat ||
+            current.outputFormat != draft.outputFormat ||
             current.scriptHubOptions != draft.scriptHubOptions
         let customIconChanged = current.customIconURL != normalizedDraft.customIconURL
         var module = current
+        if current.outputFormat != draft.outputFormat {
+            module.lastConvertedOutputFormat = current.lastConvertedOutputFormat ?? current.outputFormat
+        }
         module.name = normalizedDraft.name
         module.refreshIntervalMinutes = draft.refreshIntervalMinutes
         module.sourceURL = normalizedDraft.source
         module.sourceFormat = draft.sourceFormat
+        module.outputFormat = draft.outputFormat
         module.outputFileName = normalizedDraft.outputFileName
         module.category = normalizedDraft.category
         module.moduleDescription = normalizedDraft.moduleDescription
@@ -320,7 +327,8 @@ enum ModuleDraftPlanner {
             source: source,
             outputFileName: outputFileName,
             outputFolder: outputFolder,
-            localModuleDirectory: localModuleDirectory
+            localModuleDirectory: localModuleDirectory,
+            outputFormat: draft.outputFormat
         )
         return NormalizedDraftValues(
             name: draft.name.trimmingCharacters(in: .whitespacesAndNewlines),

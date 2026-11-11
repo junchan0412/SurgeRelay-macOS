@@ -97,6 +97,7 @@ enum ModuleMetadataRefreshPlanner {
             module.sourceCheckedAt = updatedAt
         }
         module.conversionEngineRevision = nativeModule ? nil : engineRevision
+        module.lastConvertedOutputFormat = module.outputFormat
 
         if hasOverride, let baseHash = module.overrideBaseHash {
             module.hasOverrideConflict = baseHash != Data(convertedContent.utf8).sha256String

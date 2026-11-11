@@ -128,8 +128,15 @@ extension AppModel {
             _ = try ModuleDraftPlanner.addPlan(from: draft, modules: modules, localModuleDirectory: settings.localModuleDirectory)
             refreshSource = true
         }
-        pendingModuleSaves.append(PendingModuleSave(moduleID: moduleID, draft: draft, refreshSource: refreshSource))
-        try await persistPendingModuleSaves()
+        let item = PendingModuleSave(moduleID: moduleID, draft: draft, refreshSource: refreshSource)
+        pendingModuleSaves.append(item)
+        do {
+            try await persistPendingModuleSaves()
+        } catch {
+            pendingModuleSaves.removeAll { $0.id == item.id }
+            enqueueConfiguration(pendingModuleSaves, fileName: "pending-module-saves.json")
+            throw error
+        }
         statusMessage = "已加入待处理保存队列（\(pendingModuleSaves.count) 项），当前任务完成后自动保存"
         schedulePendingModuleSaves()
     }

@@ -3,6 +3,46 @@ import XCTest
 @testable import SurgeRelay
 
 final class PublishFileAssemblerTests: XCTestCase {
+    func testChangedClientCannotPublishPreviousClientCacheUnderANewExtension() async throws {
+        var module = RelayModule(name: "Changed", sourceURL: "https://example.org/Demo.plugin", outputFormat: .stash, outputFileName: "Changed")
+        module.lastConvertedOutputFormat = .surge
+        do {
+            _ = try await PublishFileAssembler.files(
+                request: PublishFileAssemblyRequest(plan: PublishPlan(standaloneModules: [module]), includeAssets: false,
+                    destination: .gitHub, localModuleDirectory: "/tmp/Modules"),
+                readComponent: { _ in XCTFail("The previous-client cache must not be read for publication"); return "[Script]\n" },
+                generatedAssetFiles: { _ in [] }, materialize: { text, _ in text },
+                applyingModuleMetadata: { _, _, _, _, text in text }, cancellationCheckpoint: {}
+            )
+            XCTFail("Changing the output client requires a new conversion")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("先更新模块生成 Stash 输出"))
+        }
+    }
+
+    func testStashPublishingPreservesYAMLBodyAndOwnsTheCorrectExtension() async throws {
+        let body = "http:\n  mitm:\n    - example.org\nscript-providers:\n  Demo:\n    script: |\n      console.log('first');\n\n\n      console.log('second');\n"
+        let module = RelayModule(name: "Managed", sourceURL: "https://example.org/Demo.plugin", sourceFormat: .loon,
+            outputFormat: .stash, outputFileName: "Managed", category: "Network")
+        let files = try await PublishFileAssembler.files(
+            request: PublishFileAssemblyRequest(plan: PublishPlan(standaloneModules: [module]), includeAssets: false,
+                destination: .local, localModuleDirectory: "/tmp/Modules"),
+            readComponent: { _ in "name: Old\n" + body }, generatedAssetFiles: { _ in [] },
+            materialize: { _, _ in XCTFail("Stash must preserve scalar whitespace"); return "" },
+            applyingModuleMetadata: { _, _, _, _, _ in XCTFail("Stash must use YAML metadata"); return "" },
+            cancellationCheckpoint: {}
+        )
+        let file = try XCTUnwrap(files.first)
+        XCTAssertEqual(file.name, "Managed.stoverride")
+        let text = try XCTUnwrap(String(data: file.data, encoding: .utf8))
+        XCTAssertTrue(text.contains("name: \"Managed\""))
+        XCTAssertTrue(text.hasSuffix(body))
+        XCTAssertTrue(text.contains("target=stash-stoverride"))
+        let wrapped = ManagedPublishedFile.dataWrapping(file.data, relativePath: file.name)
+        XCTAssertTrue(ManagedPublishedFile.isManaged(wrapped, relativePath: "Managed.stoverride"))
+        XCTAssertTrue(String(decoding: wrapped, as: UTF8.self).hasSuffix(body))
+    }
+
     func testMissingStandaloneCacheStopsAssemblyBeforeProducingCleanupCandidates() async throws {
         let ready = RelayModule(name: "Ready", sourceURL: "https://example.com/ready.sgmodule", outputFileName: "Ready")
         let missing = RelayModule(name: "Missing", sourceURL: "https://example.com/missing.sgmodule", outputFileName: "Missing")

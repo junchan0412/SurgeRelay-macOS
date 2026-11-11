@@ -2,6 +2,64 @@ import XCTest
 @testable import SurgeRelay
 
 final class ModuleMetadataParserTests: XCTestCase {
+    func testUnclassifiedAutomaticSourceKeepsAutomaticSubscriptionType() throws {
+        var module = RelayModule(name: "Automatic", sourceURL: "https://example.org/source", outputFormat: .quantumultX, outputFileName: "Automatic")
+        XCTAssertEqual(module.sourceFormatDisplayTitle, "自动识别")
+        XCTAssertEqual(module.initialSource, .remote(.automatic))
+        let subscription = try XCTUnwrap(ModuleMetadataParser.scriptHubSubscription(for: module))
+        XCTAssertEqual(subscription.sourceType, "all-module")
+        XCTAssertEqual(subscription.sourceFormat, .automatic)
+        module.scriptHubSubscription = subscription
+        XCTAssertEqual(module.initialSource, .subscribed(.automatic))
+        XCTAssertNil(ModuleNamingPlanner.detectedFormat(for: .automatic, source: module.sourceURL))
+    }
+
+    func testStashQuotedAndPinnedLiteralHeadersAndLoonTagsRoundTrip() throws {
+        let name = "Managed\t\"Name\""
+        let category = "#工具"
+        let icon = "https://example.org/icons/demo.png"
+        let stash = ModuleMetadataParser.applyingModuleMetadata(name: name, category: category, iconURL: icon,
+            to: "http:\n  mitm:\n    - example.org\n", outputFormat: .stash)
+        XCTAssertEqual(ModuleMetadataParser.displayName(in: stash), name)
+        XCTAssertEqual(ModuleMetadataParser.category(in: stash), category)
+        XCTAssertEqual(ModuleMetadataParser.iconURL(in: stash)?.absoluteString, icon)
+        let literal = "name: |-\n  Pinned name\n\ncategory: |-\n  #工具\n\nicon: |-\n  https://example.org/icons/demo.png\n\nhttp:\n  script:\n    - name: Nested name\n"
+        XCTAssertEqual(ModuleMetadataParser.displayName(in: literal), "Pinned name")
+        XCTAssertEqual(ModuleMetadataParser.category(in: literal), category)
+        XCTAssertEqual(ModuleMetadataParser.iconURL(in: literal)?.absoluteString, icon)
+        let loon = ModuleMetadataParser.applyingModuleMetadata(name: "Loon", category: category, iconURL: icon,
+            to: "#!category=Old category\n#!tag=Old tag\n[Rewrite]\n^https://example.org - reject\n", outputFormat: .loon)
+        XCTAssertEqual(ModuleMetadataParser.category(in: loon), category)
+        XCTAssertEqual(ModuleMetadataParser.displayName(in: loon), "Loon")
+        XCTAssertEqual(ModuleMetadataParser.iconURL(in: loon)?.absoluteString, icon)
+        let body = "http:\n  script:\n    - name: Nested name\n" + String(repeating: "      #!icon=https://example.org/body.png\n", count: 10_000)
+        XCTAssertNil(ModuleMetadataParser.displayName(in: body))
+        XCTAssertNil(ModuleMetadataParser.iconURL(in: body))
+    }
+
+    func testClientMetadataKeepsStashBlockScalarsAndLoonTags() throws {
+        let body = "http:\n  script:\n    - name: Demo\nscript-providers:\n  Demo:\n    script: |\n      [Script]\n\n\n      console.log('unchanged');\n"
+        let stash = ModuleMetadataParser.applyingModuleMetadata(name: "Managed \"Name\"", category: "Ads", desc: "Line one\nLine two",
+            to: "name: |-\n  Old name\n\ndesc: |-\n  Old description\n\n" + body, outputFormat: .stash)
+        XCTAssertTrue(stash.contains("name: \"Managed \\\"Name\\\"\""))
+        XCTAssertTrue(stash.contains("desc: \"Line one\\nLine two\""))
+        XCTAssertTrue(stash.hasSuffix(body))
+        XCTAssertFalse(stash.contains("#!name="))
+        XCTAssertFalse(stash.contains("Old description"))
+        let loon = ModuleMetadataParser.applyingModuleMetadata(name: "Managed", category: "New tag",
+            to: "#!name=Old\n#!tag=Old tag\n[Rewrite]\n^https://example.org - reject\n", outputFormat: .loon)
+        XCTAssertTrue(loon.contains("#!tag=New tag"))
+        XCTAssertFalse(loon.contains("#!category="))
+        XCTAssertFalse(loon.contains("#!tag=Old tag"))
+        for format in ModuleOutputFormat.allCases {
+            let module = RelayModule(name: "Output", sourceURL: "https://example.org/Demo.conf", sourceFormat: .quantumultX,
+                outputFormat: format, outputFileName: "Output")
+            let subscription = try XCTUnwrap(ModuleMetadataParser.scriptHubSubscription(for: module))
+            XCTAssertEqual(subscription.target, format.scriptHubTarget)
+            XCTAssertTrue(subscription.subscriptionURL.contains("/_end_/Output.\(format.fileExtension)?"))
+        }
+    }
+
     func testReadsSubscribedMetadataWithoutRegexFormattingAssumptions() throws {
         let content = """
           # subscribed = http://script.hub/file/_start_/https://example.com/demo.conf/_end_/Demo.sgmodule?type=qx-rewrite&target=surge-module

@@ -41,7 +41,7 @@
         const message = query || filterState.failuresOnly ? `找到 ${modules.length} 个模块，共 ${state.modules.length} 个` : '';
         if (ui.searchStatus.textContent !== message) ui.searchStatus.textContent = message;
       }
-      for (const [element, id] of [[ui.overview, 'overview'], [ui.history, 'activity']]) {
+      for (const [element, id] of [[ui.overview, 'overview'], [ui.history, 'activity'], [ui.tools, 'tools']]) {
         element?.classList.toggle('selected', selectedID === id);
         element?.setAttribute('aria-current', selectedID === id ? 'page' : 'false');
       }

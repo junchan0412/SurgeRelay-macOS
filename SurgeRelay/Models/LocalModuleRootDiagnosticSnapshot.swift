@@ -68,7 +68,7 @@ struct LocalModuleRootDiagnosticSnapshot: Codable, Equatable, Sendable {
                     if values.isPackage == true { continue }
                     if values.isDirectory == true {
                         folderCount += 1
-                    } else if values.isRegularFile == true, url.pathExtension.lowercased() == "sgmodule" {
+                    } else if values.isRegularFile == true, LocalModuleScanner.supportedFileExtensions.contains(url.pathExtension.lowercased()) {
                         moduleFileCount += 1
                     }
                 } catch {

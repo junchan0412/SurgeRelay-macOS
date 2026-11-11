@@ -33,7 +33,7 @@ enum ModuleTemplatePlanner {
         options.sniKeywords = source.sniKeywords
         options.preMatchingKeywords = source.preMatchingKeywords
         options.enableJQ = source.enableJQ
-        return ModuleTemplate(name: name, sourceFormat: module.sourceFormat, category: module.category,
+        return ModuleTemplate(name: name, sourceFormat: module.sourceFormat, outputFormat: module.outputFormat, category: module.category,
                               moduleDescription: module.moduleDescription, outputFolder: module.outputFolder,
                               storageTargets: module.storageTargets,
                               refreshIntervalMinutes: module.refreshIntervalMinutes,
@@ -44,6 +44,7 @@ enum ModuleTemplatePlanner {
         var draft = ModuleDraft()
         draft.name = template.name
         draft.sourceFormat = template.sourceFormat
+        draft.outputFormat = template.outputFormat
         draft.category = template.category
         draft.moduleDescription = template.moduleDescription
         draft.outputFolder = template.outputFolder

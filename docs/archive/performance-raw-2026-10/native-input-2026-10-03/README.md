@@ -39,7 +39,7 @@ attribution-before.jsonl 混合了定位样本与 sample 运行期间样本，�
 
 ## 剩余验收
 
-三档查找/正则、替换与Undo、Tab/换行、窄宽resize、查找取消及外部reload的组件矩阵已补齐，见 [Release组件矩阵](../NATIVE_EDITOR_COMPONENT_MATRIX.md)：独立1通过、0skip、0失败（7.839秒）。其每项仅一次组件耗时，不是输入p95或真实页签操作。100KiB病理正则观察到取消至worker完成5.568ms；1MiB/5MiB在取消前已完成，未取得取消延迟。全文layout次数为null，不能用三次显式测量调用代替。
+三档查找/正则、替换与Undo、Tab/换行、窄宽resize、查找取消及外部reload的组件矩阵已补齐，见 [Release组件矩阵](../../../performance/NATIVE_EDITOR_COMPONENT_MATRIX.md)：独立1通过、0skip、0失败（7.839秒）。其每项仅一次组件耗时，不是输入p95或真实页签操作。100KiB病理正则观察到取消至worker完成5.568ms；1MiB/5MiB在取消前已完成，未取得取消延迟。全文layout次数为null，不能用三次显式测量调用代替。
 
 仍需实际“详情↔预览”切换时的未保存草稿、选区、滚动与进行中查询组合；组件调用也不能描述为替换/Undo、Tab/换行、resize已完成真实窗口端到端操作。100/1000/5000模块更新中列表指标另行验收。
 

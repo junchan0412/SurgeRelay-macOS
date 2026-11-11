@@ -1,5 +1,7 @@
 # Web 真实浏览器验收与性能基线
 
+> 历史基线（2026-10-02）：结果仅对应当时的 fixture/build，当前验收与计划见 [当前项目报告](../CURRENT_PROJECT_REPORT.md)。
+
 本次运行加载工作区当前 `SurgeRelay/WebResources`，使用已安装的 Chrome 和现有 Playwright 1.62.1，无依赖安装。fixture 仅监听 `127.0.0.1` 随机端口，API 状态与模块正文只存在进程内存中；浏览器使用临时隔离 profile，并阻止访问 fixture 以外的地址。未启用用户的真实 Web 服务，未调用 GitHub 或 Surge。
 
 ## 环境与结果
@@ -45,4 +47,6 @@ SURGE_RELAY_PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs node script
 
 参数可为 `acceptance`、`performance` 或 `all`。设置 `SURGE_RELAY_HEADED=1` 可运行有屏 Chrome，但结果应单独标注，不与本次 headless 数值混用。正式采样前应暂停编译、其他性能任务和重负载应用。
 
-结果输出到 `docs/performance/web-browser-<phase>.json`；验收另输出 accessibility snapshot。JSON 保存了原始 30 个筛选样本、long task entries、浏览器环境和 viewport。`script/browser_fixture_server.mjs` 可由其他验证脚本复用，调用结束必须关闭 browser 与 fixture。
+脚本仍将新结果输出到 `docs/performance/web-browser-<phase>.json`；验收另输出 accessibility snapshot。入库前应把原始产物移入按日期命名的 archive，并更新摘要中的证据链接。JSON 保存了原始 30 个筛选样本、long task entries、浏览器环境和 viewport。`script/browser_fixture_server.mjs` 可由其他验证脚本复用，调用结束必须关闭 browser 与 fixture。
+
+本次历史证据：[功能验收](../archive/performance-raw-2026-10/web-browser-acceptance.json)、[性能原始数据](../archive/performance-raw-2026-10/web-browser-performance.json)、[Accessibility snapshot](../archive/performance-raw-2026-10/web-browser-accessibility-snapshot.txt)。

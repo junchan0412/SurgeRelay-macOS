@@ -11,6 +11,8 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     var name: String
     var sourceURL: String
     var sourceFormat: ModuleSourceFormat
+    var outputFormat: ModuleOutputFormat
+    var lastConvertedOutputFormat: ModuleOutputFormat?
     var outputFileName: String
     var category: String
     /// User-facing module description written to the `#!desc=` header. Empty
@@ -66,6 +68,8 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         name: String,
         sourceURL: String,
         sourceFormat: ModuleSourceFormat = .automatic,
+        outputFormat: ModuleOutputFormat = .surge,
+        lastConvertedOutputFormat: ModuleOutputFormat? = nil,
         outputFileName: String,
         category: String = "",
         moduleDescription: String = "",
@@ -113,9 +117,12 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         self.name = name
         self.sourceURL = sourceURL
         self.sourceFormat = sourceFormat
+        self.outputFormat = outputFormat
+        self.lastConvertedOutputFormat = lastConvertedOutputFormat
         self.outputFileName = Self.normalizedOutputFileName(
             outputFileName,
-            preservesExistingFileName: shouldPreserveOutputFileName
+            preservesExistingFileName: shouldPreserveOutputFileName,
+            outputFormat: outputFormat
         )
         self.category = category.trimmingCharacters(in: .whitespacesAndNewlines)
         self.moduleDescription = moduleDescription.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -154,7 +161,8 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, sourceURL, sourceFormat, outputFileName, category, outputFolder
+        case id, name, sourceURL, sourceFormat, outputFormat, outputFileName, category, outputFolder
+        case lastConvertedOutputFormat
         case moduleDescription
         case storageLocation, storageTargets, localStorageRelativePath, preservesOutputFileName
         case scriptHubOptions, argumentOverrides, iconURL, customIconURL, scriptHubSubscription, detectedSourceFormat
@@ -170,6 +178,8 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         try container.encode(name, forKey: .name)
         try container.encode(sourceURL, forKey: .sourceURL)
         try container.encode(sourceFormat, forKey: .sourceFormat)
+        try container.encode(outputFormat, forKey: .outputFormat)
+        try container.encodeIfPresent(lastConvertedOutputFormat, forKey: .lastConvertedOutputFormat)
         try container.encode(outputFileName, forKey: .outputFileName)
         try container.encode(category, forKey: .category)
         try container.encode(moduleDescription, forKey: .moduleDescription)
@@ -215,6 +225,10 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         name = try container.decode(String.self, forKey: .name)
         sourceURL = try container.decode(String.self, forKey: .sourceURL)
         sourceFormat = try container.decodeIfPresent(ModuleSourceFormat.self, forKey: .sourceFormat) ?? .automatic
+        let decodedOutputFormat = try container.decodeIfPresent(ModuleOutputFormat.self, forKey: .outputFormat)
+        outputFormat = decodedOutputFormat ?? .surge
+        lastConvertedOutputFormat = try container.decodeIfPresent(ModuleOutputFormat.self, forKey: .lastConvertedOutputFormat)
+            ?? (decodedOutputFormat == nil ? .surge : nil)
         localStorageRelativePath = Self.normalizedOptionalRelativePath(
             try container.decodeIfPresent(String.self, forKey: .localStorageRelativePath)
         )
@@ -231,7 +245,8 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
             ?? FilenameSanitizer.suggestedName(from: sourceURL)
         outputFileName = Self.normalizedOutputFileName(
             decodedOutputFileName,
-            preservesExistingFileName: preservesOutputFileName
+            preservesExistingFileName: preservesOutputFileName,
+            outputFormat: outputFormat
         )
         category = try container.decodeIfPresent(String.self, forKey: .category)?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -275,7 +290,7 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
 
     var sourceFormatDisplayTitle: String {
         guard sourceFormat == .automatic else { return sourceFormat.title }
-        let resolved = detectedSourceFormat ?? URL(string: updateSourceURL).map { sourceFormat.resolvedFormat(for: $0) }
+        let resolved = detectedSourceFormat ?? URL(string: updateSourceURL).flatMap(ModuleSourceFormat.inferredFormat(for:))
         guard let resolved else { return sourceFormat.title }
         return "自动识别（\(resolved.shortTitle)）"
     }
@@ -454,14 +469,13 @@ struct RelayModule: Identifiable, Codable, Hashable, Sendable {
         ModuleOutputFolder.relativePath(
             fileName: outputFileName,
             folder: outputFolder,
-            preservesExistingFileName: preservesOutputFileName
+            preservesExistingFileName: preservesOutputFileName,
+            outputFormat: outputFormat
         )
     }
 
-    private static func normalizedOutputFileName(_ value: String, preservesExistingFileName: Bool) -> String {
-        preservesExistingFileName
-            ? FilenameSanitizer.existingSgmoduleName(from: value)
-            : FilenameSanitizer.sgmoduleName(from: value)
+    private static func normalizedOutputFileName(_ value: String, preservesExistingFileName: Bool, outputFormat: ModuleOutputFormat) -> String {
+        FilenameSanitizer.outputFileName(from: value, format: outputFormat, preservesExistingFileName: preservesExistingFileName)
     }
 
     private static func normalizedOptionalRelativePath(_ value: String?) -> String? {

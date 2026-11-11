@@ -47,7 +47,7 @@ extension AppModel {
             let preparation = Task { @MainActor [self] in
                 let needsConversion = updateModules.contains { module in
                     guard let url = URL(string: module.updateSourceURL) else { return false }
-                    return !module.sourceFormat.isNativeSurgeModule(for: url)
+                    return !module.outputFormat.isNativeOutput(for: url, sourceFormat: module.sourceFormat)
                 }
                 let hasEngine = await engineStore.hasScript(named: "Rewrite-Parser.js")
                 let missingEngine = needsConversion && !hasEngine

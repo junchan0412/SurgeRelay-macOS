@@ -120,6 +120,16 @@ struct ModuleSidebarView: View {
                 }
                 .accessibilityAddTraits(model.selectedModuleID == AppModel.activitySelectionID ? .isSelected : [])
                 .accessibilityIdentifier("navigation.activity")
+                Button { model.selectedModuleID = AppModel.conversionToolsSelectionID } label: {
+                    Label("转换工具", systemImage: "arrow.triangle.2.circlepath")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(8)
+                        .contentShape(Rectangle())
+                        .background(model.selectedModuleID == AppModel.conversionToolsSelectionID ? Design.Palette.accent.opacity(0.12) : .clear,
+                                    in: .rect(cornerRadius: 6))
+                }
+                .accessibilityAddTraits(model.selectedModuleID == AppModel.conversionToolsSelectionID ? .isSelected : [])
+                .accessibilityIdentifier("navigation.tools")
             }
             .font(.system(size: 14, weight: .medium))
             .buttonStyle(.plain)
@@ -399,7 +409,7 @@ private struct ModuleRow: View {
         if module.state == .failed, let failureSummary {
             return "更新失败：\(failureSummary)"
         }
-        var parts = [module.initialSource.title]
+        var parts = [module.initialSource.title, module.outputFormat.title]
         if !module.category.isEmpty { parts.append(module.category) }
         let folder = ModuleOutputFolder.normalized(module.outputFolder)
         if folder != ModuleOutputFolder.root {

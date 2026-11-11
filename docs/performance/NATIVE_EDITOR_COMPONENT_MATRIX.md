@@ -1,5 +1,7 @@
 # 原生编辑器组件矩阵（最终2026-10-04）
 
+> 历史基线：结果仅对应当时的 fixture/build，当前验收与计划见 [当前项目报告](../CURRENT_PROJECT_REPORT.md)。
+
 Release opt-in矩阵 **1通过、0跳过、0失败，7.696秒**。三档正文分别为100KiB、1MiB、5MiB；每个操作一次，异步完成以5ms间隔观察。以下是组件耗时，不是输入p95、GPU帧率或真实窗口端到端延迟。
 
 | 单次操作（ms） | 100KiB | 1MiB | 5MiB |
@@ -25,6 +27,6 @@ Release opt-in矩阵 **1通过、0跳过、0失败，7.696秒**。三档正文�
 
 ## 与实际UI证据的关系
 
-三档真实输入各40次及5MiB搜索/滚动/行号另见[输入记录](native-input-2026-10-03/README.md)。[1MiB实际页签记录](native-tab-state-2026-10-03.json)验证预览→详情→预览保持草稿、查询匹配、选区/光标、滚动与焦点。组件结果不替代这些UI证据。
+三档真实输入各40次及5MiB搜索/滚动/行号另见[输入记录](../archive/performance-raw-2026-10/native-input-2026-10-03/README.md)。[1MiB实际页签记录](../archive/performance-raw-2026-10/native-tab-state-2026-10-03.json)验证预览→详情→预览保持草稿、查询匹配、选区/光标、滚动与焦点。组件结果不替代这些UI证据。
 
-[最终原始附件](native-editor-component-matrix-2026-10-04.json) · [测试结果](native-editor-component-result-2026-10-04.json)。2026-10-03旧矩阵保留为历史，原有1/5MiB取消缺样本已由本次固定fixture与实际progress协议补齐。
+[最终原始附件](../archive/performance-raw-2026-10/native-editor-component-matrix-2026-10-04.json) · [测试结果](../archive/performance-raw-2026-10/native-editor-component-result-2026-10-04.json)。2026-10-03旧矩阵保留为历史，原有1/5MiB取消缺样本已由本次固定fixture与实际progress协议补齐。

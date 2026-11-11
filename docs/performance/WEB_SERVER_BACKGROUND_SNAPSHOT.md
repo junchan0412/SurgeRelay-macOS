@@ -1,5 +1,7 @@
 # Web 完整快照后台构造复测（2026-10-02）
 
+> 历史基线：结果仅对应当时的 fixture/build，当前验收与计划见 [当前项目报告](../CURRENT_PROJECT_REPORT.md)。
+
 本轮接续 [activity 分流复测](WEB_SERVER_ACTIVITY_SPLIT.md)，将剩余的完整 DTO 构造移出 MainActor。协议继续保留完整 state 与独立 activity，不采用 module delta。5000 模块的 module-state 窗口中，MainActor 捕获最大耗时从上一版 **140–142 ms 降至 0.105–0.117 ms**；原有计算继续在后台执行，总准备与编码成本没有消失。
 
 ## 捕获与后台工作
@@ -50,8 +52,8 @@ CPU 为测试 Host 整个进程（含服务端、流式客户端与 driver），
 
 ## 结果文件
 
-- [本版原始数据](web-server-load-background-5000-2026-10-02.json)
-- [本版源码/二进制/运行配置 SHA-256](web-server-load-background-build-release-tmp-2026-10-02.json)
+- [本版原始数据](../archive/performance-raw-2026-10/web-server-load-background-5000-2026-10-02.json)
+- [本版源码/二进制/运行配置 SHA-256](../archive/performance-raw-2026-10/web-server-load-background-build-release-tmp-2026-10-02.json)
 - [上一版分流结果](WEB_SERVER_ACTIVITY_SPLIT.md)
 - [最初完整协议基线](WEB_SERVER_LOAD_BASELINE.md)
 - 正式结果：`/tmp/SurgeRelay-web-load-background-2026-10-02.xcresult`

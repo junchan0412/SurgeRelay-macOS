@@ -31,6 +31,7 @@ struct ModulePreviewPane: View {
         return [
             module.id.uuidString,
             module.sourceURL,
+            module.outputFormat.rawValue,
             module.contentHash ?? "",
             module.state.rawValue,
             module.lastUpdatedAt.map { String($0.timeIntervalSinceReferenceDate) } ?? "",
@@ -115,6 +116,8 @@ struct ModulePreviewPane: View {
 
             Divider()
             HStack(spacing: 12) {
+                Text(currentModule.outputFormat.title)
+                    .font(.caption).foregroundStyle(.secondary)
                 Label("第 \(cursorPosition.line) 行，第 \(cursorPosition.column) 列", systemImage: "text.cursor")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
@@ -355,6 +358,7 @@ struct ModuleTextEditorView: View {
         return [
             module.id.uuidString,
             module.sourceURL,
+            module.outputFormat.rawValue,
             module.contentHash ?? "",
             module.state.rawValue,
             module.lastUpdatedAt.map { String($0.timeIntervalSinceReferenceDate) } ?? "",
@@ -365,7 +369,7 @@ struct ModuleTextEditorView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                Text("文本编辑：\(currentModule.name)")
+                Text("文本编辑：\(currentModule.name) · \(currentModule.outputFormat.title)")
                     .font(.headline)
                     .lineLimit(1)
                 Spacer(minLength: 0)

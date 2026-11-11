@@ -4,6 +4,50 @@ import XCTest
 
 final class ModulePreviewContentProviderTests: XCTestCase {
     @MainActor
+    func testChangedClientDoesNotPresentPreviousClientCacheAsCurrentOutput() async throws {
+        var module = RelayModule(name: "Changed", sourceURL: "https://example.org/Demo.plugin", outputFormat: .loon, outputFileName: "Changed")
+        module.lastConvertedOutputFormat = .surge
+        let provider = ModulePreviewContentProvider(hasComponent: { _ in XCTFail("Client mismatch must be rejected before cache lookup"); return true },
+            readComponent: { _ in "[Script]\n" }, readConvertedComponent: { _ in "[Script]\n" }, writeComponent: { _, _ in },
+            materialize: { text, _ in text }, argumentInfo: { _ in ModuleArgumentInfo() },
+            applyingModuleMetadata: { _, _, _, _, text in text })
+        for reader in [{ try await provider.previewContent(for: module) }, { try await provider.convertedPreviewContent(for: module) }] {
+            do {
+                _ = try await reader()
+                XCTFail("A previous-client cache is not current output")
+            } catch {
+                XCTAssertTrue(error.localizedDescription.contains("先更新模块生成 Loon 输出"))
+            }
+        }
+    }
+
+    @MainActor
+    func testLocalLoonAndQuantumultSourcesRecoverWithoutSurgeSanitization() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        for (format, sourceFormat, body) in [
+            (ModuleOutputFormat.loon, ModuleSourceFormat.loon, "[Rewrite]\n^https://example.org - reject\n\n\n[MITM]\nhostname = example.org\n"),
+            (.quantumultX, .quantumultX, "^https://example.org url reject-200\n\n\nhostname = example.org\n")
+        ] {
+            let source = root.appending(path: "Local.\(format.fileExtension)")
+            try Data(body.utf8).write(to: source)
+            var stored: String?
+            let provider = ModulePreviewContentProvider(hasComponent: { _ in false },
+                readComponent: { _ in throw RelayError.invalidOutput("missing") },
+                readConvertedComponent: { _ in throw RelayError.invalidOutput("missing") },
+                writeComponent: { text, _ in stored = text }, materialize: { text, _ in text },
+                argumentInfo: { _ in ModuleArgumentInfo() }, applyingModuleMetadata: { _, _, _, _, text in text })
+            let module = RelayModule(name: "Local", sourceURL: source.absoluteString, sourceFormat: sourceFormat,
+                outputFormat: format, outputFileName: "Local")
+            let preview = try await provider.previewContent(for: module)
+            XCTAssertEqual(stored, body)
+            XCTAssertTrue(preview.hasSuffix(body))
+            XCTAssertFalse(preview.contains("[URL Rewrite]"))
+        }
+    }
+
+    @MainActor
     func testModulePreviewContentProviderRecoversLocalSurgeSourceWithoutCache() async throws {
         let root = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)

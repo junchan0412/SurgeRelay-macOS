@@ -494,6 +494,17 @@ dialog.is-closing::backdrop { animation: backdrop-out 160ms ease forwards; }
 .option-toggle .toggle-track { grid-column: 2; }
 .dialog-actions { padding: 14px 18px; display: flex; justify-content: flex-end; gap: 9px; border-top: 1px solid var(--separator); background: var(--surface-solid); }
 .dialog-message { margin: 0 18px 12px; padding: 9px 12px; border-radius: 10px; background: color-mix(in srgb, var(--red) 12%, transparent); color: var(--red); font-size: 12px; font-weight: 550; }
+.dialog-message.neutral { background: var(--fill); color: var(--secondary-label); }
+.conversion-tool-form { display: grid; gap: 18px; }
+.tool-panel { padding: 20px; }
+.tool-field-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.tool-field { display: grid; gap: 7px; margin: 12px 0; font-size: 13px; color: var(--secondary-label); }
+.tool-field input, .tool-field select, .tool-field textarea, .tool-result-text { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid var(--separator); border-radius: 8px; background: var(--surface-solid); color: var(--label); font: inherit; }
+.tool-field textarea, .tool-result-text { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; resize: vertical; }
+.tool-field textarea[name="sourceText"] { min-height: 180px; }
+.tool-toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.tool-result-text { min-height: 280px; }
+.tool-error { color: var(--red); white-space: pre-wrap; }
 .confirm-dialog { width: min(390px, calc(100vw - 32px)); padding: 0; border: 1px solid var(--separator); border-radius: 18px; background: var(--surface-solid); box-shadow: var(--shadow); }
 .confirm-content { padding: 24px 24px 18px; text-align: center; }
 .confirm-icon { width: 28px; height: 28px; color: var(--orange); }

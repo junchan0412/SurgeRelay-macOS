@@ -1,5 +1,7 @@
 # 原生交互验收记录
 
+> 历史基线（2026-10-02）：结果仅对应当时的 fixture/build，当前验收与计划见 [当前项目报告](../CURRENT_PROJECT_REPORT.md)。
+
 2026-10-02，在已编译应用的独立临时副本 `/tmp/surge-relay-native-qa/Surge Relay.app` 中执行。使用本机已有自签名证书，`SURGE_RELAY_UI_QA=1`；配置目录在系统临时目录的SurgeRelayUIQA下，自动更新/自动发布暂停，未连接真实GitHub或修改用户生产配置。
 
 通过原生Accessibility界面实际操作并核验：

@@ -1,5 +1,9 @@
 # 生产 Web 服务 5000 模块负载基准（2026-10-02）
 
+> 历史基线：结果仅对应当时的 fixture/build，当前验收与计划见 [当前项目报告](../CURRENT_PROJECT_REPORT.md)。
+
+本文是 Web 优化前的负载对照。后续已完成 [activity 分流](WEB_SERVER_ACTIVITY_SPLIT.md) 和 [完整快照后台构造](WEB_SERVER_BACKGROUND_SNAPSHOT.md)，下文关于 MainActor 编码及“下一步”的表述对应原测量阶段。
+
 ## 有效测量
 
 本次使用生产 `WebManagementServer`、`WebEventPayloadCache`、`WebManagementAPI/StateBuilder` 和真实 `AppModel`，模型采用随机临时 `WorkspaceContext`，禁止旧工作区回退且不持久化初始化。没有修改产品 API、SSE 上限、推送间隔或 OS 权限。
@@ -51,10 +55,10 @@ activity-only 阶段只改变进度与状态文本，modules 内容保持不变�
 
 ## 基线与复现
 
-- [有效原始数据](web-server-load-5000-2026-10-02.json)
-- [有效构建与源码/二进制 SHA-256](web-server-load-build-baseline-release-tmp-2026-10-02.json)
-- [先前 Release/Documents 路径启动环境失败](web-server-load-release-environment-failure-2026-10-02.json)
-- [先前构建基线](web-server-load-build-baseline-release-documents-2026-10-02.json)
+- [有效原始数据](../archive/performance-raw-2026-10/web-server-load-5000-2026-10-02.json)
+- [有效构建与源码/二进制 SHA-256](../archive/performance-raw-2026-10/web-server-load-build-baseline-release-tmp-2026-10-02.json)
+- [先前 Release/Documents 路径启动环境失败](../archive/performance-raw-2026-10/web-server-load-release-environment-failure-2026-10-02.json)
+- [先前构建基线](../archive/performance-raw-2026-10/web-server-load-build-baseline-release-documents-2026-10-02.json)
 
 先前尝试在 dyld 打开依赖时等待 sandboxd approval，未进入 Swift、AppModel 或 benchmark；它不是服务负载失败。将构建产物与运行时结果放入 `/tmp` 后，同 Release 配置成功运行。路径/环境相关性得到支持，但具体被阻塞文件没有确认，因此不把路径差异当成已完全证明的根因。
 

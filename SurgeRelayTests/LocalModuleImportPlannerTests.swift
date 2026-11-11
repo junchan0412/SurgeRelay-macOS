@@ -3,6 +3,24 @@ import XCTest
 @testable import SurgeRelay
 
 final class LocalModuleImportPlannerTests: XCTestCase {
+    func testImportPlanPreservesNativeExtensionsAndAllowsDifferentClientVariants() throws {
+        let original = "https://example.com/original.plugin"
+        var candidates: [LocalModuleScanCandidate] = []
+        for (path, format, sourceFormat) in [("Demo.module", ModuleOutputFormat.surge, ModuleSourceFormat.surge), ("Demo.lpx", .loon, .loon), ("Demo.conf", .quantumultX, .quantumultX), ("Demo.stoverride", .stash, .loon)] {
+            var candidate = scanCandidate(relativePath: path, sourceURL: original, sourceFormat: sourceFormat)
+            candidate.outputFormat = format
+            candidates.append(candidate)
+        }
+        let plan = LocalModuleImportPlanner.plan(candidates: candidates, existingModules: [])
+        XCTAssertTrue(plan.failures.isEmpty)
+        XCTAssertEqual(plan.entries.map(\.module.outputFileName), ["Demo.module", "Demo.lpx", "Demo.conf", "Demo.stoverride"])
+        XCTAssertEqual(plan.entries.map(\.module.outputFormat), [.surge, .loon, .quantumultX, .stash])
+        XCTAssertEqual(plan.entries.map(\.module.publishedRelativePath), ["Demo.module", "Demo.lpx", "Demo.conf", "Demo.stoverride"])
+        let repeated = LocalModuleImportPlanner.plan(candidates: candidates, existingModules: plan.entries.map(\.module))
+        XCTAssertTrue(repeated.entries.isEmpty)
+        XCTAssertEqual(repeated.failures.count, 4)
+    }
+
     func testLocalModuleImportPlannerPreservesPhysicalModulePath() {
         let plannedAt = Date(timeIntervalSince1970: 10_000)
         let candidate = scanCandidate(

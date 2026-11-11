@@ -18,6 +18,8 @@ struct ScriptHubWorkerMain {
             let script = try ScriptHubWorkerFiles.read(directory.appending(path: ScriptHubWorkerFiles.scriptName), maximumBytes: ScriptHubWorkerFiles.maximumScriptBytes)
             let converter = request.hasConverter
                 ? try ScriptHubWorkerFiles.read(directory.appending(path: ScriptHubWorkerFiles.converterName), maximumBytes: ScriptHubWorkerFiles.maximumScriptBytes - script.count) : nil
+            let source = request.sourceURL != nil
+                ? try ScriptHubWorkerFiles.read(directory.appending(path: ScriptHubWorkerFiles.sourceName), maximumBytes: ScriptHubWorkerFiles.maximumOutputBytes) : nil
             let started = ContinuousClock.now
             let output: String
             do {
@@ -25,7 +27,9 @@ struct ScriptHubWorkerMain {
                     try ScriptHubJavaScriptRuntime.execute(
                         script: String(decoding: script, as: UTF8.self),
                         scriptConverterScript: converter.map { String(decoding: $0, as: UTF8.self) },
-                        requestURL: request.requestURL
+                        requestURL: request.requestURL,
+                        sourceData: source,
+                        sourceURL: request.sourceURL
                     )
                 }
                 metrics.record(StageMetric(stage: .conversion, duration: max(0, StageMetricsRecorder.elapsed(since: started) - metrics.duration(for: .download)), bytesWritten: Int64(output.utf8.count)))

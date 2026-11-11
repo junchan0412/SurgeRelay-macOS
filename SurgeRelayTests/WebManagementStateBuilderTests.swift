@@ -2,6 +2,27 @@ import XCTest
 @testable import SurgeRelay
 
 final class WebManagementStateBuilderTests: XCTestCase {
+    func testOutputClientPayloadAndMutationKeepSourceAndOutputIndependent() throws {
+        for outputFormat in ModuleOutputFormat.allCases {
+            var module = RelayModule(name: "Multi-client", sourceURL: "https://example.com/source.plugin", outputFileName: "Multi-client")
+            module.outputFormat = outputFormat
+            let payload = WebManagementStateBuilder.modulePayload(module, publishedURL: nil, iconURL: nil)
+            XCTAssertEqual(payload.outputFormat, outputFormat.rawValue)
+            XCTAssertEqual(payload.outputFormatTitle, outputFormat.title)
+            let body = Data("{\"name\":\"Multi-client\",\"sourceURL\":\"https://example.com/source.plugin\",\"sourceFormat\":\"loon\",\"outputFormat\":\"\(outputFormat.rawValue)\"}".utf8)
+            let draft = try JSONDecoder().decode(WebModuleMutation.self, from: body).draft()
+            XCTAssertEqual(draft.sourceFormat, .loon)
+            XCTAssertEqual(draft.outputFormat, outputFormat)
+            let legacy = try JSONDecoder().decode(WebModuleMutation.self, from: Data("{\"name\":\"Legacy\",\"sourceURL\":\"https://example.com/source.plugin\"}".utf8))
+            XCTAssertEqual(try legacy.draft(existing: module).outputFormat, outputFormat)
+            XCTAssertEqual(try legacy.draft().outputFormat, .surge)
+        }
+        let invalid = try JSONDecoder().decode(WebModuleMutation.self, from: Data("{\"name\":\"Invalid\",\"sourceURL\":\"https://example.com/source.plugin\",\"outputFormat\":\"unknown\"}".utf8))
+        XCTAssertThrowsError(try invalid.draft()) { error in
+            XCTAssertEqual(error.localizedDescription, WebAPIError.invalidOutputFormat.localizedDescription)
+        }
+    }
+
     func testModuleEditorPayloadUsesSharedDefaultAndTargetFolders() {
         var settings = AppSettings()
         settings.publishToLocal = true

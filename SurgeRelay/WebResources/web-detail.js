@@ -4,11 +4,13 @@
     const markup = dependencies.markup || {};
     const logic = dependencies.logic;
     const previewController = dependencies.previewController;
+    const toolsController = dependencies.toolsController;
     const api = dependencies.api;
     const documentRef = dependencies.document || global.document;
     const formatDate = dependencies.formatDate || (() => '');
     const getState = dependencies.getState || (() => null);
     const getSelectedID = dependencies.getSelectedID || (() => null);
+    const getPendingModuleSaveIDs = dependencies.getPendingModuleSaveIDs || (() => null);
     const normalizeSelection = dependencies.normalizeSelection;
     const setTimer = dependencies.setTimeout || global.setTimeout;
     const clearTimer = dependencies.clearTimeout || global.clearTimeout;
@@ -66,6 +68,11 @@
         renderHistory(animate);
         return;
       }
+      if (selectedID === 'tools') {
+        previewController.deactivate?.();
+        toolsController?.render();
+        return;
+      }
 
       else {
         const module = state.modules.find(item => item.id === selectedID);
@@ -84,7 +91,7 @@
     function renderHistory(animate = false) {
       const state = getState();
       const version = `${state.workspace?.historyCount || 0}:${state.workspace?.recentHistory?.[0]?.id || ''}`;
-      const content = entries => `<header class="workspace-heading"><p class="eyebrow">ACTIVITY</p><h1>活动记录</h1><p>回看每一次更新、缓存回退与发布结果。</p></header><section class="workspace-panel">${markup.historyMarkup?.(entries, { detailed: true }) || ''}</section>`;
+      const content = entries => `<header class="workspace-heading"><p class="eyebrow">ACTIVITY</p><h1>活动记录</h1><p>查看待保存配置与更新、缓存回退和发布结果。</p></header><section id="pending-module-saves" class="workspace-section">${markup.pendingModuleSavesMarkup?.(getState().activity, { pendingIDs: getPendingModuleSaveIDs() }) || ''}</section><section class="workspace-section"><div class="workspace-section-heading"><h2>更新与发布记录</h2></div><div class="workspace-panel">${markup.historyMarkup?.(entries, { detailed: true }) || ''}</div></section>`;
       setDetailHTML(content(historyEntries.length ? historyEntries : state.workspace?.recentHistory || []), animate);
       if (historyVersion === version) return;
       historyVersion = version;
@@ -94,6 +101,14 @@
         historyEntries = entries;
         if (getSelectedID() === 'activity') setDetailHTML(content(entries), false);
       }).catch(() => { if (request === historyRequest) historyVersion = null; });
+    }
+
+    function patchPendingModuleSaves() {
+      if (getSelectedID() !== 'activity') return;
+      const target = ui.detail.querySelector?.('#pending-module-saves');
+      if (!target) return;
+      const content = markup.pendingModuleSavesMarkup?.(getState().activity, { pendingIDs: getPendingModuleSaveIDs() }) || '';
+      if (target.innerHTML !== content) target.innerHTML = content;
     }
 
     function renderModuleDetail(module, animate = true) {
@@ -150,12 +165,14 @@
 
     // 只更新“信息”页签中变化了字段值，避免整个详情区重排。
     function patchLiveDetail(previous, next) {
-      if (detailTab !== 'info') return;
       const selectedID = getSelectedID();
+      if (selectedID === 'tools') { toolsController?.patchStatus(); return; }
       if (selectedID === 'overview' || selectedID === 'activity') {
         if (JSON.stringify(previous?.workspace) !== JSON.stringify(next.workspace) || logic.sidebarListSignature(previous) !== logic.sidebarListSignature(next)) renderDetail(false);
+        else patchPendingModuleSaves();
         return;
       }
+      if (detailTab !== 'info') return;
 
       const module = next.modules.find(item => item.id === selectedID);
       if (!module) return;
@@ -170,6 +187,7 @@
       patchDetailValue('更新状态', logic.moduleStatusTitle(module));
       patchDetailValue('初始来源', module.initialSourceTitle || '自写模块');
       patchDetailValue('来源格式', module.sourceFormatTitle);
+      patchDetailValue('输出客户端', module.outputFormatTitle || 'Surge');
       patchDetailValue('创建时间', formatDate(module.createdAt, '—'));
       patchDetailValue('上次更新', formatDate(module.lastUpdatedAt, '从未更新'));
       patchDetailValue('来源检查', formatDate(module.sourceCheckedAt, '尚未检查'));
@@ -177,7 +195,7 @@
       patchDetailValue('来源 hash', module.sourceContentHash?.slice(0, 12), module.sourceContentHash);
       patchDetailValue('来源 ETag', module.sourceETag, module.sourceETag);
       patchDetailValue('来源修改时间', module.sourceLastModified);
-      patchDetailValue('转换引擎', module.conversionEngineRevision ? module.conversionEngineRevision.slice(0, 12) : '原生 Surge 模块', module.conversionEngineRevision);
+      patchDetailValue('转换引擎', module.conversionEngineRevision ? module.conversionEngineRevision.slice(0, 12) : '原生格式', module.conversionEngineRevision);
       if (previousModule?.contentHash !== module.contentHash) loadArguments(module);
     }
 
@@ -203,7 +221,8 @@
       handleTabKeydown,
       renderDetail,
       renderModuleDetail,
-      patchLiveDetail
+      patchLiveDetail,
+      patchPendingModuleSaves
     };
   }
 

@@ -15,7 +15,8 @@ actor EmbeddedScriptHubEngine {
         self.maximumConcurrentWorkers = max(1, min(maximumConcurrentWorkers, 4))
     }
 
-    func convert(script: String, scriptConverterScript: String? = nil, requestURL: URL) async throws -> String {
+    func convert(script: String, scriptConverterScript: String? = nil, requestURL: URL,
+                 sourceData: Data? = nil, sourceURL: URL? = nil) async throws -> String {
         let metrics = StageMetricsContext.current
         let started = ContinuousClock.now
         var helperDownloads: TimeInterval = 0
@@ -45,7 +46,8 @@ actor EmbeddedScriptHubEngine {
         let directory = FileManager.default.temporaryDirectory.appending(path: "SurgeRelay-ScriptWorker-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
         defer { try? FileManager.default.removeItem(at: directory) }
-        let request = ScriptHubWorkerRequest(requestURL: requestURL, hasConverter: scriptConverterScript != nil, capturesMetrics: metrics != nil)
+        let request = ScriptHubWorkerRequest(requestURL: requestURL, hasConverter: scriptConverterScript != nil,
+            capturesMetrics: metrics != nil, sourceURL: sourceData == nil ? nil : sourceURL)
         let metadata = try JSONEncoder().encode(request)
         guard metadata.count <= ScriptHubWorkerFiles.maximumMetadataBytes else {
             throw RelayError.invalidOutput("Script-Hub 转换请求地址过长。")
@@ -54,6 +56,12 @@ actor EmbeddedScriptHubEngine {
         try Data(script.utf8).write(to: directory.appending(path: ScriptHubWorkerFiles.scriptName), options: .atomic)
         if let scriptConverterScript {
             try Data(scriptConverterScript.utf8).write(to: directory.appending(path: ScriptHubWorkerFiles.converterName), options: .atomic)
+        }
+        if let sourceData {
+            guard sourceData.count <= ScriptHubWorkerFiles.maximumOutputBytes else {
+                throw RelayError.invalidOutput("转换来源超过 20 MB 限制。")
+            }
+            try sourceData.write(to: directory.appending(path: ScriptHubWorkerFiles.sourceName), options: .atomic)
         }
         let worker = ScriptHubWorkerProcess(executable: executable, directory: directory)
         return try await withTaskCancellationHandler {

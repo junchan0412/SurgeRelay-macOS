@@ -217,7 +217,7 @@ final class ModelAndCoordinatorTests: XCTestCase {
         XCTAssertEqual(candidate.localStorageRelativePath, "Converted/Demo.sgmodule")
         XCTAssertEqual(candidate.sourceFormat, .quantumultX)
         XCTAssertEqual(candidate.initialSource, .subscribed(.quantumultX))
-        XCTAssertEqual(candidate.relationshipSummary, "本地模块 · 订阅 Quantumult X")
+        XCTAssertEqual(candidate.relationshipSummary, "本地模块 · 订阅 Quantumult X · Surge")
         XCTAssertEqual(candidate.category, "#工具")
         XCTAssertEqual(candidate.outputFolder, "Converted")
         XCTAssertNil(candidate.sourceContentHash)

@@ -2,12 +2,12 @@
 
 本文件记录本 fork（`junchan0412/SurgeRelay-macOS`）相对 upstream（`EEliberto/SurgeRelay-macOS`）的提交分叉情况，以及后续如何更精准地同步。
 
-最后审查日期：2026-08-30（基于本地 remote-tracking refs，未执行 fetch）
+最后分叉审查日期：2026-08-30（基于当时本地 remote-tracking refs，未执行 fetch；下列 SHA 和计数是历史快照，不代表当前 HEAD 或上游最新状态）
 审查基线：
 
 | 引用 | SHA | 说明 |
 | --- | --- | --- |
-| fork `HEAD` / 当前审查点 | `4b591fc56d7d` | 当前工作分支 HEAD |
+| fork `HEAD` / 当时审查点 | `4b591fc56d7d` | 2026-08-30 审查时的 HEAD |
 | upstream `main` | `a3e667c` | `Revert "Fix macOS 27 toolbar layout"` |
 | 共同祖先 `merge-base` | `30203ef732e1` | `Update README.md` |
 
@@ -42,8 +42,8 @@ git log --oneline HEAD..upstream/main
 
 | 边界 | 本 fork 现状 | 不要直接采用的 upstream 方向 |
 | --- | --- | --- |
-| 模块关系模型 | `storageLocation` × `initialSource(#SUBSCRIBED)` | 把 iCloud/GitHub/远程来源揉成单一 `storageMode` 语义 |
-| 发布模型 | `publishToLocal` + `publishToGitHub` 可并存；独立模块按 `storageLocation` 输出 | 仅 iCloud 或仅 GitHub 的旧路径假设 |
+| 模块关系模型 | `storageTargets` × `initialSource(#SUBSCRIBED)`；`storageLocation` 保留旧单目标兼容 | 把 iCloud/GitHub/远程来源揉成单一 `storageMode` 语义 |
+| 发布模型 | `publishToLocal` + `publishToGitHub` 可并存；每个模块按 `storageTargets` 独立输出，总模块/合并已移除 | 仅 iCloud 或仅 GitHub 的旧路径假设 |
 | 架构 | AppModel 扩展拆分、planner/service 化、Web 资源拆分（`web-*.js`） | 重新塞回巨大 `AppModel.swift` / 单体 `RootView` / 单体 `app.js` |
 | 远程管理 | 本机 Web 管理 + 本地加密 token | Surge Ponte 服务端/客户端整套模式（除非明确立项） |
 | 发布产物 | 固定自签名 + Sparkle EdDSA + `script/build_release_assets.sh` | upstream 自己的 build 号、appcast 私钥、误提交图标/README 回滚链 |

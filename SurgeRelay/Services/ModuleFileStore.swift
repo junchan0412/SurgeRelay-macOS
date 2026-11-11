@@ -53,10 +53,10 @@ actor ModuleFileStore {
     func writeComponent(_ content: String, id: UUID) throws {
         try recoverInterruptedRestore(id: id)
         try FileManager.default.createDirectory(at: componentDirectory, withIntermediateDirectories: true)
-        try Data(SurgeModuleSanitizer.sanitize(content).utf8).write(to: componentURL(for: id), options: .atomic)
+        try Data(content.utf8).write(to: componentURL(for: id), options: .atomic)
     }
 
-    func commitConversion(_ result: ConversionResult, id: UUID) throws {
+    func commitConversion(_ result: ConversionResult, id: UUID, retiringOverride: Bool = false, previousOutputFormat: ModuleOutputFormat? = nil) throws {
         try recoverInterruptedRestore(id: id)
         try Task.checkCancellation()
         let manager = FileManager.default
@@ -64,16 +64,18 @@ actor ModuleFileStore {
         let staging = snapshotDirectory.appending(path: ".\(id.uuidString)-\(UUID().uuidString)", directoryHint: .isDirectory)
         try manager.createDirectory(at: staging, withIntermediateDirectories: true)
         defer { try? manager.removeItem(at: staging) }
-        try Data(SurgeModuleSanitizer.sanitize(result.content).utf8).write(to: staging.appending(path: "Content.cache"))
+        try Data(result.content.utf8).write(to: staging.appending(path: "Content.cache"))
+        try JSONEncoder().encode(result.outputFormat).write(to: staging.appending(path: "OutputFormat.json"))
         try stageAssets(result.assets, id: id, at: staging.appending(path: "Assets", directoryHint: .isDirectory))
         try Task.checkCancellation()
-        _ = try recordCurrentVersion(id: id, reason: .beforeUpdate)
+        _ = try recordCurrentVersion(id: id, reason: .beforeUpdate, outputFormat: previousOutputFormat)
         let destination = snapshotURL(for: id)
         if manager.fileExists(atPath: destination.path) {
             _ = try manager.replaceItemAt(destination, withItemAt: staging)
         } else {
             try manager.moveItem(at: staging, to: destination)
         }
+        if retiringOverride { try removeComponentOverride(id: id) }
     }
 
     static let maximumVersionCount = 20
@@ -90,23 +92,23 @@ actor ModuleFileStore {
         if FileManager.default.fileExists(atPath: root.path) { try FileManager.default.removeItem(at: root) }
     }
 
-    func currentVersionContent(id: UUID, reason: ModuleVersionReason = .current) throws -> ModuleVersionContent? {
-        let current = try currentVersionState(id: id, reason: reason)
+    func currentVersionContent(id: UUID, reason: ModuleVersionReason = .current, outputFormat: ModuleOutputFormat? = nil) throws -> ModuleVersionContent? {
+        let current = try currentVersionState(id: id, reason: reason, outputFormat: outputFormat)
         if let problem = current.problem { throw RelayError.invalidOutput(problem) }
         return current.content
     }
 
-    func currentVersionState(id: UUID, reason: ModuleVersionReason = .current) throws -> ModuleVersionCurrentState {
+    func currentVersionState(id: UUID, reason: ModuleVersionReason = .current, outputFormat: ModuleOutputFormat? = nil) throws -> ModuleVersionCurrentState {
         try recoverInterruptedRestore(id: id)
         if allowsLegacyFallback, !AppRuntimeOptions.isUIQAMode, !FileManager.default.fileExists(atPath: componentURL(for: id).path) {
             _ = try? readConvertedComponent(id: id)
         }
-        return try currentVersionState(from: captureRawRestoreState(id: id), id: id, reason: reason)
+        return try currentVersionState(from: captureRawRestoreState(id: id), id: id, reason: reason, outputFormat: outputFormat)
     }
 
     @discardableResult
-    func recordCurrentVersion(id: UUID, reason: ModuleVersionReason) throws -> ModuleVersionRecord? {
-        guard let version = try currentVersionContent(id: id, reason: reason) else { return nil }
+    func recordCurrentVersion(id: UUID, reason: ModuleVersionReason, outputFormat: ModuleOutputFormat? = nil) throws -> ModuleVersionRecord? {
+        guard let version = try currentVersionContent(id: id, reason: reason, outputFormat: outputFormat) else { return nil }
         return try storeVersion(version)
     }
 
@@ -154,7 +156,8 @@ actor ModuleFileStore {
             }
             assets.append(GeneratedAsset(relativePath: asset.path, data: data))
         }
-        let verified = try makeVersionContent(id: id, content: content, converted: converted, hasOverride: record.hasOverride, assets: assets, reason: record.reason)
+        let verified = try makeVersionContent(id: id, content: content, converted: converted, hasOverride: record.hasOverride, assets: assets, reason: record.reason,
+            outputFormat: record.outputFormat)
         guard verified.record.fingerprint == record.fingerprint, verified.record.byteCount == record.byteCount else {
             throw RelayError.invalidOutput("历史版本清单校验失败。")
         }
@@ -175,7 +178,7 @@ actor ModuleFileStore {
         if let content = current.content { _ = try storeVersion(content) }
         try installVersionContent(version, previous: previous, preservesDamagedCurrent: current.problem != nil, id: id)
         return try makeVersionContent(id: id, content: version.content, converted: version.convertedContent ?? version.content,
-                                      hasOverride: true, assets: version.assets, reason: .restored)
+                                      hasOverride: true, assets: version.assets, reason: .restored, outputFormat: version.record.outputFormat ?? .surge)
     }
 
     private struct VersionIdentity: Codable {
@@ -185,7 +188,8 @@ actor ModuleFileStore {
         var assets: [ModuleVersionAsset]
     }
 
-    private func makeVersionContent(id: UUID, content: String, converted: String?, hasOverride: Bool, assets: [GeneratedAsset], reason: ModuleVersionReason) throws -> ModuleVersionContent {
+    private func makeVersionContent(id: UUID, content: String, converted: String?, hasOverride: Bool, assets: [GeneratedAsset], reason: ModuleVersionReason,
+                                    outputFormat: ModuleOutputFormat? = nil) throws -> ModuleVersionContent {
         let contentHash = Data(content.utf8).sha256String
         let convertedHash = converted.map { Data($0.utf8).sha256String }
         let sorted = assets.sorted { $0.relativePath < $1.relativePath }
@@ -196,7 +200,8 @@ actor ModuleFileStore {
         let record = ModuleVersionRecord(id: UUID(), moduleID: id, createdAt: .now, reason: reason, contentHash: contentHash,
                                          convertedContentHash: convertedHash, hasOverride: hasOverride, assets: manifest,
                                          fingerprint: try encoder.encode(identity).sha256String,
-                                         byteCount: content.utf8.count + (converted?.utf8.count ?? 0) + sorted.reduce(0) { $0 + $1.data.count })
+                                         byteCount: content.utf8.count + (converted?.utf8.count ?? 0) + sorted.reduce(0) { $0 + $1.data.count },
+                                         outputFormat: outputFormat)
         return ModuleVersionContent(record: record, content: content, convertedContent: converted, assets: sorted)
     }
 
@@ -206,7 +211,8 @@ actor ModuleFileStore {
     }
 
     private func storeVersion(_ version: ModuleVersionContent) throws -> ModuleVersionRecord {
-        if let latest = try moduleVersions(id: version.record.moduleID).first, latest.fingerprint == version.record.fingerprint { return latest }
+        if let latest = try moduleVersions(id: version.record.moduleID).first,
+           latest.fingerprint == version.record.fingerprint, latest.outputFormat == version.record.outputFormat { return latest }
         let destination = versionURL(moduleID: version.record.moduleID, versionID: version.record.id)
         let root = destination.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
@@ -236,12 +242,14 @@ actor ModuleFileStore {
         var converted: Data?
         var override: Data?
         var assets: [GeneratedAsset]
+        var outputFormat: ModuleOutputFormat? = nil
     }
 
     private struct RawRestoreIdentity: Codable {
         var convertedHash: String?
         var overrideHash: String?
         var assets: [ModuleVersionAsset]
+        var outputFormat: ModuleOutputFormat? = nil
     }
 
     private struct RestoreJournal: Codable {
@@ -327,14 +335,14 @@ actor ModuleFileStore {
         let converted = manager.fileExists(atPath: convertedURL.path) ? try Data(contentsOf: convertedURL) : nil
         let override = manager.fileExists(atPath: effectiveOverride.path) ? try Data(contentsOf: effectiveOverride) : nil
         let assets = try assetFiles(id: id).map { GeneratedAsset(relativePath: $0.name, data: $0.data) }
-        return RawRestoreState(converted: converted, override: override, assets: assets)
+        return RawRestoreState(converted: converted, override: override, assets: assets, outputFormat: try snapshotOutputFormat(id: id))
     }
 
     private func rawRestoreIdentity(_ state: RawRestoreState) -> RawRestoreIdentity {
         RawRestoreIdentity(convertedHash: state.converted?.sha256String, overrideHash: state.override?.sha256String,
                            assets: state.assets.sorted { $0.relativePath < $1.relativePath }.map {
                             ModuleVersionAsset(path: $0.relativePath, contentHash: $0.data.sha256String, byteCount: $0.data.count)
-                           })
+                           }, outputFormat: state.outputFormat)
     }
 
     private func rawRestoreFingerprint(_ state: RawRestoreState) throws -> String {
@@ -343,7 +351,8 @@ actor ModuleFileStore {
         return try encoder.encode(rawRestoreIdentity(state)).sha256String
     }
 
-    private func currentVersionState(from state: RawRestoreState, id: UUID, reason: ModuleVersionReason) throws -> ModuleVersionCurrentState {
+    private func currentVersionState(from state: RawRestoreState, id: UUID, reason: ModuleVersionReason,
+                                     outputFormat: ModuleOutputFormat? = nil) throws -> ModuleVersionCurrentState {
         let assets = rawRestoreIdentity(state).assets
         guard let effective = state.override ?? state.converted else {
             return ModuleVersionCurrentState(content: nil,
@@ -355,9 +364,10 @@ actor ModuleFileStore {
             return ModuleVersionCurrentState(content: nil, fingerprint: "raw:" + (try rawRestoreFingerprint(state)), assets: assets,
                 problem: "当前正文损坏，无法按 UTF-8 读取；历史仍可恢复，损坏原始文件将单独保留。")
         }
-        let converted = state.converted.flatMap { String(data: $0, encoding: .utf8) }.map(SurgeModuleSanitizer.sanitize)
-        let content = try makeVersionContent(id: id, content: SurgeModuleSanitizer.sanitize(text), converted: converted,
-                                             hasOverride: state.override != nil, assets: state.assets, reason: reason)
+        let converted = state.converted.flatMap { String(data: $0, encoding: .utf8) }
+        let content = try makeVersionContent(id: id, content: text, converted: converted,
+                                             hasOverride: state.override != nil, assets: state.assets, reason: reason,
+                                             outputFormat: state.outputFormat ?? outputFormat ?? .surge)
         return ModuleVersionCurrentState(content: content, fingerprint: content.record.fingerprint, assets: assets, problem: nil)
     }
 
@@ -365,6 +375,7 @@ actor ModuleFileStore {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         if let converted = state.converted { try writeRestoreData(converted, to: root.appending(path: "Content.cache")) }
         if let override = state.override { try writeRestoreData(override, to: root.appending(path: "Override.module")) }
+        if let outputFormat = state.outputFormat { try writeRestoreData(JSONEncoder().encode(outputFormat), to: root.appending(path: "OutputFormat.json")) }
         let assetsRoot = root.appending(path: "Assets", directoryHint: .isDirectory)
         try stageAssets(state.assets, id: id, at: assetsRoot)
         let prefix = "assets/\(id.uuidString.lowercased())/"
@@ -392,8 +403,12 @@ actor ModuleFileStore {
             guard bytes.sha256String == asset.contentHash, bytes.count == asset.byteCount else { throw RelayError.invalidOutput("恢复事务中的脚本校验失败。") }
             assets.append(GeneratedAsset(relativePath: asset.path, data: bytes))
         }
+        if let outputFormat = identity.outputFormat {
+            let recordedFormat = try JSONDecoder().decode(ModuleOutputFormat.self, from: Data(contentsOf: root.appending(path: "OutputFormat.json")))
+            guard recordedFormat == outputFormat else { throw RelayError.invalidOutput("恢复事务中的输出客户端不一致。") }
+        }
         return RawRestoreState(converted: try data("Content.cache", expected: identity.convertedHash),
-                               override: try data("Override.module", expected: identity.overrideHash), assets: assets)
+                               override: try data("Override.module", expected: identity.overrideHash), assets: assets, outputFormat: identity.outputFormat)
     }
 
     private func writeRestoreData(_ data: Data, to url: URL) throws {
@@ -415,6 +430,7 @@ actor ModuleFileStore {
         try manager.createDirectory(at: staging, withIntermediateDirectories: true)
         defer { try? manager.removeItem(at: staging) }
         if let converted = state.converted { try writeRestoreData(converted, to: staging.appending(path: "Content.cache")) }
+        if let outputFormat = state.outputFormat { try writeRestoreData(JSONEncoder().encode(outputFormat), to: staging.appending(path: "OutputFormat.json")) }
         try stageAssets(state.assets, id: id, at: staging.appending(path: "Assets", directoryHint: .isDirectory))
         let destination = snapshotURL(for: id)
         if !recovery {
@@ -440,7 +456,7 @@ actor ModuleFileStore {
         var prepared = false
         defer { if !prepared { try? FileManager.default.removeItem(at: root) } }
         let next = RawRestoreState(converted: Data((version.convertedContent ?? version.content).utf8),
-                                   override: Data(version.content.utf8), assets: version.assets)
+                                   override: Data(version.content.utf8), assets: version.assets, outputFormat: version.record.outputFormat ?? .surge)
         try writeRestoreBundle(previous, id: id, at: root.appending(path: "Old", directoryHint: .isDirectory))
         try writeRestoreBundle(next, id: id, at: root.appending(path: "New", directoryHint: .isDirectory))
         let journalURL = root.appending(path: "Journal.json")
@@ -543,9 +559,20 @@ actor ModuleFileStore {
     }
 
     func prepareConversion(_ result: ConversionResult, id: UUID) throws -> (converted: String, effective: String, hasOverride: Bool) {
-        let converted = SurgeModuleSanitizer.sanitize(result.content)
+        let converted = result.content
         let hasOverride = hasOverride(id: id)
         return (converted, hasOverride ? try readComponent(id: id) : converted, hasOverride)
+    }
+
+    func convertedOutputFormat(id: UUID) throws -> ModuleOutputFormat? {
+        try recoverInterruptedRestore(id: id)
+        return try snapshotOutputFormat(id: id)
+    }
+
+    private func snapshotOutputFormat(id: UUID) throws -> ModuleOutputFormat? {
+        let url = snapshotURL(for: id).appending(path: "OutputFormat.json")
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        return try JSONDecoder().decode(ModuleOutputFormat.self, from: Data(contentsOf: url))
     }
 
     func hasComponent(id: UUID) -> Bool {
@@ -573,7 +600,7 @@ actor ModuleFileStore {
             try FileManager.default.moveItem(at: legacyOverrideURL, to: overrideURL)
         }
         if FileManager.default.fileExists(atPath: overrideURL.path) {
-            return SurgeModuleSanitizer.sanitize(try decodeText(at: overrideURL))
+            return try decodeText(at: overrideURL)
         }
         return try readConvertedComponent(id: id)
     }
@@ -589,14 +616,14 @@ actor ModuleFileStore {
                 try FileManager.default.copyItem(at: legacyURL, to: url)
             }
         }
-        return SurgeModuleSanitizer.sanitize(try decodeText(at: url))
+        return try decodeText(at: url)
     }
 
     func writeComponentOverride(_ content: String, id: UUID) throws {
         try recoverInterruptedRestore(id: id)
         try FileManager.default.createDirectory(at: overrideDirectory, withIntermediateDirectories: true)
         try PersistenceStore.writeProtectedData(
-            Data(SurgeModuleSanitizer.sanitize(content).utf8),
+            Data(content.utf8),
             to: componentOverrideURL(for: id),
             configurationDirectory: storageConfigurationDirectory
         )

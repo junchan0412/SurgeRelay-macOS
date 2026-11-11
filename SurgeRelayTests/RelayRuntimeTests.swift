@@ -4,6 +4,99 @@ import XCTest
 
 @MainActor
 final class RelayRuntimeTests: XCTestCase {
+    func testConversionToolAPIReturnsFileAndRespectsWorkspaceAndBusyAdmission() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = pendingSaveModel(root: root)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        let script = "$done({body: 'native'});"
+        let body = try JSONSerialization.data(withJSONObject: ["kind": "script", "sourceText": script,
+            "outputName": "Native", "outputFormat": "quantumultX", "sourceFormat": "quantumultX"])
+        func request(_ workspace: String) -> WebHTTPRequest {
+            WebHTTPRequest(method: "POST", path: "/api/tools/convert", query: [:],
+                headers: ["x-relay-workspace": workspace], body: body, isLoopback: true)
+        }
+        let wrong = await WebManagementAPI.response(for: request(UUID().uuidString), model: model)
+        XCTAssertEqual(wrong.status, 412)
+        model.beginWork(.publishing)
+        let busy = await WebManagementAPI.response(for: request(model.workspaceID.uuidString), model: model)
+        XCTAssertEqual(busy.status, 409)
+        model.endWork(.publishing)
+        let generation = model.localChangeGeneration
+        let response = await WebManagementAPI.response(for: request(model.workspaceID.uuidString), model: model)
+        XCTAssertEqual(response.status, 200)
+        let result = try XCTUnwrap(JSONSerialization.jsonObject(with: response.body) as? [String: Any])
+        XCTAssertEqual(result["fileName"] as? String, "Native.js")
+        XCTAssertEqual(result["content"] as? String, script)
+        XCTAssertEqual(result["kind"] as? String, "script")
+        XCTAssertEqual(result["outputFormat"] as? String, "quantumultX")
+        XCTAssertFalse(model.isWorking)
+        XCTAssertEqual(model.localChangeGeneration, generation)
+        XCTAssertTrue(model.modules.isEmpty)
+        XCTAssertTrue(model.updateHistory.isEmpty)
+        XCTAssertNil(model.nativeToolResult)
+    }
+
+    func testConversionToolCancellationReleasesHelperAndDrainsQueuedModuleSave() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = pendingSaveModel(root: root)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        let module = RelayModule(name: "Before", sourceURL: "https://example.org/Module.sgmodule", outputFileName: "Module")
+        model.modules = [module]
+        try await model.engineStore.save(scripts: ["rule-parser.js": Data("while (true) {}".utf8)])
+        var tool = ConversionToolDraft()
+        tool.sourceText = "example.org"
+        let operation = Task { try await model.convertTool(tool) }
+        for _ in 0..<100 where model.conversionToolTask == nil { try await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertNotNil(model.conversionToolTask)
+        XCTAssertEqual(model.workActivity.kind, .convertingTool)
+        var edit = ModuleDraft(module: module)
+        edit.name = "After"
+        try await model.enqueueModuleSave(moduleID: module.id, draft: edit)
+        XCTAssertNil(model.pendingModuleSaveTask)
+        XCTAssertTrue(model.cancelCurrentWork())
+        do {
+            _ = try await operation.value
+            XCTFail("Cancelled conversion must not return output")
+        } catch { XCTAssertTrue(error is CancellationError) }
+        await model.pendingModuleSaveTask?.value
+        XCTAssertEqual(model.modules[0].name, "After")
+        XCTAssertTrue(model.pendingModuleSaves.isEmpty)
+        XCTAssertNil(model.conversionToolTask)
+        XCTAssertFalse(model.isWorking)
+    }
+
+    func testHistoricalClientIsCheckedEvenWhenSurgeAndLoonBodiesMatch() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = pendingSaveModel(root: root)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        var module = RelayModule(name: "Shared", sourceURL: "https://example.org/Shared.plugin", outputFileName: "Shared")
+        let body = "[Rule]\nFINAL,DIRECT\n"
+        let source = try XCTUnwrap(URL(string: module.sourceURL))
+        try await model.fileStore.commitConversion(ConversionResult(content: body, requestURL: source), id: module.id)
+        let oldValue = try await model.fileStore.recordCurrentVersion(id: module.id, reason: .current)
+        let old = try XCTUnwrap(oldValue)
+        module.outputFormat = .loon
+        module.lastConvertedOutputFormat = .loon
+        module.outputFileName = "Shared.plugin"
+        model.modules = [module]
+        try await model.fileStore.commitConversion(ConversionResult(content: body, requestURL: source, outputFormat: .loon), id: module.id)
+        let comparison = try await model.compareModuleVersion(moduleID: module.id, versionID: old.id)
+        do {
+            try await model.restoreModuleVersion(comparison)
+            XCTFail("History with another client must not replace the current output")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("历史版本属于 Surge"))
+        }
+        let retained = try await model.fileStore.readComponent(id: module.id)
+        let retainedFormat = try await model.fileStore.convertedOutputFormat(id: module.id)
+        XCTAssertEqual(retained, body)
+        XCTAssertEqual(retainedFormat, .loon)
+        XCTAssertEqual(model.modules[0].lastConvertedOutputFormat, .loon)
+    }
+
     func testMovingModuleWritesNewOutputThenRemovesOnlyItsPreviousFile() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -364,6 +457,84 @@ final class RelayRuntimeTests: XCTestCase {
         XCTAssertFalse(model.isWorking)
         XCTAssertEqual(PersistenceStore.loadModules(in: root.appending(path: "Config"), allowLegacyFallback: false)[0].name, "Second click")
         XCTAssertTrue(PersistenceStore.loadPendingModuleSaves(in: root.appending(path: "Config")).isEmpty)
+    }
+
+    func testRejectedPendingSaveIsNotReplayedAfterPersistenceRecovers() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = pendingSaveModel(root: root)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        model.beginWork(.publishing)
+        var accepted = ModuleDraft(defaultStorageLocation: .gitHub)
+        accepted.name = "Accepted"
+        accepted.sourceURL = "https://test.invalid/accepted.sgmodule"
+        try await model.enqueueModuleSave(moduleID: nil, draft: accepted)
+        let acceptedID = try XCTUnwrap(model.pendingModuleSaves.first?.id)
+        let queueURL = root.appending(path: "Config/pending-module-saves.json")
+        try FileManager.default.removeItem(at: queueURL)
+        try FileManager.default.createDirectory(at: queueURL, withIntermediateDirectories: true)
+        var rejected = ModuleDraft(defaultStorageLocation: .gitHub)
+        rejected.name = "Rejected"
+        rejected.sourceURL = "https://test.invalid/rejected.sgmodule"
+        do {
+            try await model.enqueueModuleSave(moduleID: nil, draft: rejected)
+            XCTFail("A failed queue write must reject the submission")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("pending-module-saves.json"))
+        }
+        XCTAssertEqual(model.pendingModuleSaves.map(\.id), [acceptedID])
+        XCTAssertNil(model.pendingModuleSaveTask)
+        try FileManager.default.removeItem(at: queueURL)
+        try await model.flushPersistence()
+        XCTAssertEqual(PersistenceStore.loadPendingModuleSaves(in: root.appending(path: "Config")).map(\.id), [acceptedID])
+        model.endWork(.publishing)
+        await model.pendingModuleSaveTask?.value
+        XCTAssertEqual(model.modules.map(\.name), ["Accepted"])
+        XCTAssertTrue(model.pendingModuleSaves.isEmpty)
+        try await model.enqueueModuleSave(moduleID: nil, draft: rejected)
+        await model.pendingModuleSaveTask?.value
+        XCTAssertEqual(model.modules.map(\.name), ["Accepted", "Rejected"])
+        XCTAssertTrue(model.pendingModuleSaves.isEmpty)
+    }
+
+    func testPendingSaveBackupRequiresConfirmationBeforeReplayingCompletedOrCancelledEdits() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        for completesSave in [true, false] {
+            let caseRoot = root.appending(path: completesSave ? "Completed" : "Cancelled")
+            let model = pendingSaveModel(root: caseRoot)
+            defer { model.persistenceFeedbackTask?.cancel() }
+            let original = RelayModule(name: "Original", sourceURL: "https://test.invalid/original.sgmodule", outputFileName: "Original")
+            model.modules = [original]
+            model.beginWork(.publishing)
+            var oldDraft = ModuleDraft(module: original)
+            oldDraft.name = "Historical edit"
+            try await model.enqueueModuleSave(moduleID: original.id, draft: oldDraft)
+            let intentID = try XCTUnwrap(model.pendingModuleSaves.first?.id)
+            if !completesSave { try await model.cancelPendingModuleSave(id: intentID) }
+            model.endWork(.publishing)
+            await model.pendingModuleSaveTask?.value
+            XCTAssertTrue(model.pendingModuleSaves.isEmpty)
+            var latestDraft = ModuleDraft(module: try XCTUnwrap(model.modules.first))
+            latestDraft.name = "Latest configuration"
+            try model.updateModule(id: original.id, from: latestDraft)
+            try await model.flushPersistence()
+            let queueURL = caseRoot.appending(path: "Config/pending-module-saves.json")
+            try Data("broken queue".utf8).write(to: queueURL)
+            let reopened = pendingSaveModel(root: caseRoot)
+            defer { reopened.persistenceFeedbackTask?.cancel() }
+            XCTAssertEqual(reopened.modules.first?.name, "Latest configuration")
+            XCTAssertEqual(reopened.pendingModuleSaves.map(\.id), [intentID])
+            XCTAssertTrue(reopened.pendingModuleSaves.first?.errorMessage?.contains("核对后重试或取消") == true)
+            reopened.schedulePendingModuleSaves()
+            XCTAssertNil(reopened.pendingModuleSaveTask)
+            XCTAssertEqual(PersistenceStore.loadPendingModuleSaves(in: caseRoot.appending(path: "Config")).first?.errorMessage,
+                reopened.pendingModuleSaves.first?.errorMessage)
+            try await reopened.retryPendingModuleSave(id: intentID)
+            await reopened.pendingModuleSaveTask?.value
+            XCTAssertEqual(reopened.modules.first?.name, "Historical edit")
+            XCTAssertTrue(reopened.pendingModuleSaves.isEmpty)
+        }
     }
 
     func testPendingAdditionsRecoverAfterRestartWithoutDuplicatingAcknowledgedModules() async throws {

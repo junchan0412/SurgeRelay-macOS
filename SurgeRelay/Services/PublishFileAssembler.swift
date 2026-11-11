@@ -27,6 +27,9 @@ enum PublishFileAssembler {
         for module in request.plan.standaloneModules {
             try await cancellationCheckpoint()
             try Task.checkCancellation()
+            if let cachedFormat = module.lastConvertedOutputFormat, cachedFormat != module.outputFormat {
+                throw RelayError.invalidOutput("“\(module.name)”的输出客户端已改变，请先更新模块生成 \(module.outputFormat.title) 输出。现有发布输出已保留。")
+            }
             if PublishCoordinator.shouldSkipStandaloneLocalExport(
                 module,
                 isLocalExport: request.destination == .local,
@@ -37,14 +40,17 @@ enum PublishFileAssembler {
             guard let content = await readComponent(module.id) else {
                 throw RelayError.invalidOutput("“\(module.name)”缺少转换缓存，请先更新该模块。现有发布输出已保留。")
             }
-            let materialized = await materialize(content, module.argumentOverrides)
-            let namedContent = await applyingModuleMetadata(
-                module.name,
-                module.category,
-                module.moduleDescription,
-                module.customIconURL,
-                materialized
-            )
+            let materialized: String
+            let namedContent: String
+            if module.outputFormat.usesSurgeSyntax {
+                materialized = await materialize(content, module.argumentOverrides)
+                namedContent = await applyingModuleMetadata(module.name, module.category, module.moduleDescription,
+                    module.customIconURL, materialized)
+            } else {
+                materialized = ModuleArgumentProcessor.materialize(content, overrides: module.argumentOverrides, preservingWhitespace: true)
+                namedContent = ModuleMetadataParser.applyingModuleMetadata(name: module.name, category: module.category,
+                    desc: module.moduleDescription, iconURL: module.customIconURL, to: materialized, outputFormat: module.outputFormat)
+            }
             // Write the Script-Hub `#SUBSCRIBED` marker into the exported source
             // file so on-disk output carries the original subscription/conversion
             // URL — matching the in-app preview instead of only living in the

@@ -4,6 +4,7 @@ import './web-resource-tests/logic-markup.test.mjs';
 import './web-resource-tests/api-state.test.mjs';
 import './web-resource-tests/editor-feedback-preview.test.mjs';
 import './web-resource-tests/detail.test.mjs';
+import './web-resource-tests/conversion-tools.test.mjs';
 import './web-resource-tests/index-contract.test.mjs';
 import './web-resource-tests/lifecycle.test.mjs';
 import './web-resource-tests/persistent-drafts.test.mjs';

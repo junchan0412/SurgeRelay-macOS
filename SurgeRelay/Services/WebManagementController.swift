@@ -85,6 +85,7 @@ struct WebActivitySnapshot: Sendable {
     let githubSettings: GitHubSettings
     let error: String?
     let cancellationRequested: Bool
+    let pendingModuleSaves: [WebPendingModuleSavePayload]
 }
 
 struct WebManagementSnapshot: Sendable {
@@ -164,7 +165,12 @@ final class WebManagementSnapshotSource {
             automaticPublishScheduledAt: model.automaticPublishScheduledAt,
             automaticPublishRunsAt: model.automaticPublishRunsAt, history: model.updateHistory,
             githubSettings: model.settings.github, error: model.presentedError,
-            cancellationRequested: model.workCancellationRequested)
+            cancellationRequested: model.workCancellationRequested,
+            pendingModuleSaves: model.pendingModuleSaves.map { item in
+                WebPendingModuleSavePayload(id: item.id.uuidString.lowercased(),
+                    moduleID: item.moduleID?.uuidString.lowercased(), name: item.draft.name,
+                    errorMessage: item.errorMessage, isActive: model.activePendingModuleSaveID == item.id)
+            })
     }
 }
 

@@ -2,10 +2,10 @@ import Foundation
 
 enum ModuleLintPlanner {
     static let maximumIssues = 500
-    private static let scriptPathExpression = try? NSRegularExpression(pattern: #"script-path\s*=\s*("[^"]*"|'[^']*'|[^,\s]+)"#, options: [.caseInsensitive])
+    private static let scriptPathExpression = try? NSRegularExpression(pattern: #"(?:script-path\s*=\s*|script-(?:request|response)(?:-(?:body|header))?\s+|url:\s*)("[^"]*"|'[^']*'|[^,\s]+)"#, options: [.caseInsensitive])
     private static let knownSections: Set<String> = [
         "general", "proxy", "proxy group", "rule", "host", "url rewrite", "header rewrite", "body rewrite",
-        "map local", "script", "mitm", "panel", "ssid setting", "wireguard", "replica", "rule provider"
+        "map local", "script", "mitm", "panel", "ssid setting", "wireguard", "replica", "rule provider", "rewrite", "argument"
     ]
 
     static func check(files: [PublishFile], ownedModuleIDs: Set<UUID> = []) -> [ModuleLintIssue] {
@@ -21,7 +21,8 @@ enum ModuleLintPlanner {
             }
             issues.append(issue)
         }
-        for file in files.sorted(by: { $0.name < $1.name }) where ["sgmodule", "module"].contains((file.name as NSString).pathExtension.lowercased()) {
+        for file in files.sorted(by: { $0.name < $1.name }) where ManagedPublishedFile.requiresInlineMarker(file.name) {
+            let usesSections = ["sgmodule", "module", "plugin"].contains((file.name as NSString).pathExtension.lowercased())
             guard let text = String(data: file.data, encoding: .utf8) else {
                 append(ModuleLintIssue(filePath: file.name, line: 1, severity: .error, code: "invalid-utf8", message: "模块正文不是有效的 UTF-8 文本。"))
                 continue
@@ -40,7 +41,7 @@ enum ModuleLintPlanner {
                 if line.contains("\0") { issue(.error, "nul-character", "模块包含 NUL 字符，无法作为正常配置文本读取。") }
                 if line.isEmpty || line.hasPrefix("#") || line.hasPrefix(";") || line.hasPrefix("//") { continue }
                 if section.isEmpty, !line.hasPrefix("[") { hasUnsectionedContent = true }
-                if line.hasPrefix("[") {
+                if usesSections, line.hasPrefix("[") {
                     guard let close = line.firstIndex(of: "]") else {
                         issue(.error, "malformed-section", "配置段标题缺少右方括号 ]。")
                         continue
@@ -53,17 +54,19 @@ enum ModuleLintPlanner {
                     }
                     section = name.lowercased()
                     sectionCount += 1
-                    if !knownSections.contains(section) { issue(.warning, "unknown-section", "未识别的配置段 [\(name)]，请核对当前 Surge 版本是否支持。") }
+                    if !knownSections.contains(section) { issue(.warning, "unknown-section", "未识别的配置段 [\(name)]，请核对目标客户端是否支持。") }
                     continue
                 }
-                guard !section.isEmpty else {
+                if usesSections && section.isEmpty {
                     issue(.warning, "outside-section", "此行位于任何配置段之外，请核对是否遗漏段标题。")
                     continue
                 }
                 let lineKey = section + "\0" + line
                 let duplicate = seenLines[lineKey]
-                if let first = duplicate { issue(.warning, "duplicate-entry", "此项与第 \(first) 行重复。", relatedLine: first) }
-                else { seenLines[lineKey] = number }
+                if usesSections {
+                    if let first = duplicate { issue(.warning, "duplicate-entry", "此项与第 \(first) 行重复。", relatedLine: first) }
+                    else { seenLines[lineKey] = number }
+                }
                 if duplicate == nil, ["general", "mitm", "script", "panel"].contains(section), let equal = line.firstIndex(of: "=") {
                     let key = line[..<equal].trimmingCharacters(in: .whitespaces)
                     if !key.isEmpty {
@@ -73,7 +76,7 @@ enum ModuleLintPlanner {
                         } else { seenKeys[keyIdentity] = number }
                     }
                 }
-                guard section == "script", let expression = scriptPathExpression else { continue }
+                guard !usesSections || section == "script", let expression = scriptPathExpression else { continue }
                 let source = line as NSString
                 for match in expression.matches(in: line, range: NSRange(location: 0, length: source.length)) {
                     let captured = source.substring(with: match.range(at: 1))
@@ -99,11 +102,11 @@ enum ModuleLintPlanner {
                             issue(.warning, "invalid-script-url", "脚本 URL 格式可疑，请核对协议、主机和转义字符。")
                         }
                     } else if let scheme, scheme != "file" {
-                        issue(.warning, "unverified-script-scheme", "脚本使用 \(scheme) 协议，请核对 Surge 是否支持。")
+                        issue(.warning, "unverified-script-scheme", "脚本使用 \(scheme) 协议，请核对目标客户端是否支持。")
                     }
                 }
             }
-            if sectionCount == 0 {
+            if usesSections && sectionCount == 0 {
                 append(ModuleLintIssue(filePath: file.name, line: 1, severity: hasUnsectionedContent ? .error : .warning, code: "missing-section", message: hasUnsectionedContent ? "配置内容没有所属的 [配置段]。" : "模块只有注释或元数据，没有生效的配置项。"))
             }
         }

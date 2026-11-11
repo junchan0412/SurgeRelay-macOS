@@ -1,6 +1,6 @@
 #!/bin/zsh
 set -euo pipefail
-cd '/Users/qidewei/Documents/Surge Relay'
+cd "$(dirname "$0")/../../../.."
 fixture_root=/tmp/surge-relay-production-script-fixture
 xcrun swiftc -swift-version 6 -parse-as-library -O \
   SurgeRelay/Models/StageMetric.swift SurgeRelay/Models/RelayError.swift \

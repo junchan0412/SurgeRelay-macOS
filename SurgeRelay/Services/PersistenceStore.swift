@@ -138,7 +138,24 @@ enum PersistenceStore {
     }
 
     static func loadPendingModuleSaves(in directory: URL) -> [PendingModuleSave] {
-        decodeFile(at: directory.appending(path: "pending-module-saves.json")) ?? []
+        let url = directory.appending(path: "pending-module-saves.json")
+        if let data = try? Data(contentsOf: url),
+           let items = try? decoder.decode([PendingModuleSave].self, from: data) {
+            return items
+        }
+        for backup in backupFiles(for: url, configurationDirectory: directory) {
+            guard let data = try? Data(contentsOf: backup),
+                  let items = try? decoder.decode([PendingModuleSave].self, from: data) else { continue }
+            let restored = items.map { item in
+                var item = item
+                item.errorMessage = "从历史备份恢复的保存请求，请核对后重试或取消。"
+                return item
+            }
+            preserveCorruptFile(at: url)
+            try? write(restored, to: url)
+            return restored
+        }
+        return []
     }
 
     static func loadSelectedPublishAttempt(in directory: URL? = nil) -> SelectedPublishAttempt? {

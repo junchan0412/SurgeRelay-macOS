@@ -23,14 +23,16 @@ actor ModuleProcessingWorker {
         category: String,
         desc: String = "",
         iconURL: String? = nil,
-        to content: String
+        to content: String,
+        outputFormat: ModuleOutputFormat = .surge
     ) -> String {
-        ModuleMetadataParser.applyingModuleMetadata(
+        return ModuleMetadataParser.applyingModuleMetadata(
             name: name,
             category: category,
             desc: desc,
             iconURL: iconURL,
-            to: content
+            to: outputFormat.usesSurgeSyntax ? SurgeModuleSanitizer.sanitize(content) : content,
+            outputFormat: outputFormat
         )
     }
 

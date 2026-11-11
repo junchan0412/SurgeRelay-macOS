@@ -11,6 +11,7 @@ extension AppModel {
         let pendingStartup = startupTask
         let pendingForeground = foregroundWorkTask
         let pendingPreparation = updatePreparationTask
+        let pendingConversionTool = conversionToolTask
         let pendingUpdate = moduleUpdateTask
         let pendingAutomaticUpdate = automaticUpdateTask
         let pendingAutomaticPublish = automaticPublishTask
@@ -43,6 +44,7 @@ extension AppModel {
             await pendingStartup?.value
             await pendingForeground?.value
             await pendingPreparation?.value
+            _ = try? await pendingConversionTool?.value
             _ = await pendingUpdate?.value
             await pendingAutomaticUpdate?.value
             await pendingAutomaticPublish?.value

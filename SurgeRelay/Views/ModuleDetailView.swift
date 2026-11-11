@@ -113,6 +113,7 @@ struct ModuleDetailView: View {
                     detailRow("登记地址", value: registeredSourceAddress.display, icon: "link", monospaced: true, copyValue: registeredSourceAddress.copyValue)
                 }
                 detailRow("来源格式", value: module.sourceFormatDisplayTitle, icon: "doc.text")
+                detailRow("输出客户端", value: module.outputFormat.title, icon: "arrow.triangle.2.circlepath")
                 if let subscription = module.scriptHubSubscription {
                     detailRow("来源记录", value: subscription.displaySummary, icon: "point.3.connected.trianglepath.dotted")
                     detailRow("模块链接", value: subscription.subscriptionURL, icon: "link.badge.plus", monospaced: true, copyValue: subscription.subscriptionURL)
@@ -176,7 +177,7 @@ struct ModuleDetailView: View {
                 }
                 detailRow(
                     "转换引擎",
-                    value: module.conversionEngineRevision.map { String($0.prefix(12)) } ?? "原生 Surge 模块",
+                    value: module.conversionEngineRevision.map { String($0.prefix(12)) } ?? "原生格式",
                     icon: "cpu",
                     monospaced: module.conversionEngineRevision != nil,
                     copyValue: module.conversionEngineRevision

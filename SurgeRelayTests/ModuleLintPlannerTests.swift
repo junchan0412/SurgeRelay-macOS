@@ -3,6 +3,24 @@ import XCTest
 @testable import SurgeRelay
 
 final class ModuleLintPlannerTests: XCTestCase {
+    func testClientSyntaxChecksOwnedScriptsWithoutRequiringSurgeSections() {
+        let id = UUID()
+        let path = "assets/\(id.uuidString.lowercased())/helper.js"
+        let url = "https://example.org/\(path)"
+        let clients = [
+            module("[Argument]\nMode = select,\"one\",\"two\"\n[Script]\nhttp-response ^https://example.org script-path=\(url)", path: "Demo.plugin"),
+            module("^https://example.org url script-response-body \(url)", path: "Demo.conf"),
+            module("name: Demo\nhttp:\n  mitm:\n    - example.org\nscript-providers:\n  Demo:\n    url: \"\(url)\"", path: "Demo.stoverride")
+        ]
+        for client in clients {
+            let missing = ModuleLintPlanner.check(files: [client], ownedModuleIDs: [id])
+            XCTAssertTrue(missing.contains { $0.code == "missing-owned-asset" && $0.severity == .error }, client.name)
+            XCTAssertFalse(missing.contains { ["missing-section", "unknown-section", "outside-section"].contains($0.code) }, client.name)
+            let present = ModuleLintPlanner.check(files: [client, PublishFile(name: path, data: Data("// helper".utf8))], ownedModuleIDs: [id])
+            XCTAssertTrue(present.isEmpty, client.name)
+        }
+    }
+
     func testValidModuleDoesNotParseJavaScriptAssetsAsModules() throws {
         let files = [
             module("#!name=Demo\n[Rule]\nDOMAIN,example.org,DIRECT\n[MITM]\nhostname = example.org"),

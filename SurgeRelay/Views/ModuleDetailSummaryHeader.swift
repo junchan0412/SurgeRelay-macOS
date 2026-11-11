@@ -7,7 +7,7 @@ struct ModuleDetailSummaryHeader: View {
     let onEdit: () -> Void
 
     private var source: URL? { URL(string: module.updateSourceURL) }
-    private var isNative: Bool { source.map { module.sourceFormat.isNativeSurgeModule(for: $0) } ?? false }
+    private var isNative: Bool { source.map { module.outputFormat.isNativeOutput(for: $0, sourceFormat: module.sourceFormat) } ?? false }
 
     private var outputTitle: String { module.displayStorageLocationTitle }
     private var outputDetail: String {
@@ -24,7 +24,7 @@ struct ModuleDetailSummaryHeader: View {
                         .font(.system(size: 28, weight: .bold))
                         .lineLimit(3).textSelection(.enabled)
                         .help(module.name)
-                    Text([module.initialSource.title, module.category].filter { !$0.isEmpty }.joined(separator: " · "))
+                    Text([module.initialSource.title, module.outputFormat.title, module.category].filter { !$0.isEmpty }.joined(separator: " · "))
                         .font(.system(size: 14)).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -64,8 +64,8 @@ struct ModuleDetailSummaryHeader: View {
                          value: source?.isFileURL == true ? "本地源文件" : source?.host() ?? "尚未配置",
                          detail: module.sourceFormatDisplayTitle)
                 flowStep("转换", symbol: "arrow.triangle.2.circlepath",
-                         value: isNative ? "原生 Surge" : "Script-Hub",
-                         detail: isNative ? "保留原生模块格式" : "转换为 Surge 模块")
+                         value: isNative ? "原生格式" : "Script-Hub",
+                         detail: isNative ? "\(module.outputFormat.title) 兼容输出" : "转换为 \(module.outputFormat.title)")
                 flowStep("输出", symbol: module.displayStorageLocationSystemImage,
                          value: outputTitle, detail: outputDetail)
             }

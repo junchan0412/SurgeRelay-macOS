@@ -50,6 +50,8 @@ enum ModuleSearchIndex {
         hash.combine(module.customIconURL)
         hash.combine(module.sourceURL)
         hash.combine(module.sourceFormat)
+        hash.combine(module.outputFormat)
+        hash.combine(module.lastConvertedOutputFormat)
         hash.combine(module.outputFileName)
         hash.combine(module.scriptHubSubscription)
         hash.combine(module.scriptHubOptions)
@@ -65,6 +67,7 @@ enum ModuleSearchIndex {
         hash.combine(module.outputFileName)
         hash.combine(module.publishedRelativePath)
         hash.combine(module.sourceFormat)
+        hash.combine(module.outputFormat)
         hash.combine(module.detectedSourceFormat)
         hash.combine(module.category)
         hash.combine(module.moduleDescription)
@@ -115,6 +118,7 @@ enum ModuleSearchIndex {
             module.outputFileName,
             module.publishedRelativePath,
             module.sourceFormatDisplayTitle,
+            module.outputFormat.title,
             module.category,
             module.moduleDescription,
             module.outputFolder,

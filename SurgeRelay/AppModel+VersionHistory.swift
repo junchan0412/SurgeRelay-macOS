@@ -4,11 +4,12 @@ import Foundation
 extension AppModel {
     func moduleVersions(moduleID: UUID) async throws -> [ModuleVersionRecord] {
         guard !isWorking else { throw PreviewContentSaveError.busy }
-        guard modules.contains(where: { $0.id == moduleID }) else { throw RelayError.invalidOutput("模块已移除。") }
+        guard let module = modules.first(where: { $0.id == moduleID }) else { throw RelayError.invalidOutput("模块已移除。") }
         beginWork(.previewingPublish)
         workActivity.title = "版本历史"
         defer { endWork(.previewingPublish) }
-        do { _ = try await fileStore.recordCurrentVersion(id: moduleID, reason: .current) }
+        do { _ = try await fileStore.recordCurrentVersion(id: moduleID, reason: .current,
+            outputFormat: module.lastConvertedOutputFormat ?? module.outputFormat) }
         catch { statusMessage = "当前缓存未能归档，仍可查看已有历史：\(error.localizedDescription)" }
         return try await fileStore.moduleVersions(id: moduleID)
     }
@@ -21,7 +22,8 @@ extension AppModel {
         defer { endWork(.previewingPublish) }
         let generation = localChangeGeneration
         let historical = try await fileStore.readModuleVersion(id: moduleID, versionID: versionID)
-        let currentState = try await fileStore.currentVersionState(id: moduleID)
+        let currentState = try await fileStore.currentVersionState(id: moduleID,
+            outputFormat: module.lastConvertedOutputFormat ?? module.outputFormat)
         let current = currentState.content
         let oldText = await previewContent(historical, for: module)
         let currentText: String
@@ -59,6 +61,12 @@ extension AppModel {
         registerLocalChange()
         let generation = localChangeGeneration
         let startedAt = Date.now
+        let historical = try await fileStore.readModuleVersion(id: comparison.module.id, versionID: comparison.version.id)
+        try await validateHistoricalOutput(historical, for: comparison.module)
+        try checkCurrentWorkCancellation()
+        guard generation == localChangeGeneration, modules.first(where: { $0.id == comparison.module.id }) == comparison.module else {
+            throw PreviewContentSaveError.changed
+        }
         let restored = try await fileStore.restoreModuleVersion(
             id: comparison.module.id, versionID: comparison.version.id, expectedFingerprint: comparison.expectedFingerprint
         )
@@ -68,6 +76,7 @@ extension AppModel {
             throw RelayError.invalidOutput("历史内容已写入缓存，但模块同时变化，请重新检查内容。")
         }
         module.contentHash = fingerprint
+        module.lastConvertedOutputFormat = module.outputFormat
         module.overrideBaseHash = restored.record.hasOverride ? restored.convertedContent.map { Data($0.utf8).sha256String } : nil
         module.hasOverrideConflict = false
         module.refreshIntervalMinutes = 0
@@ -90,6 +99,15 @@ extension AppModel {
         statusMessage = "已恢复历史正文和脚本，自动刷新已暂停；本次未发布，后续发布按现有设置执行，未保存草稿仍保留"
         if startupRecoveryFailed { Task { [weak self] in self?.start(performLaunchRefresh: false) } }
     }
+
+    private func validateHistoricalOutput(_ version: ModuleVersionContent, for module: RelayModule) async throws {
+        let historicalFormat = version.record.outputFormat ?? .surge
+        if historicalFormat != module.outputFormat,
+           !(historicalFormat.usesSurgeSyntax && module.outputFormat.usesSurgeSyntax) {
+            throw RelayError.invalidOutput("该历史版本属于 \(historicalFormat.title)，当前输出客户端是 \(module.outputFormat.title)。请选择相同客户端的历史版本。")
+        }
+        try await scriptHubClient.validate(version.content, outputFormat: historicalFormat)
+    }
 }
 
 @MainActor
@@ -100,11 +118,15 @@ extension AppModel {
         guard needsRecovery || !ids.isEmpty else { return }
         for id in ids {
             guard var module = modules.first(where: { $0.id == id }) else { continue }
-            let state = try await fileStore.currentVersionState(id: id)
+            let state = try await fileStore.currentVersionState(id: id,
+                outputFormat: module.lastConvertedOutputFormat ?? module.outputFormat)
             guard let current = state.content else {
                 throw RelayError.invalidOutput(state.problem ?? "恢复后的模块正文缺失，请从版本历史恢复。")
             }
+            let restoredFormat = current.record.outputFormat ?? .surge
+            try await scriptHubClient.validate(current.content, outputFormat: restoredFormat)
             module.contentHash = await processingWorker.contentFingerprint(of: current.content, assets: current.assets)
+            module.lastConvertedOutputFormat = restoredFormat
             module.overrideBaseHash = current.record.hasOverride ? current.convertedContent.map { Data($0.utf8).sha256String } : nil
             module.hasOverrideConflict = false
             module.sourceContentHash = nil

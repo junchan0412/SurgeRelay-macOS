@@ -171,7 +171,7 @@ struct ModuleSidebarToolbarContent: View {
             Label("扫描本地模块", systemImage: "folder.badge.plus")
         }
         .disabled(model.isWorking || isScanningLocalModules)
-        .help("扫描本地模块根目录下已有的 .sgmodule，并纳入 Surge Relay 管理")
+        .help("扫描本地目录的 Surge、Loon、Quantumult X 模块及带订阅来源的 Stash 覆写，并纳入管理")
     }
 
     private var publishAllHelp: String {

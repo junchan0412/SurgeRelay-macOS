@@ -33,6 +33,7 @@ struct ModuleVersionRecord: Identifiable, Codable, Equatable, Sendable {
     var assets: [ModuleVersionAsset]
     var fingerprint: String
     var byteCount: Int
+    var outputFormat: ModuleOutputFormat? = nil
 }
 
 struct ModuleVersionContent: Sendable {

@@ -25,7 +25,7 @@ struct ModuleEditorBasicInfoSection: View {
                 title: "注释",
                 icon: "text.alignleft",
                 text: $moduleDescription,
-                prompt: "模块说明，写入 #!desc（留空保留来源说明）"
+                prompt: "模块说明（留空保留来源说明）"
             )
             ModuleEditorControlRow("模块存放", icon: "arrow.triangle.2.circlepath") {
                 ModuleEditorStorageTargetsPicker(storageTargets: $storageTargets)
@@ -39,7 +39,7 @@ struct ModuleEditorBasicInfoSection: View {
                     .foregroundStyle(relationshipIsWarning ? Design.Palette.warning : .secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            ModuleEditorTextFieldRow(title: "模块标签", icon: "tag", text: $category, prompt: "Surge category，例如：广告过滤")
+            ModuleEditorTextFieldRow(title: "模块标签", icon: "tag", text: $category, prompt: "例如：广告过滤")
             ModuleEditorControlRow("存放文件夹", icon: "folder") {
                 ModuleEditorFolderPicker(
                     outputFolder: $outputFolder,
@@ -95,11 +95,21 @@ struct ModuleEditorIconSection: View {
 
 struct ModuleEditorPublishingSection: View {
     @Binding var outputFileName: String
+    @Binding var outputFormat: ModuleOutputFormat
     let publishedRelativePath: String
     let outputPathNotice: ModuleOutputPathNotice?
 
     var body: some View {
         ModuleEditorSection("输出") {
+            ModuleEditorControlRow("输出客户端", icon: "arrow.triangle.2.circlepath") {
+                Picker("输出客户端", selection: $outputFormat) {
+                    ForEach(ModuleOutputFormat.allCases) { format in
+                        Text(format.title).tag(format)
+                    }
+                }
+                .labelsHidden()
+                .accessibilityIdentifier("module-editor.output-format")
+            }
             ModuleEditorTextFieldRow(title: "输出文件名", icon: "doc", text: $outputFileName, prompt: "留空时根据显示名称生成")
             ModuleEditorInfoRow("输出路径", icon: "folder") {
                 ModuleEditorOutputPathRow(
@@ -146,7 +156,7 @@ struct ModuleEditorSourceSection: View {
 struct ModuleEditorConversionSection: View {
     @Binding var isAdvancedExpanded: Bool
     @Binding var scriptHubOptions: ScriptHubOptions
-    let isNativeSurgeModule: Bool
+    let isNativeModule: Bool
 
     var body: some View {
         ModuleEditorSection("转换") {
@@ -165,9 +175,9 @@ struct ModuleEditorConversionSection: View {
             .buttonStyle(.plain)
 
             if isAdvancedExpanded {
-                if isNativeSurgeModule {
+                if isNativeModule {
                     Label(
-                        "该地址是 Surge 模块，将直接生成独立输出，不经过 Script-Hub；高级转换选项不会应用。",
+                        "来源与输出客户端兼容，将保留原生格式生成独立输出；高级转换选项不会应用。",
                         systemImage: "arrow.triangle.branch"
                     )
                     .font(.callout)
@@ -177,7 +187,7 @@ struct ModuleEditorConversionSection: View {
                     ScriptHubAdvancedOptionsView(options: $scriptHubOptions)
                 }
             }
-            Text("Loon 与 Quantumult X 来源可在这里使用 Script-Hub 原有的转换控制。")
+            Text("跨客户端转换使用 Script-Hub 的格式和脚本转换控制。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

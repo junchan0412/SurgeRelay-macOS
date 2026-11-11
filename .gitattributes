@@ -1,2 +1,2 @@
 # Preserve exact output bytes in archived conversion fixtures.
-docs/performance/script-hub-production-2026-10-03/validated-*.sgmodule whitespace=-blank-at-eof
+docs/archive/performance-raw-2026-10/script-hub-production-2026-10-03/validated-*.sgmodule whitespace=-blank-at-eof

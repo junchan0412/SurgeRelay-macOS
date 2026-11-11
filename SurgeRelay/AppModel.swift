@@ -26,6 +26,7 @@ final class AppModel {
     static let publishingActivityID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
     static let overviewSelectionID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
     static let activitySelectionID = UUID(uuidString: "00000000-0000-0000-0000-000000000003")!
+    static let conversionToolsSelectionID = UUID(uuidString: "00000000-0000-0000-0000-000000000004")!
 
     let workspaceID: UUID
     var workspaceName: String
@@ -75,6 +76,9 @@ final class AppModel {
     var webServerState: WebServerRuntimeState = .stopped
     var updateHistory: [UpdateHistoryEntry]
     var moduleTemplates: [ModuleTemplate]
+    var conversionToolDraft = ConversionToolDraft()
+    var nativeToolResult: ConversionToolResult?
+    var nativeToolError: String?
     var localModuleOutputFolders: [String] = [ModuleOutputFolder.root]
     var githubModuleOutputFolders: [String] = [ModuleOutputFolder.root]
     var selectedPublishAttempt: SelectedPublishAttempt?
@@ -92,6 +96,8 @@ final class AppModel {
     @ObservationIgnored var configurationMigrationTask: Task<Void, Never>?
 
     @ObservationIgnored let scriptHubClient: ScriptHubClient
+    @ObservationIgnored let conversionToolService: ConversionToolService
+    @ObservationIgnored var conversionToolTask: Task<ConversionToolResult, Error>?
     @ObservationIgnored let sourceRevisionService: SourceRevisionService
     @ObservationIgnored let upstreamService: ScriptHubUpstreamService
     @ObservationIgnored let engineStore: EngineStore
@@ -151,6 +157,7 @@ final class AppModel {
         let engine = EngineStore(cacheDirectory: contextValue.cacheDirectory)
         engineStore = engine
         scriptHubClient = ScriptHubClient(engineStore: engine, session: session)
+        conversionToolService = ConversionToolService(engineStore: engine, session: session)
         sourceRevisionService = SourceRevisionService(session: session)
         upstreamService = ScriptHubUpstreamService(session: session)
         self.fileStore = fileStore ?? ModuleFileStore(cacheDirectory: contextValue.cacheDirectory, configurationDirectory: contextValue.configurationDirectory,

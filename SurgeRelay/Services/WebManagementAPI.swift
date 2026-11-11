@@ -40,6 +40,8 @@ enum WebManagementAPI {
                 return .json(payload)
             case ("GET", "/api/history"):
                 return .json(model.updateHistory)
+            case ("POST", "/api/tools/convert"):
+                return .json(try await model.convertTool(request.decodeBody(ConversionToolDraft.self)))
             case ("POST", "/api/activity/error/dismiss"):
                 model.presentedError = nil
                 return .json(ActionPayload(ok: true, message: "已清除错误提示。"))
@@ -91,6 +93,9 @@ enum WebManagementAPI {
                 let payload = try request.decodeBody(WebSourceNameRequest.self)
                 return .json(try await sourceNamePayload(for: payload.url))
             default:
+                if request.path.hasPrefix("/api/module-saves/") {
+                    return try await pendingModuleSaveResponse(for: request, model: model)
+                }
                 return try await moduleResponse(for: request, model: model)
             }
         } catch let error as PreviewContentSaveError {
@@ -105,6 +110,27 @@ enum WebManagementAPI {
             return .error(status: status, message: error.localizedDescription)
         } catch {
             return .error(status: 400, message: error.localizedDescription)
+        }
+    }
+
+    private static func pendingModuleSaveResponse(for request: WebHTTPRequest, model: AppModel) async throws -> WebHTTPResponse {
+        guard request.method == "POST" else { throw WebAPIError.methodNotAllowed }
+        let components = request.path.split(separator: "/")
+        guard components.count == 4, let id = UUID(uuidString: String(components[2])),
+              model.pendingModuleSaves.contains(where: { $0.id == id }) else {
+            throw WebAPIError.moduleNotFound
+        }
+        guard model.workspaceIsActive, !model.isWorkspaceTransitioning,
+              model.activePendingModuleSaveID != id else { throw PreviewContentSaveError.busy }
+        switch components[3] {
+        case "retry":
+            try await model.retryPendingModuleSave(id: id)
+            return .json(ActionPayload(ok: true, message: "已安排重试排队保存。"))
+        case "cancel":
+            try await model.cancelPendingModuleSave(id: id)
+            return .json(ActionPayload(ok: true, message: "已取消排队保存。"))
+        default:
+            throw WebAPIError.methodNotAllowed
         }
     }
 

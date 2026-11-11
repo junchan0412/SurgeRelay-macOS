@@ -6,6 +6,7 @@ enum WorkActivityKind: String, Codable, Equatable, Sendable {
     case scanningLocalModules
     case importingLocalModules
     case refreshingScriptHub
+    case convertingTool
     case testingGitHub
     case publishing
     case automaticPublishing
@@ -25,6 +26,7 @@ enum WorkActivityKind: String, Codable, Equatable, Sendable {
         case .scanningLocalModules: "本地模块扫描"
         case .importingLocalModules: "本地模块导入"
         case .refreshingScriptHub: "Script-Hub 引擎更新"
+        case .convertingTool: "转换工具"
         case .testingGitHub: "GitHub 连接测试"
         case .publishing: "GitHub 发布"
         case .automaticPublishing: "GitHub 自动发布"
@@ -45,7 +47,7 @@ enum WorkActivityKind: String, Codable, Equatable, Sendable {
             false
         case .updatingModules, .scanningLocalModules, .importingLocalModules, .refreshingScriptHub,
              .testingGitHub, .publishing, .automaticPublishing, .previewingPublish, .confirmingPublish,
-             .savingPreview, .savingModule, .restoringPreview, .migratingConfiguration, .switchingWorkspace:
+             .savingPreview, .savingModule, .restoringPreview, .migratingConfiguration, .switchingWorkspace, .convertingTool:
             true
         }
     }
@@ -53,7 +55,7 @@ enum WorkActivityKind: String, Codable, Equatable, Sendable {
     var canCancelByDefault: Bool {
         switch self {
         case .updatingModules, .scanningLocalModules, .importingLocalModules, .refreshingScriptHub,
-             .testingGitHub, .publishing, .automaticPublishing, .previewingPublish, .confirmingPublish:
+             .testingGitHub, .publishing, .automaticPublishing, .previewingPublish, .confirmingPublish, .convertingTool:
             true
         case .idle, .savingPreview, .savingModule, .restoringPreview, .checkingLocalCredentials, .migratingConfiguration, .switchingWorkspace:
             false

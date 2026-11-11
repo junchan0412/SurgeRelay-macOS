@@ -3,6 +3,9 @@ import Foundation
 /// 判定更新失败是否值得自动重试的瞬态错误（瞬时 404 / 5xx / 网络/DNS/超时）。
 enum UpdateRetryPolicy {
     static func shouldRetryTransientFailure(_ error: any Error) -> Bool {
+        if let resourceError = error as? ScriptHubResourceError {
+            return shouldRetryTransientFailure(resourceError.underlying)
+        }
         if let relayError = error as? RelayError, case let .httpFailure(status, _) = relayError {
             return status == 404 || (500..<600).contains(status)
         }

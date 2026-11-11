@@ -3,6 +3,113 @@ import XCTest
 @testable import SurgeRelay
 
 final class LocalModuleScannerTests: XCTestCase {
+    func testScanRecoversNativeFormatsAndClientVariantsFromOneSubscription() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let originalURL = "https://example.com/original.plugin"
+        let variants: [(String, ModuleOutputFormat, String)] = [
+            ("Demo.sgmodule", .surge, "[Rule]\nFINAL,DIRECT"),
+            ("Demo.plugin", .loon, "[Rewrite]\n^https://example.com reject"),
+            ("Demo.conf", .quantumultX, "^https://example.com url reject"),
+            ("Demo.stoverride", .stash, "http:\n  mitm:\n    - example.com")
+        ]
+        for (name, format, body) in variants {
+            let content = "#SUBSCRIBED http://script.hub/file/_start_/\(originalURL)/_end_/Demo.\(format.fileExtension)?type=loon-plugin&target=\(format.scriptHubTarget)\n\(body)\n"
+            try Data(content.utf8).write(to: root.appending(path: name))
+        }
+        try Data("[Rule]\nFINAL,DIRECT\n".utf8).write(to: root.appending(path: "Native.module"))
+        try Data("[Rewrite]\n^https://example.com reject\n".utf8).write(to: root.appending(path: "Native.lpx"))
+        try Data("http:\n  mitm:\n    - example.com\n".utf8).write(to: root.appending(path: "Raw.stoverride"))
+        let report = try LocalModuleScanner.report(in: root.path, existingModules: [], publishedFilePaths: [])
+        XCTAssertEqual(report.candidates.count, 6)
+        let candidates = Dictionary(uniqueKeysWithValues: report.candidates.map { ($0.relativePath, $0) })
+        for (name, outputFormat, _) in variants {
+            let candidate = try XCTUnwrap(candidates[name])
+            XCTAssertEqual(candidate.outputFormat, outputFormat)
+            XCTAssertEqual(candidate.sourceFormat, .loon)
+            XCTAssertEqual(candidate.sourceURL, originalURL)
+            XCTAssertEqual(candidate.outputFileName, name)
+        }
+        XCTAssertEqual(candidates["Native.module"]?.sourceFormat, .surge)
+        XCTAssertEqual(candidates["Native.module"]?.outputFormat, .surge)
+        XCTAssertEqual(candidates["Native.lpx"]?.sourceFormat, .loon)
+        XCTAssertEqual(candidates["Native.lpx"]?.outputFormat, .loon)
+        XCTAssertEqual(LocalModuleRootDiagnosticSnapshot.current(path: root.path).moduleFileCount, 7)
+        XCTAssertEqual(report.skippedFiles.map(\.relativePath), ["Raw.stoverride"])
+        let existing = RelayModule(name: "Registered Surge", sourceURL: originalURL, outputFileName: "Remote.sgmodule")
+        let filtered = try LocalModuleScanner.report(in: root.path, existingModules: [existing], publishedFilePaths: [])
+        XCTAssertFalse(filtered.candidates.contains { $0.relativePath == "Demo.sgmodule" })
+        XCTAssertTrue(filtered.candidates.contains { $0.relativePath == "Demo.plugin" })
+        XCTAssertTrue(filtered.candidates.contains { $0.relativePath == "Demo.conf" })
+        XCTAssertTrue(filtered.candidates.contains { $0.relativePath == "Demo.stoverride" })
+    }
+
+    @MainActor
+    func testImportBuildsAllNativeCachesFromPhysicalBytesWithoutChangingSources() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let directory = root.appending(path: "Modules")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let files: [(String, ModuleOutputFormat, String)] = [
+            ("Surge.module", .surge, "[Rule]\nFINAL,DIRECT"),
+            ("Loon.lpx", .loon, "[Rewrite]\n^https://example.com reject"),
+            ("QX.conf", .quantumultX, "^https://example.com url reject"),
+            ("Stash.stoverride", .stash, "#SUBSCRIBED http://script.hub/file/_start_/https://example.com/original.plugin/_end_/Stash.stoverride?type=loon-plugin&target=stash-stoverride\nhttp:\n  mitm:\n    - example.com")
+        ]
+        for (name, _, content) in files { try Data(content.utf8).write(to: directory.appending(path: name)) }
+        let context = WorkspaceContext(id: UUID(), name: "Native imports", configurationDirectory: root.appending(path: "Config"),
+            cacheDirectory: root.appending(path: "Cache"), allowsLegacyFallback: false)
+        let model = AppModel(context: context, persistsOnInit: false)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        model.settings.localModuleDirectory = directory.path
+        model.settings.publishToLocal = false
+        model.settings.publishToGitHub = false
+        model.settings.watchesLocalModuleChanges = false
+        let candidates = try LocalModuleScanner.candidates(in: directory.path, existingModules: [], publishedFilePaths: [])
+        await model.importLocalModules(candidates)
+        XCTAssertNil(model.presentedError)
+        XCTAssertEqual(model.modules.count, files.count)
+        for (name, format, original) in files {
+            let module = try XCTUnwrap(model.modules.first { $0.outputFileName == name })
+            XCTAssertEqual(module.outputFormat, format)
+            XCTAssertEqual(module.lastConvertedOutputFormat, format)
+            XCTAssertEqual(module.publishedRelativePath, name)
+            XCTAssertEqual(module.state, .current)
+            XCTAssertNil(module.conversionEngineRevision)
+            let cachedContent = try await model.fileStore.readComponent(id: module.id)
+            let cached = try XCTUnwrap(cachedContent)
+            XCTAssertTrue(cached.contains(format == .stash ? "http:" : format == .loon ? "[Rewrite]" : format == .surge ? "[Rule]" : " url reject"))
+            XCTAssertEqual(try Data(contentsOf: directory.appending(path: name)), Data(original.utf8))
+        }
+        XCTAssertTrue(model.settings.localPublishedFilePaths.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: context.cacheDirectory.appending(path: "ScriptHubEngine").path))
+    }
+
+    func testMetadataReaderHandlesLoonAndQXPhysicalPathsAndRefreshesStashSubscription() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let cases: [(String, ModuleOutputFormat)] = [("My Plugin.lpx", .loon), ("My Rewrite.conf", .quantumultX)]
+        for (name, format) in cases {
+            let content = "#SUBSCRIBED http://script.hub/file/_start_/https://example.com/original.plugin/_end_/Demo.\(format.fileExtension)?type=loon-plugin&target=\(format.scriptHubTarget)\n"
+            try Data(content.utf8).write(to: root.appending(path: name))
+            let expected = name.replacingOccurrences(of: " ", with: "-")
+            let module = RelayModule(name: "Recovered", sourceURL: "https://example.com/original.plugin", outputFormat: format,
+                outputFileName: expected, storageLocation: .local, localStorageRelativePath: expected)
+            let snapshot = try XCTUnwrap(LocalModuleMetadataReader.snapshot(for: module, rootDirectoryPath: root.path))
+            XCTAssertEqual(snapshot.localStorageRelativePath, name)
+            XCTAssertEqual(snapshot.scriptHubSubscription?.originalURL, "https://example.com/original.plugin")
+        }
+        let stash = root.appending(path: "Demo.stoverride")
+        try Data("#SUBSCRIBED http://script.hub/file/_start_/https://example.com/original.plugin/_end_/Demo.stoverride?type=loon-plugin&target=stash-stoverride\nhttp:\n".utf8).write(to: stash)
+        let candidate = try XCTUnwrap(LocalModuleScanner.candidates(in: root.path, existingModules: [], publishedFilePaths: []).first { $0.outputFormat == .stash })
+        try Data("http:\n".utf8).write(to: stash)
+        XCTAssertThrowsError(try LocalModuleScanner.snapshotForImport(candidate, rootDirectoryPath: root.path)) { error in
+            XCTAssertTrue(error.localizedDescription.contains("缺少可识别的 Script-Hub 订阅来源"))
+        }
+    }
+
     func testScanSkipsHistoricalAndCopiedPublishedOutputsWithoutManifest() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

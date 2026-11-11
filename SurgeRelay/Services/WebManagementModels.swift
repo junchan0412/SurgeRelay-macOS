@@ -42,6 +42,8 @@ struct WebModulePayload: Encodable, Sendable {
     let updateSourceURL: String
     let sourceFormat: String
     let sourceFormatTitle: String
+    let outputFormat: String
+    let outputFormatTitle: String
     let initialSourceTitle: String
     let initialSourceIcon: String
     let outputFileName: String
@@ -113,6 +115,15 @@ struct WebActivityPayload: Encodable, Sendable {
     let latestGitHubPublish: GitHubPublishSnapshot?
     let error: String?
     var activeStages: [WorkStageProgress]? = nil
+    var pendingModuleSaves: [WebPendingModuleSavePayload] = []
+}
+
+struct WebPendingModuleSavePayload: Encodable, Sendable {
+    let id: String
+    let moduleID: String?
+    let name: String
+    let errorMessage: String?
+    let isActive: Bool
 }
 
 struct ActionPayload: Encodable {
@@ -149,6 +160,7 @@ struct WebModuleMutation: Decodable {
     let name: String
     let sourceURL: String
     let sourceFormat: String?
+    let outputFormat: String?
     let storageLocation: String?
     let storageTargets: [String]?
     let category: String?
@@ -167,7 +179,7 @@ struct WebModuleMutation: Decodable {
     let changesRefreshInterval: Bool
 
     private enum CodingKeys: String, CodingKey {
-        case name, sourceURL, sourceFormat, storageLocation, storageTargets, category, iconURL, outputFolder, outputFileName, policy, includeKeywords, excludeKeywords, mitmAdd, mitmRemove, noResolve, enableJQ, scriptHubOptions, refreshIntervalMinutes
+        case name, sourceURL, sourceFormat, outputFormat, storageLocation, storageTargets, category, iconURL, outputFolder, outputFileName, policy, includeKeywords, excludeKeywords, mitmAdd, mitmRemove, noResolve, enableJQ, scriptHubOptions, refreshIntervalMinutes
     }
 
     init(from decoder: Decoder) throws {
@@ -175,6 +187,7 @@ struct WebModuleMutation: Decodable {
         name = try values.decode(String.self, forKey: .name)
         sourceURL = try values.decode(String.self, forKey: .sourceURL)
         sourceFormat = try values.decodeIfPresent(String.self, forKey: .sourceFormat)
+        outputFormat = try values.decodeIfPresent(String.self, forKey: .outputFormat)
         storageLocation = try values.decodeIfPresent(String.self, forKey: .storageLocation)
         storageTargets = try values.decodeIfPresent([String].self, forKey: .storageTargets)
         category = try values.decodeIfPresent(String.self, forKey: .category)
@@ -206,6 +219,12 @@ struct WebModuleMutation: Decodable {
                 throw WebAPIError.invalidFormat
             }
             draft.sourceFormat = format
+        }
+        if let outputFormat {
+            guard let format = ModuleOutputFormat(rawValue: outputFormat) else {
+                throw WebAPIError.invalidOutputFormat
+            }
+            draft.outputFormat = format
         }
         if let storageLocation {
             guard let location = ModuleStorageLocation(rawValue: storageLocation) else {
@@ -249,6 +268,7 @@ enum WebAPIError: LocalizedError {
     case invalidBody
     case invalidArgument
     case invalidFormat
+    case invalidOutputFormat
     case invalidStorageLocation
     case invalidSourceURL
 
@@ -268,6 +288,7 @@ enum WebAPIError: LocalizedError {
         case .invalidBody: "请求内容不是有效的 UTF-8 文本。"
         case .invalidArgument: "找不到这个模块参数。"
         case .invalidFormat: "来源格式无效。"
+        case .invalidOutputFormat: "输出客户端无效。"
         case .invalidStorageLocation: "模块存放位置无效。"
         case .invalidSourceURL: "来源地址无效。"
         }

@@ -72,4 +72,4 @@ VERSION=2.0.0 BUILD=103 ./script/check_release_configuration.sh
 
 继续支持 macOS 26 及以上、Apple Silicon / Intel、现有配置和发布地址。旧组件缓存仍可读取；新快照位于本机缓存的 `Snapshots/<module-id>`，手动覆盖独立保存。凭据、GitHub 提交保护、本地受管文件边界与 Script-Hub 固定来源规则沿用现有设计。
 
-分发继续使用原有固定自签名证书与 Sparkle 公钥；本版本未引入 Apple Developer ID 公证、Sandbox 或 ATS 策略迁移。相关安装说明与取舍见 [Release Hardening](RELEASE_HARDENING.md)。
+分发继续使用原有固定自签名证书与 Sparkle 公钥；本版本未引入 Apple Developer ID 公证、Sandbox 或 ATS 策略迁移。相关安装说明与取舍见 [Release Hardening](../../RELEASE_HARDENING.md)。

@@ -60,14 +60,13 @@ extension AppModel {
                 failures.append(contentsOf: importPlan.failures)
                 guard let entry = importPlan.entries.first else { continue }
                 let module = entry.module
-                var nativeModule = module
-                nativeModule.sourceURL = snapshot.fileURL.absoluteString
-                nativeModule.sourceFormat = .surge
-                nativeModule.scriptHubSubscription = nil
-                let result = try await scriptHubClient.convert(
-                    module: nativeModule,
-                    sourceData: snapshot.data
+                let namedContent = await processingWorker.applyingModuleMetadata(
+                    name: module.name, category: module.category, desc: module.moduleDescription,
+                    iconURL: module.customIconURL, to: snapshot.content, outputFormat: module.outputFormat
                 )
+                let subscribedContent = ModuleMetadataParser.applyingScriptHubSubscription(module.scriptHubSubscription, to: namedContent)
+                try await scriptHubClient.validate(subscribedContent, outputFormat: module.outputFormat)
+                let result = ConversionResult(content: subscribedContent, requestURL: snapshot.fileURL, outputFormat: module.outputFormat)
                 guard shouldContinueCurrentWork() else { return }
                 try await fileStore.commitConversion(result, id: module.id)
                 let fingerprint = await processingWorker.contentFingerprint(

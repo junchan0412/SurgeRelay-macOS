@@ -1028,6 +1028,86 @@ extension WebManagementHTTPTests {
         XCTAssertEqual(last["status"] as? String, "after-state")
         XCTAssertGreaterThan(try XCTUnwrap(last["revision"] as? UInt64), stateRevision)
     }
+
+    @MainActor
+    func testPendingSaveChangesStreamThroughActivityWithoutRebuildingModules() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = AppModel(context: WorkspaceContext(id: UUID(), name: "Save queue",
+            configurationDirectory: root, cacheDirectory: root.appending(path: "Cache"),
+            allowsLegacyFallback: false), persistsOnInit: false)
+        let source = WebManagementSnapshotSource(model: model)
+        let encoder = WebManagementJSONEncoder()
+        let initial = try source.snapshot(includingLegacy: true)
+        _ = try await encoder.encode(initial)
+        var draft = ModuleDraft()
+        draft.name = "First save"
+        let first = PendingModuleSave(moduleID: UUID(), draft: draft)
+        draft.name = "Second save"
+        let second = PendingModuleSave(moduleID: nil, draft: draft, errorMessage: "Needs retry")
+        model.pendingModuleSaves = [first, second]
+        model.activePendingModuleSaveID = first.id
+        let changed = try source.snapshot(includingLegacy: true)
+        XCTAssertEqual(changed.state.revision, initial.state.revision)
+        XCTAssertGreaterThan(changed.activity.revision, initial.activity.revision)
+        let event = try await encoder.encode(changed)
+        let activityEvent = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(event.activity).data) as? [String: Any])
+        let activity = try XCTUnwrap(activityEvent["activity"] as? [String: Any])
+        let queue = try XCTUnwrap(activity["pendingModuleSaves"] as? [[String: Any]])
+        XCTAssertEqual(queue.compactMap { $0["name"] as? String }, ["First save", "Second save"])
+        XCTAssertEqual(queue[0]["id"] as? String, first.id.uuidString.lowercased())
+        XCTAssertEqual(queue[0]["moduleID"] as? String, first.moduleID?.uuidString.lowercased())
+        XCTAssertEqual(queue[0]["isActive"] as? Bool, true)
+        XCTAssertEqual(queue[1]["errorMessage"] as? String, "Needs retry")
+        XCTAssertNil(queue[0]["draft"])
+        let legacy = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(event.legacyState).data) as? [String: Any])
+        XCTAssertEqual((legacy["activity"] as? [String: Any])?["pendingModuleSaves"] as? NSArray, queue as NSArray)
+        model.pendingModuleSaves = []
+        model.activePendingModuleSaveID = nil
+        let cleared = try await encoder.activity(source.snapshot(includingLegacy: false))
+        XCTAssertTrue(cleared.activity.pendingModuleSaves.isEmpty)
+    }
+
+    @MainActor
+    func testWebPendingSaveActionsPersistAndRespectWorkspaceAndActiveItem() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = AppModel(context: WorkspaceContext(id: UUID(), name: "Save actions",
+            configurationDirectory: root, cacheDirectory: root.appending(path: "Cache"),
+            allowsLegacyFallback: false), persistsOnInit: false)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        model.beginWork(.publishing)
+        var draft = ModuleDraft()
+        draft.name = "Retry save"
+        let item = PendingModuleSave(moduleID: nil, draft: draft, errorMessage: "Needs retry")
+        model.pendingModuleSaves = [item]
+        let path = "/api/module-saves/\(item.id.uuidString.lowercased())"
+        func request(_ action: String, workspace: String?) -> WebHTTPRequest {
+            WebHTTPRequest(method: "POST", path: path + "/" + action, query: [:],
+                headers: workspace.map { ["x-relay-workspace": $0] } ?? [:], body: Data(), isLoopback: true)
+        }
+        let missingWorkspace = await WebManagementAPI.response(for: request("retry", workspace: nil), model: model)
+        XCTAssertEqual(missingWorkspace.status, 412)
+        let staleWorkspace = await WebManagementAPI.response(for: request("cancel", workspace: UUID().uuidString), model: model)
+        XCTAssertEqual(staleWorkspace.status, 412)
+        XCTAssertEqual(model.pendingModuleSaves.first?.errorMessage, "Needs retry")
+        let workspace = model.workspaceID.uuidString
+        model.activePendingModuleSaveID = item.id
+        let active = await WebManagementAPI.response(for: request("cancel", workspace: workspace), model: model)
+        XCTAssertEqual(active.status, 409)
+        model.activePendingModuleSaveID = nil
+        let retried = await WebManagementAPI.response(for: request("retry", workspace: workspace), model: model)
+        XCTAssertEqual(retried.status, 200)
+        let persisted = PersistenceStore.loadPendingModuleSaves(in: root)
+        XCTAssertEqual(persisted.map(\.id), [item.id])
+        XCTAssertNil(persisted.first?.errorMessage)
+        XCTAssertNil(model.pendingModuleSaveTask)
+        let cancelled = await WebManagementAPI.response(for: request("cancel", workspace: workspace), model: model)
+        XCTAssertEqual(cancelled.status, 200)
+        XCTAssertTrue(PersistenceStore.loadPendingModuleSaves(in: root).isEmpty)
+        let removed = await WebManagementAPI.response(for: request("retry", workspace: workspace), model: model)
+        XCTAssertEqual(removed.status, 404)
+    }
 }
 
 
