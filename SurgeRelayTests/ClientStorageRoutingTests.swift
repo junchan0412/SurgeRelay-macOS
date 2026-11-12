@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import XCTest
 @testable import SurgeRelay
 
@@ -187,6 +188,122 @@ final class ClientStorageRoutingTests: XCTestCase {
             XCTFail("Publishing cannot replace another client's registered physical source")
         } catch { }
         XCTAssertEqual(try Data(contentsOf: source), bytes)
+    }
+
+    func testSharedRootScanOffersEachPhysicalModuleOnceAndUsesSubscriptionTarget() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = model(root: root)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        let shared = root.appending(path: "Shared")
+        try FileManager.default.createDirectory(at: shared, withIntermediateDirectories: true)
+        for format in [ModuleOutputFormat.surge, .egern, .shadowrocket] {
+            configure(format, root: shared, model: model)
+        }
+        try Data(content(for: .surge).utf8).write(to: shared.appending(path: "Personal.sgmodule"))
+        let subscribed = """
+        #!name=Shadowrocket
+        #SUBSCRIBED http://script.hub/file/_start_/https://example.com/original.sgmodule/_end_/Subscribed.sgmodule?type=surge-module&target=shadowrocket-module
+        [Rule]
+        FINAL,DIRECT
+        """
+        try Data(subscribed.utf8).write(to: shared.appending(path: "Subscribed.sgmodule"))
+
+        let report = try await model.scanExistingLocalModules()
+        XCTAssertEqual(report.candidates.count, 2)
+        XCTAssertEqual(report.candidates.first { $0.relativePath == "Personal.sgmodule" }?.outputFormat, .surge)
+        XCTAssertEqual(report.candidates.first { $0.relativePath == "Subscribed.sgmodule" }?.outputFormat, .shadowrocket)
+        await model.importLocalModules(report.candidates)
+        XCTAssertNil(model.presentedError)
+        XCTAssertEqual(model.modules.count, 2)
+        XCTAssertEqual(Set(model.modules.map(\.outputFormat)), [.surge, .shadowrocket])
+        let repeated = try await model.scanExistingLocalModules()
+        XCTAssertTrue(repeated.candidates.isEmpty)
+    }
+
+    func testNestedClientRootRegistrationExcludesParentCandidateAndRejectsStaleImport() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = model(root: root)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        let surge = root.appending(path: "Surge")
+        let egern = surge.appending(path: "Egern")
+        configure(.surge, root: surge, model: model)
+        configure(.egern, root: egern, model: model)
+        try FileManager.default.createDirectory(at: egern, withIntermediateDirectories: true)
+        let source = egern.appending(path: "Demo.sgmodule")
+        let bytes = Data("""
+        #!name=Subscribed
+        #SUBSCRIBED http://script.hub/file/_start_/https://example.com/original.sgmodule/_end_/Demo.sgmodule?type=surge-module&target=surge-module
+        [Rule]
+        FINAL,DIRECT
+        """.utf8)
+        try bytes.write(to: source)
+        let initial = try await model.scanExistingLocalModules()
+        let stale = try XCTUnwrap(initial.candidates.first { $0.outputFormat == .surge })
+        XCTAssertEqual(stale.relativePath, "Egern/Demo.sgmodule")
+        let child = try XCTUnwrap(LocalModuleScanner.report(in: egern.path, existingModules: [],
+            publishedFilePaths: [], outputFormat: .egern).candidates.first)
+
+        await model.importLocalModules([child])
+        XCTAssertNil(model.presentedError)
+        let registered = try XCTUnwrap(model.modules.first)
+        XCTAssertEqual(model.modules.count, 1)
+        XCTAssertEqual(registered.outputFormat, .egern)
+        XCTAssertEqual(registered.sourceURL, "https://example.com/original.sgmodule")
+        let repeated = try await model.scanExistingLocalModules()
+        XCTAssertTrue(repeated.candidates.isEmpty)
+        await model.importLocalModules([stale])
+        XCTAssertEqual(model.modules.map(\.id), [registered.id])
+        XCTAssertTrue(model.presentedError?.contains("本地模块路径已纳入管理") == true)
+        XCTAssertEqual(try Data(contentsOf: source), bytes)
+    }
+
+    func testIndependentSurgeFamilyRootsKeepSameNamedFilesForEachClient() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = model(root: root)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        for format in [ModuleOutputFormat.surge, .egern, .shadowrocket] {
+            let directory = root.appending(path: format.rawValue)
+            configure(format, root: directory, model: model)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try Data(content(for: format).utf8).write(to: directory.appending(path: "Demo.sgmodule"))
+        }
+
+        let report = try await model.scanExistingLocalModules()
+        XCTAssertEqual(report.candidates.count, 3)
+        XCTAssertEqual(Set(report.candidates.map(\.outputFormat)), [.surge, .egern, .shadowrocket])
+        XCTAssertEqual(Set(report.candidates.map(\.id)).count, 3)
+        XCTAssertTrue(report.candidates.allSatisfy {
+            $0.relativePath == "Demo.sgmodule" && $0.rootDirectoryPath
+                == LocalSourcePathResolver.canonicalDirectoryURL(for: model.settings.localModuleDirectory(for: $0.outputFormat))?.path
+        })
+    }
+
+    func testBackgroundLocalScanPreservesStatusAndWorkActivity() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = model(root: root)
+        defer { model.persistenceFeedbackTask?.cancel() }
+        let directory = root.appending(path: "Surge")
+        configure(.surge, root: directory, model: model)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try Data(content(for: .surge).utf8).write(to: directory.appending(path: "Demo.sgmodule"))
+        model.statusMessage = "已保存模块"
+        withObservationTracking {
+            _ = model.statusMessage
+            _ = model.isWorking
+            _ = model.workActivity
+        } onChange: {
+            XCTFail("Background scanning must preserve the displayed status and work activity")
+        }
+
+        let report = try await model.scanExistingLocalModules(reportsProgress: false)
+        XCTAssertEqual(report.candidates.map(\.relativePath), ["Demo.sgmodule"])
+        XCTAssertEqual(model.statusMessage, "已保存模块")
+        XCTAssertFalse(model.isWorking)
+        XCTAssertEqual(model.workActivity.kind, .idle)
     }
 
     func testConfiguredSurgeFamilyRootsDetermineScanTargetAndFolderCatalog() async throws {

@@ -19,7 +19,7 @@ extension AppModel {
             stopLocalSourceWatching()
             return
         }
-        let roots = ModuleOutputFormat.allCases.filter { settings.isLocalPublishingEnabled(for: $0) }.map { settings.localModuleDirectory(for: $0) }
+        let roots = ModuleOutputFormat.allCases.filter { settings.localStorage(for: $0).isEnabled }.map { settings.localModuleDirectory(for: $0) }
         let paths = LocalSourceSyncPlanner.watchedDirectories(modules: modules, localModuleDirectories: roots)
         guard !paths.isEmpty else {
             stopLocalSourceWatching()
@@ -29,9 +29,9 @@ extension AppModel {
         localSourceWatcherTask?.cancel()
         guard let events = localSourceWatcher.start(paths: paths) else { return }
         localSourceWatcherTask = Task { [weak self] in
-            for await _ in events {
+            for await paths in events {
                 guard let self, !Task.isCancelled else { return }
-                self.scheduleLocalSourceSync()
+                self.scheduleLocalSourceSync(changedPaths: Set(paths))
             }
         }
     }
@@ -41,6 +41,8 @@ extension AppModel {
         localSourceWatcherTask = nil
         localSourceSyncTask?.cancel()
         localSourceSyncTask = nil
+        localSourceSyncPendingDelay = nil
+        localSourceSyncPendingPaths.removeAll()
         localSourceWatcher.stop()
     }
 
@@ -60,37 +62,75 @@ extension AppModel {
 
     /// 合并一段时间内的多次文件事件，只在安静下来之后同步一次。
     ///
-    /// iCloud 落地、编辑器保存和 Surge Relay 自己的发布写入都会产生连续事件，
+    /// iCloud 落地和编辑器保存会产生连续事件，
     /// 直接逐事件同步会重复转换同一批模块。
-    func scheduleLocalSourceSync(after delay: Duration = .milliseconds(900)) {
+    func scheduleLocalSourceSync(after delay: Duration = .milliseconds(350), changedPaths: Set<String> = []) {
         guard workspaceIsActive, !isWorkspaceTransitioning else { return }
-        localSourceSyncTask?.cancel()
+        localSourceSyncPendingDelay = delay
+        localSourceSyncPendingPaths.formUnion(changedPaths)
+        guard localSourceSyncTask == nil else { return }
         localSourceSyncTask = Task { [weak self] in
-            try? await Task.sleep(for: delay)
-            guard !Task.isCancelled, let self else { return }
-            await self.syncChangedLocalSources(reason: .fileSystemEvent)
+            guard let self else { return }
+            defer {
+                if !Task.isCancelled || self.localSourceSyncTask?.isCancelled == true {
+                    self.localSourceSyncTask = nil
+                }
+            }
+            while let delay = self.localSourceSyncPendingDelay {
+                self.localSourceSyncPendingDelay = nil
+                do { try await Task.sleep(for: delay) } catch { return }
+                guard !Task.isCancelled else { return }
+                if self.localSourceSyncPendingDelay != nil { continue }
+                let paths = self.localSourceSyncPendingPaths
+                self.localSourceSyncPendingPaths.removeAll()
+                await self.syncChangedLocalSources(reason: .fileSystemEvent, changedPaths: paths)
+            }
         }
     }
 
-    /// 比较本地来源文件的当前内容哈希，只更新真正改动过的模块。
-    ///
-    /// 判据与 `SourceRevisionService` 一致，因此重复调用是幂等的：转换成功后
-    /// `sourceContentHash` 会写回磁盘内容的哈希，下一轮扫描不再认为有改动。
-    func syncChangedLocalSources(reason: LocalSourceSyncReason) async {
-        guard workspaceIsActive, !isWorkspaceTransitioning, !AppRuntimeOptions.isUIQAMode, settings.watchesLocalModuleChanges else { return }
-        let sourceFiles = LocalSourceSyncPlanner.sourceFiles(in: modules, includesManualOnly: reason == .manual)
+    /// 同步本地来源与输出文件的磁盘改动，保留转换缓存和本地编辑。
+    func syncChangedLocalSources(reason: LocalSourceSyncReason, changedPaths: Set<String>? = nil) async {
+        guard workspaceIsActive, !isWorkspaceTransitioning, reason == .manual || !AppRuntimeOptions.isUIQAMode, settings.watchesLocalModuleChanges else { return }
+        guard !isWorking else { return retryLocalSourceSync(reason: reason, changedPaths: changedPaths) }
+        let outputChanges = await syncChangedLocalOutputs(reason: reason, changedPaths: changedPaths)
+        let sourceFiles = LocalSourceSyncPlanner.sourceFiles(in: modules, includesManualOnly: reason == .manual).filter { source in
+            changedPaths.map { $0.isEmpty || LocalSourceSyncPlanner.includesFile(source.url, changedPaths: $0) } ?? true
+        }
         guard !sourceFiles.isEmpty else { return }
         // 正在执行其他任务时不抢占，稍后重试；否则会被 updateAdmission 直接拒绝。
-        guard !isWorking else { return retryLocalSourceSync(reason: reason) }
+        guard !isWorking else { return retryLocalSourceSync(reason: reason, changedPaths: changedPaths) }
         let hashes = await Task.detached(priority: .utility) {
             LocalSourceSyncPlanner.contentHashes(for: sourceFiles)
         }.value
-        let changed = LocalSourceSyncPlanner.changedModuleIDs(
+        var changed = LocalSourceSyncPlanner.changedModuleIDs(
             sourceFiles: sourceFiles,
             currentHashes: hashes
         )
+        var missingCount = 0
+        var missingStateChanged = false
+        for source in sourceFiles {
+            guard let index = modules.firstIndex(where: { $0.id == source.moduleID }) else { continue }
+            if !FileManager.default.fileExists(atPath: source.url.path) {
+                missingCount += 1
+                let message = "本地来源文件已缺失：\(source.url.path)"
+                if modules[index].lastError != message {
+                    modules[index].state = .failed
+                    modules[index].lastError = message
+                    missingStateChanged = true
+                }
+            } else if hashes[source.moduleID] != nil,
+                      modules[index].lastError?.hasPrefix("本地来源文件已缺失：") == true {
+                changed.insert(source.moduleID)
+            }
+        }
+        if missingStateChanged {
+            do { try persistModules(); try await flushPersistence() }
+            catch { presentedError = "保存本地来源状态失败：\(error.localizedDescription)" }
+        }
         guard !changed.isEmpty else {
-            if reason == .manual {
+            if missingCount > 0 {
+                statusMessage = "\(missingCount) 个本地来源文件已缺失，缓存已保留"
+            } else if reason == .manual, outputChanges.isEmpty {
                 statusMessage = LocalSourceSyncPlanner.detectedStatus(
                     changedCount: 0,
                     firstModuleName: nil
@@ -99,7 +139,7 @@ extension AppModel {
             return
         }
         // 哈希扫描期间可能有其他任务开始执行，这里再确认一次。
-        guard !isWorking else { return retryLocalSourceSync(reason: reason) }
+        guard !isWorking else { return retryLocalSourceSync(reason: reason, changedPaths: changedPaths) }
         statusMessage = LocalSourceSyncPlanner.detectedStatus(
             changedCount: changed.count,
             firstModuleName: changed.count == 1
@@ -111,11 +151,112 @@ extension AppModel {
         await updateAll(only: changed, refreshesScriptHubEngine: false)
     }
 
-    private func retryLocalSourceSync(reason: LocalSourceSyncReason) {
+    func syncChangedLocalOutputs(reason: LocalSourceSyncReason, changedPaths: Set<String>? = nil) async -> Set<UUID> {
+        guard workspaceIsActive, !isWorkspaceTransitioning, !isWorking else { return [] }
+        let candidates = modules.filter {
+            $0.hasLocalStorageTarget && $0.hasRemoteUpdateSource && settings.localStorage(for: $0.outputFormat).isEnabled
+                && (reason == .manual || $0.refreshIntervalMinutes != 0)
+                && ($0.lastConvertedOutputFormat == nil || $0.lastConvertedOutputFormat == $0.outputFormat)
+        }
+        guard !candidates.isEmpty else { return [] }
+        beginWork(.savingPreview)
+        defer { endWork(.savingPreview) }
+        var changed = Set<UUID>()
+        var metadataChanged = false
+        let generation = localChangeGeneration
+        for original in candidates {
+            guard shouldContinueCurrentWork(generation: generation) else { break }
+            let root = settings.localModuleDirectory(for: original.outputFormat)
+            guard let url = LocalSourcePathResolver.fileURL(relativePath: original.publishedRelativePath, rootDirectoryPath: root) else { continue }
+            if let changedPaths, !changedPaths.isEmpty, !LocalSourceSyncPlanner.includesFile(url, changedPaths: changedPaths) { continue }
+            do {
+                guard FileManager.default.fileExists(atPath: url.path) else {
+                    throw RelayError.invalidOutput("本地模块文件已缺失：\(url.path)")
+                }
+                let currentContent = try? await fileStore.readComponent(id: original.id)
+                if changedPaths?.isEmpty != false, currentContent != nil,
+                   let cacheDate = try? await fileStore.componentModificationDate(id: original.id),
+                   let fileDate = try url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
+                   fileDate <= cacheDate { continue }
+                let data = try await Task.detached(priority: .utility) { try SourceRevisionService.readLocalSource(url) }.value
+                guard let content = String(data: data, encoding: .utf8) else { throw RelayError.invalidOutput("本地模块不是有效的 UTF-8 文本。") }
+                var unchanged = currentContent == content
+                if !unchanged, currentContent != nil {
+                    let files = try await publishedFiles(plan: PublishPlan(standaloneModules: [original]), includeAssets: false, destination: .gitHub)
+                    if let expected = files.first,
+                       data == expected.data || data == ManagedPublishedFile.dataWrapping(expected.data, relativePath: original.publishedRelativePath) {
+                        unchanged = true
+                    }
+                }
+                if unchanged {
+                    if let index = modules.firstIndex(where: { $0.id == original.id }),
+                       modules[index].localOutputError?.hasPrefix("本地模块文件已缺失：") == true {
+                        modules[index].localOutputError = nil
+                        metadataChanged = true
+                    }
+                    continue
+                }
+                try await scriptHubClient.validate(content, outputFormat: original.outputFormat)
+                var module = original
+                module.name = ModuleMetadataParser.displayName(in: content) ?? module.name
+                module.category = ModuleMetadataParser.category(in: content) ?? ""
+                module.moduleDescription = ModuleMetadataParser.moduleDescription(in: content)
+                module.customIconURL = ModuleMetadataParser.iconURL(in: content, relativeTo: module.updateSourceURL)?.absoluteString
+                let converted = try? await fileStore.readConvertedComponent(id: module.id)
+                let plan = ModulePreviewEditPlanner.savePlan(module: module, namedContent: content,
+                    currentContent: currentContent, convertedContent: converted, automaticallyPublish: false)
+                module = plan.module
+                let defaults = ModuleArgumentProcessor.info(in: converted ?? content).definitions.reduce(into: [String: String]()) { $0[$1.key] = $1.defaultValue }
+                module.argumentOverrides = ModuleArgumentProcessor.info(in: content).definitions.reduce(into: [:]) { values, definition in
+                    if defaults[definition.key] != definition.defaultValue { values[definition.key] = definition.defaultValue }
+                }
+                let assets = try await fileStore.generatedAssetFiles(for: [module.id]).map { GeneratedAsset(relativePath: $0.name, data: $0.data) }
+                let icon = await processingWorker.iconURL(in: content, relativeTo: module.updateSourceURL)
+                let metadata = ModuleMetadataRefreshPlanner.plan(module: module, cachedContent: content,
+                    convertedContent: converted, authoritativeSubscription: ModuleMetadataParser.scriptHubSubscription(in: content),
+                    hasOverride: currentContent != nil, detectedIconURL: icon)
+                module = metadata.module
+                module.contentHash = await processingWorker.contentFingerprint(of: content, assets: assets)
+                guard shouldContinueCurrentWork(generation: generation), modules.contains(original) else { continue }
+                if currentContent == nil {
+                    try await fileStore.commitConversion(ConversionResult(content: content, requestURL: url, outputFormat: module.outputFormat), id: module.id)
+                } else {
+                    _ = try await fileStore.recordCurrentVersion(id: module.id, reason: .beforeEdit, outputFormat: module.outputFormat)
+                    try await fileStore.writeComponentOverride(content, id: module.id)
+                }
+                module.lastUpdatedAt = .now
+                module.lastConvertedOutputFormat = module.outputFormat
+                module.state = .current
+                module.lastError = nil
+                module.localOutputError = nil
+                replace(module)
+                changed.insert(module.id)
+                metadataChanged = true
+                recordHistory([UpdateHistoryEntry(moduleID: module.id, moduleName: module.name, outcome: .updated,
+                    duration: 0, message: "已同步本地文件编辑", contentChanged: true)])
+            } catch {
+                guard shouldContinueCurrentWork(generation: generation), let index = modules.firstIndex(where: { $0.id == original.id }) else { continue }
+                if modules[index].localOutputError != error.localizedDescription {
+                    modules[index].localOutputError = error.localizedDescription
+                    metadataChanged = true
+                }
+            }
+        }
+        if metadataChanged {
+            do { try persistModules(); try await flushPersistence() }
+            catch { presentedError = "保存本地文件同步结果失败：\(error.localizedDescription)" }
+        }
+        if !changed.isEmpty {
+            statusMessage = "已同步 \(changed.count) 个本地模块文件的编辑"
+        }
+        return changed
+    }
+
+    private func retryLocalSourceSync(reason: LocalSourceSyncReason, changedPaths: Set<String>?) {
         guard reason != .manual else {
             statusMessage = updateAdmission.message
             return
         }
-        scheduleLocalSourceSync(after: .seconds(5))
+        scheduleLocalSourceSync(after: .seconds(5), changedPaths: changedPaths ?? [])
     }
 }

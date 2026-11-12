@@ -7,9 +7,9 @@ import Foundation
 /// 的 `@MainActor` 隔离，而 FSEvents 回调运行在后台派发队列上，从那里读取
 /// main-actor 隔离的属性会在运行时触发执行器断言而崩溃。
 private final class LocalSourceEventSink: Sendable {
-    let continuation: AsyncStream<Void>.Continuation
+    let continuation: AsyncStream<[String]>.Continuation
 
-    init(continuation: AsyncStream<Void>.Continuation) {
+    init(continuation: AsyncStream<[String]>.Continuation) {
         self.continuation = continuation
     }
 }
@@ -31,7 +31,7 @@ private func localSourceEventCallback(
     Unmanaged<LocalSourceEventSink>.fromOpaque(info)
         .takeUnretainedValue()
         .continuation
-        .yield()
+        .yield(unsafeBitCast(eventPaths, to: NSArray.self) as! [String])
 }
 
 /// 用 FSEvents 递归监听本地模块来源目录，把合并后的改动通知投递到异步序列。
@@ -47,7 +47,7 @@ final class LocalSourceWatcher {
     )
     private var eventStream: FSEventStreamRef?
     private var sink: Unmanaged<LocalSourceEventSink>?
-    private var continuation: AsyncStream<Void>.Continuation?
+    private var continuation: AsyncStream<[String]>.Continuation?
     private(set) var watchedPaths: [String] = []
 
     var isWatching: Bool { eventStream != nil }
@@ -57,15 +57,15 @@ final class LocalSourceWatcher {
         isWatching && watchedPaths == paths
     }
 
-    /// 开始递归监听 `paths`。返回的序列在每一批文件事件后产生一个元素；
+    /// 开始递归监听 `paths`。返回的序列包含每批事件涉及的文件路径；
     /// 无法监听或路径为空时返回 nil。
-    func start(paths: [String], latency: TimeInterval = 1.0) -> AsyncStream<Void>? {
+    func start(paths: [String], latency: TimeInterval = 0.35) -> AsyncStream<[String]>? {
         stop()
         guard !paths.isEmpty else { return nil }
 
         var createdStream: FSEventStreamRef?
         var createdSink: Unmanaged<LocalSourceEventSink>?
-        let events = AsyncStream<Void>(bufferingPolicy: .bufferingNewest(1)) { continuation in
+        let events = AsyncStream<[String]> { continuation in
             let sink = Unmanaged.passRetained(LocalSourceEventSink(continuation: continuation))
             var context = FSEventStreamContext(
                 version: 0,
@@ -78,6 +78,7 @@ final class LocalSourceWatcher {
             // 不再回灌成“来源已改动”，只保留其他进程（编辑器、iCloud、iOS 端）的改动。
             let flags = UInt32(
                 kFSEventStreamCreateFlagFileEvents |
+                    kFSEventStreamCreateFlagUseCFTypes |
                     kFSEventStreamCreateFlagNoDefer |
                     kFSEventStreamCreateFlagIgnoreSelf
             )

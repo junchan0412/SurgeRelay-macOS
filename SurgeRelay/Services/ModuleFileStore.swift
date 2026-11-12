@@ -605,6 +605,12 @@ actor ModuleFileStore {
         return try readConvertedComponent(id: id)
     }
 
+    func componentModificationDate(id: UUID) throws -> Date? {
+        let override = componentOverrideURL(for: id)
+        let url = FileManager.default.fileExists(atPath: override.path) ? override : componentURL(for: id)
+        return try url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+    }
+
     func readConvertedComponent(id: UUID) throws -> String {
         try recoverInterruptedRestore(id: id)
         let url = componentURL(for: id)

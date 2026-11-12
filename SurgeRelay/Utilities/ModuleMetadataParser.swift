@@ -126,6 +126,10 @@ enum ModuleMetadataParser {
         return value.isEmpty ? nil : value
     }
 
+    static func moduleDescription(in content: String) -> String {
+        ModuleMetadataLineReader.headerValue(named: "desc", in: content)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+
     static func applyingDisplayName(_ name: String, to content: String) -> String {
         let normalized = content.replacingOccurrences(of: "\r\n", with: "\n")
         let line = "#!name=\(name.trimmingCharacters(in: .whitespacesAndNewlines))"

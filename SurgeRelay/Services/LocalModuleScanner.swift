@@ -240,6 +240,17 @@ enum LocalModuleScanner {
         }
     }
 
+    private static func isConfiguration(_ content: String, fileURL: URL) -> Bool {
+        guard fileURL.pathExtension.lowercased() == "conf" else { return false }
+        let configurationSections: Set<String> = [
+            "[general]", "[proxy]", "[proxy group]", "[module]",
+            "[dns]", "[server_local]", "[server_remote]", "[policy]"
+        ]
+        return content.components(separatedBy: .newlines).contains {
+            configurationSections.contains($0.trimmingCharacters(in: .whitespaces).lowercased())
+        }
+    }
+
     static func snapshotForImport(
         _ candidate: LocalModuleScanCandidate,
         rootDirectoryPath: String,
@@ -269,10 +280,15 @@ enum LocalModuleScanner {
         guard let content = String(data: data, encoding: .utf8) else {
             throw RelayError.invalidOutput("来源不是有效的 UTF-8 模块文本。")
         }
+        guard !isConfiguration(content, fileURL: fileURL) else {
+            throw RelayError.invalidOutput("这是完整客户端配置文件，请重新扫描")
+        }
+        if let expectedOutputFormat, !accepts(fileURL, outputFormat: expectedOutputFormat) {
+            throw RelayError.invalidOutput("文件格式不属于 \(expectedOutputFormat.title) 模块，请重新扫描")
+        }
         var refreshed = candidate
         let subscription = ModuleMetadataParser.scriptHubSubscription(in: content)
-        guard let inferred = outputFormat(for: fileURL, subscription: subscription),
-              expectedOutputFormat == nil || accepts(fileURL, outputFormat: expectedOutputFormat!) else {
+        guard let inferred = outputFormat(for: fileURL, subscription: subscription) else {
             throw RelayError.invalidOutput("Stash 文件缺少可识别的 Script-Hub 订阅来源，请重新扫描")
         }
         refreshed.relativePath = relativePath
@@ -350,6 +366,9 @@ enum LocalModuleScanner {
                   (try? standardizedURL.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else {
                 continue
             }
+            if let expectedOutputFormat, !accepts(standardizedURL, outputFormat: expectedOutputFormat) {
+                continue
+            }
             guard let relativePath = LocalSourcePathResolver.relativePath(
                 forSourceURL: standardizedURL.absoluteString,
                 rootDirectoryPath: root.path
@@ -412,6 +431,13 @@ enum LocalModuleScanner {
                 skipped.append(LocalModuleScanSkippedFile(
                     relativePath: normalizedRelativePath,
                     reason: "不是有效的 UTF-8 文本"
+                ))
+                continue
+            }
+            if isConfiguration(content, fileURL: standardizedURL) {
+                skipped.append(LocalModuleScanSkippedFile(
+                    relativePath: normalizedRelativePath,
+                    reason: "这是完整客户端配置文件"
                 ))
                 continue
             }

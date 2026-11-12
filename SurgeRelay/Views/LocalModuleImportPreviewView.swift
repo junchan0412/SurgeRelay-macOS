@@ -6,8 +6,12 @@ struct LocalModuleImportPreviewView: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var selectedCandidateIDs: Set<String>
     @State private var candidates: [LocalModuleScanCandidate]
-    private let skippedFiles: [LocalModuleScanSkippedFile]
+    @State private var skippedFiles: [LocalModuleScanSkippedFile]
     @State private var isImporting = false
+    @State private var isRefreshing = false
+    @State private var refreshError: String?
+    @State private var editedFields: [String: Set<WritableKeyPath<LocalModuleScanCandidate, String>>] = [:]
+    @State private var sourceWatcher = LocalSourceWatcher()
 
     init(
         candidates: [LocalModuleScanCandidate],
@@ -15,7 +19,7 @@ struct LocalModuleImportPreviewView: View {
         selectedCandidateIDs: Binding<Set<String>>
     ) {
         _candidates = State(initialValue: candidates)
-        self.skippedFiles = skippedFiles
+        _skippedFiles = State(initialValue: skippedFiles)
         _selectedCandidateIDs = selectedCandidateIDs
     }
 
@@ -49,6 +53,9 @@ struct LocalModuleImportPreviewView: View {
                 Text("导入会从当前本地文件建立缓存；已有文件位置保持不变。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Text(refreshError ?? "文件列表随本地目录改动自动刷新。")
+                    .font(.caption)
+                    .foregroundStyle(refreshError == nil ? .secondary : Design.Palette.error)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(24)
@@ -60,8 +67,8 @@ struct LocalModuleImportPreviewView: View {
                     importSummaryCard
                     if !candidates.isEmpty {
                         importSection("可导入") {
-                            ForEach(candidates.indices, id: \.self) { index in
-                                importCandidateCard(index: index)
+                            ForEach(candidates) { candidate in
+                                importCandidateCard(candidate: candidate)
                             }
                         }
                     }
@@ -89,6 +96,10 @@ struct LocalModuleImportPreviewView: View {
                 Button("全不选") {
                     selectedCandidateIDs.removeAll()
                 }
+                Button(isRefreshing ? "正在刷新…" : "刷新列表") {
+                    Task { await refreshCandidates() }
+                }
+                .disabled(isRefreshing || isImporting || model.isWorking)
                 Spacer()
                 Text(selectionSummary)
                     .font(.caption)
@@ -104,6 +115,26 @@ struct LocalModuleImportPreviewView: View {
             .padding(20)
         }
         .frame(width: 780, height: 560)
+        .task(id: directoryWatchKey) {
+            let paths = LocalSourceSyncPlanner.minimalDirectorySet(ModuleOutputFormat.allCases.compactMap { format in
+                let storage = model.settings.localStorage(for: format)
+                guard storage.isEnabled, !storage.directory.isEmpty else { return nil }
+                return LocalSourceSyncPlanner.canonicalDirectoryPath(storage.directory)
+            })
+            let events = sourceWatcher.start(paths: paths)
+            await refreshCandidates()
+            if let events {
+                for await _ in events {
+                    try? await Task.sleep(for: .milliseconds(350))
+                    guard !Task.isCancelled else { return }
+                    await refreshCandidates()
+                }
+            }
+        }
+        .onChange(of: model.isWorking) { _, isWorking in
+            if !isWorking { Task { await refreshCandidates() } }
+        }
+        .onDisappear { sourceWatcher.stop() }
     }
 
     private var importSummaryCard: some View {
@@ -168,8 +199,7 @@ struct LocalModuleImportPreviewView: View {
         }
     }
 
-    private func importCandidateCard(index: Int) -> some View {
-        let candidate = candidates[index]
+    private func importCandidateCard(candidate: LocalModuleScanCandidate) -> some View {
         let isSelected = selectedCandidateIDs.contains(candidate.id)
         return HStack(alignment: .top, spacing: 12) {
             Toggle("", isOn: selectionBinding(forID: candidate.id))
@@ -211,13 +241,13 @@ struct LocalModuleImportPreviewView: View {
                     GridRow {
                         Text("名称")
                             .foregroundStyle(.secondary)
-                        TextField("模块名称", text: textBinding(index: index, keyPath: \.name))
+                        TextField("模块名称", text: textBinding(forID: candidate.id, keyPath: \.name))
                             .textFieldStyle(.roundedBorder)
                     }
                     GridRow {
                         Text("标签")
                             .foregroundStyle(.secondary)
-                        TextField("Surge category", text: textBinding(index: index, keyPath: \.category))
+                        TextField("Surge category", text: textBinding(forID: candidate.id, keyPath: \.category))
                             .textFieldStyle(.roundedBorder)
                     }
                     GridRow {
@@ -296,11 +326,52 @@ struct LocalModuleImportPreviewView: View {
         )
     }
 
-    private func textBinding(index: Int, keyPath: WritableKeyPath<LocalModuleScanCandidate, String>) -> Binding<String> {
+    private func textBinding(forID id: String, keyPath: WritableKeyPath<LocalModuleScanCandidate, String>) -> Binding<String> {
         Binding(
-            get: { candidates[index][keyPath: keyPath] },
-            set: { candidates[index][keyPath: keyPath] = $0 }
+            get: { candidates.first(where: { $0.id == id })?[keyPath: keyPath] ?? "" },
+            set: {
+                guard let index = candidates.firstIndex(where: { $0.id == id }) else { return }
+                editedFields[id, default: []].insert(keyPath)
+                candidates[index][keyPath: keyPath] = $0
+            }
         )
+    }
+
+    private var directoryWatchKey: String {
+        ModuleOutputFormat.allCases.map { format in
+            let storage = model.settings.localStorage(for: format)
+            return "\(format.rawValue):\(storage.isEnabled):\(storage.directory)"
+        }.joined(separator: "|") + ":\(model.moduleRevision)"
+    }
+
+    private func refreshCandidates() async {
+        guard !isImporting, !model.isWorking else { return }
+        let watchKey = directoryWatchKey
+        isRefreshing = true
+        defer { isRefreshing = false }
+        do {
+            let report = try await model.scanExistingLocalModules(reportsProgress: false)
+            guard !Task.isCancelled, watchKey == directoryWatchKey else { return }
+            let previous = Dictionary(uniqueKeysWithValues: candidates.map { ($0.id, $0) })
+            candidates = report.candidates.map { scanned in
+                var candidate = scanned
+                if let fields = editedFields[candidate.id], let draft = previous[candidate.id],
+                   draft.rootDirectoryPath == candidate.rootDirectoryPath {
+                    for keyPath in fields { candidate[keyPath: keyPath] = draft[keyPath: keyPath] }
+                }
+                return candidate
+            }
+            let retainedIDs = Set(candidates.compactMap { candidate in
+                previous[candidate.id]?.rootDirectoryPath == candidate.rootDirectoryPath ? candidate.id : nil
+            })
+            selectedCandidateIDs.formIntersection(retainedIDs)
+            editedFields = editedFields.filter { retainedIDs.contains($0.key) }
+            skippedFiles = report.skippedFiles
+            refreshError = nil
+        } catch is CancellationError {
+        } catch {
+            refreshError = "刷新失败：\(error.localizedDescription)"
+        }
     }
 
     private func importSelectedCandidates() async {

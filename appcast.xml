@@ -3,6 +3,23 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>3.2.0</title>
+            <pubDate>Fri, 13 Nov 2026 03:20:44 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v3.2.0</link>
+            <sparkle:version>118</sparkle:version>
+            <sparkle:shortVersionString>3.2.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 3.2.0
+
+
+- 本地扫描：按客户端筛选原生模块，排除 Surge 配置及 Quantumult X 完整配置；共享目录中的同一文件只出现一次，订阅目标决定客户端归属，已登记的路径和来源不再出现在可选列表。
+- 导入预览：文件新增、修改、删除及管理列表变化后自动刷新，保留用户填写的名称、标签和有效选择；支持手动刷新，导入时重新读取当前磁盘内容。
+- 即时同步：合并连续文件事件，保留正在执行的同步任务并继续处理后续保存；订阅模块的本地输出被外部修改后同步缓存与详情，保留编辑前历史，不触发远程下载或覆盖磁盘文件。
+- 验证：678 项 Release 测试通过，2 项可选性能测试跳过；隔离原生界面验证候选筛选、目录变更自动刷新、名称与标签编辑保留及导入后去重。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v3.2.0/Surge-Relay-3.2.0.app.zip" length="13625850" type="application/zip" sparkle:edSignature="j0AzXGRjP06REDV3hIEs/AlOUa7tXGVYUV9h/nPOLI3A66xPErMiDk/5SBkfZQoPr3cr+0keavQaO9ydFK0jCg=="/>
+        </item>
+        <item>
             <title>3.1.0</title>
             <pubDate>Thu, 12 Nov 2026 02:42:19 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v3.1.0</link>

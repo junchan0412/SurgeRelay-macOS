@@ -2,13 +2,15 @@ import Foundation
 
 @MainActor
 extension AppModel {
-    func scanExistingLocalModules() async throws -> LocalModuleScanReport {
+    func scanExistingLocalModules(reportsProgress: Bool = true) async throws -> LocalModuleScanReport {
         guard !isWorking else {
             throw RelayError.invalidOutput(updateAdmission.message)
         }
-        beginWork(.scanningLocalModules)
-        defer { endWork(.scanningLocalModules) }
-        statusMessage = LocalModuleImportPlanner.scanStartedStatus
+        if reportsProgress {
+            beginWork(.scanningLocalModules)
+            statusMessage = LocalModuleImportPlanner.scanStartedStatus
+        }
+        defer { if reportsProgress { endWork(.scanningLocalModules) } }
         let configured = ModuleOutputFormat.allCases.filter { settings.localStorage(for: $0).isEnabled && !settings.localModuleDirectory(for: $0).isEmpty }
         guard !configured.isEmpty else { throw RelayError.invalidOutput("请先启用并设置客户端的本地存储目录。") }
         var candidates: [LocalModuleScanCandidate] = []
@@ -18,27 +20,44 @@ extension AppModel {
             let rootDirectoryPath = settings.localModuleDirectory(for: format)
             let existingModules = localModulesSharingRoot(rootDirectoryPath)
             let storage = settings.localStorage(for: format)
-            let publishedFilePaths = LocalSourcePathResolver.canonicalDirectoryURL(for: storage.publishedRootDirectory ?? "")
+            var publishedFilePaths = LocalSourcePathResolver.canonicalDirectoryURL(for: storage.publishedRootDirectory ?? "")
                 == LocalSourcePathResolver.canonicalDirectoryURL(for: rootDirectoryPath) ? storage.publishedFilePaths : []
+            publishedFilePaths.append(contentsOf: registeredLocalModuleFiles.compactMap {
+                LocalSourcePathResolver.relativePath(forSourceURL: $0.absoluteString, rootDirectoryPath: rootDirectoryPath)
+            })
             do {
                 let report = try await Task.detached(priority: .userInitiated) {
                     try LocalModuleScanner.report(in: rootDirectoryPath, existingModules: existingModules,
                         publishedFilePaths: publishedFilePaths, outputFormat: format)
                 }.value
-                candidates.append(contentsOf: report.candidates)
+                for candidate in report.candidates {
+                    let fileURL = LocalSourcePathResolver.fileURL(relativePath: candidate.localStorageRelativePath,
+                        rootDirectoryPath: rootDirectoryPath)
+                    if let index = candidates.firstIndex(where: {
+                        LocalSourcePathResolver.fileURL(relativePath: $0.localStorageRelativePath,
+                            rootDirectoryPath: $0.rootDirectoryPath ?? "") == fileURL
+                    }) {
+                        if candidate.scriptHubSubscription?.target == candidate.outputFormat.scriptHubTarget,
+                           candidates[index].scriptHubSubscription?.target != candidates[index].outputFormat.scriptHubTarget {
+                            candidates[index] = candidate
+                        }
+                    } else {
+                        candidates.append(candidate)
+                    }
+                }
                 skipped.append(contentsOf: report.skippedFiles.map { file in
                     LocalModuleScanSkippedFile(relativePath: format.title + " · " + file.relativePath, reason: file.reason)
                 })
             } catch {
                 skipped.append(LocalModuleScanSkippedFile(relativePath: format.title + " 目录", reason: error.localizedDescription))
             }
-            guard settings == originalSettings, shouldContinueCurrentWork() else { return LocalModuleScanReport(candidates: [], skippedFiles: []) }
+            guard settings == originalSettings, !Task.isCancelled, workspaceIsActive, !isWorkspaceTransitioning,
+                  reportsProgress || !isWorking else {
+                throw CancellationError()
+            }
         }
         let report = LocalModuleScanReport(candidates: candidates, skippedFiles: skipped)
-        guard shouldContinueCurrentWork() else {
-            return LocalModuleScanReport(candidates: [], skippedFiles: [])
-        }
-        statusMessage = LocalModuleImportPlanner.scanStatus(for: report)
+        if reportsProgress { statusMessage = LocalModuleImportPlanner.scanStatus(for: report) }
         return report
     }
 
@@ -67,6 +86,9 @@ extension AppModel {
                     try LocalModuleScanner.snapshotForImport(candidate, rootDirectoryPath: rootDirectoryPath, outputFormat: format)
                 }.value
                 guard shouldContinueCurrentWork() else { return }
+                guard !registeredLocalModuleFiles.contains(snapshot.fileURL) else {
+                    throw RelayError.invalidOutput("本地模块路径已纳入管理，请重新扫描")
+                }
                 let importPlan = LocalModuleImportPlanner.plan(
                     candidates: [snapshot.candidate],
                     existingModules: localModulesSharingRoot(rootDirectoryPath) + imported.filter {
@@ -130,6 +152,13 @@ extension AppModel {
             presentedError = failureDetails
         }
     }
+    private var registeredLocalModuleFiles: Set<URL> {
+        Set(modules.filter(\.hasLocalStorageTarget).compactMap { module in
+            LocalSourcePathResolver.fileURL(relativePath: module.localStorageRelativePath ?? module.publishedRelativePath,
+                rootDirectoryPath: settings.localModuleDirectory(for: module.outputFormat))
+        })
+    }
+
     private func localModulesSharingRoot(_ target: String) -> [RelayModule] {
         let root = LocalSourcePathResolver.canonicalDirectoryURL(for: target)
         return modules.filter { module in

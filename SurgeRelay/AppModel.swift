@@ -122,6 +122,8 @@ final class AppModel {
     @ObservationIgnored var automaticPublishTask: Task<Void, Never>?
     @ObservationIgnored var localSourceWatcherTask: Task<Void, Never>?
     @ObservationIgnored var localSourceSyncTask: Task<Void, Never>?
+    @ObservationIgnored var localSourceSyncPendingDelay: Duration?
+    @ObservationIgnored var localSourceSyncPendingPaths = Set<String>()
     @ObservationIgnored var localChangeGeneration = 0
     @ObservationIgnored var hasStarted = false
     @ObservationIgnored var githubModuleOutputFoldersLastRefreshedAt: Date?

@@ -18,11 +18,18 @@ enum LocalSourceSyncPlanner {
     /// 单次扫描允许读取的来源文件大小上限，与来源检查保持一致。
     static let maximumSourceFileBytes = 20 * 1024 * 1024
 
+    static func includesFile(_ url: URL, changedPaths: Set<String>) -> Bool {
+        let filePath = LocalSourcePathResolver.pathIdentity(canonicalDirectoryPath(url.standardizedFileURL.path))
+        return changedPaths.contains { path in
+            let eventPath = LocalSourcePathResolver.pathIdentity(canonicalDirectoryPath(path))
+            return filePath == eventPath || filePath.hasPrefix(eventPath.hasSuffix("/") ? eventPath : eventPath + "/")
+        }
+    }
+
     /// 可以从本地文件刷新的模块来源。
     ///
     /// 只有“转换前来源”本身就是本地文件的模块才在此列：带 Script-Hub
-    /// `#SUBSCRIBED` 的本地模块其更新来源是远程地址，改动应由来源检查而不是
-    /// 文件监听驱动。
+    /// `#SUBSCRIBED` 的本地模块其更新来源是远程地址，本地输出编辑另按文件事件同步。
     static func sourceFiles(in modules: [RelayModule], includesManualOnly: Bool = false) -> [LocalModuleSourceFile] {
         modules.compactMap { module in
             guard includesManualOnly || module.refreshIntervalMinutes != 0 else { return nil }
@@ -83,9 +90,6 @@ enum LocalSourceSyncPlanner {
     }
 
     /// 读取来源文件的当前内容哈希。文件缺失、无法读取或体积超限时记为 nil。
-    ///
-    /// 缺失文件交给正常的更新流程报错，这里不把它当成“已改动”，避免 iCloud
-    /// 尚未下载完成时触发一轮注定失败的转换。
     static func contentHashes(for sourceFiles: [LocalModuleSourceFile]) -> [UUID: String] {
         var hashes: [UUID: String] = [:]
         for source in sourceFiles {

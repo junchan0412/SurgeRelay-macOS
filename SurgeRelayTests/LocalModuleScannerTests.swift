@@ -3,6 +3,62 @@ import XCTest
 @testable import SurgeRelay
 
 final class LocalModuleScannerTests: XCTestCase {
+    func testClientScanListsOnlyNativeModulesAndExcludesRegisteredFiles() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let files = [
+            "New.sgmodule": "#!name=New\n[Rule]\nFINAL,DIRECT",
+            "Registered.module": "#!name=Registered\n[Rule]\nFINAL,DIRECT",
+            "Loon.plugin": "#!name=Loon\n[Rewrite]\n^https://example.com reject",
+            "Rewrite.conf": "^https://example.com url reject",
+            "Surge.conf": "[General]\nloglevel = notify\n[Proxy]\nDirect = direct",
+            "QuantumultX.conf": "[server_local]\nshadowsocks=example.com:443, method=aes-128-gcm\n[rewrite_local]\n^https://example.com url reject"
+        ]
+        for (name, content) in files { try Data(content.utf8).write(to: root.appending(path: name)) }
+        let registered = RelayModule(name: "Registered", sourceURL: root.appending(path: "Registered.module").absoluteString,
+            sourceFormat: .surge, outputFileName: "Registered.module", storageLocation: .local,
+            localStorageRelativePath: "Registered.module", preservesOutputFileName: true)
+
+        let surge = try LocalModuleScanner.report(in: root.path, existingModules: [registered],
+            publishedFilePaths: [], outputFormat: .surge)
+        XCTAssertEqual(surge.candidates.map(\.relativePath), ["New.sgmodule"])
+        XCTAssertEqual(surge.candidates.map(\.outputFormat), [.surge])
+        let loon = try LocalModuleScanner.report(in: root.path, existingModules: [registered],
+            publishedFilePaths: [], outputFormat: .loon)
+        XCTAssertEqual(loon.candidates.map(\.relativePath), ["Loon.plugin"])
+        let qx = try LocalModuleScanner.report(in: root.path, existingModules: [registered],
+            publishedFilePaths: [], outputFormat: .quantumultX)
+        XCTAssertEqual(qx.candidates.map(\.relativePath), ["Rewrite.conf"])
+        XCTAssertEqual(Set(qx.skippedFiles.map(\.relativePath)), ["Surge.conf", "QuantumultX.conf"])
+        XCTAssertTrue(qx.skippedFiles.allSatisfy { $0.reason == "这是完整客户端配置文件" })
+
+        let imported = LocalModuleImportPlanner.plan(candidates: surge.candidates, existingModules: [registered],
+            localModuleDirectory: root.path)
+        XCTAssertTrue(imported.failures.isEmpty)
+        let repeated = try LocalModuleScanner.report(in: root.path,
+            existingModules: [registered] + imported.entries.map(\.module), publishedFilePaths: [], outputFormat: .surge)
+        XCTAssertTrue(repeated.candidates.isEmpty)
+    }
+
+    func testImportRejectsRewriteReplacedWithFullConfigurationAfterScan() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let source = root.appending(path: "Rewrite.conf")
+        try Data("^https://example.com url reject".utf8).write(to: source)
+        let candidate = try XCTUnwrap(LocalModuleScanner.report(in: root.path, existingModules: [],
+            publishedFilePaths: [], outputFormat: .quantumultX).candidates.first)
+        let configuration = Data("[general]\nserver_check_url = https://example.com\n[rewrite_local]\n^https://example.com url reject".utf8)
+        try configuration.write(to: source)
+
+        XCTAssertThrowsError(try LocalModuleScanner.snapshotForImport(candidate, rootDirectoryPath: root.path,
+            outputFormat: .quantumultX)) {
+            XCTAssertTrue($0.localizedDescription.contains("完整客户端配置文件"))
+        }
+        XCTAssertEqual(try Data(contentsOf: source), configuration)
+    }
+
     func testScanRecoversNativeFormatsAndClientVariantsFromOneSubscription() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
