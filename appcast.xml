@@ -3,6 +3,24 @@
     <channel>
         <title>Surge Relay</title>
         <item>
+            <title>3.3.0</title>
+            <pubDate>Wed, 18 Nov 2026 14:38:11 +0800</pubDate>
+            <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v3.3.0</link>
+            <sparkle:version>119</sparkle:version>
+            <sparkle:shortVersionString>3.3.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Surge Relay 3.3.0
+
+
+- 原生材质与设计语言：重构 macOS 原生端与内置 Web 管理端视觉体系，恢复侧边栏毛玻璃材质与多级明暗自适应表面，引入 `GroupedCardStack` 消除分组卡片末行多余分割线，统一弹窗头尾框架与输入框样式。
+- 侧边栏与导航架构：优化顶部内凹搜索与紧凑操作栏，支持多工作区直接下拉切换，补齐 `⌘3` 转换工具快捷键；模块行按客户端提供专属徽标并修复双目标模块的访达定位，底部状态栏改为“空闲极简、忙碌或异常按需展开”。
+- 详情页与代码工作台：消除详情页 4 张单按钮碎片卡片与重复路径展示，统一收敛至头部操作栏与更多菜单，并将高频“模块参数”前置；分离代码编辑器与行号栏背景色阶，补齐路径与行列状态栏；模块编辑器启用实时预览卡。
+- 双栏转换与设置精简：原生端与 Web 端转换工具均升级为自适应左右双栏对照工作台；设置“发布”页将 6 张独立客户端目录卡片收敛为单卡片可展开行，Web 端同步精简眉标并保留完整移动端响应式体验。
+- 验证：通用二进制 Release 构建、固定自签名、Sparkle EdDSA 验签、Swift 核心与编辑器/Web 单元测试及全部 15 项 Web 资源/DOM 回归测试通过。
+]]></description>
+            <enclosure url="https://github.com/junchan0412/SurgeRelay-macOS/releases/download/v3.3.0/Surge-Relay-3.3.0.app.zip" length="14184765" type="application/zip" sparkle:edSignature="mvSvlAHhIQC1kiG2GduAbCc8p/T7JMzeo0BVazbE8vBYVZD4tFTfiS2cI7IrIYt8AUmUoQcZemGk3KWOeRZJAw=="/>
+        </item>
+        <item>
             <title>3.2.0</title>
             <pubDate>Fri, 13 Nov 2026 03:20:44 +0800</pubDate>
             <link>https://github.com/junchan0412/SurgeRelay-macOS/releases/tag/v3.2.0</link>

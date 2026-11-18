@@ -1,33 +1,31 @@
 import AppKit
 import SwiftUI
 
-/// Contents of the menu bar extra: quick status plus a few common actions and
-/// settings, without needing to bring the main window forward.
 struct MenuBarContent: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        Section("状态") {
+        Section("Surge Relay · \(model.workspaceName)") {
             if model.workActivity.isActive {
-                Text(workingText)
+                Label(workingText, systemImage: "arrow.triangle.2.circlepath")
             }
-            Text("最新更新：\(latestUpdateText)")
-            Text(moduleScopeText)
+            Label("上次同步：\(latestUpdateText)", systemImage: "clock")
+            Label(moduleScopeText, systemImage: "square.stack.3d.up")
             if attentionCount > 0 {
-                Text("需要处理：\(attentionCount)")
+                Label("需要处理：\(attentionCount) 项", systemImage: "exclamationmark.triangle.fill")
             }
         }
 
         Divider()
 
-        Button("更新全部模块") {
+        Button("更新全部模块", systemImage: "arrow.clockwise") {
             model.startUpdateAll()
         }
         .disabled(!model.updateAdmission.isAccepted)
 
         if model.workActivity.isActive, model.workActivity.canCancel {
-            Button(model.workCancellationRequested ? "正在取消…" : "取消当前任务") {
+            Button(model.workCancellationRequested ? "正在取消…" : "取消当前任务", systemImage: "xmark.circle") {
                 model.cancelCurrentWork()
             }
             .disabled(!model.canCancelCurrentWork)
@@ -54,12 +52,19 @@ struct MenuBarContent: View {
             model.selectedModuleID = AppModel.activitySelectionID
             activateMainWindow()
         }
+        Button("打开转换工具", systemImage: "arrow.left.arrow.right.square") {
+            model.selectedModuleID = AppModel.conversionToolsSelectionID
+            activateMainWindow()
+        }
+
+        Divider()
+
         CheckForUpdatesView()
-        Button("查看 GitHub Release 资产…") {
+        Button("查看 GitHub Release 资产…", systemImage: "shippingbox") {
             activateMainWindow()
             model.presentsUpdateChecker = true
         }
-        Button("设置…") {
+        Button("设置…", systemImage: "gearshape") {
             activateMainWindow()
             model.presentsSettings = true
         }
@@ -76,12 +81,11 @@ struct MenuBarContent: View {
 
     private var moduleScopeText: String {
         let summary = model.moduleSummary
-        return "模块：\(summary.totalCount) · 本地：\(summary.localCount) · GitHub：\(summary.githubCount)"
+        return "模块 \(summary.totalCount) · 本地 \(summary.localCount) · GitHub \(summary.githubCount)"
     }
 
     private var attentionCount: Int {
-        let summary = model.moduleSummary
-        return summary.attentionCount
+        model.moduleSummary.attentionCount
     }
 
     private var workingText: String {

@@ -91,7 +91,7 @@
     function renderHistory(animate = false) {
       const state = getState();
       const version = `${state.workspace?.historyCount || 0}:${state.workspace?.recentHistory?.[0]?.id || ''}`;
-      const content = entries => `<header class="workspace-heading"><p class="eyebrow">ACTIVITY</p><h1>活动记录</h1><p>查看待保存配置与更新、缓存回退和发布结果。</p></header><section id="pending-module-saves" class="workspace-section">${markup.pendingModuleSavesMarkup?.(getState().activity, { pendingIDs: getPendingModuleSaveIDs() }) || ''}</section><section class="workspace-section"><div class="workspace-section-heading"><h2>更新与发布记录</h2></div><div class="workspace-panel">${markup.historyMarkup?.(entries, { detailed: true }) || ''}</div></section>`;
+      const content = entries => `<header class="workspace-heading"><h1>活动记录</h1><p>查看待保存配置队列与历次更新、缓存回退和发布结果。</p></header><section id="pending-module-saves" class="workspace-section">${markup.pendingModuleSavesMarkup?.(getState().activity, { pendingIDs: getPendingModuleSaveIDs() }) || ''}</section><section class="workspace-section"><div class="workspace-section-heading"><h2>更新与发布记录</h2></div><div class="workspace-panel">${markup.historyMarkup?.(entries, { detailed: true }) || ''}</div></section>`;
       setDetailHTML(content(historyEntries.length ? historyEntries : state.workspace?.recentHistory || []), animate);
       if (historyVersion === version) return;
       historyVersion = version;

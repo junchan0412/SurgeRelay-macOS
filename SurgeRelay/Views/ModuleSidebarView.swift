@@ -4,6 +4,7 @@ import SwiftUI
 @MainActor
 struct ModuleSidebarView: View {
     @Environment(AppModel.self) private var model
+    @Environment(WorkspaceController.self) private var workspaces: WorkspaceController?
     @SceneStorage("ModuleSidebarView.collapsedSectionIDs") private var collapsedSectionIDsRaw = ""
     let sections: [ModuleSidebarSection]
     let filteredModulesAreEmpty: Bool
@@ -27,62 +28,80 @@ struct ModuleSidebarView: View {
         @Bindable var model = model
 
         VStack(spacing: 0) {
-            searchField
-                .padding(.horizontal, 14)
-                .padding(.top, 12)
-            ModuleSidebarToolbarContent(
-                isBatchSelecting: $isBatchSelecting,
-                batchSelectedModuleIDs: $batchSelectedModuleIDs,
-                isScanningLocalModules: isScanningLocalModules,
-                addModule: addModule,
-                scanLocalModules: scanLocalModules
-            )
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            Divider()
+            VStack(spacing: 8) {
+                searchField
+                ModuleSidebarToolbarContent(
+                    isBatchSelecting: $isBatchSelecting,
+                    batchSelectedModuleIDs: $batchSelectedModuleIDs,
+                    isScanningLocalModules: isScanningLocalModules,
+                    addModule: addModule,
+                    scanLocalModules: scanLocalModules
+                )
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+            .padding(.bottom, 8)
+
+            Rectangle()
+                .fill(Color.primary.opacity(0.07))
+                .frame(height: 1)
+
             List(selection: $model.selectedModuleID) {
                 workspaceNavigation
-                    .listRowInsets(EdgeInsets(top: 10, leading: 0, bottom: 0, trailing: 0))
+                    .listRowInsets(EdgeInsets(top: 6, leading: 2, bottom: 4, trailing: 2))
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
                     .selectionDisabled()
 
-                ModuleSidebarFilterBar(selection: $sidebarFilter, sortOrder: $sortOrder,
-                                       searchText: $searchText,
-                                       counts: filterCounts, resultCount: resultCount)
-                    .padding(.horizontal, 6)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 0, trailing: 0))
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-                    .selectionDisabled()
+                ModuleSidebarFilterBar(
+                    selection: $sidebarFilter,
+                    sortOrder: $sortOrder,
+                    searchText: $searchText,
+                    counts: filterCounts,
+                    resultCount: resultCount
+                )
+                .padding(.horizontal, 4)
+                .listRowInsets(EdgeInsets(top: 6, leading: 2, bottom: 2, trailing: 2))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+                .selectionDisabled()
 
                 ForEach(sections) { section in
                     moduleSection(section)
                 }
+
                 if filteredModulesAreEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(emptyStateTitle).font(.system(size: 14, weight: .semibold))
-                        Text(emptyStateDescription).font(.system(size: 13)).foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(emptyStateTitle)
+                            .font(.system(size: 13, weight: .semibold))
+                        Text(emptyStateDescription)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
                         if allModulesAreEmpty {
                             Button("添加模块", systemImage: "plus", action: addModule)
+                                .controlSize(.small)
                         } else {
-                            Button("清除筛选与搜索") { sidebarFilter = .all; searchText = "" }
+                            Button("清除筛选与搜索") {
+                                sidebarFilter = .all
+                                searchText = ""
+                            }
+                            .controlSize(.small)
                         }
-                    }.padding(.vertical, 20).listRowSeparator(.hidden)
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 16)
+                    .listRowSeparator(.hidden)
                 }
             }
             .listStyle(.sidebar)
-            .scrollContentBackground(.hidden)
             .frame(minHeight: 100)
             .accessibilityIdentifier("modules.list")
             .animation(.snappy(duration: 0.2), value: sections.map(\.id))
             .animation(.snappy(duration: 0.2), value: collapsedSectionIDsRaw)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Design.Palette.canvas)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             ModuleSidebarStatusCard()
-                .background(Design.Palette.canvas)
         }
         .clipped()
         .accessibilityElement(children: .contain)
@@ -90,58 +109,152 @@ struct ModuleSidebarView: View {
     }
 
     private var workspaceNavigation: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label(model.workspaceName, systemImage: "square.stack.3d.up")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .help("当前工作区：" + model.workspaceName)
-                .accessibilityIdentifier("workspace.current")
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 8)
-            VStack(spacing: 4) {
-                Button { model.selectedModuleID = AppModel.overviewSelectionID } label: {
-                    Label("工作台", systemImage: "square.grid.2x2")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(8)
-                        .contentShape(Rectangle())
-                        .background(model.selectedModuleID == AppModel.overviewSelectionID ? Design.Palette.accent.opacity(0.12) : .clear,
-                                    in: .rect(cornerRadius: 6))
-                }
-                .accessibilityAddTraits(model.selectedModuleID == AppModel.overviewSelectionID ? .isSelected : [])
-                .accessibilityIdentifier("navigation.overview")
-                Button { model.selectedModuleID = AppModel.activitySelectionID } label: {
-                    Label("活动记录", systemImage: "clock.arrow.circlepath")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(8)
-                        .contentShape(Rectangle())
-                        .background(model.selectedModuleID == AppModel.activitySelectionID ? Design.Palette.accent.opacity(0.12) : .clear,
-                                    in: .rect(cornerRadius: 6))
-                }
-                .accessibilityAddTraits(model.selectedModuleID == AppModel.activitySelectionID ? .isSelected : [])
-                .accessibilityIdentifier("navigation.activity")
-                Button { model.selectedModuleID = AppModel.conversionToolsSelectionID } label: {
-                    Label("转换工具", systemImage: "arrow.triangle.2.circlepath")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(8)
-                        .contentShape(Rectangle())
-                        .background(model.selectedModuleID == AppModel.conversionToolsSelectionID ? Design.Palette.accent.opacity(0.12) : .clear,
-                                    in: .rect(cornerRadius: 6))
-                }
-                .accessibilityAddTraits(model.selectedModuleID == AppModel.conversionToolsSelectionID ? .isSelected : [])
-                .accessibilityIdentifier("navigation.tools")
+        VStack(alignment: .leading, spacing: 6) {
+            workspaceSwitcherHeader
+                .padding(.horizontal, 6)
+
+            VStack(spacing: 2) {
+                sidebarNavButton(
+                    title: "工作台",
+                    systemImage: "square.grid.2x2",
+                    targetID: AppModel.overviewSelectionID,
+                    badge: model.moduleSummary.attentionCount > 0 ? "\(model.moduleSummary.attentionCount)" : nil,
+                    badgeIsWarning: true,
+                    identifier: "navigation.overview"
+                )
+                sidebarNavButton(
+                    title: "活动记录",
+                    systemImage: "clock.arrow.circlepath",
+                    targetID: AppModel.activitySelectionID,
+                    badge: !model.pendingModuleSaves.isEmpty ? "\(model.pendingModuleSaves.count)" : nil,
+                    badgeIsWarning: model.pendingModuleSaves.contains { $0.errorMessage != nil },
+                    identifier: "navigation.activity"
+                )
+                sidebarNavButton(
+                    title: "转换工具",
+                    systemImage: "arrow.left.arrow.right.square",
+                    targetID: AppModel.conversionToolsSelectionID,
+                    badge: nil,
+                    badgeIsWarning: false,
+                    identifier: "navigation.tools"
+                )
             }
-            .font(.system(size: 14, weight: .medium))
             .buttonStyle(.plain)
         }
     }
 
+    @ViewBuilder
+    private var workspaceSwitcherHeader: some View {
+        if let workspaces, workspaces.registry.workspaces.count > 1 {
+            Menu {
+                Section("切换工作区") {
+                    ForEach(workspaces.registry.workspaces) { workspace in
+                        Button {
+                            guard workspace.id != model.workspaceID else { return }
+                            Task { try? await workspaces.switchWorkspace(to: workspace.id) }
+                        } label: {
+                            Label(workspace.name, systemImage: workspace.id == model.workspaceID ? "checkmark" : "square.stack.3d.up")
+                        }
+                    }
+                }
+                Divider()
+                Button("管理工作区…") {
+                    model.settingsPage = .workspaces
+                    model.presentsSettings = true
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "square.stack.3d.up")
+                        .font(.system(size: 10, weight: .semibold))
+                    Text(model.workspaceName)
+                        .font(.system(size: 11, weight: .semibold))
+                        .lineLimit(1)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .foregroundStyle(.secondary)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .help("当前工作区：\(model.workspaceName)（点击切换）")
+            .accessibilityIdentifier("workspace.current")
+        } else {
+            Button {
+                model.settingsPage = .workspaces
+                model.presentsSettings = true
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "square.stack.3d.up")
+                        .font(.system(size: 10, weight: .semibold))
+                    Text(model.workspaceName)
+                        .font(.system(size: 11, weight: .semibold))
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+                .foregroundStyle(.secondary)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("当前工作区：\(model.workspaceName)")
+            .accessibilityIdentifier("workspace.current")
+        }
+    }
+
+    private func sidebarNavButton(
+        title: String,
+        systemImage: String,
+        targetID: UUID,
+        badge: String?,
+        badgeIsWarning: Bool,
+        identifier: String
+    ) -> some View {
+        let isSelected = model.selectedModuleID == targetID
+        return Button {
+            model.selectedModuleID = targetID
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? Design.Palette.accent : .secondary)
+                    .frame(width: 18, alignment: .center)
+                Text(title)
+                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? Design.Palette.accent : .primary)
+                Spacer(minLength: 4)
+                if let badge {
+                    Text(badge)
+                        .font(.system(size: 10, weight: .semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(badgeIsWarning ? Design.Palette.warning : .secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background(
+                            (badgeIsWarning ? Design.Palette.warning : Color.primary).opacity(0.12),
+                            in: Capsule()
+                        )
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
+            .background(
+                isSelected ? Design.Palette.accent.opacity(0.12) : .clear,
+                in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+            )
+        }
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier(identifier)
+    }
+
     private var searchField: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
             TextField("搜索模块", text: $searchText)
+                .font(.system(size: 12))
                 .textFieldStyle(.plain)
                 .onExitCommand { searchText = "" }
                 .accessibilityLabel("搜索模块")
@@ -149,6 +262,7 @@ struct ModuleSidebarView: View {
             if !searchText.isEmpty {
                 Button { searchText = "" } label: {
                     Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
@@ -157,10 +271,14 @@ struct ModuleSidebarView: View {
                 .accessibilityIdentifier("modules.clear-search")
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 6)
         .frame(maxWidth: .infinity)
-        .background(Color.primary.opacity(0.05), in: .rect(cornerRadius: 8))
+        .background(Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        }
     }
 
     private var emptyStateTitle: String {
@@ -206,7 +324,7 @@ struct ModuleSidebarView: View {
 
     @ViewBuilder
     private func moduleRow(_ module: RelayModule) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             if isBatchSelecting {
                 Toggle("", isOn: batchSelectionBinding(for: module.id))
                     .labelsHidden()
@@ -222,8 +340,13 @@ struct ModuleSidebarView: View {
         .tag(module.id)
         .accessibilityIdentifier("modules.row.\(module.id.uuidString)")
         .contextMenu {
-            ModuleSidebarContextMenu(moduleID: module.id, model: model, deleteCandidate: $deleteCandidate,
-                                     editModule: editModule, textEditModule: textEditModule)
+            ModuleSidebarContextMenu(
+                moduleID: module.id,
+                model: model,
+                deleteCandidate: $deleteCandidate,
+                editModule: editModule,
+                textEditModule: textEditModule
+            )
         }
     }
 
@@ -270,19 +393,17 @@ private struct ModuleSidebarContextMenu: View {
     var body: some View {
         if let module = model.modules.first(where: { $0.id == moduleID }) {
             let admission = model.updateAdmission(for: module)
-            Menu("编辑") {
-                Button("视图编辑") { editModule(module) }
-                    .help("在表单编辑器中修改模块来源、输出等设置")
-                Button("文本编辑") { textEditModule(module) }
-                    .help("直接编辑转换后的模块文本内容")
-            }
-            if module.storageLocation == .local {
-                Button("在访达中显示") { revealModuleInFinder(module) }
-            }
-            Button("更新") { model.startUpdate(moduleID: module.id) }
+            Button("编辑配置…") { editModule(module) }
+            Button("编辑模块内容…") { textEditModule(module) }
+            Divider()
+            Button("立即更新") { model.startUpdate(moduleID: module.id) }
                 .disabled(!admission.isAccepted)
                 .help(admission.message)
-            Button("复制模块") { try? model.duplicateModule(id: module.id) }
+            if module.hasLocalStorageTarget {
+                Button("在访达中显示") { revealModuleInFinder(module) }
+            }
+            Button("复制模块副本") { try? model.duplicateModule(id: module.id) }
+            Divider()
             Button("拷贝更新地址") { copyToPasteboard(module.updateSourceURL) }
             Button("拷贝输出路径") { copyToPasteboard(module.publishedRelativePath) }
             Divider()
@@ -314,13 +435,11 @@ private struct ModuleSidebarContextMenu: View {
         if FileManager.default.fileExists(atPath: fileURL.path) {
             NSWorkspace.shared.activateFileViewerSelecting([fileURL])
         } else if FileManager.default.fileExists(atPath: folderURL.path) {
-            // 输出文件尚未生成时，精确定位到其应处的文件夹
             NSWorkspace.shared.activateFileViewerSelecting([folderURL])
         } else {
             NSWorkspace.shared.activateFileViewerSelecting([rootURL])
         }
     }
-
 }
 
 @MainActor
@@ -333,24 +452,29 @@ private struct ModuleSidebarSectionHeader: View {
 
     var body: some View {
         Button {
-            withAnimation(.snappy(duration: 0.22, extraBounce: 0.05)) {
+            withAnimation(.snappy(duration: 0.2, extraBounce: 0.03)) {
                 toggle()
             }
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: 5) {
                 Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                    .font(.caption2.weight(.semibold))
+                    .font(.system(size: 9, weight: .bold))
                     .foregroundStyle(.tertiary)
                     .frame(width: 10)
                     .contentTransition(.symbolEffect(.replace))
-                Label("\(title) \(count)", systemImage: systemImage)
-                    .font(.caption.weight(.medium))
-                    .labelStyle(.titleAndIcon)
-                    .contentTransition(.opacity)
+                Image(systemName: systemImage)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Text(title)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Text("\(count)")
+                    .font(.system(size: 10, weight: .medium))
+                    .monospacedDigit()
+                    .foregroundStyle(.tertiary)
                 Spacer(minLength: 0)
             }
-            .foregroundStyle(.secondary)
-            .padding(.vertical, 4)
+            .padding(.vertical, 3)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -360,23 +484,25 @@ private struct ModuleSidebarSectionHeader: View {
     }
 }
 
-/// Pure value row: no AppModel observation in body reads, so bulk update progress
-/// ticks only re-render rows whose module identity/content actually changed.
 private struct ModuleRow: View {
     let module: RelayModule
     let isSelected: Bool
 
+    private var hasIssue: Bool {
+        module.localOutputError != nil || module.state == .failed || module.hasOverrideConflict || module.hasSyncConflict
+    }
+
     var body: some View {
-        HStack(spacing: 10) {
-            ModuleIconView(module: module, size: 32)
+        HStack(spacing: 9) {
+            ModuleIconView(module: module, size: 28)
             VStack(alignment: .leading, spacing: 2) {
                 Text(module.name)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 13, weight: .medium))
                     .lineLimit(1)
                     .help(module.name)
                 Text(subtitle)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11))
+                    .foregroundStyle(hasIssue && !isSelected ? Design.Palette.warning : .secondary)
                     .lineLimit(1)
                     .contentTransition(.opacity)
                     .help(subtitle)
@@ -385,31 +511,48 @@ private struct ModuleRow: View {
             ZStack {
                 if module.state == .updating {
                     ProgressView()
-                        .controlSize(.small)
+                        .controlSize(.mini)
                         .transition(.opacity.combined(with: .scale(scale: 0.85)))
-                } else {
-                    Image(systemName: module.localOutputError == nil ? module.state.systemImage : "exclamationmark.triangle")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(isSelected ? Color.primary : statusColor)
+                } else if hasIssue {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(isSelected ? Color.primary : (module.state == .failed || module.localOutputError != nil ? Design.Palette.error : Design.Palette.warning))
                         .frame(width: 14, height: 14)
                         .help(statusHelp)
-                        .transition(.opacity.combined(with: .scale(scale: 0.85)))
+                } else if module.state == .current {
+                    Circle()
+                        .fill(isSelected ? Color.primary.opacity(0.7) : Design.Palette.success)
+                        .frame(width: 6, height: 6)
+                        .help(statusHelp)
+                } else {
+                    Circle()
+                        .strokeBorder(Color.secondary.opacity(0.45), lineWidth: 1.2)
+                        .frame(width: 6, height: 6)
+                        .help(statusHelp)
                 }
             }
             .frame(width: 14, height: 14)
             .accessibilityElement()
             .accessibilityLabel("状态：\(statusHelp)")
         }
-        .padding(.vertical, 7)
+        .padding(.vertical, 4)
         .animation(.snappy(duration: 0.18), value: module.state)
     }
 
     private var subtitle: String {
-        if module.localOutputError != nil { return "本地输出需要处理 · " + module.publishedRelativePath }
-        if module.state == .failed, let failureSummary {
-            return "更新失败：\(failureSummary)"
+        if module.localOutputError != nil {
+            return "本地输出异常 · " + module.publishedRelativePath
         }
-        var parts = [module.initialSource.title, module.outputFormat.title]
+        if module.state == .failed, let failureSummary {
+            return failureSummary
+        }
+        if module.hasSyncConflict {
+            return "两端同步冲突 · " + module.outputFormat.title
+        }
+        if module.hasOverrideConflict {
+            return "上游已更新 · 保留本地编辑"
+        }
+        var parts = [module.outputFormat.title, module.initialSource.title]
         if !module.category.isEmpty { parts.append(module.category) }
         let folder = ModuleOutputFolder.normalized(module.outputFolder)
         if folder != ModuleOutputFolder.root {
@@ -427,13 +570,8 @@ private struct ModuleRow: View {
         guard module.state == .failed, let failureSummary else { return module.state.title }
         return "\(module.state.title)：\(failureSummary)"
     }
-
-    private var statusColor: Color {
-        module.localOutputError == nil ? module.state.tintColor : Design.Palette.error
-    }
 }
 
-/// 待删除模块及其处理深度。
 struct ModuleDeleteCandidate {
     let module: RelayModule
     let mode: ModuleDeletionMode

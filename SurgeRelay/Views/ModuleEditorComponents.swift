@@ -9,34 +9,35 @@ struct ModuleEditorPreviewCard: View {
     let iconSourceTitle: String
 
     var body: some View {
-        HStack(alignment: .center, spacing: 14) {
+        HStack(alignment: .center, spacing: 12) {
             DraftModuleIconPreview(
                 url: iconURL,
-                size: 54,
+                size: 42,
                 isInvalid: iconIsInvalid
             )
-            VStack(alignment: .leading, spacing: 7) {
-                Text(title)
-                    .font(.title3.weight(.semibold))
-                    .lineLimit(2)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(title)
+                        .font(.system(size: 14, weight: .semibold))
+                        .lineLimit(1)
+                    MetadataPill(iconSourceTitle, systemImage: iconIsInvalid ? "exclamationmark.triangle" : "photo", tint: iconIsInvalid ? Design.Palette.warning : nil)
+                }
                 Text(subtitle)
-                    .font(.caption)
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                    .lineLimit(1)
                 Text(publishedRelativePath)
-                    .font(.caption2.monospaced())
+                    .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
                     .textSelection(.enabled)
-                Label(iconSourceTitle, systemImage: iconIsInvalid ? "exclamationmark.triangle" : "photo")
-                    .font(.caption)
-                    .foregroundStyle(iconIsInvalid ? Design.Palette.warning : .secondary)
             }
             Spacer(minLength: 0)
         }
-        .padding(Design.Spacing.xl)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .detailCard(radius: Design.Radius.large)
+        .detailCard()
     }
 }
 
@@ -50,17 +51,14 @@ struct ModuleEditorSection<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Design.Spacing.md + 2) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.headline)
-                .padding(.leading, Design.Spacing.xxs)
-            VStack(alignment: .leading, spacing: Design.Spacing.md) {
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.leading, 2)
+            GroupedCardStack {
                 content()
             }
-            .padding(.horizontal, Design.Card.padding)
-            .padding(.vertical, Design.Card.verticalPadding)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .detailCard()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -78,19 +76,18 @@ struct ModuleEditorInfoRow<Content: View>: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: Design.Row.spacing) {
+        HStack(alignment: .center, spacing: Design.Row.spacing) {
             Image(systemName: icon)
-                .font(.callout)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Design.Palette.icon)
                 .frame(width: Design.Row.iconWidth, alignment: .center)
             Text(title)
-                .font(.callout.weight(.medium))
+                .font(.system(size: 13, weight: .medium))
                 .frame(width: Design.Row.labelWidth, alignment: .leading)
             content()
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.vertical, Design.Row.verticalPadding)
-        .rowSeparator()
     }
 }
 
@@ -119,22 +116,12 @@ struct ModuleEditorTextFieldRow: View {
     @Binding var text: String
     let prompt: String
     var accessibilityIdentifier: String? = nil
-    @FocusState private var isFocused: Bool
 
     var body: some View {
         ModuleEditorControlRow(title, icon: icon) {
             TextField(title, text: $text, prompt: Text(prompt))
                 .labelsHidden()
-                .textFieldStyle(.plain)
-                .focused($isFocused)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 6)
-                        .strokeBorder(isFocused ? Color.accentColor : Color(nsColor: .separatorColor),
-                                      lineWidth: isFocused ? 2 : 0.5)
-                }
+                .textFieldStyle(.roundedBorder)
                 .accessibilityIdentifier(accessibilityIdentifier ?? "module-editor.field.\(title)")
         }
     }
@@ -147,10 +134,13 @@ struct ModuleEditorToggleRow: View {
 
     var body: some View {
         ModuleEditorControlRow(title, icon: icon) {
-            Toggle(title, isOn: $isOn)
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .controlSize(.small)
+            HStack {
+                Spacer(minLength: 0)
+                Toggle(title, isOn: $isOn)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+            }
         }
     }
 }
@@ -162,12 +152,13 @@ struct ModuleEditorOutputPathRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: 8) {
+                HStack(alignment: .center, spacing: 8) {
                     outputPathText(fixedHorizontal: true)
+                    Spacer(minLength: 4)
                     TextCopyButton(text: relativePath)
                         .layoutPriority(1)
                 }
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 6) {
                     outputPathText(fixedHorizontal: false)
                     TextCopyButton(text: relativePath)
                 }
@@ -182,7 +173,7 @@ struct ModuleEditorOutputPathRow: View {
 
     private func outputPathText(fixedHorizontal: Bool) -> some View {
         Text(relativePath)
-            .font(.system(.caption, design: .monospaced))
+            .font(.system(size: 12, design: .monospaced))
             .foregroundStyle(.secondary)
             .textSelection(.enabled)
             .fixedSize(horizontal: fixedHorizontal, vertical: true)
@@ -208,8 +199,11 @@ struct ModuleEditorFolderPicker: View {
             .labelsHidden()
 
             Button(action: onCreateFolder) {
-                Image(systemName: "folder.badge.plus")
+                Label("新建", systemImage: "folder.badge.plus")
+                    .font(.system(size: 11, weight: .medium))
             }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
             .help("新建存放文件夹")
             .accessibilityLabel("新建存放文件夹")
         }
@@ -236,7 +230,7 @@ struct ModuleEditorStorageTargetsPicker: View {
     @Binding var storageTargets: Set<ModuleStorageLocation>
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             ForEach(ModuleStorageLocation.allCases) { location in
                 Toggle(isOn: Binding(
                     get: { storageTargets.contains(location) },
@@ -246,8 +240,10 @@ struct ModuleEditorStorageTargetsPicker: View {
                     }
                 )) {
                     Label(location.title, systemImage: location.systemImage)
+                        .font(.system(size: 12, weight: .medium))
                 }
                 .toggleStyle(.button)
+                .controlSize(.small)
                 .help(location.detail)
             }
         }
@@ -286,28 +282,28 @@ struct DraftModuleIconPreview: View {
 
     private func previewContainer<Content: View>(_ content: Content, isWarning: Bool) -> some View {
         content
-        .frame(width: size, height: size)
-        .background(Design.Palette.surface, in: iconShape)
-        .clipShape(iconShape)
-        .overlay {
-            iconShape
-                .strokeBorder(
-                    isWarning ? Design.Palette.warning.opacity(0.72) : Design.Palette.stroke,
-                    lineWidth: isWarning ? 1 : 0.5
-                )
-        }
+            .frame(width: size, height: size)
+            .background(Design.Palette.elevated, in: iconShape)
+            .clipShape(iconShape)
+            .overlay {
+                iconShape
+                    .strokeBorder(
+                        isWarning ? Design.Palette.warning.opacity(0.72) : Design.Palette.stroke,
+                        lineWidth: 1
+                    )
+            }
     }
 
     private var placeholder: some View {
-        Image(systemName: isInvalid ? "exclamationmark.triangle" : "photo")
-            .font(.system(size: size * 0.45))
-            .foregroundStyle(isInvalid ? Design.Palette.warning : Design.Palette.icon)
+        Image(systemName: isInvalid ? "exclamationmark.triangle" : "bolt.horizontal.fill")
+            .font(.system(size: size * 0.42, weight: .medium))
+            .foregroundStyle(isInvalid ? Design.Palette.warning : Design.Palette.accent.opacity(0.85))
             .frame(width: size, height: size)
     }
 
     private var warningPlaceholder: some View {
         Image(systemName: "exclamationmark.triangle")
-            .font(.system(size: size * 0.45))
+            .font(.system(size: size * 0.42, weight: .medium))
             .foregroundStyle(Design.Palette.warning)
             .frame(width: size, height: size)
     }

@@ -12,69 +12,101 @@ struct ModuleSidebarFilterBar: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Text("模块库").font(.system(size: 13, weight: .semibold))
-                Text("\(resultCount)").font(.system(size: 12)).monospacedDigit().foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 6) {
+                Text("模块库")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Text("\(resultCount)")
+                    .font(.system(size: 11, weight: .medium))
+                    .monospacedDigit()
+                    .foregroundStyle(.tertiary)
                     .accessibilityLabel("当前显示 \(resultCount) 个模块")
                 Spacer(minLength: 0)
                 filterMenu
                 sortMenu
             }
-            HStack(spacing: 5) {
-                ForEach([ModuleFilter.all, .updatable, .attention]) { filter in chip(filter) }
-            }
-            if selection != .all || hasSearchQuery {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 8) {
-                        Label(selection.title, systemImage: selection.systemImage)
-                            .lineLimit(1)
-                        Spacer(minLength: 0)
-                        Button("重置") {
-                            selection = .all
-                            searchText = ""
-                        }
-                        .buttonStyle(.borderless)
-                        .help("清除筛选与搜索，显示所有模块")
-                        .accessibilityLabel("清除筛选与搜索")
-                        .accessibilityIdentifier("modules.reset-filters")
-                    }
-                    if hasSearchQuery {
-                        Text("搜索：\(searchText)")
-                            .lineLimit(1).truncationMode(.middle)
-                            .help(searchText)
-                    }
+
+            HStack(spacing: 4) {
+                ForEach([ModuleFilter.all, .updatable, .attention]) { filter in
+                    chip(filter)
                 }
-                .font(.system(size: 12)).foregroundStyle(.secondary)
+            }
+
+            if selection != .all || hasSearchQuery {
+                HStack(spacing: 6) {
+                    Image(systemName: selection == .all ? "magnifyingglass" : selection.systemImage)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Design.Palette.accent)
+                    Text(activeFilterSummary)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer(minLength: 4)
+                    Button("重置") {
+                        selection = .all
+                        searchText = ""
+                    }
+                    .buttonStyle(.borderless)
+                    .font(.system(size: 11, weight: .medium))
+                    .help("清除筛选与搜索，显示所有模块")
+                    .accessibilityLabel("清除筛选与搜索")
+                    .accessibilityIdentifier("modules.reset-filters")
+                }
+                .padding(.top, 1)
             }
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 4)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("modules.filters")
     }
 
+    private var activeFilterSummary: String {
+        if selection != .all && hasSearchQuery {
+            return "\(selection.title) · “\(searchText)”"
+        }
+        if hasSearchQuery {
+            return "搜索：“\(searchText)”"
+        }
+        return selection.title
+    }
+
     private func chip(_ filter: ModuleFilter) -> some View {
-        Button { selection = filter } label: {
-            HStack(spacing: 4) {
+        let count = counts[filter, default: 0]
+        let isSelected = selection == filter
+        let isUrgent = filter == .attention && count > 0
+        let activeColor = isUrgent && isSelected ? Design.Palette.warning : Design.Palette.accent
+
+        let textColor: Color = isSelected ? activeColor : (isUrgent ? Design.Palette.warning : .secondary)
+        let countColor: Color = isSelected ? activeColor : (isUrgent ? Design.Palette.warning : Color.secondary.opacity(0.75))
+
+        return Button { selection = filter } label: {
+            HStack(spacing: 3) {
                 Text(filter == .attention ? "待处理" : filter.title)
-                Text("\(counts[filter, default: 0])").monospacedDigit()
+                Text("\(count)")
+                    .monospacedDigit()
+                    .foregroundStyle(countColor)
             }
-            .font(.system(size: 11, weight: selection == filter ? .semibold : .regular))
+            .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
             .lineLimit(1)
-            .foregroundStyle(selection == filter ? Design.Palette.accent : Color.secondary)
+            .foregroundStyle(textColor)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 7)
-            .background(selection == filter ? Design.Palette.accent.opacity(0.12) : Color.primary.opacity(0.035), in: .rect(cornerRadius: 7))
+            .padding(.vertical, 4)
+            .background(
+                isSelected ? activeColor.opacity(0.14) : Color.primary.opacity(0.04),
+                in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+            )
             .overlay {
-                RoundedRectangle(cornerRadius: 7)
-                    .strokeBorder(selection == filter ? Design.Palette.accent.opacity(0.6) : .clear, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(isSelected ? activeColor.opacity(0.45) : .clear, lineWidth: 1)
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help("筛选：\(filter.title)（\(counts[filter, default: 0]) 个模块）")
-        .accessibilityLabel("\(filter.title)，\(counts[filter, default: 0]) 个模块")
-        .accessibilityAddTraits(selection == filter ? .isSelected : [])
+        .help("筛选：\(filter.title)（\(count) 个模块）")
+        .accessibilityLabel("\(filter.title)，\(count) 个模块")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityIdentifier("modules.filter.\(filter.rawValue)")
     }
 
@@ -94,11 +126,16 @@ struct ModuleSidebarFilterBar: View {
                 }
             }
         } label: {
-            Image(systemName: "line.3.horizontal.decrease").frame(width: 22, height: 24)
+            Image(systemName: "line.3.horizontal.decrease.circle")
+                .font(.system(size: 12))
+                .frame(width: 20, height: 20)
                 .foregroundStyle(selection == .all ? Color.secondary : Design.Palette.accent)
         }
-        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-        .help("筛选：\(selection.title)").accessibilityLabel("筛选模块")
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("筛选：\(selection.title)")
+        .accessibilityLabel("筛选模块")
         .accessibilityValue(selection.title)
         .accessibilityIdentifier("modules.filter-menu")
     }
@@ -111,10 +148,16 @@ struct ModuleSidebarFilterBar: View {
                 }
             }
         } label: {
-            Image(systemName: "arrow.up.arrow.down").frame(width: 22, height: 24)
+            Image(systemName: "arrow.up.arrow.down")
+                .font(.system(size: 11))
+                .frame(width: 20, height: 20)
+                .foregroundStyle(sortOrder == .nameAsc ? Color.secondary : Design.Palette.accent)
         }
-        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-        .help("排序：\(sortOrder.title)").accessibilityLabel("模块排序")
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("排序：\(sortOrder.title)")
+        .accessibilityLabel("模块排序")
         .accessibilityValue(sortOrder.title)
         .accessibilityIdentifier("modules.sort-menu")
     }

@@ -9,9 +9,7 @@ struct SettingsPublishingView: View {
         SettingsForm {
             storageLocationSection
             if model.settings.publishToLocal {
-                ForEach(ModuleOutputFormat.allCases) { format in
-                    clientStorageSection(format)
-                }
+                clientDirectoriesSection
             }
             githubStorageSection
             cloudflareWorkerSection
@@ -22,48 +20,90 @@ struct SettingsPublishingView: View {
 
     private var storageLocationSection: some View {
         SettingsSection("存储位置") {
-            SettingsToggleRow("发布到本地", icon: "folder", isOn: Binding(
+            SettingsToggleRow("发布到本地", icon: "externaldrive", isOn: Binding(
                 get: { model.settings.publishToLocal },
                 set: { model.setPublishToLocal($0) }
             ))
             .accessibilityIdentifier("settings.local-publishing")
-            Text("启用的客户端使用各自的根目录，模块可选择根目录下的文件夹。默认只启用 Surge。")
-                .font(.caption).foregroundStyle(.secondary)
+            Text("启用的客户端各自维护独立模块根目录，默认仅启用 Surge。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.vertical, 6)
         }
     }
 
-    private func clientStorageSection(_ format: ModuleOutputFormat) -> some View {
-        let storage = model.settings.localStorage(for: format)
-        return SettingsSection(format.title) {
-            SettingsToggleRow("启用本地存储", icon: "folder", isOn: Binding(
-                get: { model.settings.localStorage(for: format).isEnabled },
-                set: { model.setClientLocalStorageEnabled($0, for: format) }
-            ))
-            .accessibilityIdentifier("settings.local-storage.\(format.rawValue)")
-            if storage.isEnabled {
-                SettingsControlRow("存储目录", icon: "folder") {
-                    if storage.directory.isEmpty {
-                        HStack(spacing: 10) {
-                            Text("请选择目录").font(.callout).foregroundStyle(.secondary)
-                            Button("选择…") { chooseLocalModuleDirectory(for: format) }
-                        }
-                    } else {
-                        SettingsPathSelectionControl(path: storage.directory) { chooseLocalModuleDirectory(for: format) }
-                    }
-                }
-                .accessibilityIdentifier("settings.local-directory.\(format.rawValue)")
-                if !storage.directory.isEmpty {
-                    if let diagnostics = localRootDiagnostics[format] {
-                        DisclosureGroup("目录检查") { localRootDiagnosticContent(diagnostics).padding(.top, 8) }
-                    } else {
-                        HStack(spacing: 8) {
-                            ProgressView().controlSize(.small)
-                            Text("正在检查目录…").font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                }
+    private var clientDirectoriesSection: some View {
+        SettingsSection("客户端本地目录") {
+            ForEach(ModuleOutputFormat.allCases) { format in
+                clientStorageRow(format)
             }
         }
+    }
+
+    private func clientStorageRow(_ format: ModuleOutputFormat) -> some View {
+        let storage = model.settings.localStorage(for: format)
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 10) {
+                Image(systemName: storage.isEnabled ? "folder.fill" : "folder")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(storage.isEnabled ? Design.Palette.accent : Design.Palette.icon)
+                    .frame(width: Design.Row.iconWidth)
+                Text(format.title)
+                    .font(.system(size: 13, weight: .medium))
+                if storage.isEnabled, storage.directory.isEmpty {
+                    MetadataPill("待选择目录", tint: Design.Palette.warning)
+                }
+                Spacer(minLength: 8)
+                Toggle("启用 \(format.title) 本地存储", isOn: Binding(
+                    get: { model.settings.localStorage(for: format).isEnabled },
+                    set: { model.setClientLocalStorageEnabled($0, for: format) }
+                ))
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .accessibilityIdentifier("settings.local-storage.\(format.rawValue)")
+            }
+
+            if storage.isEnabled {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        if storage.directory.isEmpty {
+                            Text("请选择此客户端的本地模块根目录")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Button("选择…") { chooseLocalModuleDirectory(for: format) }
+                                .controlSize(.small)
+                        } else {
+                            SettingsPathSelectionControl(path: storage.directory) {
+                                chooseLocalModuleDirectory(for: format)
+                            }
+                        }
+                    }
+                    .accessibilityIdentifier("settings.local-directory.\(format.rawValue)")
+
+                    if !storage.directory.isEmpty {
+                        if let diagnostics = localRootDiagnostics[format] {
+                            DisclosureGroup("目录权限与内容检查") {
+                                localRootDiagnosticContent(diagnostics)
+                                    .padding(.top, 6)
+                            }
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                        } else {
+                            HStack(spacing: 6) {
+                                ProgressView().controlSize(.mini)
+                                Text("正在检查目录…")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+                .padding(.leading, Design.Row.separatorInset)
+            }
+        }
+        .padding(.vertical, 8)
     }
 
     private var githubStorageSection: some View {
@@ -80,9 +120,9 @@ struct SettingsPublishingView: View {
                 SettingsTextFieldRow("模块根目录", icon: "folder", text: githubBinding(\.directory), prompt: "modules 或 surge/modules")
                 SettingsInfoRow("仓库类型", icon: repositoryTypeIcon) {
                     switch model.settings.github.repositoryIsPrivate {
-                    case .some(true): Label("私有", systemImage: "lock.fill")
-                    case .some(false): Label("公开", systemImage: "globe")
-                    case nil: Text("未检测").foregroundStyle(.secondary)
+                    case .some(true): Label("私有", systemImage: "lock.fill").font(.system(size: 12))
+                    case .some(false): Label("公开", systemImage: "globe").font(.system(size: 12))
+                    case nil: Text("未检测").font(.system(size: 12)).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -151,21 +191,17 @@ struct SettingsPublishingView: View {
     }
 
     private func localRootDiagnosticContent(_ diagnostics: LocalModuleRootDiagnosticSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SettingsInfoRow("根目录状态", icon: "folder") {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 12) {
                 Label(diagnostics.status, systemImage: localRootDiagnosticImage(diagnostics))
                     .foregroundStyle(localRootDiagnosticColor(diagnostics))
-                    .textSelection(.enabled)
-            }
-            SettingsInfoRow("写入权限", icon: diagnostics.isWritable ? "pencil" : "lock.fill") {
                 Label(diagnostics.isWritable ? "可写" : "不可写", systemImage: diagnostics.isWritable ? "pencil" : "lock.fill")
                     .foregroundStyle(diagnostics.isWritable ? Design.Palette.success : Design.Palette.warning)
+                Text("\(diagnostics.folderCount) 个文件夹 · \(diagnostics.moduleFileCount) 个模块文件")
+                    .foregroundStyle(.secondary)
             }
-            SettingsCopyableInfoRow(
-                "目录内容",
-                value: "\(diagnostics.folderCount) 个文件夹 · \(diagnostics.moduleFileCount) 个模块文件",
-                icon: "shippingbox"
-            )
+            .font(.system(size: 11))
+
             if let error = diagnostics.error {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
@@ -176,9 +212,11 @@ struct SettingsPublishingView: View {
                 Button("重新检查", systemImage: "arrow.clockwise") {
                     Task { await refreshLocalRootDiagnostics() }
                 }
-                Button("在 Finder 中显示", systemImage: "folder") {
+                .controlSize(.small)
+                Button("在访达中显示", systemImage: "folder") {
                     NSWorkspace.shared.open(URL(filePath: diagnostics.path, directoryHint: .isDirectory))
                 }
+                .controlSize(.small)
                 .disabled(!diagnostics.exists || !diagnostics.isDirectory)
             }
         }

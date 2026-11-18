@@ -18,12 +18,12 @@ struct SettingsForm<Content: View>: View {
             )
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 18) {
                     content()
                 }
                 .frame(width: contentWidth, alignment: .topLeading)
                 .padding(.horizontal, horizontalPadding)
-                .padding(.top, 18)
+                .padding(.top, 16)
                 .padding(.bottom, 24)
                 .frame(width: geometry.size.width, alignment: .top)
             }
@@ -43,17 +43,14 @@ struct SettingsSection<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Design.Spacing.md + 2) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.headline)
-                .padding(.leading, Design.Spacing.xxs)
-            VStack(alignment: .leading, spacing: Design.Spacing.md) {
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.leading, 2)
+            GroupedCardStack {
                 content()
             }
-            .padding(.horizontal, Design.Card.padding)
-            .padding(.vertical, Design.Card.verticalPadding)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .detailCard()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -71,20 +68,19 @@ struct SettingsInfoRow<Content: View>: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: Design.Row.spacing) {
+        HStack(alignment: .center, spacing: Design.Row.spacing) {
             Image(systemName: icon)
-                .font(.callout)
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Design.Palette.icon)
                 .frame(width: Design.Row.iconWidth, alignment: .center)
             Text(title)
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.primary)
                 .frame(width: Design.Row.labelWidth, alignment: .leading)
             content()
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.vertical, Design.Row.verticalPadding)
-        .rowSeparator()
     }
 }
 
@@ -121,12 +117,13 @@ struct SettingsCopyableValue: View {
     var body: some View {
         if let copyValue {
             ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: 8) {
+                HStack(alignment: .center, spacing: 8) {
                     SettingsValueText(value: value, monospaced: monospaced, fixedHorizontal: true)
+                    Spacer(minLength: 4)
                     TextCopyButton(text: copyValue)
                         .layoutPriority(1)
                 }
-                VStack(alignment: .leading, spacing: 7) {
+                VStack(alignment: .leading, spacing: 6) {
                     SettingsValueText(value: value, monospaced: monospaced, fixedHorizontal: false)
                     TextCopyButton(text: copyValue)
                 }
@@ -150,7 +147,7 @@ struct SettingsValueText: View {
 
     var body: some View {
         Text(value)
-            .font(monospaced ? .system(.callout, design: .monospaced) : .callout)
+            .font(monospaced ? .system(size: 12, design: .monospaced) : .system(size: 13))
             .foregroundStyle(.secondary)
             .textSelection(.enabled)
             .fixedSize(horizontal: fixedHorizontal, vertical: true)
@@ -203,13 +200,15 @@ struct SettingsPathSelectionControl: View {
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
+            HStack(alignment: .center, spacing: 8) {
                 SettingsCopyableValue(value: path, monospaced: true, copyValue: path)
                 Button("选择…", action: chooseAction)
+                    .controlSize(.small)
             }
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 6) {
                 SettingsCopyableValue(value: path, monospaced: true, copyValue: path)
                 Button("选择…", action: chooseAction)
+                    .controlSize(.small)
             }
         }
     }
@@ -276,10 +275,13 @@ struct SettingsToggleRow: View {
 
     var body: some View {
         SettingsControlRow(title, icon: icon) {
-            Toggle(title, isOn: isOn)
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .controlSize(.small)
+            HStack {
+                Spacer(minLength: 0)
+                Toggle(title, isOn: isOn)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+            }
         }
     }
 }

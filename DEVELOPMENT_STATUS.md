@@ -6,7 +6,7 @@
 
 | 项目 | 当前值 |
 | --- | --- |
-| 版本 | 3.2.0 (118) |
+| 版本 | 3.3.0 (119) |
 | macOS deployment target | 15.0 |
 | Swift | 6.0，strict concurrency complete |
 
@@ -52,9 +52,9 @@
 | Swift 测试文件（unit / UI） | 54 / 1 |
 | 源码中的 XCTest 方法 | 684 |
 | Services / Models / Views / Utilities / App-Core | 73 / 27 / 39 / 3 / 30 |
-| 应用 Swift 行数 | 31,378 |
+| 应用 Swift 行数 | 32,936 |
 | 测试 Swift 行数 | 17,670 |
-| CHANGELOG release 段落 | 118 |
+| CHANGELOG release 段落 | 119 |
 
 ## 主要维护热点
 
@@ -64,14 +64,14 @@
 | --- | --- |
 | SurgeRelay/Services/ModuleFileStore.swift | 1354 |
 | SurgeRelay/Views/ModuleCodeTextView.swift | 858 |
-| SurgeRelay/Views/ModuleDetailView.swift | 702 |
+| SurgeRelay/Views/ModuleDetailView.swift | 850 |
 | SurgeRelay/Utilities/ModuleMetadataParser.swift | 693 |
-| SurgeRelay/Views/ModulePreviewViews.swift | 587 |
+| SurgeRelay/Views/ModulePreviewViews.swift | 676 |
+| SurgeRelay/Views/ModuleSidebarView.swift | 578 |
 | SurgeRelay/Services/PersistenceStore.swift | 524 |
 | SurgeRelay/Services/LocalModuleScanner.swift | 496 |
 | SurgeRelay/AppModel+Modules.swift | 495 |
-| SurgeRelay/Models/RelayModule.swift | 486 |
-| SurgeRelay/Views/NativeQAPerformanceRecorder.swift | 482 |
+| SurgeRelay/Views/ConversionToolsView.swift | 494 |
 
 ## 当前优化顺序
 
@@ -91,7 +91,7 @@ git diff --check
 node script/generate_project_status.mjs --check
 node script/test_web_resources.mjs
 node script/test_web_dom_resources.mjs
-VERSION=3.2.0 BUILD=118 ./script/check_release_configuration.sh
+VERSION=3.3.0 BUILD=119 ./script/check_release_configuration.sh
 
 ./script/run_swift_qa.sh
 

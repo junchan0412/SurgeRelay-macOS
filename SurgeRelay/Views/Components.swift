@@ -45,8 +45,6 @@ struct ModuleIconView: View {
         .frame(width: size, height: size)
         .accessibilityHidden(true)
         .task(id: cacheIdentity) {
-            // Keep the previous image visible while reloading so sidebar rows
-            // do not flash placeholders during background status updates.
             let previousImage = cachedImage
             hasLoadedCachedImage = false
             let url = ModuleIconStore.cachedURL(for: module.id, cacheDirectory: cacheDirectory)
@@ -72,30 +70,52 @@ struct ModuleIconView: View {
             .resizable()
             .scaledToFill()
             .frame(width: size, height: size)
-            .background(Design.Palette.surface, in: iconShape)
+            .background(Design.Palette.elevated, in: iconShape)
             .clipShape(iconShape)
             .overlay {
                 iconShape
-                    .stroke(Design.Palette.stroke, lineWidth: Design.Separator.hairline)
+                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: Design.Separator.hairline)
             }
     }
 
     private var placeholder: some View {
-        Image(systemName: "shippingbox")
-            .font(.system(size: size * 0.48, weight: .regular))
-            .foregroundStyle(Design.Palette.icon)
+        Image(systemName: placeholderSymbol)
+            .font(.system(size: size * 0.44, weight: .medium))
+            .foregroundStyle(Design.Palette.accent.opacity(0.85))
             .frame(width: size, height: size)
-            .background(Design.Palette.surface, in: iconShape)
+            .background(
+                LinearGradient(
+                    colors: [
+                        Design.Palette.accent.opacity(0.14),
+                        Design.Palette.accent.opacity(0.06)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                in: iconShape
+            )
+            .overlay {
+                iconShape
+                    .strokeBorder(Design.Palette.accent.opacity(0.16), lineWidth: Design.Separator.hairline)
+            }
+    }
+
+    private var placeholderSymbol: String {
+        switch module.outputFormat {
+        case .surge: "bolt.horizontal.fill"
+        case .loon: "wind"
+        case .egern: "shield.lefthalf.filled"
+        case .quantumultX: "arrow.triangle.branch"
+        case .shadowrocket: "paperplane.fill"
+        case .stash: "shippingbox.fill"
+        }
     }
 
     private var iconShape: RoundedRectangle {
         RoundedRectangle(cornerRadius: size * ModuleIconView.cornerRadiusRatio, style: .continuous)
     }
 
-    /// Continuous-corner ratio calibrated so the transparent corner matches the
-    /// app icon artwork (SummaryIcon): at this ratio a `.continuous` rounded rect
-    /// reproduces the icon's measured corner extent (316/1024 of the side).
-    static let cornerRadiusRatio: CGFloat = 0.26
+    static let cornerRadiusRatio: CGFloat = 0.24
 }
 
 struct StatusPill: View {
@@ -107,16 +127,29 @@ struct StatusPill: View {
     }
 
     var body: some View {
-        Label(title, systemImage: state.systemImage)
-            .font(.caption)
-            .lineLimit(1)
-            .foregroundStyle(color)
-            .padding(.horizontal, Design.Spacing.md + 1)
-            .padding(.vertical, Design.Spacing.xs + 1)
-            .background(color.opacity(0.12), in: Capsule())
-            .contentTransition(.opacity)
-            .animation(.snappy(duration: 0.18), value: state)
-            .help(title)
+        HStack(spacing: 4) {
+            if state == .updating {
+                ProgressView()
+                    .controlSize(.mini)
+            } else {
+                Image(systemName: state.systemImage)
+                    .font(.system(size: 10, weight: .semibold))
+            }
+            Text(title)
+                .font(.system(size: 11, weight: .medium))
+                .lineLimit(1)
+        }
+        .foregroundStyle(color)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(color.opacity(0.11), in: Capsule())
+        .overlay {
+            Capsule()
+                .strokeBorder(color.opacity(0.22), lineWidth: Design.Separator.hairline)
+        }
+        .contentTransition(.opacity)
+        .animation(.snappy(duration: 0.18), value: state)
+        .help(title)
     }
 
     private var title: String {
@@ -171,20 +204,73 @@ struct TextCopyButton: View {
             guard !copied else { return }
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
-            withAnimation(.snappy) { copied = true }
+            withAnimation(.snappy(duration: 0.18)) { copied = true }
             Task {
-                try? await Task.sleep(for: .seconds(1.5))
-                withAnimation(.snappy) { copied = false }
+                try? await Task.sleep(for: .seconds(1.4))
+                withAnimation(.snappy(duration: 0.18)) { copied = false }
             }
         } label: {
             Label(copied ? copiedTitle : title,
-                  systemImage: copied ? "checkmark.circle.fill" : "doc.on.doc")
+                  systemImage: copied ? "checkmark" : "doc.on.doc")
+                .font(.system(size: 11, weight: .medium))
                 .contentTransition(.symbolEffect(.replace))
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
-        .tint(copied ? Design.Palette.success : Design.Palette.accent)
+        .tint(copied ? Design.Palette.success : nil)
+        .foregroundStyle(copied ? Design.Palette.success : .primary)
         .disabled(text.isEmpty)
+    }
+}
+
+struct SheetHeader<Trailing: View>: View {
+    let title: String
+    var subtitle: String? = nil
+    var systemImage: String? = nil
+    @ViewBuilder var trailing: Trailing
+
+    init(
+        _ title: String,
+        subtitle: String? = nil,
+        systemImage: String? = nil,
+        @ViewBuilder trailing: () -> Trailing = { EmptyView() }
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.systemImage = systemImage
+        self.trailing = trailing()
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Design.Palette.accent)
+                    .frame(width: 32, height: 32)
+                    .background(Design.Palette.accent.opacity(0.11), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 16, weight: .semibold))
+                if let subtitle, !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+            Spacer(minLength: 8)
+            trailing
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .background(Design.Palette.surface)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Design.Separator.color)
+                .frame(height: Design.Separator.hairline)
+        }
     }
 }
 
@@ -192,13 +278,13 @@ struct SheetActionFooter<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        HStack(spacing: Design.Spacing.lg) {
+        HStack(spacing: Design.Spacing.md) {
             content
         }
-        .padding(.horizontal, Design.Spacing.xl)
-        .padding(.vertical, Design.Spacing.md + 2)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
-        .background(Design.Palette.canvas)
+        .background(Design.Palette.surface)
         .overlay(alignment: .top) {
             Rectangle()
                 .fill(Design.Separator.color)
@@ -207,27 +293,28 @@ struct SheetActionFooter<Content: View>: View {
     }
 }
 
-// MARK: - Design system
+// MARK: - Native macOS Design System
 
-/// Shared design tokens for consistent spacing, radii, separators, and row
-/// metrics across the app. Native counterpart to the token set that already
-/// exists for the Web UI in `WebResources/app.css`, so the two front-ends share
-/// one visual language. Previously every screen hardcoded its own values, which
-/// left the Detail / Editor / Settings row families visibly out of sync.
 enum Design {
     enum Palette {
-        static let accent = adaptive(0x207566, 0x79CDBA)
-        static let canvas = adaptive(0xF2F2F2, 0x242424)
-        static let surface = adaptive(0xF8F8F8, 0x292929)
-        static let stroke = adaptive(0xDEDEDE, 0x383838)
-        static let icon = adaptive(0x62666A, 0xB2B6BA)
-        static let success = adaptive(0x28734D, 0x81CCA0)
-        static let warning = adaptive(0x9A5D13, 0xEDBE72)
-        static let error = adaptive(0xB34036, 0xF59387)
+        static let accent = adaptive(0x1A68E8, 0x5E9EFF)
+        static let canvas = adaptive(0xF5F6F8, 0x18191C)
+        static let surface = adaptive(0xFFFFFF, 0x222429)
+        static let elevated = adaptive(0xEEF0F4, 0x2A2D34)
+        static let codeBackground = adaptive(0xFAFBFC, 0x141518)
+        static let codeGutter = adaptive(0xF1F3F6, 0x1A1C20)
+        static let stroke = adaptive(0xE1E4EA, 0x31343C)
+        static let rowDivider = adaptive(0xECEEF2, 0x2B2E36)
+        static let icon = adaptive(0x646A73, 0x9CA3AF)
+        static let success = adaptive(0x15803D, 0x4ADE80)
+        static let warning = adaptive(0xB45309, 0xFBBF24)
+        static let error = adaptive(0xDC2626, 0xF87171)
 
-        static let nsCanvas = adaptiveNSColor(light: 0xF2F2F2, dark: 0x242424)
-        static let nsStroke = adaptiveNSColor(light: 0xDEDEDE, dark: 0x383838)
-        static let nsAccent = adaptiveNSColor(light: 0x207566, dark: 0x79CDBA)
+        static let nsCanvas = adaptiveNSColor(light: 0xF5F6F8, dark: 0x18191C)
+        static let nsCodeBackground = adaptiveNSColor(light: 0xFAFBFC, dark: 0x141518)
+        static let nsCodeGutter = adaptiveNSColor(light: 0xF1F3F6, dark: 0x1A1C20)
+        static let nsStroke = adaptiveNSColor(light: 0xE1E4EA, dark: 0x31343C)
+        static let nsAccent = adaptiveNSColor(light: 0x1A68E8, dark: 0x5E9EFF)
 
         private static func adaptive(_ light: UInt32, _ dark: UInt32) -> Color {
             Color(nsColor: adaptiveNSColor(light: light, dark: dark))
@@ -236,9 +323,12 @@ enum Design {
         private static func adaptiveNSColor(light: UInt32, dark: UInt32) -> NSColor {
             NSColor(name: nil) { appearance in
                 let value = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : light
-                return NSColor(srgbRed: CGFloat((value >> 16) & 0xFF) / 255,
-                               green: CGFloat((value >> 8) & 0xFF) / 255,
-                               blue: CGFloat(value & 0xFF) / 255, alpha: 1)
+                return NSColor(
+                    srgbRed: CGFloat((value >> 16) & 0xFF) / 255,
+                    green: CGFloat((value >> 8) & 0xFF) / 255,
+                    blue: CGFloat(value & 0xFF) / 255,
+                    alpha: 1
+                )
             }
         }
     }
@@ -250,43 +340,40 @@ enum Design {
         static let md: CGFloat = 8
         static let lg: CGFloat = 12
         static let xl: CGFloat = 16
-        static let xxl: CGFloat = 24
-        static let xxxl: CGFloat = 32
+        static let xxl: CGFloat = 20
+        static let xxxl: CGFloat = 28
     }
 
     enum Radius {
-        static let small: CGFloat = 8
-        static let medium: CGFloat = 10
-        static let card: CGFloat = 14
-        static let large: CGFloat = 18
+        static let small: CGFloat = 6
+        static let medium: CGFloat = 8
+        static let card: CGFloat = 10
+        static let large: CGFloat = 12
     }
 
     enum Separator {
         static let color = Design.Palette.stroke
+        static let rowColor = Design.Palette.rowDivider
         static let opacity: Double = 1
-        static let hairline: CGFloat = 0.5
+        static let hairline: CGFloat = 1
     }
 
-    /// Metrics shared by every label / value / control row (Detail, Editor,
-    /// Settings) so the three families stay pixel-consistent.
     enum Row {
-        static let labelWidth: CGFloat = 108
-        static let iconWidth: CGFloat = 20
-        static let spacing: CGFloat = 12
-        static let verticalPadding: CGFloat = 6
-        static let separatorInset: CGFloat = 32
+        static let labelWidth: CGFloat = 112
+        static let iconWidth: CGFloat = 18
+        static let spacing: CGFloat = 10
+        static let verticalPadding: CGFloat = 9
+        static let separatorInset: CGFloat = 28
     }
 
     enum Card {
-        static let padding: CGFloat = 14
-        static let verticalPadding: CGFloat = 10
+        static let padding: CGFloat = 16
+        static let verticalPadding: CGFloat = 6
         static let radius: CGFloat = Radius.card
-        static let strokeOpacity: Double = 0.18
+        static let strokeOpacity: Double = 1
     }
 }
 
-/// A single semantic mapping for status colors, replacing the scattered inline
-/// `.green` / `.orange` / `.red` used across the sidebar, detail, and settings.
 enum SemanticStatus {
     case neutral
     case info
@@ -305,33 +392,58 @@ enum SemanticStatus {
     }
 }
 
+/// Renders grouped form rows with automatic inset separators *between* items
+/// and never after the last item, matching macOS System Settings grouped cards.
+struct GroupedCardStack<Content: View>: View {
+    var dividerInset: CGFloat = Design.Row.separatorInset
+    var horizontalPadding: CGFloat = Design.Card.padding
+    var verticalPadding: CGFloat = Design.Card.verticalPadding
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        Group(subviews: content) { subviews in
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(subviews.indices, id: \.self) { index in
+                    subviews[index]
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if index < subviews.count - 1 {
+                        Rectangle()
+                            .fill(Design.Separator.rowColor)
+                            .frame(height: 1)
+                            .padding(.leading, dividerInset)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, horizontalPadding)
+        .padding(.vertical, verticalPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .detailCard()
+    }
+}
+
 extension View {
-    /// Standard card chrome: material fill, continuous corners, hairline stroke.
+    /// Crisp native macOS grouped card surface with subtle border and elevation.
     func detailCard(radius: CGFloat = Design.Card.radius) -> some View {
         background(Design.Palette.surface, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .strokeBorder(
-                        Design.Palette.stroke,
-                        lineWidth: Design.Separator.hairline
-                    )
+                    .strokeBorder(Design.Palette.stroke, lineWidth: 1)
             }
+            .shadow(color: .black.opacity(0.025), radius: 3, x: 0, y: 1)
     }
 
-    /// Standard hairline row separator, inset to align under the value column.
+    /// Kept for explicit opt-in separators where needed.
     func rowSeparator(inset: CGFloat = Design.Row.separatorInset) -> some View {
         overlay(alignment: .bottom) {
             Rectangle()
-                .fill(Design.Separator.color.opacity(Design.Separator.opacity))
-                .frame(height: Design.Separator.hairline)
+                .fill(Design.Separator.rowColor)
+                .frame(height: 1)
                 .padding(.leading, inset)
         }
     }
 }
 
-/// Compact metadata capsule (icon + text) used to summarize a module's
-/// attributes. Consolidates the four near-identical pill recipes that used to
-/// live in the summary header, combined view, editor header, and import sheet.
 struct MetadataPill: View {
     let text: String
     var systemImage: String?
@@ -344,23 +456,26 @@ struct MetadataPill: View {
     }
 
     var body: some View {
-        Group {
+        HStack(spacing: 4) {
             if let systemImage {
-                Label(text, systemImage: systemImage)
-            } else {
-                Text(text)
+                Image(systemName: systemImage)
+                    .font(.system(size: 10, weight: .semibold))
             }
+            Text(text)
+                .font(.system(size: 11, weight: .medium))
+                .lineLimit(1)
         }
-        .font(.caption)
-        .lineLimit(1)
         .foregroundStyle(tint ?? .secondary)
-        .padding(.horizontal, Design.Spacing.md)
-        .padding(.vertical, Design.Spacing.xs)
-        .background((tint ?? Color.primary).opacity(tint == nil ? 0.06 : 0.12), in: Capsule())
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(
+            tint == nil ? Design.Palette.elevated : (tint ?? .primary).opacity(0.11),
+            in: Capsule()
+        )
         .overlay {
             Capsule().strokeBorder(
-                (tint ?? Color.primary).opacity(tint == nil ? 0.08 : 0.0),
-                lineWidth: Design.Separator.hairline
+                tint == nil ? Design.Palette.stroke : (tint ?? .primary).opacity(0.22),
+                lineWidth: 1
             )
         }
     }

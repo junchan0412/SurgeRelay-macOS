@@ -9,44 +9,40 @@ struct ModuleSidebarToolbarContent: View {
     let scanLocalModules: () -> Void
 
     var body: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 12) {
+        VStack(spacing: 8) {
+            HStack(spacing: 6) {
                 addModuleButton
-                updateAllButton
-                publishAllButton
-                Spacer(minLength: 0)
-                Menu {
-                    Group {
-                        batchSelectionButton
-                        if isBatchSelecting {
-                            selectAllButton
-                            clearSelectionButton
-                        }
-                        Divider()
-                        scanLocalModulesButton
-                    }
-                    .labelStyle(.titleAndIcon)
-                } label: {
-                    Label("更多模块操作", systemImage: "ellipsis.circle")
+                Spacer(minLength: 4)
+                HStack(spacing: 4) {
+                    updateAllButton
+                    publishAllButton
+                    moreActionsMenu
                 }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .fixedSize()
-                .accessibilityIdentifier("modules.more-actions")
             }
-            .labelStyle(.iconOnly)
-            .buttonStyle(.borderless)
+
             if isBatchSelecting {
                 HStack(spacing: 8) {
                     Text("已选 \(batchSelectedModuleIDs.count) 个")
-                        .font(.caption).monospacedDigit()
+                        .font(.system(size: 11, weight: .medium))
+                        .monospacedDigit()
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("modules.selected-count")
                     Spacer(minLength: 0)
+                    Button("取消") {
+                        isBatchSelecting = false
+                        batchSelectedModuleIDs.removeAll()
+                    }
+                    .buttonStyle(.borderless)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+
                     publishSelectedButton
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)
                 }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(Design.Palette.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
             }
         }
         .accessibilityElement(children: .contain)
@@ -54,13 +50,17 @@ struct ModuleSidebarToolbarContent: View {
     }
 
     private var addModuleButton: some View {
-        Button {
-            addModule()
-        } label: {
-            Label("添加模块", systemImage: "plus")
+        Button(action: addModule) {
+            Label("添加", systemImage: "plus")
+                .font(.system(size: 12, weight: .medium))
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
+        .buttonStyle(.plain)
         .keyboardShortcut("n", modifiers: .command)
         .help("添加模块（⌘N）")
+        .accessibilityLabel("添加模块")
         .accessibilityIdentifier("modules.add")
     }
 
@@ -68,11 +68,17 @@ struct ModuleSidebarToolbarContent: View {
         Button {
             model.startUpdateAll()
         } label: {
-            Label("更新全部", systemImage: "arrow.clockwise")
+            Image(systemName: "arrow.clockwise")
+                .font(.system(size: 12, weight: .medium))
+                .frame(width: 26, height: 24)
+                .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
+        .buttonStyle(.plain)
         .keyboardShortcut("r", modifiers: .command)
         .disabled(!model.updateAdmission.isAccepted)
+        .opacity(model.updateAdmission.isAccepted ? 1 : 0.4)
         .help(model.updateAdmission.isAccepted ? "更新全部模块（⌘R）" : model.updateAdmission.message)
+        .accessibilityLabel("更新全部")
         .accessibilityIdentifier("modules.update-all")
     }
 
@@ -80,13 +86,44 @@ struct ModuleSidebarToolbarContent: View {
         Button {
             publishAllAction()
         } label: {
-            Label("发布到 GitHub", systemImage: "square.and.arrow.up")
+            Image(systemName: "square.and.arrow.up")
+                .font(.system(size: 12, weight: .medium))
+                .frame(width: 26, height: 24)
+                .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
+        .buttonStyle(.plain)
         .keyboardShortcut("p", modifiers: [.command, .shift])
         .disabled(model.isWorking)
+        .opacity(model.isWorking ? 0.4 : 1)
         .help(publishAllHelp)
         .accessibilityLabel("发布到 GitHub")
         .accessibilityIdentifier("modules.publish-all")
+    }
+
+    private var moreActionsMenu: some View {
+        Menu {
+            Group {
+                batchSelectionButton
+                if isBatchSelecting {
+                    selectAllButton
+                    clearSelectionButton
+                }
+                Divider()
+                scanLocalModulesButton
+            }
+            .labelStyle(.titleAndIcon)
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .font(.system(size: 13, weight: .medium))
+                .frame(width: 26, height: 24)
+                .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("更多操作")
+        .accessibilityLabel("更多模块操作")
+        .accessibilityIdentifier("modules.more-actions")
     }
 
     private var batchSelectionButton: some View {
@@ -94,7 +131,7 @@ struct ModuleSidebarToolbarContent: View {
             isBatchSelecting.toggle()
             if !isBatchSelecting { batchSelectedModuleIDs.removeAll() }
         } label: {
-            Label(isBatchSelecting ? "结束选择" : "多选", systemImage: isBatchSelecting ? "checkmark.circle" : "checklist")
+            Label(isBatchSelecting ? "结束选择" : "批量选择发布", systemImage: isBatchSelecting ? "checkmark.circle" : "checklist")
         }
         .disabled(model.isWorking)
         .help(isBatchSelecting ? "结束多选并清除已勾选模块" : "进入多选模式，勾选需要单独发布的模块")
@@ -112,7 +149,8 @@ struct ModuleSidebarToolbarContent: View {
                 }
             }
         } label: {
-            Label("发布所选", systemImage: "square.and.arrow.up.on.square")
+            Label("发布所选", systemImage: "arrow.up.doc")
+                .font(.system(size: 11, weight: .medium))
         }
         .disabled(
             model.isWorking ||
@@ -168,7 +206,7 @@ struct ModuleSidebarToolbarContent: View {
         Button {
             scanLocalModules()
         } label: {
-            Label("扫描本地模块", systemImage: "folder.badge.plus")
+            Label("扫描本地模块…", systemImage: "folder.badge.plus")
         }
         .disabled(model.isWorking || isScanningLocalModules)
         .help("扫描本地目录的 Surge、Loon、Quantumult X 模块及带订阅来源的 Stash 覆写，并纳入管理")
@@ -180,11 +218,12 @@ struct ModuleSidebarToolbarContent: View {
         if !model.githubPublishPlan.hasPublishableModuleSelection {
             return "当前没有 GitHub 存放的可发布模块；请编辑模块并将“模块存放”改为 GitHub"
         }
-        return "发布当前所有输出到 GitHub"
+        return "发布当前所有输出到 GitHub（⇧⌘P）"
     }
 
     private func publishAllAction() {
         guard model.settings.publishToGitHub, model.settings.github.isConfigured else {
+            model.settingsPage = .publishing
             model.presentsSettings = true
             return
         }

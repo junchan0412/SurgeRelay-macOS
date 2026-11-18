@@ -455,7 +455,7 @@ final class GutterView: NSView {
             // and draw text upright without flipping the CTM.
             let height = size.height
 
-            NSColor(Design.Palette.canvas).setFill()
+            Design.Palette.nsCodeGutter.setFill()
             NSRect(origin: .zero, size: size).fill()
 
             let origin = textView.textContainerOrigin
@@ -628,7 +628,7 @@ struct ModuleCodeTextView: NSViewRepresentable {
         )
         textView.delegate = context.coordinator
         textView.isRichText = false
-        textView.backgroundColor = NSColor(Design.Palette.canvas)
+        textView.backgroundColor = Design.Palette.nsCodeBackground
         textView.isEditable = isEditable
         textView.isSelectable = true
         textView.allowsUndo = true

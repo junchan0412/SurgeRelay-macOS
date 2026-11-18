@@ -23,7 +23,7 @@ struct ModuleDetailPaneView: View {
         Binding(
             get: { selectedTab },
             set: { newValue in
-                withAnimation(.snappy(duration: 0.22, extraBounce: 0.02)) {
+                withAnimation(.snappy(duration: 0.2, extraBounce: 0.02)) {
                     selectedTab = newValue
                     if newValue == .preview {
                         hasPresentedPreview = true
@@ -56,7 +56,11 @@ struct ModuleDetailPaneView: View {
                 detailContent(for: kind)
                     .id(kindID(kind))
             } else {
-                WorkspaceOverviewView(addModule: addModule, scanLocalModules: scanLocalModules, filterModules: filterModules)
+                WorkspaceOverviewView(
+                    addModule: addModule,
+                    scanLocalModules: scanLocalModules,
+                    filterModules: filterModules
+                )
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -65,18 +69,18 @@ struct ModuleDetailPaneView: View {
             if selectionKind != nil {
                 ToolbarItem(placement: .primaryAction) {
                     Picker("视图", selection: selectedTabBinding) {
-                        Label("概览", systemImage: "info.circle")
+                        Label("概览", systemImage: "slider.horizontal.below.rectangle")
                             .accessibilityLabel("详情")
-                            .help("查看模块详情")
+                            .help("查看模块概览与参数")
                             .tag(DetailTab.info)
                         Label("内容", systemImage: "curlybraces")
                             .accessibilityLabel("预览")
-                            .help("预览模块内容")
+                            .help("查看或编辑模块正文")
                             .tag(DetailTab.preview)
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
-                    .frame(width: 160)
+                    .frame(width: 156)
                 }
             }
             ToolbarItem(placement: .primaryAction) {
@@ -85,7 +89,7 @@ struct ModuleDetailPaneView: View {
                 } label: {
                     Label("设置", systemImage: "gearshape")
                 }
-                .help("设置")
+                .help("设置（⌘,）")
                 .accessibilityIdentifier("settings.open")
             }
         }
@@ -103,29 +107,36 @@ struct ModuleDetailPaneView: View {
         }
     }
 
+    private func openPreviewTab() {
+        selectedTabBinding.wrappedValue = .preview
+    }
+
     @ViewBuilder
     private func detailContent(for kind: SelectionKind) -> some View {
-        // Keep both panes mounted after preview has been opened so unsaved
-        // editor text survives tab switches; animate only visibility.
         ZStack {
             switch kind {
             case .module:
                 if let module = selectedModule {
-                    ModuleDetailView(module: module, onEdit: { editModule(module) })
-                        .opacity(selectedTab == .info ? 1 : 0)
-                        .offset(y: selectedTab == .info ? 0 : 6)
-                        .allowsHitTesting(selectedTab == .info)
-                        .accessibilityHidden(selectedTab != .info)
+                    ModuleDetailView(
+                        module: module,
+                        onEdit: { editModule(module) },
+                        onOpenPreview: openPreviewTab
+                    )
+                    .opacity(selectedTab == .info ? 1 : 0)
+                    .offset(y: selectedTab == .info ? 0 : 4)
+                    .allowsHitTesting(selectedTab == .info)
+                    .accessibilityHidden(selectedTab != .info)
+
                     if hasPresentedPreview {
                         ModulePreviewPane(module: module)
                             .opacity(selectedTab == .preview ? 1 : 0)
-                            .offset(y: selectedTab == .preview ? 0 : 6)
+                            .offset(y: selectedTab == .preview ? 0 : 4)
                             .allowsHitTesting(selectedTab == .preview)
                             .accessibilityHidden(selectedTab != .preview)
                     }
                 }
             }
         }
-        .animation(.snappy(duration: 0.22, extraBounce: 0.02), value: selectedTab)
+        .animation(.snappy(duration: 0.2, extraBounce: 0.02), value: selectedTab)
     }
 }

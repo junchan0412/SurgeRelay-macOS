@@ -8,35 +8,55 @@ struct ModuleTemplatesView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text("\(model.workspaceName) · 模块模板").font(.headline)
-                Spacer()
-                Button("完成") { dismiss() }.keyboardShortcut(.cancelAction)
-            }
-            Text("在模块详情中保存模板。来源地址、请求头、参数值、脚本正文和凭据不会复制到模板。")
-                .font(.caption).foregroundStyle(.secondary)
-            if model.moduleTemplates.isEmpty {
-                ContentUnavailableView("尚无模板", systemImage: "square.on.square")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                List(model.moduleTemplates) { template in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(template.name).fontWeight(.medium)
-                            Text(template.sourceFormat.title + " → " + template.outputFormat.title + (template.category.isEmpty ? "" : " · " + template.category))
-                                .font(.caption).foregroundStyle(.secondary)
+        VStack(spacing: 0) {
+            SheetHeader(
+                "\(model.workspaceName) · 模块模板",
+                subtitle: "复用格式、分类、目录与转换控制；不复制来源地址或凭据。",
+                systemImage: "square.on.square"
+            )
+
+            Group {
+                if model.moduleTemplates.isEmpty {
+                    ContentUnavailableView("尚无模板", systemImage: "square.on.square", description: Text("可在任意模块的“更多操作”菜单中将其保存为模板。"))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView {
+                        GroupedCardStack(dividerInset: 0) {
+                            ForEach(model.moduleTemplates) { template in
+                                HStack(spacing: 12) {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(template.name)
+                                            .font(.system(size: 13, weight: .semibold))
+                                        Text(template.sourceFormat.title + " → " + template.outputFormat.title + (template.category.isEmpty ? "" : " · " + template.category))
+                                            .font(.system(size: 11))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Button("从模板新建…") { selectedTemplate = template }
+                                        .buttonStyle(.borderedProminent)
+                                        .controlSize(.small)
+                                        .disabled(model.isWorking)
+                                    Button("移除", role: .destructive) { deletingTemplate = template }
+                                        .buttonStyle(.bordered)
+                                        .controlSize(.small)
+                                        .disabled(model.isWorking)
+                                }
+                                .padding(.vertical, 8)
+                            }
                         }
-                        Spacer()
-                        Button("从模板创建") { selectedTemplate = template }.disabled(model.isWorking)
-                        Button("移除", role: .destructive) { deletingTemplate = template }.disabled(model.isWorking)
+                        .padding(20)
                     }
-                    .padding(.vertical, 6)
                 }
             }
+            .background(Design.Palette.canvas)
+
+            SheetActionFooter {
+                Spacer()
+                Button("完成") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+            }
         }
-        .padding(20)
-        .frame(minWidth: 660, minHeight: 430)
+        .frame(minWidth: 640, minHeight: 420)
         .sheet(item: $selectedTemplate) { template in
             ModuleEditorView(module: nil, initialDraft: ModuleTemplatePlanner.draft(from: template)).environment(model)
         }

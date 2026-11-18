@@ -24,6 +24,7 @@ struct MainWindowCloseBehavior: NSViewRepresentable {
         func install(on candidate: NSWindow?) {
             guard let candidate, window !== candidate,
                   let closeButton = candidate.standardWindowButton(.closeButton) else { return }
+            candidate.titlebarSeparatorStyle = .line
             window = candidate
             closeButton.target = self
             closeButton.action = #selector(hideMainWindow)

@@ -33,7 +33,7 @@ struct CheckForUpdatesView: View {
     }
 
     var body: some View {
-        Button("查看更新…", action: action)
+        Button("检查软件更新…", systemImage: "arrow.down.circle", action: action)
     }
 }
 
@@ -52,37 +52,52 @@ struct CheckForUpdatesSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(spacing: 0) {
             HStack(alignment: .center, spacing: 12) {
                 Image(nsImage: NSApp.applicationIconImage)
                     .resizable()
-                    .frame(width: 48, height: 48)
-                    .cornerRadius(10)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Surge Relay 更新")
-                        .font(.title2.bold())
+                    .frame(width: 40, height: 40)
+                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Surge Relay 软件更新")
+                        .font(.system(size: 16, weight: .semibold))
                     Text("当前版本 \(currentVersion) (\(currentBuild))")
-                        .font(.caption)
+                        .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
                 }
                 Spacer()
-            }
-
-            Group {
-                switch phase {
-                case .loading:
-                    loadingView
-                case let .loaded(release):
-                    releaseView(release)
-                case let .failed(message):
-                    failureView(message)
+                Button("重新检查", systemImage: "arrow.clockwise") {
+                    Task { await refresh() }
                 }
+                .controlSize(.small)
+                .disabled(isLoading)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+            .background(Design.Palette.surface)
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(Design.Separator.color).frame(height: 1)
+            }
 
-            HStack {
-                Button("打开 Releases", systemImage: "safari") {
+            ScrollView {
+                Group {
+                    switch phase {
+                    case .loading:
+                        loadingView
+                    case let .loaded(release):
+                        releaseView(release)
+                    case let .failed(message):
+                        failureView(message)
+                    }
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .background(Design.Palette.canvas)
+
+            SheetActionFooter {
+                Button("打开 GitHub Releases", systemImage: "safari") {
                     NSWorkspace.shared.open(ReleaseUpdateChannel.latestReleaseURL)
                 }
                 Spacer()
@@ -90,33 +105,39 @@ struct CheckForUpdatesSheet: View {
                     .keyboardShortcut(.defaultAction)
             }
         }
-        .padding(24)
+        .frame(width: 560, height: 480)
         .task { await refresh() }
+    }
+
+    private var isLoading: Bool {
+        if case .loading = phase { return true }
+        return false
     }
 
     private var loadingView: some View {
         HStack(spacing: 10) {
             ProgressView().controlSize(.small)
-            Text("正在检查 GitHub Release…")
+            Text("正在读取最新 GitHub Release…")
+                .font(.system(size: 13))
                 .foregroundStyle(.secondary)
         }
-        .frame(minHeight: 180, alignment: .center)
+        .frame(maxWidth: .infinity, minHeight: 220, alignment: .center)
     }
 
     private func failureView(_ message: String) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             Label("无法读取最新版本", systemImage: "exclamationmark.triangle.fill")
                 .foregroundStyle(Design.Palette.warning)
-                .font(.headline)
+                .font(.system(size: 14, weight: .semibold))
             Text(message)
+                .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
-            Button("重新检查", systemImage: "arrow.clockwise") {
-                Task { await refresh() }
-            }
         }
-        .frame(minHeight: 180, alignment: .topLeading)
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .detailCard()
     }
 
     private func releaseView(_ release: GitHubRelease) -> some View {
@@ -124,42 +145,52 @@ struct CheckForUpdatesSheet: View {
             current: currentVersion,
             latest: release.version
         )
-        return VStack(alignment: .leading, spacing: 14) {
-            LabeledContent("最新版本") {
-                Text("\(release.version) · \(release.publishedAt.formatted(date: .abbreviated, time: .shortened))")
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-            }
-            LabeledContent("状态") {
-                Label(availability.title, systemImage: availability.systemImage)
-                    .foregroundStyle(availability.color)
-            }
+        return VStack(alignment: .leading, spacing: 16) {
+            DetailInfoSection("版本状态") {
+                DetailInfoRow(
+                    label: "最新版本",
+                    value: "\(release.version) · \(release.publishedAt.formatted(date: .abbreviated, time: .shortened))",
+                    icon: "tag"
+                )
+                HStack(spacing: Design.Row.spacing) {
+                    Image(systemName: availability.systemImage)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(availability.color)
+                        .frame(width: Design.Row.iconWidth)
+                    Text("更新状态")
+                        .font(.system(size: 13, weight: .medium))
+                        .frame(width: Design.Row.labelWidth, alignment: .leading)
+                    MetadataPill(availability.title, systemImage: availability.systemImage, tint: availability.color)
+                    Spacer()
+                }
+                .padding(.vertical, Design.Row.verticalPadding)
 
-            installationGuidanceView(release.installGuidance)
-
-            if let package = release.packageAsset {
-                HStack(spacing: 10) {
-                    Button("下载 pkg", systemImage: "shippingbox") {
-                        NSWorkspace.shared.open(package.downloadURL)
+                HStack(spacing: 8) {
+                    if let package = release.packageAsset {
+                        Button("下载安装包 (.pkg · \(package.formattedSize))", systemImage: "shippingbox") {
+                            NSWorkspace.shared.open(package.downloadURL)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
                     }
-                    .buttonStyle(.borderedProminent)
-                    Text(package.formattedSize)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    if let appZip = release.appZipAsset {
+                        Button("下载压缩包 (.app.zip)", systemImage: "arrow.down.app") {
+                            NSWorkspace.shared.open(appZip.downloadURL)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
                 }
+                .padding(.vertical, 6)
             }
 
-            if let appZip = release.appZipAsset {
-                Button("下载 app.zip", systemImage: "arrow.down.app") {
-                    NSWorkspace.shared.open(appZip.downloadURL)
-                }
+            DetailInfoSection("安装提示") {
+                installationGuidanceView(release.installGuidance)
+                    .padding(.vertical, 6)
             }
 
             if !release.installableAssets.isEmpty {
-                Divider()
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("资产完整性")
-                        .font(.headline)
+                DetailInfoSection("校验摘要") {
                     ForEach(release.installableAssets) { asset in
                         assetIntegrityRow(asset, validation: release.checksumValidation(for: asset))
                     }
@@ -167,27 +198,20 @@ struct CheckForUpdatesSheet: View {
             }
 
             if !release.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Divider()
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("发布说明")
-                        .font(.headline)
-                    ScrollView {
-                        Text(release.notesPreview)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .textSelection(.enabled)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxHeight: 150)
+                DetailInfoSection("发布说明") {
+                    Text(release.notesPreview)
+                        .font(.system(size: 12))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 6)
                 }
             }
         }
-        .frame(minHeight: 180, alignment: .topLeading)
     }
 
     private func installationGuidanceView(_ guidance: ReleaseInstallGuidance) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Text("安装建议")
-                .font(.headline)
+        VStack(alignment: .leading, spacing: 6) {
             Label(guidance.updateRecommendation, systemImage: guidance.updateSystemImage)
                 .foregroundStyle(guidance.updateNeedsAttention ? Design.Palette.warning : .secondary)
             Label(guidance.firstInstallRecommendation, systemImage: "arrow.down.app")
@@ -201,24 +225,26 @@ struct CheckForUpdatesSheet: View {
     }
 
     private func assetIntegrityRow(_ asset: GitHubReleaseAsset, validation: ReleaseAssetChecksumValidation) -> some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .center, spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(asset.name)
-                    .font(.caption.weight(.semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .textSelection(.enabled)
                 Text("\(asset.formattedSize) · \(asset.digestDisplay)")
-                    .font(.caption)
+                    .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
                     .textSelection(.enabled)
             }
             Spacer()
-            Label(
+            MetadataPill(
                 validation.title,
-                systemImage: validation.systemImage
+                systemImage: validation.systemImage,
+                tint: checksumValidationColor(validation.status)
             )
-            .font(.caption)
-            .foregroundStyle(checksumValidationColor(validation.status))
         }
+        .padding(.vertical, 6)
     }
 
     private func checksumValidationColor(_ status: ReleaseAssetChecksumStatus) -> Color {

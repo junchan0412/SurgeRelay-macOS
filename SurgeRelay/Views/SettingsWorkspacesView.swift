@@ -16,48 +16,82 @@ struct SettingsWorkspacesView: View {
     var body: some View {
         SettingsForm {
             SettingsSection("工作区") {
-                Text("每次只运行一个工作区。模块、仓库、凭据、草稿、版本历史和缓存分别保存。")
-                    .font(.caption).foregroundStyle(.secondary)
                 ForEach(workspaces.registry.workspaces) { workspace in
-                    HStack(alignment: .top, spacing: 12) {
-                        Image(systemName: workspace.id == model.workspaceID ? "checkmark.circle.fill" : "folder")
+                    HStack(alignment: .center, spacing: 12) {
+                        Image(systemName: workspace.id == model.workspaceID ? "checkmark.circle.fill" : "square.stack.3d.up")
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(workspace.id == model.workspaceID ? Design.Palette.accent : .secondary)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(workspace.name).fontWeight(.medium)
-                            Text("配置：\(workspace.configurationDirectory.path)")
-                                .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
-                            Text("缓存：\(workspace.cacheDirectory.path)")
-                                .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
-                        }
-                        Spacer()
-                        Button("重命名") { editingID = workspace.id; name = workspace.name; showsNameDialog = true }
-                            .disabled(model.isWorking || workspaces.isSwitching || migratingWorkspaceID != nil)
-                        Button(migratingWorkspaceID == workspace.id ? "正在迁移…" : "迁移…") {
-                            chooseMigrationDirectory(for: workspace)
-                        }
-                        .disabled(workspaces.isSwitching || migratingWorkspaceID != nil || model.workActivity.isActive && !model.workActivity.canCancel)
-                        .accessibilityIdentifier("workspace.migrate.\(workspace.id.uuidString.lowercased())")
-                        if workspace.id != model.workspaceID {
-                            Button("切换") {
-                                Task {
-                                    do { try await workspaces.switchWorkspace(to: workspace.id) }
-                                    catch { errorMessage = error.localizedDescription }
+                            .frame(width: 22)
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 6) {
+                                Text(workspace.name)
+                                    .font(.system(size: 13, weight: .semibold))
+                                if workspace.id == model.workspaceID {
+                                    MetadataPill("当前活跃", tint: Design.Palette.accent)
                                 }
                             }
+                            Text("配置：\(workspace.configurationDirectory.path)")
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .textSelection(.enabled)
+                            Text("缓存：\(workspace.cacheDirectory.path)")
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundStyle(.tertiary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .textSelection(.enabled)
+                        }
+                        Spacer(minLength: 8)
+                        HStack(spacing: 6) {
+                            if workspace.id != model.workspaceID {
+                                Button("切换") {
+                                    Task {
+                                        do { try await workspaces.switchWorkspace(to: workspace.id) }
+                                        catch { errorMessage = error.localizedDescription }
+                                    }
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.small)
+                                .disabled(workspaces.isSwitching || migratingWorkspaceID != nil || model.workActivity.isActive && !model.workActivity.canCancel)
+                            }
+                            Button("重命名") { editingID = workspace.id; name = workspace.name; showsNameDialog = true }
+                                .controlSize(.small)
+                                .disabled(model.isWorking || workspaces.isSwitching || migratingWorkspaceID != nil)
+                            Button(migratingWorkspaceID == workspace.id ? "迁移中…" : "迁移…") {
+                                chooseMigrationDirectory(for: workspace)
+                            }
+                            .controlSize(.small)
                             .disabled(workspaces.isSwitching || migratingWorkspaceID != nil || model.workActivity.isActive && !model.workActivity.canCancel)
+                            .accessibilityIdentifier("workspace.migrate.\(workspace.id.uuidString.lowercased())")
                         }
                     }
                     .padding(.vertical, 8)
                 }
-                Button("新建工作区…", systemImage: "plus") { editingID = nil; name = ""; showsNameDialog = true }
-                    .disabled(workspaces.isSwitching || migratingWorkspaceID != nil || model.workActivity.isActive && !model.workActivity.canCancel)
-                Text("迁移会移动工作区的配置、凭据、草稿、历史和缓存；各客户端的发布目录单独管理。")
-                    .font(.caption).foregroundStyle(.secondary)
+
+                HStack {
+                    Text("每个工作区独立保存模块、凭据、草稿与缓存。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("新建工作区…", systemImage: "plus") { editingID = nil; name = ""; showsNameDialog = true }
+                        .controlSize(.small)
+                        .disabled(workspaces.isSwitching || migratingWorkspaceID != nil || model.workActivity.isActive && !model.workActivity.canCancel)
+                }
+                .padding(.vertical, 6)
             }
+
             SettingsSection("模块模板") {
-                Text("模板仅保存格式、分类、相对输出位置和常用转换选项；创建时需要补填来源。")
-                    .font(.caption).foregroundStyle(.secondary)
-                Button("管理当前工作区的模板…") { showsTemplates = true }
+                HStack {
+                    Text("模板保存格式、分类、相对输出路径与常用转换选项，新建模块时可快速套用。")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 8)
+                    Button("管理模板…") { showsTemplates = true }
+                        .controlSize(.small)
+                }
+                .padding(.vertical, 8)
             }
         }
         .alert(editingID == nil ? "新建工作区" : "重命名工作区", isPresented: $showsNameDialog) {

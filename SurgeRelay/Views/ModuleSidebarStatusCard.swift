@@ -6,18 +6,34 @@ struct ModuleSidebarStatusCard: View {
     @State private var showsErrorDetails = false
     @State private var showsPendingSaves = false
 
+    private var hasDetailedStatus: Bool {
+        !model.pendingModuleSaves.isEmpty
+            || model.presentedError != nil
+            || model.workActivity.isActive
+            || automaticPublishText != nil
+            || (model.selectedPublishAttempt.map { !$0.retryDestinations.isEmpty } ?? false)
+            || (!model.statusMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && model.statusMessage != "准备就绪")
+    }
+
     var body: some View {
-        ViewThatFits(in: .vertical) {
-            statusContent.fixedSize(horizontal: false, vertical: true)
-            ScrollView {
-                statusContent
+        Group {
+            if hasDetailedStatus {
+                ViewThatFits(in: .vertical) {
+                    detailedStatusContent.fixedSize(horizontal: false, vertical: true)
+                    ScrollView {
+                        detailedStatusContent
+                    }
+                }
+                .frame(maxHeight: 190)
+            } else {
+                compactIdleBar
             }
         }
-        .frame(maxHeight: 190)
+        .background(.bar)
         .overlay(alignment: .top) {
             Rectangle()
-                .fill(Design.Separator.color.opacity(Design.Separator.opacity))
-                .frame(height: Design.Separator.hairline)
+                .fill(Color.primary.opacity(0.08))
+                .frame(height: 1)
         }
         .animation(.snappy(duration: 0.22), value: model.workActivity.kind)
         .animation(.snappy(duration: 0.22), value: model.workActivity.isActive)
@@ -29,75 +45,99 @@ struct ModuleSidebarStatusCard: View {
         }
         .sheet(isPresented: $showsErrorDetails) {
             if let error = model.presentedError {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text("错误详情").font(.headline)
-                        Spacer()
+                VStack(spacing: 0) {
+                    SheetHeader("错误详情", subtitle: "本次操作返回了以下错误信息", systemImage: "exclamationmark.triangle.fill") {
                         TextCopyButton(text: error, title: "复制错误")
+                    }
+                    ScrollView {
+                        Text(error)
+                            .font(.system(size: 12, design: .monospaced))
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(16)
+                    }
+                    .background(Design.Palette.codeBackground)
+
+                    SheetActionFooter {
+                        Spacer()
                         Button("关闭") { showsErrorDetails = false }
                             .keyboardShortcut(.cancelAction)
                             .accessibilityIdentifier("work.close-error-details")
                     }
-                    ScrollView {
-                        Text(error)
-                            .font(.callout)
-                            .textSelection(.enabled)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .frame(maxHeight: 300)
                 }
-                .padding(16)
-                .frame(width: 520, height: 360)
+                .frame(width: 540, height: 380)
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("work.error-detail-content")
             }
         }
     }
 
-    private var statusContent: some View {
+    private var compactIdleBar: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(model.moduleSummary.attentionCount > 0 ? Design.Palette.warning : Design.Palette.success)
+                .frame(width: 6, height: 6)
+            Text("最新更新")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 4)
+            Text(latestUpdateText)
+                .font(.system(size: 11))
+                .monospacedDigit()
+                .foregroundStyle(.tertiary)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var detailedStatusContent: some View {
         VStack(alignment: .leading, spacing: 8) {
             if !model.pendingModuleSaves.isEmpty {
                 Button {
                     showsPendingSaves = true
                 } label: {
-                    Label(pendingSaveTitle, systemImage: "list.bullet.rectangle")
-                        .font(.caption)
+                    Label(pendingSaveTitle, systemImage: "tray.full")
+                        .font(.system(size: 11, weight: .medium))
                 }
                 .buttonStyle(.borderless)
                 .accessibilityIdentifier("work.pending-saves")
-                Divider()
             }
+
             if let error = model.presentedError {
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(Design.Palette.warning)
-                        .accessibilityHidden(true)
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                        .truncationMode(.tail)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .help(error)
-                    Spacer(minLength: 4)
-                    Button {
-                        model.presentedError = nil
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.tertiary)
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Design.Palette.warning)
+                            .accessibilityHidden(true)
+                        Text(error)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .truncationMode(.tail)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .help(error)
+                        Button {
+                            model.presentedError = nil
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.tertiary)
+                        }
+                        .buttonStyle(.plain)
+                        .help("关闭错误提示")
+                        .accessibilityLabel("关闭错误提示")
+                        .accessibilityIdentifier("work.dismiss-error")
                     }
-                    .buttonStyle(.plain)
-                    .help("关闭错误提示")
-                    .accessibilityLabel("关闭错误提示")
-                    .accessibilityIdentifier("work.dismiss-error")
+                    Button("查看完整错误…") { showsErrorDetails = true }
+                        .buttonStyle(.borderless)
+                        .controlSize(.small)
+                        .font(.system(size: 11, weight: .medium))
+                        .accessibilityIdentifier("work.error-details")
                 }
-                Button("查看完整错误…") { showsErrorDetails = true }
-                    .buttonStyle(.borderless)
-                    .controlSize(.small)
-                    .accessibilityIdentifier("work.error-details")
-                .transition(.opacity)
-                Divider()
             }
 
             if !model.workActivity.isActive,
@@ -105,26 +145,27 @@ struct ModuleSidebarStatusCard: View {
                automaticPublishText == nil,
                !model.statusMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                model.statusMessage != "准备就绪" {
-                HStack(alignment: .top, spacing: 8) {
+                HStack(alignment: .top, spacing: 6) {
                     Image(systemName: "info.circle.fill")
+                        .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .accessibilityHidden(true)
                     Text(model.statusMessage)
-                        .font(.caption)
+                        .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .help(model.statusMessage)
                 }
-                Divider()
             }
 
             if let attempt = model.selectedPublishAttempt, !attempt.retryDestinations.isEmpty {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("所选模块发布结果").font(.caption.weight(.medium))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("所选模块发布结果")
+                        .font(.system(size: 11, weight: .semibold))
                     ForEach(attempt.results) { result in
                         Text("\(result.destination.title)：\(result.message)")
-                            .font(.caption2)
+                            .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                             .lineLimit(2)
                             .help(result.message)
@@ -133,30 +174,31 @@ struct ModuleSidebarStatusCard: View {
                         Task { await model.retrySelectedPublish() }
                     }
                     .buttonStyle(.borderless)
+                    .font(.system(size: 11, weight: .medium))
                     .disabled(model.isWorking)
                     .help("使用当前模块内容，只重试未完成的发布目标")
                     .accessibilityIdentifier("publish.retry-targets")
                 }
-                Divider()
             }
 
             if model.workActivity.isActive {
-                if model.workActivity.kind == .updatingModules,
-                   let name = synchronizingModuleName,
-                   model.synchronizationTotalCount > 0 {
-                    VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: 5) {
+                    if model.workActivity.kind == .updatingModules,
+                       let name = synchronizingModuleName,
+                       model.synchronizationTotalCount > 0 {
                         HStack(spacing: 8) {
                             Text(name)
                                 .lineLimit(1)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentTransition(.identity)
-                            Spacer(minLength: 4)
                             Text("\(model.synchronizationCompletedCount)/\(model.synchronizationTotalCount)")
                                 .monospacedDigit()
+                                .foregroundStyle(.secondary)
                                 .contentTransition(.numericText(value: Double(model.synchronizationCompletedCount)))
                                 .animation(.smooth(duration: 0.25), value: model.synchronizationCompletedCount)
                         }
-                        .font(.caption)
+                        .font(.system(size: 11, weight: .medium))
+
                         ProgressView(value: synchronizationProgress)
                             .progressViewStyle(.linear)
                             .controlSize(.small)
@@ -164,72 +206,77 @@ struct ModuleSidebarStatusCard: View {
                             .accessibilityLabel("模块更新进度")
                             .accessibilityValue("已完成 \(model.synchronizationCompletedCount) 个，共 \(model.synchronizationTotalCount) 个模块")
                             .accessibilityIdentifier("work.progress")
+                    } else {
+                        HStack(spacing: 6) {
+                            ProgressView()
+                                .controlSize(.small)
+                                .accessibilityHidden(true)
+                            Text(workActivityStatusText)
+                                .font(.system(size: 11, weight: .medium))
+                                .lineLimit(2)
+                                .contentTransition(.opacity)
+                        }
                     }
-                } else {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .controlSize(.small)
-                            .accessibilityHidden(true)
-                        Text(workActivityStatusText)
-                            .font(.caption)
-                            .lineLimit(2)
-                            .contentTransition(.opacity)
+
+                    if let stages = model.workActivity.activeStages, !stages.isEmpty {
+                        TimelineView(.periodic(from: .now, by: 1)) { context in
+                            let counts = WorkStage.allCases.compactMap { stage -> String? in
+                                let count = stages.filter { $0.stage == stage }.count
+                                return count == 0 ? nil : "\(stage.title) \(count)"
+                            }.joined(separator: " · ")
+                            let elapsed = stages.map { max(0, Int(context.date.timeIntervalSince($0.startedAt))) }.max() ?? 0
+                            Text("\(counts) · \(elapsed) 秒")
+                                .font(.system(size: 10))
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        .help(stages.map { "\($0.moduleName)：\($0.stage.title)" }.joined(separator: "\n"))
+                        .accessibilityIdentifier("work.stages")
+                    }
+
+                    if model.workActivity.canCancel {
+                        Button {
+                            model.cancelCurrentWork()
+                        } label: {
+                            Label(model.workCancellationRequested ? "正在取消…" : "取消当前任务", systemImage: "xmark.circle")
+                                .font(.system(size: 11))
+                        }
+                        .buttonStyle(.borderless)
+                        .controlSize(.small)
+                        .disabled(!model.canCancelCurrentWork)
+                        .accessibilityIdentifier("work.cancel")
                     }
                 }
-                if let stages = model.workActivity.activeStages, !stages.isEmpty {
-                    TimelineView(.periodic(from: .now, by: 1)) { context in
-                        let counts = WorkStage.allCases.compactMap { stage -> String? in
-                            let count = stages.filter { $0.stage == stage }.count
-                            return count == 0 ? nil : "\(stage.title) \(count)"
-                        }.joined(separator: " · ")
-                        let elapsed = stages.map { max(0, Int(context.date.timeIntervalSince($0.startedAt))) }.max() ?? 0
-                        Text("\(counts) · \(elapsed) 秒")
-                            .font(.caption2).monospacedDigit().foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                    .help(stages.map { "\($0.moduleName)：\($0.detail ?? $0.stage.title)" }.joined(separator: "\n"))
-                    .accessibilityIdentifier("work.stages")
-                }
-                if model.workActivity.canCancel {
-                    Button {
-                        model.cancelCurrentWork()
-                    } label: {
-                        Label(model.workCancellationRequested ? "正在取消…" : "取消当前任务", systemImage: "xmark.circle")
-                    }
-                    .buttonStyle(.borderless)
-                    .controlSize(.small)
-                    .disabled(!model.canCancelCurrentWork)
-                    .accessibilityIdentifier("work.cancel")
-                }
-                Divider()
             }
 
             if let automaticPublishText {
-                HStack(alignment: .top, spacing: 8) {
+                HStack(alignment: .top, spacing: 6) {
                     Image(systemName: "paperplane.circle.fill")
+                        .font(.system(size: 11))
                         .foregroundStyle(Design.Palette.accent)
                         .accessibilityHidden(true)
                     Text(automaticPublishText)
-                        .font(.caption)
+                        .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 }
-                .transition(.opacity)
-                Divider()
             }
 
-            VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 6) {
                 Text("最新更新时间")
-                    .font(.caption.weight(.medium))
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.tertiary)
+                Spacer(minLength: 4)
                 Text(latestUpdateText)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .contentTransition(.opacity)
+                    .font(.system(size: 10))
+                    .monospacedDigit()
+                    .foregroundStyle(.tertiary)
             }
             .accessibilityElement(children: .combine)
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.vertical, 9)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -268,7 +315,6 @@ struct ModuleSidebarStatusCard: View {
             1
         )
     }
-
 }
 
 private struct PendingModuleSavesView: View {
@@ -277,45 +323,57 @@ private struct PendingModuleSavesView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("待处理保存队列").font(.title2.bold())
-                Spacer()
-                Button("关闭") { dismiss() }.keyboardShortcut(.cancelAction)
-            }
-            Text("按提交顺序保存；当前任务结束后自动处理。失败项目会保留，可重试或取消。")
-                .font(.callout).foregroundStyle(.secondary)
-            if let errorMessage {
-                Text(errorMessage).font(.caption).foregroundStyle(Design.Palette.error).textSelection(.enabled)
-            }
+        VStack(spacing: 0) {
+            SheetHeader("待处理保存队列", subtitle: "按提交顺序执行；失败项目可单独重试或取消", systemImage: "tray.full")
+
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 12) {
-                    ForEach(model.pendingModuleSaves) { item in
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text(item.draft.name).font(.headline)
-                                Spacer()
-                                if item.errorMessage != nil {
-                                    Button("重试") { perform { try await model.retryPendingModuleSave(id: item.id) } }
-                                }
-                                Button("取消") { perform { try await model.cancelPendingModuleSave(id: item.id) } }
-                                    .disabled(model.activePendingModuleSaveID == item.id)
-                            }
-                            Text(item.errorMessage ?? (model.activePendingModuleSaveID == item.id ? "正在保存…" : "等待当前任务完成"))
-                                .font(.caption)
-                                .foregroundStyle(item.errorMessage == nil ? Color.secondary : Design.Palette.error)
-                                .textSelection(.enabled)
-                            Divider()
-                        }
+                VStack(alignment: .leading, spacing: 10) {
+                    if let errorMessage {
+                        Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(Design.Palette.error)
+                            .textSelection(.enabled)
                     }
                     if model.pendingModuleSaves.isEmpty {
-                        Text("所有排队保存已处理完成").foregroundStyle(.secondary)
+                        ContentUnavailableView("保存队列为空", systemImage: "checkmark.circle", description: Text("所有待保存更改已处理完毕。"))
+                            .frame(maxWidth: .infinity, minHeight: 200)
+                    } else {
+                        GroupedCardStack(dividerInset: 0) {
+                            ForEach(model.pendingModuleSaves) { item in
+                                HStack(alignment: .center, spacing: 12) {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(item.draft.name)
+                                            .font(.system(size: 13, weight: .semibold))
+                                        Text(item.errorMessage ?? (model.activePendingModuleSaveID == item.id ? "正在保存…" : "等待当前任务完成"))
+                                            .font(.caption)
+                                            .foregroundStyle(item.errorMessage == nil ? Color.secondary : Design.Palette.error)
+                                            .textSelection(.enabled)
+                                    }
+                                    Spacer()
+                                    if item.errorMessage != nil {
+                                        Button("重试") { perform { try await model.retryPendingModuleSave(id: item.id) } }
+                                            .controlSize(.small)
+                                    }
+                                    Button("取消") { perform { try await model.cancelPendingModuleSave(id: item.id) } }
+                                        .controlSize(.small)
+                                        .disabled(model.activePendingModuleSaveID == item.id)
+                                }
+                                .padding(.vertical, 8)
+                            }
+                        }
                     }
                 }
+                .padding(20)
+            }
+            .background(Design.Palette.canvas)
+
+            SheetActionFooter {
+                Spacer()
+                Button("关闭") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
             }
         }
-        .padding(24)
-        .frame(width: 560, height: 380)
+        .frame(width: 540, height: 380)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("work.pending-saves-panel")
     }

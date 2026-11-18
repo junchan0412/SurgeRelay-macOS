@@ -1,7 +1,5 @@
 import SwiftUI
 
-/// Inline, editable preview of a single module's converted result. Replaces the
-/// old preview window; lives in the detail pane's “预览” tab.
 struct ModulePreviewPane: View {
     @Environment(AppModel.self) private var model
     let module: RelayModule
@@ -41,46 +39,71 @@ struct ModulePreviewPane: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            editorTopBar
+
             if currentModule.hasOverrideConflict {
                 HStack(spacing: 10) {
-                    Label("上游内容已变化，请确认本地编辑", systemImage: "exclamationmark.triangle.fill")
+                    Label("上游内容已变化，请确认是否保留本地编辑", systemImage: "exclamationmark.triangle.fill")
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(Design.Palette.warning)
                     Spacer()
-                    Button("比较…") { showsComparison = true }
+                    Button("对比差异…") { showsComparison = true }
+                        .controlSize(.small)
                     Button("保留本地编辑") {
                         Task { await model.acceptOverrideConflict(moduleID: module.id) }
                     }
+                    .controlSize(.small)
                 }
-                .padding(10)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(Design.Palette.warning.opacity(0.09))
+                Divider()
+            }
+
+            if recoveredDraft || draftBaseHasChanged {
+                HStack(spacing: 10) {
+                    Image(systemName: "clock.badge.exclamationmark")
+                        .foregroundStyle(Design.Palette.warning)
+                    Text(draftBaseHasChanged ? "草稿基线已变化，保存前请比较并确认覆盖。" : "已恢复上次未保存的草稿。")
+                        .font(.system(size: 12))
+                    Spacer()
+                    Button("比较…") { showsDraftComparison = true }
+                        .controlSize(.small)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
                 .background(Design.Palette.warning.opacity(0.08))
                 Divider()
             }
-            if recoveredDraft || draftBaseHasChanged {
-                HStack {
-                    Text(draftBaseHasChanged ? "草稿的已保存版本发生变化，保存前请比较并确认覆盖。" : "已恢复上次未保存的草稿。")
-                        .font(.caption)
-                    Spacer()
-                    Button("比较…") { showsDraftComparison = true }
-                }
-                .padding(10)
-                .background(Design.Palette.warning.opacity(0.08))
-            }
+
             if let message = model.previewDraftPersistenceError {
                 Text("草稿尚未写入磁盘：\(message)")
                     .font(.caption)
                     .foregroundStyle(Design.Palette.warning)
-                    .padding(10)
-            }
-            if CodeTextView.usesPlainTextMode(text) {
-                Text("大文件模式：纯文本，不自动折行；查找、替换与撤销仍可用。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(10)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 6)
+                    .background(Design.Palette.warning.opacity(0.08))
             }
+
+            if CodeTextView.usesPlainTextMode(text) {
+                HStack(spacing: 6) {
+                    Image(systemName: "bolt.horizontal")
+                    Text("大文件纯文本模式：关闭自动折行与实时着色以保障流畅编辑；查找、替换与撤销正常可用。")
+                }
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 6)
+                .background(Design.Palette.elevated.opacity(0.6))
+                Divider()
+            }
+
             if editor.isFindBarPresented {
                 ModuleCodeSearchBar(controller: editor)
             }
+
             ZStack {
                 ScrollView(CodeTextView.usesPlainTextMode(text) ? [.horizontal, .vertical] : .vertical) {
                     ModuleCodeTextView(
@@ -98,11 +121,12 @@ struct ModulePreviewPane: View {
                 } action: { _, viewport in
                     editor.updateViewport(viewport)
                 }
-                .background(Design.Palette.canvas)
+                .background(Design.Palette.codeBackground)
+
                 if isLoading {
                     ProgressView("正在载入模块内容…")
                         .padding(16)
-                        .background(Design.Palette.surface, in: RoundedRectangle(cornerRadius: 8))
+                        .background(Design.Palette.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 } else if text.isEmpty, let loadErrorMessage {
                     ContentUnavailableView {
                         Label("暂时无法显示模块内容", systemImage: "doc.text.magnifyingglass")
@@ -114,29 +138,7 @@ struct ModulePreviewPane: View {
                 }
             }
 
-            Divider()
-            HStack(spacing: 12) {
-                Text(currentModule.outputFormat.title)
-                    .font(.caption).foregroundStyle(.secondary)
-                Label("第 \(cursorPosition.line) 行，第 \(cursorPosition.column) 列", systemImage: "text.cursor")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                Button("版本…") { showsVersionHistory = true }
-                ModuleCodeEditorToolbar(controller: editor)
-                Button("恢复") { confirmsRestore = true }
-                    .disabled(isWriting || isLoading)
-                if !isLoading, text != savedText {
-                    Text("有尚未写入的修改")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 0)
-                Button("保存") { write() }
-                    .keyboardShortcut("s", modifiers: .command)
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isWriting || isLoading || text == savedText)
-            }
-            .padding(12)
+            editorBottomStatusBar
         }
         .task(id: reloadToken) { await load() }
         .onChange(of: text) { _, _ in retainDraft() }
@@ -146,7 +148,9 @@ struct ModulePreviewPane: View {
         }
         .confirmationDialog("恢复转换结果？", isPresented: $confirmsRestore) {
             Button("恢复转换结果", role: .destructive) { restore() }
-        } message: { Text("当前模块的手动修改会被丢弃。") }
+        } message: {
+            Text("当前模块的手动修改会被丢弃。")
+        }
         .sheet(isPresented: $showsVersionHistory) {
             ModuleVersionHistoryView(moduleID: module.id).environment(model)
         }
@@ -170,6 +174,68 @@ struct ModulePreviewPane: View {
         .sheet(isPresented: $showsComparison) {
             OverrideComparisonView(module: currentModule)
                 .environment(model)
+        }
+    }
+
+    private var editorTopBar: some View {
+        HStack(spacing: 10) {
+            MetadataPill(currentModule.outputFormat.title, tint: Design.Palette.accent)
+            Text(currentModule.publishedRelativePath)
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            if !isLoading, text != savedText {
+                MetadataPill("未保存修改", systemImage: "circle.fill", tint: Design.Palette.warning)
+            }
+            Spacer(minLength: 4)
+            ModuleCodeEditorToolbar(controller: editor)
+            Divider().frame(height: 16)
+            TextCopyButton(text: text, title: "拷贝全文")
+            Button("版本…") { showsVersionHistory = true }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            Button("恢复默认") { confirmsRestore = true }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(isWriting || isLoading)
+            Button("保存") { write() }
+                .keyboardShortcut("s", modifiers: .command)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .disabled(isWriting || isLoading || text == savedText)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(Design.Palette.surface)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Design.Separator.color)
+                .frame(height: 1)
+        }
+    }
+
+    private var editorBottomStatusBar: some View {
+        HStack(spacing: 12) {
+            Label("第 \(cursorPosition.line) 行，第 \(cursorPosition.column) 列", systemImage: "text.cursor")
+                .font(.system(size: 11))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+            if !text.isEmpty {
+                Text(ByteCountFormatter.string(fromByteCount: Int64(text.utf8.count), countStyle: .file))
+                    .font(.system(size: 11))
+                    .monospacedDigit()
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .background(Design.Palette.surface)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Design.Separator.color)
+                .frame(height: 1)
         }
     }
 
@@ -228,7 +294,9 @@ struct ModulePreviewPane: View {
                     return
                 }
                 let writtenContent = try await model.savePreviewContent(
-                    submittedText, for: currentModule, expectedContentHash: Data(current.utf8).sha256String
+                    submittedText,
+                    for: currentModule,
+                    expectedContentHash: Data(current.utf8).sha256String
                 )
                 if text.utf16.elementsEqual(submittedText.utf16) { text = writtenContent.content }
                 savedText = writtenContent.content
@@ -282,16 +350,19 @@ private struct OverrideComparisonView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text(draftText == nil ? "上游与本地编辑" : "已保存内容与草稿").font(.headline)
-                Spacer()
-                Button("完成") { dismiss() }.keyboardShortcut(.defaultAction)
-            }
-            .padding()
-            Divider()
+            SheetHeader(
+                draftText == nil ? "上游与本地编辑对比" : "已保存版本与未保存草稿对比",
+                subtitle: module.name,
+                systemImage: "arrow.left.arrow.right"
+            )
             HSplitView {
-                comparisonColumn(draftText == nil ? "最新上游" : "当前已保存内容", text: upstream)
+                comparisonColumn(draftText == nil ? "最新上游转换结果" : "当前已保存内容", text: upstream)
                 comparisonColumn(draftText == nil ? "当前本地编辑" : "未保存草稿", text: local)
+            }
+            SheetActionFooter {
+                Spacer()
+                Button("完成") { dismiss() }
+                    .keyboardShortcut(.defaultAction)
             }
         }
         .frame(minWidth: 920, minHeight: 560)
@@ -317,7 +388,13 @@ private struct OverrideComparisonView: View {
 
     private func comparisonColumn(_ title: String, text: String) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(title).font(.caption.weight(.semibold)).padding(10)
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Design.Palette.surface)
             Divider()
             ScrollView([.horizontal, .vertical]) {
                 Text(text)
@@ -326,6 +403,7 @@ private struct OverrideComparisonView: View {
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                     .padding(12)
             }
+            .background(Design.Palette.codeBackground)
         }
     }
 }
@@ -368,34 +446,41 @@ struct ModuleTextEditorView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Text("文本编辑：\(currentModule.name) · \(currentModule.outputFormat.title)")
-                    .font(.headline)
-                    .lineLimit(1)
-                Spacer(minLength: 0)
-                Button("版本…") { showsVersionHistory = true }
-                ModuleCodeEditorToolbar(controller: editor)
-                Button("恢复") { restore() }
-                    .disabled(isWriting || isLoading)
-                Button("保存") { write() }
-                    .keyboardShortcut("s", modifiers: .command)
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isWriting || isLoading || text == savedText)
-                // 不给“完成”绑定 return：编辑器聚焦时 return 必须落到文本里换行。
-                Button("完成") { dismiss() }
-                    .keyboardShortcut("w", modifiers: .command)
+            SheetHeader(
+                currentModule.name,
+                subtitle: "\(currentModule.outputFormat.title) · \(currentModule.publishedRelativePath)",
+                systemImage: "curlybraces"
+            ) {
+                HStack(spacing: 8) {
+                    ModuleCodeEditorToolbar(controller: editor)
+                    Button("版本…") { showsVersionHistory = true }
+                        .controlSize(.small)
+                    Button("恢复默认") { restore() }
+                        .controlSize(.small)
+                        .disabled(isWriting || isLoading)
+                    Button("保存") { write() }
+                        .keyboardShortcut("s", modifiers: .command)
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                        .disabled(isWriting || isLoading || text == savedText)
+                    Button("完成") { dismiss() }
+                        .controlSize(.small)
+                        .keyboardShortcut("w", modifiers: .command)
+                }
             }
-            .padding(12)
-            Divider()
+
             if recoveredDraft || draftBaseHasChanged {
                 HStack {
                     Text(draftBaseHasChanged ? "草稿的已保存版本发生变化，保存前请比较并确认覆盖。" : "已恢复上次未保存的草稿。")
                         .font(.caption)
                     Spacer()
                     Button("比较…") { showsDraftComparison = true }
+                        .controlSize(.small)
                 }
-                .padding(10)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
                 .background(Design.Palette.warning.opacity(0.08))
+                Divider()
             }
             if let message = model.previewDraftPersistenceError {
                 Text("草稿尚未写入磁盘：\(message)")
@@ -430,7 +515,7 @@ struct ModuleTextEditorView: View {
                 } action: { _, viewport in
                     editor.updateViewport(viewport)
                 }
-                .background(Design.Palette.canvas)
+                .background(Design.Palette.codeBackground)
                 if isLoading {
                     ProgressView("正在载入模块内容…")
                         .padding(16)
@@ -450,16 +535,18 @@ struct ModuleTextEditorView: View {
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
                 if !isLoading, text != savedText {
-                    Label("有尚未写入的修改", systemImage: "square.and.pencil")
-                        .font(.caption)
-                        .foregroundStyle(Design.Palette.warning)
+                    MetadataPill("未保存修改", systemImage: "circle.fill", tint: Design.Palette.warning)
                 }
                 Spacer()
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 14)
             .padding(.vertical, 6)
+            .background(Design.Palette.surface)
+            .overlay(alignment: .top) {
+                Rectangle().fill(Design.Separator.color).frame(height: 1)
+            }
         }
-        .frame(minWidth: 680, minHeight: 480)
+        .frame(minWidth: 740, minHeight: 520)
         .task(id: reloadToken) { await load() }
         .onChange(of: text) { _, _ in retainDraft() }
         .onDisappear {
@@ -543,7 +630,9 @@ struct ModuleTextEditorView: View {
                     return
                 }
                 let writtenContent = try await model.savePreviewContent(
-                    submittedText, for: currentModule, expectedContentHash: Data(current.utf8).sha256String
+                    submittedText,
+                    for: currentModule,
+                    expectedContentHash: Data(current.utf8).sha256String
                 )
                 if text.utf16.elementsEqual(submittedText.utf16) { text = writtenContent.content }
                 savedText = writtenContent.content
@@ -577,11 +666,11 @@ struct ModuleTextEditorView: View {
             }
         }
     }
+
     private func retainDraft() {
         guard model.modules.contains(where: { $0.id == module.id }) else { return }
         guard !isLoading else { return }
         if text.utf16.elementsEqual(savedText.utf16) { model.modulePreviewDrafts.removeValue(forKey: module.id) }
         else { model.modulePreviewDrafts[module.id] = ModulePreviewDraft(text: text, savedText: savedText) }
     }
-
 }

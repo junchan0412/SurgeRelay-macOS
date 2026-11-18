@@ -1,17 +1,19 @@
 import SwiftUI
 
-/// The module list now lives directly in the sidebar of a two-column
-/// NavigationSplitView (see `ModulesView`); settings moved to a toolbar button.
+/// Root container hosting the two-column NavigationSplitView.
+/// Keeps sidebar vibrancy intact by avoiding an opaque root canvas fill.
 struct RootView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ModulesView()
-            .background(Design.Palette.canvas)
             .background(MainWindowCloseBehavior())
             .tint(Design.Palette.accent)
             .transaction { transaction in
-                if reduceMotion { transaction.animation = nil; transaction.disablesAnimations = true }
+                if reduceMotion {
+                    transaction.animation = nil
+                    transaction.disablesAnimations = true
+                }
             }
     }
 }

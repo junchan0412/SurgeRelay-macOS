@@ -16,41 +16,66 @@ struct SettingsView: View {
             List(selection: selection) {
                 Section {
                     ForEach(SettingsPage.allCases) { page in
-                        Button { model.settingsPage = page } label: {
-                            Label(page.title, systemImage: page.systemImage)
-                                .font(.system(size: 14))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.vertical, 8)
-                                .contentShape(Rectangle())
+                        let isSelected = model.settingsPage == page
+                        Button {
+                            model.settingsPage = page
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: page.systemImage)
+                                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                                    .foregroundStyle(isSelected ? Design.Palette.accent : .secondary)
+                                    .frame(width: 20, alignment: .center)
+                                Text(page.title)
+                                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                                    .foregroundStyle(isSelected ? Design.Palette.accent : .primary)
+                                Spacer(minLength: 0)
+                            }
+                            .padding(.vertical, 5)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .tag(page)
                         .accessibilityElement(children: .combine)
                         .accessibilityIdentifier("settings.tab.\(page.rawValue)")
-                        .accessibilityAddTraits(model.settingsPage == page ? .isSelected : [])
+                        .accessibilityAddTraits(isSelected ? .isSelected : [])
                     }
                 } header: {
-                    Text("设置").font(.title2.weight(.semibold)).foregroundStyle(.primary).padding(.vertical, 16)
+                    Text("设置")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 8)
+                        .padding(.bottom, 4)
                 }
             }
             .listStyle(.sidebar)
-            .scrollContentBackground(.hidden)
-            .background(Design.Palette.canvas)
-            .navigationSplitViewColumnWidth(min: 160, ideal: 180, max: 190)
+            .navigationSplitViewColumnWidth(min: 164, ideal: 184, max: 200)
         } detail: {
             VStack(alignment: .leading, spacing: 0) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(model.settingsPage.title).font(.system(size: 25, weight: .bold))
-                    Text(pageDescription).font(.system(size: 13)).foregroundStyle(.secondary)
+                HStack(spacing: 10) {
+                    Image(systemName: model.settingsPage.systemImage)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Design.Palette.accent)
+                        .frame(width: 30, height: 30)
+                        .background(Design.Palette.accent.opacity(0.11), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(model.settingsPage.title)
+                            .font(.system(size: 18, weight: .bold))
+                        Text(pageDescription)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
                 }
-                .padding(.horizontal, 24).padding(.top, 24).padding(.bottom, 4)
+                .padding(.horizontal, 22)
+                .padding(.top, 18)
+                .padding(.bottom, 8)
+
                 selectedSettingsContent
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(Design.Palette.canvas)
         }
         .navigationSplitViewStyle(.balanced)
-        .background(Design.Palette.canvas)
         .frame(minWidth: 760, minHeight: 480)
         .tint(Design.Palette.accent)
         .task {
@@ -61,26 +86,45 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showsWebQRCode) {
             if let url = model.webManagementURL, let displayURL = model.webManagementDisplayURL {
-                VStack(spacing: 18) {
-                    Text("Web 管理").font(.title2.bold())
-                    if let image = qrCodeImage(for: url.absoluteString) {
-                        Image(nsImage: image).interpolation(.none).resizable().frame(width: 240, height: 240)
+                VStack(spacing: 0) {
+                    SheetHeader("扫码打开 Web 管理", subtitle: "局域网内移动设备可扫码进入工作台", systemImage: "qrcode")
+                    VStack(spacing: 14) {
+                        if let image = qrCodeImage(for: url.absoluteString) {
+                            Image(nsImage: image)
+                                .interpolation(.none)
+                                .resizable()
+                                .frame(width: 220, height: 220)
+                                .padding(12)
+                                .background(Color.white, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        }
+                        Text(displayURL.absoluteString)
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
                     }
-                    Text(displayURL.absoluteString).font(.system(.callout, design: .monospaced)).textSelection(.enabled)
-                    Button("完成") { showsWebQRCode = false }.keyboardShortcut(.defaultAction)
-                }.padding(28).frame(minWidth: 330)
+                    .padding(24)
+                    .frame(maxWidth: .infinity)
+                    .background(Design.Palette.canvas)
+
+                    SheetActionFooter {
+                        Spacer()
+                        Button("完成") { showsWebQRCode = false }
+                            .keyboardShortcut(.defaultAction)
+                    }
+                }
+                .frame(minWidth: 340)
             }
         }
     }
 
     private var pageDescription: String {
         switch model.settingsPage {
-        case .general: "配置自动更新与启动行为。"
-        case .workspaces: "在独立工作区之间切换，并复用模块设置。"
-        case .publishing: "选择输出目录，连接 GitHub，管理稳定订阅地址。"
-        case .credentials: "管理保存在本机加密文件中的访问凭据。"
-        case .webManagement: "通过浏览器管理模块，按需开启访问。"
-        case .diagnostics: "检查运行环境、来源目录与服务状态。"
+        case .general: "配置外观、自动同步与内置引擎更新。"
+        case .workspaces: "管理独立工作区、目录迁移与可复用模板。"
+        case .publishing: "管理各客户端本地目录与 GitHub 仓库分发。"
+        case .credentials: "管理保存在本机 AES-256-GCM 加密文件中的令牌。"
+        case .webManagement: "开启本地或局域网浏览器远程管理界面。"
+        case .diagnostics: "查看签名状态、运行环境自检与崩溃报告。"
         }
     }
 

@@ -60,14 +60,24 @@
       const advanced = isRuleSet()
         ? `${field('includeKeywords', '释放注释关键字', { placeholder: '多项使用 + 分隔' })}${field('excludeKeywords', '删除关键字', { placeholder: '多项使用 + 分隔' })}${toggle('noResolve', '添加 no-resolve')}${field('sni', 'SNI')}`
         : `${toggle('compatibilityOnly', '仅转换兼容性')}${canWrap() ? toggle('wrapResponse', '响应脚本封装') : ''}${field('prependScript', '脚本前置代码', { multiline: true })}`;
-      ui.detail.innerHTML = `<div class="detail-stage"><header class="workspace-heading"><p class="eyebrow">CONVERT</p><h1>转换工具</h1><p>把规则或脚本转换为所选客户端的文件，直接复制或下载结果。</p></header>
+      ui.detail.innerHTML = `<div class="detail-stage"><header class="workspace-heading"><h1>转换工具</h1><p>单次转换规则集或独立脚本，直接对比输入与目标客户端产物。</p></header>
         <form id="conversion-tool-form" class="conversion-tool-form">
-          <section class="workspace-panel tool-panel"><div class="tool-field-grid">${select('kind', '转换类型', [['ruleSet', '规则集'], ['script', '脚本']])}${select('outputFormat', '输出客户端', outputFormats.map(item => [item.id, item.title]))}${sourceClient}${ruleOptions}${field('outputName', '输出文件名', { placeholder: 'Converted' })}</div></section>
-          <section class="workspace-panel tool-panel">${field('sourceURL', '来源地址', { placeholder: 'HTTP/HTTPS 或本地文件地址' })}${field('sourceText', '或直接粘贴内容', { multiline: true, placeholder: isRuleSet() ? 'DOMAIN-SUFFIX,example.com' : '粘贴 JavaScript' })}</section>
+          <section class="workspace-panel tool-panel"><div class="tool-field-grid">${select('kind', '转换类型', [['ruleSet', '规则集'], ['script', '脚本']])}${sourceClient}${select('outputFormat', '输出客户端', outputFormats.map(item => [item.id, item.title]))}${ruleOptions}${field('outputName', '输出文件名', { placeholder: 'Converted' })}</div></section>
           <details class="workspace-panel tool-panel"><summary>高级转换选项</summary><div class="tool-field-grid">${advanced}</div>${field('requestHeaders', '来源请求 Header', { multiline: true, placeholder: 'User-Agent: Script-Hub' })}${field('evalScriptOriginal', '转换前处理代码', { multiline: true })}${field('evalScriptModified', '转换后处理代码', { multiline: true })}<div class="tool-field-grid">${field('evalURLOriginal', '转换前处理代码 URL')}${field('evalURLModified', '转换后处理代码 URL')}</div></details>
-          <div class="operation-buttons"><button type="submit" class="button primary" id="tool-convert">转换</button><button type="button" class="button" data-tool-action="cancel" id="tool-cancel" hidden>取消转换</button><span id="tool-status" role="status"></span></div>
-          <p id="tool-error" class="tool-error" role="alert" hidden></p>
-        </form><section id="tool-result" class="workspace-panel tool-panel" hidden></section></div>`;
+          <div class="tool-workbench-grid">
+            <section class="workspace-panel tool-panel">
+              <div class="workspace-section-heading"><h2>输入来源</h2></div>
+              ${field('sourceURL', '来源地址', { placeholder: 'HTTP/HTTPS 或本地文件地址' })}
+              ${field('sourceText', '或直接粘贴内容', { multiline: true, placeholder: isRuleSet() ? 'DOMAIN-SUFFIX,example.com' : '粘贴 JavaScript' })}
+              <div class="operation-buttons"><button type="submit" class="button primary" id="tool-convert">执行转换</button><button type="button" class="button" data-tool-action="cancel" id="tool-cancel" hidden>取消转换</button><span id="tool-status" role="status"></span></div>
+              <p id="tool-error" class="tool-error" role="alert" hidden></p>
+            </section>
+            <div class="tool-output-column">
+              <section id="tool-result" class="workspace-panel tool-panel" hidden></section>
+              <div id="tool-placeholder" class="tool-placeholder"><div><strong>等待转换输出</strong><p>在左侧填写来源地址或粘贴规则/脚本内容，点击“执行转换”生成结果。</p></div></div>
+            </div>
+          </div>
+        </form></div>`;
       patchStatus();
     }
 
@@ -83,6 +93,8 @@
       if (status) status.textContent = entry.pending ? activity.cancellationRequested ? '正在取消…' : '正在转换…' : activity.isWorking ? activity.title || '当前任务正在运行，请完成后再转换。' : '';
       const error = ui.detail.querySelector('#tool-error');
       if (error) { error.textContent = entry.error; error.hidden = !entry.error; }
+      const placeholder = ui.detail.querySelector('#tool-placeholder');
+      if (placeholder) placeholder.hidden = Boolean(entry.result);
       const result = ui.detail.querySelector('#tool-result');
       if (result) {
         result.hidden = !entry.result;

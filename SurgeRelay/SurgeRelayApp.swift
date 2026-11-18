@@ -61,6 +61,8 @@ struct SurgeRelayApp: App {
                     .keyboardShortcut("1", modifiers: .command)
                 Button("显示活动记录") { model.selectedModuleID = AppModel.activitySelectionID }
                     .keyboardShortcut("2", modifiers: .command)
+                Button("显示转换工具") { model.selectedModuleID = AppModel.conversionToolsSelectionID }
+                    .keyboardShortcut("3", modifiers: .command)
                 Button("更新全部模块") {
                     model.startUpdateAll()
                 }

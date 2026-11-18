@@ -1,10 +1,5 @@
 import SwiftUI
 
-/// 模块文本编辑器的查找 / 替换 / 跳转栏。
-///
-/// 这里刻意用 SwiftUI 实现而不是 `NSTextView` 自带的 find bar：编辑器为了绕开
-/// SwiftUI 承载 `NSScrollView` 的合成缺陷没有放进 `NSScrollView`，而系统 find bar
-/// 必须依附 `NSScrollView` 才能显示。
 struct ModuleCodeSearchBar: View {
     @Bindable var controller: ModuleCodeEditorController
     @FocusState private var focusedField: ModuleCodeEditorFocusTarget?
@@ -15,10 +10,14 @@ struct ModuleCodeSearchBar: View {
             if controller.showsReplaceRow { replaceRow }
             if controller.showsGoToLineRow { goToLineRow }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 14)
         .padding(.vertical, 8)
-        .background(Design.Palette.canvas)
-        .overlay(alignment: .bottom) { Divider() }
+        .background(Design.Palette.surface)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Design.Separator.color)
+                .frame(height: 1)
+        }
         .onChange(of: controller.focusTarget) { _, target in
             guard let target else { return }
             focusedField = target
@@ -31,18 +30,20 @@ struct ModuleCodeSearchBar: View {
     }
 
     private var findRow: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
+                .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
             TextField("查找", text: $controller.findText)
                 .textFieldStyle(.roundedBorder)
                 .focused($focusedField, equals: .find)
                 .onSubmit { controller.find(forward: true) }
-                .frame(minWidth: 140)
+                .frame(minWidth: 160, maxWidth: 280)
                 .accessibilityIdentifier("moduleCodeFindField")
             Text(controller.matchSummary)
-                .font(.caption.monospacedDigit())
+                .font(.system(size: 11))
+                .monospacedDigit()
                 .foregroundStyle(controller.hasInvalidRegularExpression ? Design.Palette.warning : .secondary)
                 .frame(minWidth: 84, alignment: .leading)
                 .help("查找最多高亮前 5,000 处；全部替换会处理整篇文档。")
@@ -89,9 +90,10 @@ struct ModuleCodeSearchBar: View {
             Button {
                 controller.dismissFindBar()
             } label: {
-                Image(systemName: "xmark")
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
             }
-            .help("关闭查找栏（esc）")
+            .help("关闭查找栏（Esc）")
             .accessibilityLabel("关闭查找栏")
         }
         .buttonStyle(.borderless)
@@ -99,19 +101,22 @@ struct ModuleCodeSearchBar: View {
     }
 
     private var replaceRow: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Image(systemName: "arrow.2.squarepath")
+                .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
             TextField("替换为", text: $controller.replacementText)
                 .textFieldStyle(.roundedBorder)
                 .focused($focusedField, equals: .replace)
                 .onSubmit { controller.replaceCurrent() }
-                .frame(minWidth: 140)
+                .frame(minWidth: 160, maxWidth: 280)
                 .accessibilityIdentifier("moduleCodeReplaceField")
             Button("替换") { controller.replaceCurrent() }
+                .buttonStyle(.bordered)
                 .disabled(controller.findText.isEmpty || controller.hasInvalidRegularExpression || controller.isReplacingAll)
             Button("全部替换") { controller.replaceAll() }
+                .buttonStyle(.bordered)
                 .disabled(controller.findText.isEmpty || controller.hasInvalidRegularExpression || controller.isReplacingAll)
             if let summary = controller.replaceAllSummary {
                 Text(summary)
@@ -124,8 +129,9 @@ struct ModuleCodeSearchBar: View {
     }
 
     private var goToLineRow: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Image(systemName: "number")
+                .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
             TextField("行号", text: $controller.lineInput)
@@ -135,6 +141,7 @@ struct ModuleCodeSearchBar: View {
                 .frame(width: 96)
                 .accessibilityIdentifier("moduleCodeGoToLineField")
             Button("跳转") { controller.goToLine() }
+                .buttonStyle(.bordered)
                 .disabled(controller.lineInput.trimmingCharacters(in: .whitespaces).isEmpty)
             Text("共 \(controller.lineCount) 行")
                 .font(.caption.monospacedDigit())
@@ -145,32 +152,36 @@ struct ModuleCodeSearchBar: View {
     }
 }
 
-/// 编辑器常用命令的紧凑按钮组，让撤销、重做和查找在界面上可见而不只依赖快捷键。
 struct ModuleCodeEditorToolbar: View {
     let controller: ModuleCodeEditorController
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 2) {
             Button {
                 controller.undo()
             } label: {
                 Image(systemName: "arrow.uturn.backward")
+                    .frame(width: 24, height: 22)
             }
             .help("撤销（⌘Z）")
             .disabled(!controller.canUndo)
             .accessibilityIdentifier("moduleCodeUndoButton")
+
             Button {
                 controller.redo()
             } label: {
                 Image(systemName: "arrow.uturn.forward")
+                    .frame(width: 24, height: 22)
             }
             .help("重做（⇧⌘Z）")
             .disabled(!controller.canRedo)
             .accessibilityIdentifier("moduleCodeRedoButton")
+
             Button {
                 controller.presentFind()
             } label: {
                 Image(systemName: "magnifyingglass")
+                    .frame(width: 24, height: 22)
             }
             .help("查找与替换（⌘F）")
             .accessibilityIdentifier("moduleCodeFindButton")

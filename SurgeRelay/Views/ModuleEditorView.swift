@@ -49,40 +49,40 @@ struct ModuleEditorView: View {
             initialValue: initialDraft ?? module.map(ModuleDraft.init(module:))
                 ?? ModuleDraft(defaultStorageLocation: defaultStorageLocation)
         )
-        _isAdvancedExpanded = State(initialValue: initialDraft.map { $0.scriptHubOptions != ScriptHubOptions() }
-                                   ?? module.map { $0.scriptHubOptions != ScriptHubOptions() } ?? false)
+        _isAdvancedExpanded = State(
+            initialValue: initialDraft.map { $0.scriptHubOptions != ScriptHubOptions() }
+                ?? module.map { $0.scriptHubOptions != ScriptHubOptions() } ?? false
+        )
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(module == nil ? "添加模块" : "编辑模块").font(.title2.bold())
-                    Text("更新地址可以随时修改，已发布的稳定地址不会改变。")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer()
-            }
-            .padding(24)
-
-            Divider()
+            SheetHeader(
+                module == nil ? "添加模块" : "编辑模块",
+                subtitle: "更新地址可随时调整；输出相对路径与稳定订阅地址保持不变。",
+                systemImage: module == nil ? "plus.square.on.square" : "slider.horizontal.3"
+            )
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
+                    editorPreviewCard
                     sourceSection
                     basicInfoSection
                     publishingSection
                     refreshPolicySection
-                    DisclosureGroup("图标与显示") { iconSection.padding(.top, 12) }
-                        .font(.system(size: 14, weight: .medium))
+                    DisclosureGroup("自定义图标") {
+                        iconSection.padding(.top, 10)
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
                     advancedEditorSection
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 20)
-                .padding(.bottom, 30)
+                .padding(.horizontal, 22)
+                .padding(.vertical, 18)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             }
             .scrollIndicators(.visible)
+            .background(Design.Palette.canvas)
             .task(id: [draft.outputFormat.rawValue] + draft.storageTargets.map(\.rawValue).sorted()) {
                 await model.refreshModuleOutputFolders(preserving: draft.outputFolder, outputFormat: draft.outputFormat)
             }
@@ -100,7 +100,7 @@ struct ModuleEditorView: View {
                     .accessibilityIdentifier("module-editor.save")
             }
         }
-        .frame(width: 680, height: 720)
+        .frame(width: 680, height: 700)
         .background(Design.Palette.canvas)
         .disabled(isSubmitting)
         .interactiveDismissDisabled(isSubmitting)
@@ -216,7 +216,6 @@ struct ModuleEditorView: View {
         ModuleEditorPublishingSection(
             outputFileName: $draft.outputFileName,
             outputFormat: $draft.outputFormat,
-
             publishedRelativePath: previewPublishedRelativePath,
             outputPathNotice: outputPathNotice
         )
@@ -238,12 +237,14 @@ struct ModuleEditorView: View {
                     }
                 }
                 .labelsHidden()
+                .frame(maxWidth: 240, alignment: .leading)
                 .accessibilityIdentifier("module-editor.refresh-interval")
             }
-            Text("失败后自动退避 1–60 分钟。手动更新可跳过普通退避，但会遵守服务器 Retry-After 截止时间；单独设置的间隔可覆盖全局手动模式。")
+            Text("失败后自动退避 1–60 分钟。手动更新可跳过普通退避，但遵守服务器 Retry-After；单独设置的间隔可覆盖全局手动模式。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+                .padding(.vertical, 6)
         }
     }
 
